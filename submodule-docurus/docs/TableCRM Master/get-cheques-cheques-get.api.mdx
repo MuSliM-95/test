@@ -1,0 +1,41 @@
+---
+id: get-cheques-cheques-get
+title: "Get Cheques"
+description: "Получение чеков кассы"
+sidebar_label: "Get Cheques"
+hide_title: true
+hide_table_of_contents: true
+api: {"tags":["FNS-Check"],"description":"Получение чеков кассы","operationId":"get_cheques_cheques__get","parameters":[{"required":true,"schema":{"title":"Token","type":"string"},"name":"token","in":"query"},{"required":false,"schema":{"title":"Limit","type":"integer","default":100},"name":"limit","in":"query"},{"required":false,"schema":{"title":"Offset","type":"integer","default":0},"name":"offset","in":"query"},{"required":false,"schema":{"title":"Datefrom","type":"integer"},"name":"datefrom","in":"query"},{"required":false,"schema":{"title":"Dateto","type":"integer"},"name":"dateto","in":"query"},{"required":false,"schema":{"title":"User","type":"integer"},"name":"user","in":"query"}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"title":"Cheques","type":"array","items":{"title":"Cheque","required":["id","created_at","data"],"type":"object","properties":{"id":{"title":"Id","type":"integer"},"user":{"title":"User","type":"integer"},"created_at":{"title":"Created At","type":"integer"},"data":{"title":"Data","type":"object"}}}}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"title":"HTTPValidationError","type":"object","properties":{"detail":{"title":"Detail","type":"array","items":{"title":"ValidationError","required":["loc","msg","type"],"type":"object","properties":{"loc":{"title":"Location","type":"array","items":{"type":"string"}},"msg":{"title":"Message","type":"string"},"type":{"title":"Error Type","type":"string"}}}}}}}}}},"method":"get","path":"/cheques/","servers":[{"url":"/api/v1"}],"info":{"title":"TABLECRM API","description":"Документация API TABLECRM","version":"1.0"},"postman":{"name":"Get Cheques","description":{"content":"Получение чеков кассы","type":"text/plain"},"url":{"path":["cheques",""],"host":["{{baseUrl}}"],"query":[{"disabled":false,"description":{"content":"(Required) ","type":"text/plain"},"key":"token","value":""},{"disabled":false,"key":"limit","value":""},{"disabled":false,"key":"offset","value":""},{"disabled":false,"key":"datefrom","value":""},{"disabled":false,"key":"dateto","value":""},{"disabled":false,"key":"user","value":""}],"variable":[]},"header":[{"key":"Accept","value":"application/json"}],"method":"GET"}}
+sidebar_class_name: "get api-method"
+info_path: docs/TableCRM Master/tablecrm-api
+custom_edit_url: null
+---
+
+import ApiTabs from "@theme/ApiTabs";
+import DiscriminatorTabs from "@theme/DiscriminatorTabs";
+import MethodEndpoint from "@theme/ApiDemoPanel/MethodEndpoint";
+import MimeTabs from "@theme/MimeTabs";
+import ParamsItem from "@theme/ParamsItem";
+import ResponseSamples from "@theme/ResponseSamples";
+import SchemaItem from "@theme/SchemaItem";
+import SchemaTabs from "@theme/SchemaTabs";
+import TabItem from "@theme/TabItem";
+
+<h1 className={"openapi__heading"}>Get Cheques</h1>
+
+<MethodEndpoint method={"get"} path={"/cheques/"}></MethodEndpoint>
+
+
+
+Получение чеков кассы
+
+<details style={{"marginBottom":"1rem"}} className={"openapi-markdown__details"} data-collapsed={false} open={true}><summary style={{}}><strong>Query Parameters</strong></summary><div><ul><ParamsItem className={"paramsItem"} param={{"required":true,"schema":{"title":"Token","type":"string"},"name":"token","in":"query"}}></ParamsItem><ParamsItem className={"paramsItem"} param={{"required":false,"schema":{"title":"Limit","type":"integer","default":100},"name":"limit","in":"query"}}></ParamsItem><ParamsItem className={"paramsItem"} param={{"required":false,"schema":{"title":"Offset","type":"integer","default":0},"name":"offset","in":"query"}}></ParamsItem><ParamsItem className={"paramsItem"} param={{"required":false,"schema":{"title":"Datefrom","type":"integer"},"name":"datefrom","in":"query"}}></ParamsItem><ParamsItem className={"paramsItem"} param={{"required":false,"schema":{"title":"Dateto","type":"integer"},"name":"dateto","in":"query"}}></ParamsItem><ParamsItem className={"paramsItem"} param={{"required":false,"schema":{"title":"User","type":"integer"},"name":"user","in":"query"}}></ParamsItem></ul></div></details><div><div><ApiTabs><TabItem label={"200"} value={"200"}><div>
+
+Successful Response
+
+</div><div><MimeTabs className={"openapi-tabs__mime"} schemaType={"response"}><TabItem label={"application/json"} value={"application/json"}><SchemaTabs className={"openapi-tabs__schema"}><TabItem label={"Schema"} value={"Schema"}><details style={{}} className={"openapi-markdown__details"} data-collapsed={false} open={true}><summary style={{"textAlign":"left"}}><strong>Schema</strong></summary><div style={{"textAlign":"left","marginLeft":"1rem"}}></div><ul style={{"marginLeft":"1rem"}}><li><div style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}>Array [</div></li><SchemaItem collapsible={false} name={"id"} required={true} schemaName={"Id"} qualifierMessage={undefined} schema={{"title":"Id","type":"integer"}}></SchemaItem><SchemaItem collapsible={false} name={"user"} required={false} schemaName={"User"} qualifierMessage={undefined} schema={{"title":"User","type":"integer"}}></SchemaItem><SchemaItem collapsible={false} name={"created_at"} required={true} schemaName={"Created At"} qualifierMessage={undefined} schema={{"title":"Created At","type":"integer"}}></SchemaItem><SchemaItem collapsible={false} name={"data"} required={true} schemaName={"object"} qualifierMessage={undefined} schema={{"title":"Data","type":"object"}}></SchemaItem><li><div style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}>]</div></li></ul></details></TabItem><TabItem label={"Example (from schema)"} value={"Example (from schema)"}><ResponseSamples responseExample={"[\n  {\n    \"id\": 0,\n    \"user\": 0,\n    \"created_at\": 0,\n    \"data\": {}\n  }\n]"} language={"json"}></ResponseSamples></TabItem></SchemaTabs></TabItem></MimeTabs></div></TabItem><TabItem label={"422"} value={"422"}><div>
+
+Validation Error
+
+</div><div><MimeTabs className={"openapi-tabs__mime"} schemaType={"response"}><TabItem label={"application/json"} value={"application/json"}><SchemaTabs className={"openapi-tabs__schema"}><TabItem label={"Schema"} value={"Schema"}><details style={{}} className={"openapi-markdown__details"} data-collapsed={false} open={true}><summary style={{"textAlign":"left"}}><strong>Schema</strong></summary><div style={{"textAlign":"left","marginLeft":"1rem"}}></div><ul style={{"marginLeft":"1rem"}}><SchemaItem collapsible={true} className={"schemaItem"}><details style={{}} className={"openapi-markdown__details"}><summary style={{}}><strong>detail</strong><span style={{"opacity":"0.6"}}> object[]</span></summary><div style={{"marginLeft":"1rem"}}><li><div style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}>Array [</div></li><SchemaItem collapsible={false} name={"loc"} required={true} schemaName={"string[]"} qualifierMessage={undefined} schema={{"title":"Location","type":"array","items":{"type":"string"}}}></SchemaItem><SchemaItem collapsible={false} name={"msg"} required={true} schemaName={"Message"} qualifierMessage={undefined} schema={{"title":"Message","type":"string"}}></SchemaItem><SchemaItem collapsible={false} name={"type"} required={true} schemaName={"Error Type"} qualifierMessage={undefined} schema={{"title":"Error Type","type":"string"}}></SchemaItem><li><div style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}>]</div></li></div></details></SchemaItem></ul></details></TabItem><TabItem label={"Example (from schema)"} value={"Example (from schema)"}><ResponseSamples responseExample={"{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\"\n    }\n  ]\n}"} language={"json"}></ResponseSamples></TabItem></SchemaTabs></TabItem></MimeTabs></div></TabItem></ApiTabs></div></div>
+      

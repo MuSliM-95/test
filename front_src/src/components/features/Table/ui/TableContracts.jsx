@@ -1,0 +1,35 @@
+import React, { useContext, useState, useEffect } from "react";
+import { API } from "../../../shared/api/api";
+import { Contracts } from "../../../enitities/Table";
+import { ContractsContext, addRow } from "../../../shared";
+import { saveRow, removeRow } from "../../../shared";
+
+export default function TableContracts() {
+  const { token, websocket, initialData, pathname } = useContext(ContractsContext);
+  const [dataSource, setDataSource] = useState(initialData);
+  useEffect(() => {
+    websocket.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (data.target === "contracts") {
+        if (data.action === 'create') {
+          addRow(dataSource, data.result, setDataSource)
+        }
+        if (data.action === "edit") {
+          saveRow(dataSource, data.result, setDataSource);
+        }
+        if (data.action === "delete") {
+          removeRow(dataSource, data.result.id, setDataSource);
+        }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, dataSource]);
+
+  return (
+    <Contracts
+      dataSource={dataSource}
+      handleSave={API.crud.edit(token, pathname)}
+      handleRemove={API.crud.remove(token, pathname)}
+    />
+  );
+}

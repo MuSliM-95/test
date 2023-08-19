@@ -1,0 +1,217 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    restart: always
+    command: bash -c "alembic revision --autogenerate && alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 8000 --reload --log-level=info"
+    volumes:
+      - ./backend:/backend
+      - /migrations:/backend/database/alembic/versions
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      APP_URL: ${APP_URL}
+      S3_ACCESS: ${S3_ACCESS}
+      S3_SECRET: ${S3_SECRET}
+      TG_TOKEN: ${TG_TOKEN}
+      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
+      ACCOUNT_INTERVAL: ${ACCOUNT_INTERVAL}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASS: ${POSTGRES_PASS}
+    networks:
+      - nginx-proxy
+
+  teleg_bot:
+    build: ./backend
+    restart: always
+    command: python3 bot.py
+    volumes:
+      - ./backend:/backend
+      - /photos:/backend/photos
+    depends_on:
+      - backend
+    environment:
+      APP_URL: ${APP_URL}
+      TG_TOKEN: ${TG_TOKEN}
+      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASS: ${POSTGRES_PASS}
+    networks:
+      - nginx-proxy
+
+  docasaurus:
+    build: ./submodule-docurus
+    restart: always
+    command: npm run serve -- --build --port 3000 --host 0.0.0.0
+    networks:
+      - nginx-proxy
+
+  nginx:
+    build: ./nginx
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    restart: always
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # - /etc/letsencrypt/:/etc/letsencrypt/
+      - /certbot/www:/var/www/certbot/:ro
+      - /etc/letsencrypt/:/etc/nginx/ssl/:ro
+      - /var/log:/var/log
+      # - ./htpasswd:/etc/nginx/.htpasswd
+      - /photos:/nginx/photos
+    networks:
+      - nginx-proxy
+    depends_on:
+      - backend
+      - adminer
+      - prometheus
+      - loki
+
+  certbot:
+    image: certbot/certbot:latest
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    volumes:
+      - /certbot/www/:/var/www/certbot/:rw
+      - /etc/letsencrypt/:/etc/letsencrypt/:rw
+    networks:
+      - nginx-proxy
+
+
+  rabbitmq_consumer:
+    build: ./backend
+    restart: always
+    command: python3 consumer.py
+    volumes:
+      - ./backend:/backend
+    depends_on:
+      - rabbitmq
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASS: ${POSTGRES_PASS}
+      TG_TOKEN: ${TG_TOKEN}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+    networks:
+      - nginx-proxy
+
+  db:
+    image: postgres:14.2
+    container_name: postgres_container
+    restart: always
+    command: postgres -c 'max_connections=300'
+    ports:
+      - "48425:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: cash_2
+    networks:
+      - nginx-proxy
+
+  backup:
+    # image: eeshugerman/postgres-backup-s3:15
+    build: ./backup
+    restart: always
+    environment:
+      SCHEDULE: '@daily'
+      BACKUP_KEEP_DAYS: 14
+      S3_ENDPOINT: https://storage.clo.ru/
+      S3_REGION: eu-north-1
+      S3_ACCESS_KEY_ID: ${S3_BACKUPS_ACCESSKEY}
+      S3_SECRET_ACCESS_KEY: ${S3_BACKUPS_SECRETKEY}
+      S3_BUCKET: apps3tablecrm-default-bucket
+      S3_PREFIX: backups/mastertablecrm
+      POSTGRES_HOST: db
+      POSTGRES_DATABASE: cash_2
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      PGDUMP_EXTRA_OPTS: '--exclude-table-data=events'
+    networks:
+      - nginx-proxy
+
+  adminer:
+    image: adminer
+    restart: always
+    networks:
+      - nginx-proxy
+    depends_on:
+      - db
+
+  rabbitmq:
+    image: rabbitmq
+    restart: always
+    ports:
+      - 5672:5672
+    networks:
+      - nginx-proxy
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - nginx-proxy
+
+  prometheus:
+    image: prom/prometheus
+    restart: always
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./web.yml:/etc/prometheus/web.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.external-url=/prometheus/'
+      - '--web.config.file=/etc/prometheus/web.yml'
+      - '--web.route-prefix=/'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - nginx-proxy
+
+  loki:
+    image: grafana/loki:latest
+    restart: always
+    volumes:
+      - ./loki-config:/etc/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - nginx-proxy
+
+  promtail:
+    image: grafana/promtail:latest
+    restart: always
+    volumes:
+      - /var/log:/var/log
+      - ./promtail-config:/etc/promtail
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - nginx-proxy
+    
+
+volumes:
+  pgdata:
+
+networks:
+  nginx-proxy:

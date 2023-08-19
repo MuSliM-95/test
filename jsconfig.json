@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./front_src/src/components",
+    "paths": {
+      "@pages/*": ["pages/*"],
+      "@widgets/*": ["widgets/*"],
+      "@features/*": ["features/*"],
+      "@entities/*": ["entities/*"],
+      "@shared/*": ["shared/*"],
+    },
+  },
+  "include": ["front_src"],
+  "exclude": ["node_modules", "public", "build"]
+}

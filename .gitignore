@@ -1,0 +1,3 @@
+/backend/photos/**
+/backend/.venv/**
+/backend/**/__pycache__

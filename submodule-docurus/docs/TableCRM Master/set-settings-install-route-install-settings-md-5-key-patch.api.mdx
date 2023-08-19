@@ -1,0 +1,41 @@
+---
+id: set-settings-install-route-install-settings-md-5-key-patch
+title: "Set Settings Install Route"
+description: "Set Settings Install Route"
+sidebar_label: "Set Settings Install Route"
+hide_title: true
+hide_table_of_contents: true
+api: {"tags":["install"],"operationId":"set_settings_install_route_install_settings__md5key__patch","parameters":[{"required":true,"schema":{"title":"Md5Key","type":"string"},"name":"md5key","in":"path"}],"requestBody":{"content":{"application/json":{"schema":{"title":"InstallSettings","type":"object","properties":{"geolocation":{"title":"Geolocation","type":"string"},"push":{"title":"Push","type":"boolean"},"my_push":{"title":"My Push","type":"string"},"foreign_push":{"title":"Foreign Push","type":"string"},"contacts":{"title":"Contacts","type":"boolean"}}}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"title":"HTTPValidationError","type":"object","properties":{"detail":{"title":"Detail","type":"array","items":{"title":"ValidationError","required":["loc","msg","type"],"type":"object","properties":{"loc":{"title":"Location","type":"array","items":{"type":"string"}},"msg":{"title":"Message","type":"string"},"type":{"title":"Error Type","type":"string"}}}}}}}}}},"description":"Set Settings Install Route","method":"patch","path":"/install/settings/{md5key}","servers":[{"url":"/api/v1"}],"jsonRequestBodyExample":{"geolocation":"string","push":true,"my_push":"string","foreign_push":"string","contacts":true},"info":{"title":"TABLECRM API","description":"Документация API TABLECRM","version":"1.0"},"postman":{"name":"Set Settings Install Route","description":{"type":"text/plain"},"url":{"path":["install","settings",":md5key"],"host":["{{baseUrl}}"],"query":[],"variable":[{"disabled":false,"description":{"content":"(Required) ","type":"text/plain"},"type":"any","value":"","key":"md5key"}]},"header":[{"key":"Content-Type","value":"application/json"},{"key":"Accept","value":"application/json"}],"method":"PATCH","body":{"mode":"raw","raw":"\"\"","options":{"raw":{"language":"json"}}}}}
+sidebar_class_name: "patch api-method"
+info_path: docs/TableCRM Master/tablecrm-api
+custom_edit_url: null
+---
+
+import ApiTabs from "@theme/ApiTabs";
+import DiscriminatorTabs from "@theme/DiscriminatorTabs";
+import MethodEndpoint from "@theme/ApiDemoPanel/MethodEndpoint";
+import MimeTabs from "@theme/MimeTabs";
+import ParamsItem from "@theme/ParamsItem";
+import ResponseSamples from "@theme/ResponseSamples";
+import SchemaItem from "@theme/SchemaItem";
+import SchemaTabs from "@theme/SchemaTabs";
+import TabItem from "@theme/TabItem";
+
+<h1 className={"openapi__heading"}>Set Settings Install Route</h1>
+
+<MethodEndpoint method={"patch"} path={"/install/settings/{md5key}"}></MethodEndpoint>
+
+
+
+Set Settings Install Route
+
+<details style={{"marginBottom":"1rem"}} className={"openapi-markdown__details"} data-collapsed={false} open={true}><summary style={{}}><strong>Path Parameters</strong></summary><div><ul><ParamsItem className={"paramsItem"} param={{"required":true,"schema":{"title":"Md5Key","type":"string"},"name":"md5key","in":"path"}}></ParamsItem></ul></div></details><MimeTabs className={"openapi-tabs__mime"}><TabItem label={"application/json"} value={"application/json-schema"}><details style={{}} className={"openapi-markdown__details"} data-collapsed={false} open={true}><summary style={{"textAlign":"left"}}><strong>Request Body</strong><strong style={{"fontSize":"var(--ifm-code-font-size)","color":"var(--openapi-required)"}}> required</strong></summary><div style={{"textAlign":"left","marginLeft":"1rem"}}></div><ul style={{"marginLeft":"1rem"}}><SchemaItem collapsible={false} name={"geolocation"} required={false} schemaName={"Geolocation"} qualifierMessage={undefined} schema={{"title":"Geolocation","type":"string"}}></SchemaItem><SchemaItem collapsible={false} name={"push"} required={false} schemaName={"Push"} qualifierMessage={undefined} schema={{"title":"Push","type":"boolean"}}></SchemaItem><SchemaItem collapsible={false} name={"my_push"} required={false} schemaName={"My Push"} qualifierMessage={undefined} schema={{"title":"My Push","type":"string"}}></SchemaItem><SchemaItem collapsible={false} name={"foreign_push"} required={false} schemaName={"Foreign Push"} qualifierMessage={undefined} schema={{"title":"Foreign Push","type":"string"}}></SchemaItem><SchemaItem collapsible={false} name={"contacts"} required={false} schemaName={"Contacts"} qualifierMessage={undefined} schema={{"title":"Contacts","type":"boolean"}}></SchemaItem></ul></details></TabItem></MimeTabs><div><div><ApiTabs><TabItem label={"200"} value={"200"}><div>
+
+Successful Response
+
+</div><div><MimeTabs className={"openapi-tabs__mime"} schemaType={"response"}><TabItem label={"application/json"} value={"application/json"}><SchemaTabs className={"openapi-tabs__schema"}><TabItem label={"Schema"} value={"Schema"}><details style={{}} className={"openapi-markdown__details"} data-collapsed={false} open={true}><summary style={{"textAlign":"left"}}><strong>Schema</strong></summary><div style={{"textAlign":"left","marginLeft":"1rem"}}></div><ul style={{"marginLeft":"1rem"}}>any</ul></details></TabItem></SchemaTabs></TabItem></MimeTabs></div></TabItem><TabItem label={"422"} value={"422"}><div>
+
+Validation Error
+
+</div><div><MimeTabs className={"openapi-tabs__mime"} schemaType={"response"}><TabItem label={"application/json"} value={"application/json"}><SchemaTabs className={"openapi-tabs__schema"}><TabItem label={"Schema"} value={"Schema"}><details style={{}} className={"openapi-markdown__details"} data-collapsed={false} open={true}><summary style={{"textAlign":"left"}}><strong>Schema</strong></summary><div style={{"textAlign":"left","marginLeft":"1rem"}}></div><ul style={{"marginLeft":"1rem"}}><SchemaItem collapsible={true} className={"schemaItem"}><details style={{}} className={"openapi-markdown__details"}><summary style={{}}><strong>detail</strong><span style={{"opacity":"0.6"}}> object[]</span></summary><div style={{"marginLeft":"1rem"}}><li><div style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}>Array [</div></li><SchemaItem collapsible={false} name={"loc"} required={true} schemaName={"string[]"} qualifierMessage={undefined} schema={{"title":"Location","type":"array","items":{"type":"string"}}}></SchemaItem><SchemaItem collapsible={false} name={"msg"} required={true} schemaName={"Message"} qualifierMessage={undefined} schema={{"title":"Message","type":"string"}}></SchemaItem><SchemaItem collapsible={false} name={"type"} required={true} schemaName={"Error Type"} qualifierMessage={undefined} schema={{"title":"Error Type","type":"string"}}></SchemaItem><li><div style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}>]</div></li></div></details></SchemaItem></ul></details></TabItem><TabItem label={"Example (from schema)"} value={"Example (from schema)"}><ResponseSamples responseExample={"{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\"\n    }\n  ]\n}"} language={"json"}></ResponseSamples></TabItem></SchemaTabs></TabItem></MimeTabs></div></TabItem></ApiTabs></div></div>
+      

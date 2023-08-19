@@ -1,0 +1,16 @@
+.content{
+    display: flex;
+    flex-direction: column;
+}
+
+.incoming{
+    color: green;
+}
+.outgoing{
+    color:red
+}
+
+.title__payment{
+    display: flex;
+    align-items: center;
+}
