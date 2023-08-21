@@ -68,3 +68,5 @@ aioboto3==11.1.0
 python-jose==3.3.0
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.21.1
+httpx==0.24.1
+pytest==7.4.0

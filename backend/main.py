@@ -51,6 +51,9 @@ from apps.amocrm.routes import router as amo_router
 
 from api.integrations.routers import router as int_router
 from api.oauth.routes import router as oauth_router
+from api.ping.routers import router as pingpong_router
+
+
 
 app = FastAPI(
     root_path="/api/v1",
@@ -107,6 +110,7 @@ app.include_router(loyality_settings)
 
 app.include_router(int_router)
 app.include_router(oauth_router)
+app.include_router(pingpong_router)
 
 
 @app.middleware("http")

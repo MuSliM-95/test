@@ -20,8 +20,45 @@ variables:
   GIT_SUBMODULE_STRATEGY: normal
 
 stages:
+  - test
   - front_build
   - build_up_docker
+
+test:
+  stage: test
+  only:
+    - develop
+  tags:
+    - develop_runner
+  script:
+    - echo "Starting Unit test"
+    - python3 -m venv .venv # Создаем Виртуальное окружение
+    - source .venv/bin/activate # Выполняем вход и следующей строкой устанавливаем зависимости
+    - pip install -r backend/requirements.txt
+    # - python3 backend/api_tests/*.py  # Выполняем тесты
+    - export APP_URL=$APP_URL
+    - export S3_ACCESS=$S3_ACCESS
+    - export S3_SECRET=$S3_SECRET
+    - export S3_BACKUPS_ACCESSKEY=$S3_BACKUPS_ACCESSKEY
+    - export S3_BACKUPS_SECRETKEY=$S3_BACKUPS_SECRETKEY
+    - export TG_TOKEN=$TG_TOKEN
+    - export POSTGRES_USER=$POSTGRES_USER
+    - export POSTGRES_PASS=$POSTGRES_PASS
+    - export CHEQUES_TOKEN=$CHEQUES_TOKEN
+    - export ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL
+    - pytest
+    - rm -rf .venv
+    - unset APP_URL
+    - unset S3_ACCESS
+    - unset S3_SECRET
+    - unset S3_BACKUPS_ACCESSKEY
+    - unset S3_BACKUPS_SECRETKEY
+    - unset TG_TOKEN
+    - unset POSTGRES_USER
+    - unset POSTGRES_PASS
+    - unset CHEQUES_TOKEN
+    - unset ACCOUNT_INTERVAL
+
 
 front-build-job:
   stage: front_build
