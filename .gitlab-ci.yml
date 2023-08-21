@@ -27,9 +27,9 @@ stages:
 test:
   stage: test
   only:
-    - develop
+    - master
   tags:
-    - develop_runner
+    - master_runner
   script:
     - echo "Starting Unit test"
     - python3 -m venv .venv # Создаем Виртуальное окружение
@@ -63,9 +63,9 @@ test:
 front-build-job:
   stage: front_build
   only:
-    - v1.0.0
+    - master
   tags:
-    - deploy
+    - master_runner
   environment: production
   script:
     - echo "Building front...."
@@ -94,9 +94,9 @@ front-build-job:
 build-up-docker-job:
   stage: build_up_docker
   only:
-    - v1.0.0
+    - master
   tags:
-    - deploy
+    - master_runner
   dependencies: 
     - front-build-job
   environment: production
