@@ -1,10 +1,14 @@
+import json
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+
 from database.db import database
 from database.fixtures import init_db
 from jobs import scheduler
-import json
+import sentry_sdk
+
 from functions.users import get_user_id_cashbox_id_by_token
 from functions.events import write_event
 
@@ -51,9 +55,18 @@ from apps.amocrm.routes import router as amo_router
 
 from api.integrations.routers import router as int_router
 from api.oauth.routes import router as oauth_router
-from api.ping.routers import router as pingpong_router
+from api.templates.routers import router as templates_router
+from api.docs_generate.routers import router as doc_generate_router
 
 
+sentry_sdk.init(
+    dsn="http://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
+
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    # We recommend adjusting this value in production,
+    traces_sample_rate=1.0,
+)
 
 app = FastAPI(
     root_path="/api/v1",
@@ -110,7 +123,9 @@ app.include_router(loyality_settings)
 
 app.include_router(int_router)
 app.include_router(oauth_router)
-app.include_router(pingpong_router)
+
+app.include_router(templates_router)
+app.include_router(doc_generate_router)
 
 
 @app.middleware("http")

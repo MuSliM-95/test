@@ -47,7 +47,7 @@ async def raschet_bonuses(user):
 
         await database.execute(loyality_cards.update().where(loyality_cards.c.id == card.id).values(edit_dict))
 
-@router.get("/loyality_transactions/{idx}", response_model=schemas.LoyalityTransaction)
+@router.get("/loyality_transactions/{idx}/", response_model=schemas.LoyalityTransaction)
 async def get_loyality_transaction_by_id(token: str, idx: int):
     """Получение транзакции по ID"""
     user = await get_user_by_token(token)
@@ -111,11 +111,8 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
         if user.status:
             if loyality_transaction_data.loyality_card_number:
                     
-                    q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_transaction_data.loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id, loyality_cards.c.is_deleted == False)
+                    q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_transaction_data.loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
                     card = await database.fetch_one(q)
-
-                    if not card:
-                        raise HTTPException(403, "Данная карта не найдена")
 
                     card_dict = {
                         "balance": card.balance,
@@ -192,7 +189,7 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
     return {**loyality_transactions_db[0],  **{ "data": { "status": "success" } }}
 
 
-@router.patch("/loyality_transactions/{idx}", response_model=schemas.LoyalityTransaction)
+@router.patch("/loyality_transactions/{idx}/", response_model=schemas.LoyalityTransaction)
 async def edit_loyality_transaction(
     token: str,
     idx: int,
@@ -233,7 +230,7 @@ async def edit_loyality_transaction(
     return {**loyality_transaction_db,  **{ "data": { "status": "success" } }}
 
 
-@router.delete("/loyality_transactions/{idx}", response_model=schemas.LoyalityTransaction)
+@router.delete("/loyality_transactions/{idx}/", response_model=schemas.LoyalityTransaction)
 async def delete_loyality_transaction(token: str, idx: int):
     """Удаление транзакций"""
     user = await get_user_by_token(token)

@@ -11,10 +11,11 @@ import api.cheques.schemas as cheque_schemas
 
 from functions.helpers import get_filters_cheques
 from datetime import datetime
+from sqlalchemy import select, func
 
 router = APIRouter(tags=["FNS-Check"])
 
-@router.get("/cheques/{id}", response_model=cheque_schemas.Cheque)
+@router.get("/cheques/{id}/", response_model=cheque_schemas.Cheque)
 async def get_cheque_by_id(token: str, id: int):
     """Получение чека по ID"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -34,7 +35,7 @@ async def get_cheque_by_id(token: str, id: int):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.get("/cheques/", response_model=cheque_schemas.Cheques)
+@router.get("/cheques/", response_model=cheque_schemas.ChequesGet)
 async def get_cheques(
     token: str,
     limit: int = 100,
@@ -56,7 +57,17 @@ async def get_cheques(
             )
 
             cheques_db = await database.fetch_all(query)
-            return cheques_db
+
+
+            q = (
+                select(func.count(cheques.c.id))
+                .where(cheques.c.cashbox == user.cashbox_id)
+                .filter(*filters)
+            )
+            cheques_db_count = await database.fetch_one(q)
+
+
+            return {"result": cheques_db, "count": cheques_db_count.count_1}
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 

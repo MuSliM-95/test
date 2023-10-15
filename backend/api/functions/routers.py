@@ -8,11 +8,12 @@ from functions.helpers import datetime_to_timestamp, check_function_exists
 from functions.helpers import get_user_by_token
 
 from ws_manager import manager
+from sqlalchemy import select, func
 
 router = APIRouter(tags=["cashbox_functions"])
 
 
-@router.get("/cashbox_functions/", response_model=schemas.FunctionList)
+@router.get("/cashbox_functions/", response_model=schemas.FunctionListGet)
 async def get_user_functions(token: str, limit: int = 100, offset: int = 0):
     """Получение подключённых функций пользователя"""
     user = await get_user_by_token(token)
@@ -38,7 +39,14 @@ async def get_user_functions(token: str, limit: int = 100, offset: int = 0):
         if entity.name not in cashbox_functions_names:
             result.append({"entity_or_function": entity.name, "status": False})
 
-    return result
+    query = (
+        select(func.count(status_entity_function.c.id))
+        .where(
+            status_entity_function.c.cashbox == user.cashbox_id,
+        )
+    )
+    cashbox_functions_c = await database.fetch_one(query)
+    return {"result": result, "count": cashbox_functions_c.count_1}
 
 
 @router.post("/cashbox_functions/", response_model=schemas.Function)

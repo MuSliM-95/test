@@ -15,7 +15,7 @@ from datetime import datetime
 router = APIRouter(tags=["pboxes"])
 
 
-@router.get("/payboxes", response_model=pboxes_schemas.GetPayments)
+@router.get("/payboxes/", response_model=pboxes_schemas.GetPayments)
 async def read_payboxes_meta(token: str, limit: int = 100, offset: int = 0, sort: str = "created_at:desc",
                              filters: filter_schemas.PayboxesFiltersQuery = Depends()):
     """Получение счетов"""
@@ -52,7 +52,7 @@ async def read_payboxes_meta(token: str, limit: int = 100, offset: int = 0, sort
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.post("/payboxes", response_model=pboxes_schemas.Payboxes)
+@router.post("/payboxes/", response_model=pboxes_schemas.Payboxes)
 async def create_paybox(token: str, paybox_data: pboxes_schemas.PayboxesCreate):
     """Создание счета"""
     query = users_cboxes_relation.select(
@@ -88,7 +88,7 @@ async def create_paybox(token: str, paybox_data: pboxes_schemas.PayboxesCreate):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/payboxes", response_model=pboxes_schemas.Payboxes)
+@router.put("/payboxes/", response_model=pboxes_schemas.Payboxes)
 async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit):
     """Обновление счета"""
     query = users_cboxes_relation.select(

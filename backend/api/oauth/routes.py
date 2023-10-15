@@ -29,7 +29,7 @@ async def login(form_data: OAuthCustomRequestForm = Depends()):
     raise HTTPException(status_code=403, detail="Неккоректные данные")
 
 
-@router.post("/token/refresh")
+@router.post("/token/refresh/")
 async def refresh_response(refresh_token: str, client_id: int):
     try:
         payload = decode_jwt(refresh_token)
@@ -43,13 +43,13 @@ async def refresh_response(refresh_token: str, client_id: int):
         raise HTTPException(status_code=403, detail="Неккоректные данные")
     
 
-@router.get("/jwt_scopes")
+@router.get("/jwt_scopes/")
 async def get_jwt_scopes(request: Request):
     res = parse_openapi_json(request.app.routes)
     return res
 
 
-@router.get("/jwt_groups")
+@router.get("/jwt_groups/")
 async def get_jwt_scopes(request: Request):
     res = get_jwt_groups(request.app.routes)
     return res

@@ -39,3 +39,8 @@ class ListView(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class ListViewGet(BaseModel):
+    result: Optional[List[ViewInList]]
+    count: int

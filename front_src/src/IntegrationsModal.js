@@ -30,7 +30,7 @@ class IntegrationModal extends React.Component {
         };
 
         const handleOk = () => {
-            axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/integration_pair?token=${this.props.query.token}&amo_token=${this.state.token_in}`)
+            axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/integration_pair/?token=${this.props.query.token}&amo_token=${this.state.token_in}`)
             .then((data) => {
                 // if (data.result === "incorrect pair token!") {
                 //     this.modal("Некорректный токен! Проверьте правильность и попробуйте еще раз", "Ошибка")

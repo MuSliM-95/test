@@ -32,7 +32,7 @@ const Filter = ({query, onChange}) => {
 
     const fetchNames = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments?token=${query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/?token=${query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -53,7 +53,7 @@ const Filter = ({query, onChange}) => {
 		else {
 
             if(openFilter){
-                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments?token=${query.token}`)
+                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/?token=${query.token}`)
                     .then((response) => response.json())
                     .then((body) => {
                         return body
@@ -76,7 +76,7 @@ const Filter = ({query, onChange}) => {
 
     const fetchProjects = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects?token=${query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/?token=${query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -98,7 +98,7 @@ const Filter = ({query, onChange}) => {
 		else {
 
             if(openFilter){
-                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects?token=${query.token}`)
+                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/?token=${query.token}`)
                     .then((response) => response.json())
                     .then((body) => {
                         return body
@@ -122,7 +122,7 @@ const Filter = ({query, onChange}) => {
 
 	const fetchPaybox = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -143,7 +143,7 @@ const Filter = ({query, onChange}) => {
 		}
 		else {
             if(openFilter){
-                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${query.token}`)
+                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${query.token}`)
                     .then((response) => response.json())
                     .then((body) => {
                         return body
@@ -167,7 +167,7 @@ const Filter = ({query, onChange}) => {
 
 	const fetchContr = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -188,7 +188,7 @@ const Filter = ({query, onChange}) => {
 		}
 		else {
             if(openFilter){
-                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${query.token}`)
+                return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body

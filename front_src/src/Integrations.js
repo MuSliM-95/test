@@ -17,7 +17,7 @@ class Integrations extends Component {
     }
 
     componentDidMount() {
-        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/check_pair?token=${this.props.query.token}`)
+        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/check_pair/?token=${this.props.query.token}`)
             .then((data) => {
 
                 if (data.data.result !== "paired") {
@@ -56,7 +56,7 @@ class Integrations extends Component {
     }
 
     ws_connect = () => {
-        this.websocket = new WebSocket(`wss://${process.env.REACT_APP_APP_URL}/ws/${this.props.query.token}`)
+        this.websocket = new WebSocket(`wss://${process.env.REACT_APP_APP_URL}/ws/${this.props.query.token}/`)
 
         this.websocket.onmessage = message => {
             const data = JSON.parse(message.data)
@@ -82,13 +82,13 @@ class Integrations extends Component {
     }
 
     disconnect = () => {
-        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/integration_unpair?token=${this.props.query.token}`)
+        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/integration_unpair/?token=${this.props.query.token}`)
             .then(() => this.modal("Интеграция отключена", "Успех"))
             .catch(err => console.log(err));
     }
 
     connect = () => {
-        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/integration_on?token=${this.props.query.token}`)
+        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/integration_on/?token=${this.props.query.token}`)
             .then(() => this.modal("Интеграция включена", "Успех"))
             .catch(err => console.log(err));
     }

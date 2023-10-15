@@ -153,7 +153,7 @@ class CreateBonusTransaction extends React.Component {
                 })
         }
         else {
-            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards?token=${this.props.token}`)
+            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards/?token=${this.props.token}`)
                 .then((response) => response.json())
                 .then((body) => {
                     return body

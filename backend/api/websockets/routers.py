@@ -10,7 +10,7 @@ import json
 router = APIRouter(tags=["ws"])
 
 
-@router.websocket("/ws/{ws_token}")
+@router.websocket("/ws/{ws_token}/")
 async def websocket(ws_token: str, websocket: WebSocket):
     """Вебсокет"""
     query = users.select().where(users_cboxes_relation.c.token == ws_token)

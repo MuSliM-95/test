@@ -155,7 +155,7 @@ class ProjectsTable extends React.Component {
     }
 
     componentDidMount() {
-        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/projects`)
+        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/projects/`)
         const { websocket } = this.props;
 
         websocket.onmessage = message => {
@@ -247,7 +247,7 @@ class ProjectsTable extends React.Component {
         //         this.edit_handler(data)
         //     }
         // })
-        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects?token=${this.props.query.token}`, body)
+        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/?token=${this.props.query.token}`, body)
             .then(response => {
                 message.success(<>Вы успешно изменили проект</>);
             });
@@ -317,7 +317,7 @@ class ProjectsTable extends React.Component {
                         {
                             total: this.state.count,
                             onChange: page => {
-                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/projects`))
+                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/projects/`))
 
                             },
                             pageSize: 35,

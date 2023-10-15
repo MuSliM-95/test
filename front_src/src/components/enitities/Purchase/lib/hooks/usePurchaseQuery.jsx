@@ -11,7 +11,7 @@ export const useFetchGetPurchases = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     }
   );
   return query;
@@ -25,10 +25,10 @@ export const useFetchGetPurchaseById = (options) => {
       // const params= { token, limit: pageSize, offset: (current-1) * +pageSize || undefined }
       const params = { token };
       const response = await axios.get(
-        `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${id}`,
+        `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${id}/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     },
     {
       enabled: id !== null&&id !== undefined,
@@ -60,7 +60,7 @@ export const useFetchEditPurchase = (token, onSuccess) => {
   const { mutate, isLoading, isError } = useMutation(
     async (options) =>
       await axios.patch(
-        `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${options?.id}?token=${token}`,
+        `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${options?.id}/?token=${token}`,
         [options]
       ),
     {
@@ -79,7 +79,7 @@ export const useFetchDeletePurchase = (token) => {
   const { mutate, isLoading, isError } = useMutation(
     async (id) =>
       await axios.delete(
-        `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${id}?token=${token}`,
+        `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${id}/?token=${token}`,
         {
           data: [id],
         }

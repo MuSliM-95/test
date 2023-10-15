@@ -142,7 +142,7 @@ class CreateLCard extends React.Component {
                 values.contragent_desc !== current_contragent.description)
         ) {
             requestBody.contragent_id = current_contragent.id
-            await axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${current_contragent.id}?token=${this.props.token}`, body)
+            await axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${current_contragent.id}/?token=${this.props.token}`, body)
         }
 
         // Если ничего не поменялось
@@ -158,7 +158,7 @@ class CreateLCard extends React.Component {
 
         // Если новый контр
         if (!isContrCleared && isNewContr) {
-            const resp = await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${this.props.token}`, body)
+            const resp = await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${this.props.token}`, body)
             requestBody.contragent_id = resp.data.id
         }
 
@@ -209,7 +209,7 @@ class CreateLCard extends React.Component {
 
 
     findContragent = async (id) => {
-        return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}?token=${this.props.token}`)
+        return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}/?token=${this.props.token}`)
             .then((response) => response.json())
             .then((body) => {
                 return body

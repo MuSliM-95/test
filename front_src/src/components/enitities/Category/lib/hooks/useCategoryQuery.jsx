@@ -1,5 +1,6 @@
 import { useQuery } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetCategories = (options) => {
   const { token, name, } = options;
@@ -11,7 +12,7 @@ export const useFetchGetCategories = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/categories/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     },
     {
       refetchOnWindowFocus: false,
@@ -19,3 +20,6 @@ export const useFetchGetCategories = (options) => {
   );
   return query;
 };
+
+export const useFetchAllCategories = ({ token }) =>
+  useFetchAllData({ token, key: "categories", path: "categories/" });

@@ -26,6 +26,9 @@ class NomenclatureCreateMass(BaseModel):
 class NomenclatureEdit(NomenclatureCreate):
     name: Optional[str]
 
+class NomenclatureEditMass(NomenclatureEdit):
+    id: int
+
 
 class Nomenclature(NomenclatureCreate):
     id: int
@@ -57,3 +60,7 @@ class NomenclatureListGet(BaseModel):
 
     class Config:
         orm_mode = True
+
+class NomenclatureListGetRes(BaseModel):
+    result: Optional[List[NomenclatureGet]]
+    count: int

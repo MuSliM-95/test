@@ -1,19 +1,15 @@
-from asyncpg import ForeignKeyViolationError, IntegrityConstraintViolationError
-from fastapi import APIRouter, HTTPException
-
-from database.db import database, categories
-
 import api.categories.schemas as schemas
-
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, check_entity_exists
-from functions.helpers import get_user_by_token
-
+from asyncpg import ForeignKeyViolationError, IntegrityConstraintViolationError
+from database.db import categories, database
+from fastapi import APIRouter, HTTPException
+from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token
+from sqlalchemy import func, select
 from ws_manager import manager
 
 router = APIRouter(tags=["categories"])
 
 
-@router.get("/categories/{idx}", response_model=schemas.Category)
+@router.get("/categories/{idx}/", response_model=schemas.Category)
 async def get_category_by_id(token: str, idx: int):
     """Получение категории по ID"""
     user = await get_user_by_token(token)
@@ -22,7 +18,7 @@ async def get_category_by_id(token: str, idx: int):
     return category_db
 
 
-@router.get("/categories/", response_model=schemas.CategoryList)
+@router.get("/categories/", response_model=schemas.CategoryListGet)
 async def get_categories(token: str, limit: int = 100, offset: int = 0):
     """Получение списка категорий"""
     user = await get_user_by_token(token)
@@ -39,7 +35,14 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
     categories_db = await database.fetch_all(query)
     categories_db = [*map(datetime_to_timestamp, categories_db)]
 
-    return categories_db
+    query = select(func.count(categories.c.id)).where(
+        categories.c.owner == user.id,
+        categories.c.is_deleted.is_not(True),
+    )
+
+    categories_db_count = await database.fetch_one(query)
+
+    return {"result": categories_db, "count": categories_db_count.count_1}
 
 
 @router.post("/categories/", response_model=schemas.CategoryList)
@@ -67,13 +70,7 @@ async def new_categories(token: str, categories_data: schemas.CategoryCreateMass
         category_id = await database.execute(query)
         inserted_ids.add(category_id)
 
-    query = (
-        categories.select()
-        .where(
-            categories.c.owner == user.id,
-            categories.c.id.in_(inserted_ids)
-        )
-    )
+    query = categories.select().where(categories.c.owner == user.id, categories.c.id.in_(inserted_ids))
     categories_db = await database.fetch_all(query)
     categories_db = [*map(datetime_to_timestamp, categories_db)]
 
@@ -92,7 +89,7 @@ async def new_categories(token: str, categories_data: schemas.CategoryCreateMass
     return categories_db
 
 
-@router.patch("/categories/{idx}", response_model=schemas.Category)
+@router.patch("/categories/{idx}/", response_model=schemas.Category)
 async def edit_category(
     token: str,
     idx: int,
@@ -107,11 +104,7 @@ async def edit_category(
         if category_values.get("parent") is not None:
             await check_entity_exists(categories, category_values["parent"], user.id)
 
-        query = (
-            categories.update()
-            .where(categories.c.id == idx, categories.c.owner == user.id)
-            .values(category_values)
-        )
+        query = categories.update().where(categories.c.id == idx, categories.c.owner == user.id).values(category_values)
         await database.execute(query)
         category_db = await get_entity_by_id(categories, idx, user.id)
 
@@ -125,7 +118,7 @@ async def edit_category(
     return category_db
 
 
-@router.delete("/categories/{idx}", response_model=schemas.Category)
+@router.delete("/categories/{idx}/", response_model=schemas.Category)
 async def delete_category(token: str, idx: int):
     """Удаление категории"""
     user = await get_user_by_token(token)
@@ -133,15 +126,11 @@ async def delete_category(token: str, idx: int):
     await get_entity_by_id(categories, idx, user.id)
 
     query = (
-        categories.update()
-        .where(categories.c.id == idx, categories.c.owner == user.id)
-        .values({"is_deleted": True})
+        categories.update().where(categories.c.id == idx, categories.c.owner == user.id).values({"is_deleted": True})
     )
     await database.execute(query)
 
-    query = categories.select().where(
-        categories.c.id == idx, categories.c.owner == user.id
-    )
+    query = categories.select().where(categories.c.id == idx, categories.c.owner == user.id)
     category_db = await database.fetch_one(query)
     category_db = datetime_to_timestamp(category_db)
 

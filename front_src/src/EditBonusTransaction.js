@@ -268,7 +268,7 @@ class EditBonusTransaction extends React.Component {
         let requestBody = { ...values }
 
         try {
-            await axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_transactions/${this.props.payment.id}?token=${this.props.token}`, requestBody)
+            await axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_transactions/${this.props.payment.id}/?token=${this.props.token}`, requestBody)
             this.closeModal();
         }
 

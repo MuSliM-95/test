@@ -1,5 +1,6 @@
 import { useQuery } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetOrganization = (options) => {
   const { token, name, } = options;
@@ -11,7 +12,7 @@ export const useFetchGetOrganization = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/organizations/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     },
     {
       refetchOnWindowFocus: false,
@@ -19,3 +20,7 @@ export const useFetchGetOrganization = (options) => {
   );
   return query;
 };
+
+
+export const useFetchAllOrganization = ({ token }) =>
+  useFetchAllData({ token, key: "organization", path: "organizations/" });

@@ -66,6 +66,9 @@ class ViewInList(BaseModel):
     updated_at: int
     created_at: int
 
+class ViewResult(BaseModel):
+    result: List[ViewInList]
+    count: int
 
 class View(ViewInList):
     goods: Optional[List[Item]]

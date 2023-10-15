@@ -34,3 +34,7 @@ class ManufacturerList(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ManufacturerListGet(BaseModel):
+    result: Optional[List[Manufacturer]]
+    count: int

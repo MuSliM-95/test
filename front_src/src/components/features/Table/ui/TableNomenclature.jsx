@@ -30,17 +30,18 @@ export default function TableNomenclature() {
   //       return res.data;
   //     });
   // };
-  
+
   const handleSaveImage = (picture) => {
     const newData = JSON.parse(JSON.stringify(dataSource));
     const index = dataSource.findIndex((item) => item.id === picture.entity_id);
-    const dubData = newData[index].pictures.filter(
-      (item) => item.id === picture.id
-    );
-    if (dubData.length === 0) {
+    if ((newData[index].pictures || []).length !== 0) {
+      const dubData = newData[index].pictures.filter((item) => item.id === picture.id);
+      if (dubData.length === 0) newData[index].pictures.push(picture);
+    } else {
+      newData[index].pictures = [];
       newData[index].pictures.push(picture);
-      setDataSource(newData);
     }
+    setDataSource(newData);
   };
 
   const handleDeleteImage = async (id) => {
@@ -93,7 +94,7 @@ export default function TableNomenclature() {
     websocket.onmessage = (message) => {
       const data = JSON.parse(message.data);
       if (data.target === "nomenclature") {
-        if (data.action === 'create') {
+        if (data.action === "create") {
           addRow(dataSource, data.result, setDataSource);
         }
         if (data.action === "edit") {

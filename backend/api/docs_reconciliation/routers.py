@@ -21,6 +21,7 @@ from functions.helpers import datetime_to_timestamp
 from functions.helpers import get_user_by_token
 
 from ws_manager import manager
+from sqlalchemy import select, func
 
 router = APIRouter(tags=["docs_reconciliation"])
 
@@ -33,7 +34,7 @@ price_types_cache = set()
 units_cache = set()
 
 
-@router.get("/docs_reconciliation/{idx}", response_model=schemas.View)
+@router.get("/docs_reconciliation/{idx}/", response_model=schemas.View)
 async def get_by_id(token: str, idx: int):
     """Получение документа по ID"""
     await get_user_by_token(token)
@@ -49,7 +50,7 @@ async def get_by_id(token: str, idx: int):
     return instance_db
 
 
-@router.get("/docs_reconciliation/", response_model=schemas.ListView)
+@router.get("/docs_reconciliation/", response_model=schemas.ListViewGet)
 async def get_list(token: str, limit: int = 100, offset: int = 0):
     """Получение списка документов"""
     await get_user_by_token(token)
@@ -61,7 +62,13 @@ async def get_list(token: str, limit: int = 100, offset: int = 0):
     )
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
-    return items_db
+
+    query = (
+        select(func.count(docs_reconciliation.c.id))
+        .where(docs_reconciliation.c.is_deleted.is_not(True))
+    )
+    items_db_c = await database.fetch_one(query)
+    return {"result": items_db, "count": items_db_c.count_1}
 
 
 @router.post("/docs_reconciliation/", response_model=schemas.CreateListView)
@@ -359,7 +366,7 @@ async def create(token: str, docs_reconciliation_data: schemas.CreateMass):
     return {"results": docs_reconciliation_db, "errors": exceptions}
 
 
-@router.delete("/docs_reconciliation/{idx}", response_model=schemas.ListView)
+@router.delete("/docs_reconciliation/{idx}/", response_model=schemas.ListView)
 async def delete(token: str, ids: list[int]):
     """Удаление документов"""
     await get_user_by_token(token)

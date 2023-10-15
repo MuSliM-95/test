@@ -48,7 +48,7 @@ export default function Nomenclature({
           id: item.id,
           name: item.url,
           status: "done",
-          url: `https://${process.env.REACT_APP_APP_URL}/api/v1/${item.url}`,
+          url: `https://${process.env.REACT_APP_APP_URL}/api/v1/${item.url}/`,
         });
       }
       setPictures(picturesDefault);

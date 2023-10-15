@@ -169,14 +169,14 @@ class PayboxTable extends React.Component {
     }
 
     editReq = (body) => {
-        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${this.props.query.token}`, body)
+        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${this.props.query.token}`, body)
             .then(response => {
                 message.success(<>Вы успешно изменили счет</>);
             });
     }
 
     componentDidMount() {
-        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes`)
+        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/`)
         console.log(this.state.dataSource)
 
         const { websocket } = this.props;
@@ -318,7 +318,7 @@ class PayboxTable extends React.Component {
                         {
                             total: this.state.count,
                             onChange: page => {
-                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes`))
+                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/`))
                             },
                             pageSize: 35,
                             showSizeChanger: false

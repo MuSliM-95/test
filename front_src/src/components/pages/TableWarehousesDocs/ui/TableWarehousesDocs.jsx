@@ -19,7 +19,7 @@ export default function TableWarehousesDocsPage({
   return (
     <WarehousesDocsContext.Provider
       value={{
-        initialData: initialData.result,
+        initialData,
         websocket,
         token,
         pathname,

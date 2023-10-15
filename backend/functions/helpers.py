@@ -250,6 +250,9 @@ def get_filters_cards(table, filters):
         if filter == "balance":
             if value:
                 filters_list.append(table.c.balance == value)
+        if filter == "tags":
+            if value:
+                filters_list.append(table.c.tags.ilike(f"%{value}%"))
         if filter == "income":
             if value:
                 filters_list.append(table.c.income == value)
@@ -268,12 +271,6 @@ def get_filters_cards(table, filters):
         if filter == "status_card":
             if value:
                 filters_list.append(table.c.status_card == value)
-        if filter == "created_at_from":
-            if value:
-                filters_list.append(table.c.created_at >= datetime.fromtimestamp(value))
-        if filter == "created_at_to":
-            if value:
-                filters_list.append(table.c.created_at <= datetime.fromtimestamp(value))
 
     return filters_list
 
@@ -493,6 +490,17 @@ def datetime_to_timestamp(instance: Optional[Record]) -> Optional[dict]:
             instance["updated_at"] = int(instance["updated_at"].timestamp())
         return instance
     
+
+def rem_owner_is_deleted(instance: Optional[Record]) -> Optional[dict]:
+    if instance is not None:
+        instance = dict(instance)
+        if instance.get("owner") is not None:
+            del instance["owner"]
+        if instance.get("is_deleted") is not None:
+            del instance["is_deleted"] 
+
+        return instance
+
 
 def add_status(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:

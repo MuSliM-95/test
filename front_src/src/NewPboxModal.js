@@ -48,7 +48,7 @@ class NewPboxModal extends React.Component {
         const handleOk = (data) => {
             this.setState({ isModalVisible: false });
 
-            axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${this.props.token}`, data)
+            axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${this.props.token}`, data)
                 .then(response => {
                     message.success(<>Вы успешно создали счет</>);
                 });

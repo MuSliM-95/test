@@ -58,3 +58,8 @@ class OrganizationList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class OrganizationListGet(BaseModel):
+    result: Optional[List[Organization]]
+    count: int

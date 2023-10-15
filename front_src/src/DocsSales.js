@@ -335,7 +335,7 @@ class DocsSales extends React.Component {
             dataSource: dataSource,
         });
 
-        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${row.id}`, { params: { token: this.props.query.token } })
+        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${row.id}/`, { params: { token: this.props.query.token } })
             .then(response => {
                 message.success("Вы успешно удалили документ продажи");
             }).catch((err) => {
@@ -357,7 +357,7 @@ class DocsSales extends React.Component {
         edit_dict.organization = payment.organization
 
         if (Object.keys(edit_dict).length !== 0) {
-            axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${id}?token=${this.props.query.token}`, [edit_dict])
+            axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${id}/?token=${this.props.query.token}`, [edit_dict])
         } else {
             message.error(<>Вы не сделали никаких изменений!</>);
         }

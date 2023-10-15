@@ -441,7 +441,7 @@ class EditableTable extends React.Component {
 
 	fetchTags = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_meta?token=${this.props.query.token}&tags=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_meta/?token=${this.props.query.token}&tags=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -477,7 +477,7 @@ class EditableTable extends React.Component {
 			dataSource: dataSource,
 		});
 
-		axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/${row.id}`, { params: { token: this.props.query.token } })
+		axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/${row.id}/`, { params: { token: this.props.query.token } })
 			.then(response => {
 				message.success("Вы успешно удалили платеж");
 			});
@@ -561,7 +561,7 @@ class EditableTable extends React.Component {
 
 	fetchNames = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments?token=${this.props.query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/?token=${this.props.query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -580,7 +580,7 @@ class EditableTable extends React.Component {
 				})
 		}
 		else {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments?token=${this.props.query.token}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/?token=${this.props.query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -602,7 +602,7 @@ class EditableTable extends React.Component {
 
 	fetchProjects = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects?token=${this.props.query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/?token=${this.props.query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -622,7 +622,7 @@ class EditableTable extends React.Component {
 				})
 		}
 		else {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects?token=${this.props.query.token}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/?token=${this.props.query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -645,7 +645,7 @@ class EditableTable extends React.Component {
 
 	fetchPaybox = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${this.props.query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${this.props.query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -665,7 +665,7 @@ class EditableTable extends React.Component {
 				})
 		}
 		else {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${this.props.query.token}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${this.props.query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -688,7 +688,7 @@ class EditableTable extends React.Component {
 
 	fetchContr = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${this.props.query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${this.props.query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -708,7 +708,7 @@ class EditableTable extends React.Component {
 				})
 		}
 		else {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${this.props.query.token}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${this.props.query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -774,7 +774,7 @@ class EditableTable extends React.Component {
 		}
 
 		if (Object.keys(edit_dict).length !== 0) {
-			axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/${id}?token=${this.props.query.token}`, edit_dict)
+			axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/${id}/?token=${this.props.query.token}`, edit_dict)
 		} else {
 			message.error(<>Вы не сделали никаких изменений!</>);
 		}
@@ -833,7 +833,7 @@ class EditableTable extends React.Component {
 			params.params.sort = sort
 		}
 
-		axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments`, params)
+		axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/`, params)
 			.then(response => {
 
 				this.setState({
@@ -908,8 +908,6 @@ class EditableTable extends React.Component {
 						ghost
 						style={{ marginBottom: 15, marginTop: -5 }}>
 						<Panel header="Фильтры поиска платежей..." key="1">
-
-
 							<Form
 								ref={this.formRef}
 								layout={"inline"}

@@ -1,5 +1,6 @@
 import { useQuery } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetPriceTypes = (options) => {
   const { token, name, } = options;
@@ -11,7 +12,7 @@ export const useFetchGetPriceTypes = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/price_types/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     },
     {
       refetchOnWindowFocus: false,
@@ -19,3 +20,6 @@ export const useFetchGetPriceTypes = (options) => {
   );
   return query;
 };
+
+export const useFetchAllPricesType = ({ token }) =>
+  useFetchAllData({ token, key: "priceTypes", path: "price_types/" });

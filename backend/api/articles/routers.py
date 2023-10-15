@@ -16,7 +16,7 @@ import aiofiles
 router = APIRouter(tags=["articles"])
 
 
-@router.get("/articles/{id}", response_model=article_schemas.Article)
+@router.get("/articles/{id}/", response_model=article_schemas.Article)
 async def get_article_by_id(token: str, id: int):
     """Получение статьи по ID"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -35,7 +35,7 @@ async def get_article_by_id(token: str, id: int):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.get("/articles", response_model=article_schemas.GetArticles)
+@router.get("/articles/", response_model=article_schemas.GetArticles)
 async def get_articles(
     token: str,
     limit: int = 100,
@@ -92,7 +92,7 @@ async def get_articles(
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.post("/articles")
+@router.post("/articles/")
 async def new_article(token: str, article: article_schemas.ArticleCreate):
     """Создание статьи"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -125,7 +125,7 @@ async def new_article(token: str, article: article_schemas.ArticleCreate):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.patch("/articles")
+@router.patch("/articles/")
 async def edit_article(token: str, article: article_schemas.ArticleEdit):
     """Редактирование статьи"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -175,7 +175,7 @@ async def edit_article(token: str, article: article_schemas.ArticleEdit):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/articles/add_icon")
+@router.put("/articles/add_icon/")
 async def add_icon_to_article(
     token: str, article_id: int, icon_file: UploadFile = File(...)
 ):

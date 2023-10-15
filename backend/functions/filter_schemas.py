@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class PaymentFiltersQuery(BaseModel):
     name: Optional[str]
@@ -57,7 +57,7 @@ class PricesFiltersQuery(BaseModel):
     description_long: Optional[str]
     code: Optional[int]
     unit: Optional[int]
-    category: Optional[int]
+    category: Optional[str]
     manufacturer: Optional[int]
     price_type_id: Optional[int]
     date_from: Optional[int]

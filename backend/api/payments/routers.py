@@ -34,7 +34,7 @@ import asyncio
 router = APIRouter(tags=["payments"])
 
 
-@router.get("/payments", response_model=pay_schemas.GetPaymentsBasic)
+@router.get("/payments/", response_model=pay_schemas.GetPaymentsBasic)
 async def read_payments_list(
     token: str,
     filters: filter_schemas.PaymentFiltersQuery = Depends(),
@@ -198,7 +198,7 @@ async def read_payments_list(
         # return {"result": pays_list, "count": count.count} # PROD
 
 
-@router.post("/payments")
+@router.post("/payments/")
 async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
     """Создание платежа"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -444,7 +444,7 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.get("/payment/{id}", response_model=pay_schemas.PaymentInList)
+@router.get("/payment/{id}/", response_model=pay_schemas.PaymentInList)
 async def read_payment(token: str, id: int):
     """Просмотр платежа по ID"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -490,7 +490,7 @@ async def read_payment(token: str, id: int):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/payments/{id}", response_model=pay_schemas.PaymentInListWithData)
+@router.put("/payments/{id}/", response_model=pay_schemas.PaymentInListWithData)
 async def update_payment(
     token: str, id: int, payment: pay_schemas.PaymentEdit, bg_tasks: BackgroundTasks
 ):
@@ -674,7 +674,7 @@ async def update_payment(
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.delete("/payments/{payment_id}")
+@router.delete("/payments/{payment_id}/")
 async def delete_payment(token: str, payment_id: int):
     """Удаление платежа по ID"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -818,7 +818,7 @@ async def delete_payment(token: str, payment_id: int):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.post("/payments_split/{id}")
+@router.post("/payments_split/{id}/")
 async def raspil_platezha(
     token: str,
     id: int,
@@ -893,7 +893,7 @@ async def raspil_platezha(
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/payments_split")
+@router.put("/payments_split/")
 async def update_childs_payments(
     token: str, payments_list: List[pay_schemas.ChildrenEdit], bg_tasks: BackgroundTasks
 ):
@@ -952,7 +952,7 @@ async def update_childs_payments(
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.delete("/payments_split/{id}", response_model=pay_schemas.PaymentInList)
+@router.delete("/payments_split/{id}/", response_model=pay_schemas.PaymentInList)
 async def split_payment(token: str, id: int, bg_tasks: BackgroundTasks):
     """Отмена распила платежа"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -1001,7 +1001,7 @@ async def split_payment(token: str, id: int, bg_tasks: BackgroundTasks):
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.get("/payments/{id}/childs", response_model=pay_schemas.GetPayments)
+@router.get("/payments/{id}/childs/", response_model=pay_schemas.GetPayments)
 async def read_payments_childs(token: str, id: int, offset: int = 0, limit: int = 100):
     """Получение дочерних платежей по ID родительского"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -1037,7 +1037,7 @@ async def read_payments_childs(token: str, id: int, offset: int = 0, limit: int 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.get("/payments_meta")
+@router.get("/payments_meta/")
 async def read_payments_meta(token: str, limit: int = 100, offset: int = 0):
     """Мета платежей"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -1054,7 +1054,7 @@ async def read_payments_meta(token: str, limit: int = 100, offset: int = 0):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/payments/{id}/attachmen", response_model=pay_schemas.PaymentInList)
+@router.put("/payments/{id}/attachment/", response_model=pay_schemas.PaymentInList)
 async def attach_payment(
     token: str, id: int, sale_id: int
 ):
@@ -1088,7 +1088,7 @@ async def attach_payment(
     return payment_db
 
 
-@router.delete("/payments/{id}/attachment", response_model=pay_schemas.PaymentInList)
+@router.delete("/payments/{id}/attachment/", response_model=pay_schemas.PaymentInList)
 async def detach_payment(token: str, id: int, sale_id: int):
     """Открепление платежа от документа продажи"""
 

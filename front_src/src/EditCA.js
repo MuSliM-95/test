@@ -54,7 +54,7 @@ class EditCA extends React.Component {
     };
 
     handleOk = (item) => {
-        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${this.props.ca.id}?token=${this.props.token}`, item)
+        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${this.props.ca.id}/?token=${this.props.token}`, item)
             .then(response => {
                 message.success('Вы успешно изменили контрагента');
                 this.props.updateRow(this.props.ca, response);

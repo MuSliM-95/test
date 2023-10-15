@@ -25,3 +25,8 @@ class PictureList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PictureListGet(BaseModel):
+    result: Optional[List[Picture]]
+    count: int

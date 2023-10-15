@@ -303,7 +303,7 @@ class LoyalityCards extends React.Component {
 		}
 
 		if (Object.keys(edit_dict).length !== 0) {
-			axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards/${id}?token=${this.props.query.token}`, edit_dict)
+			axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards/${id}/?token=${this.props.query.token}`, edit_dict)
 			const newData = [...this.state.dataSource];
 			const index = newData.findIndex((item) => item.id === id);
 
@@ -319,7 +319,7 @@ class LoyalityCards extends React.Component {
 	}
 
 	delete_request = (row_id) => {
-		axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards/${row_id}?token=${this.props.query.token}`)
+		axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards/${row_id}/?token=${this.props.query.token}`)
 		const newData = [...this.state.dataSource];
 		const index = newData.findIndex((item) => item.id === row_id);
 
@@ -477,7 +477,7 @@ class LoyalityCards extends React.Component {
 				})
 		}
 		else {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards?token=${this.props.query.token}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards/?token=${this.props.query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -503,7 +503,7 @@ class LoyalityCards extends React.Component {
 
 	fetchContr = async (name) => {
 		if (name) {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${this.props.query.token}&name=${name}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${this.props.query.token}&name=${name}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -523,7 +523,7 @@ class LoyalityCards extends React.Component {
 				})
 		}
 		else {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${this.props.query.token}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${this.props.query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body
@@ -545,7 +545,7 @@ class LoyalityCards extends React.Component {
 
 	fetchManager = async (name) => {
 
-		return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users?token=${this.props.query.token}`)
+		return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users/?token=${this.props.query.token}`)
 			.then((response) => response.json())
 			.then((body) => {
 				return body

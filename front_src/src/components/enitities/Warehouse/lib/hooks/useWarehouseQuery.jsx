@@ -1,5 +1,6 @@
 import { useQuery } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetWarehouses = (options) => {
   const { token, name, } = options;
@@ -11,8 +12,12 @@ export const useFetchGetWarehouses = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/warehouses/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     }
   );
   return query;
 };
+
+
+export const useFetchAllWarehouses = ({ token }) =>
+  useFetchAllData({ token, key: "warehouses", path: "warehouses/" });

@@ -3,11 +3,11 @@ import { Button, } from "antd";
 import { EditOutlined } from "@ant-design/icons";
 
 import { useFetchGetPurchases } from "../../../../../enitities/Purchase/lib/hooks/usePurchaseQuery";
-import { useFetchGetContracts } from "../../../../../enitities/Contract/lib/hooks/useContractQuery";
-import { useFetchGetContragents } from "../../../../../enitities/Contragent/lib/hooks/useContragentQuery";
-import { useFetchGetOrganization } from "../../../../../enitities/Organization/lib/hooks/useOrganizationQuery";
-import { useFetchGetUsers } from "../../../../../enitities/User/lib/hooks/useUserQuery";
-import { useFetchGetWarehouses } from "../../../../../enitities/Warehouse/lib/hooks/useWarehouseQuery";
+import { useFetchAllContracts } from "../../../../../enitities/Contract/lib/hooks/useContractQuery";
+import { useFetchAllContragents } from "../../../../../enitities/Contragent/lib/hooks/useContragentQuery";
+import { useFetchAllOrganization } from "../../../../../enitities/Organization/lib/hooks/useOrganizationQuery";
+import { useFetchAllUsers } from "../../../../../enitities/User/lib/hooks/useUserQuery";
+import { useFetchAllWarehouses } from "../../../../../enitities/Warehouse/lib/hooks/useWarehouseQuery";
 
 import { RemoveButton } from "../../../../../widgets/Button";
 
@@ -56,22 +56,23 @@ const convertUsersArrayToObject = (arr) => {
 
 const useGetDataTable = ({ token, current, pageSize }) => {
     const { isLoading, isError, isSuccess, data, error } = useFetchGetPurchases({ token,current, pageSize });
-    const { isLoading: isLoadingContragents, isError: isErrorContragents, isSuccess: isSuccessConragents, data: contragents, error: errorContragets } = useFetchGetContragents({ token })
-    const { isLoading: isLoadingContracts, isError: isErrorContracts, isSuccess: isSuccessContracts, data: contracts, error: errorContracts } = useFetchGetContracts({ token })
-    const { isLoading: isLoadingOrganizations, isError: isErrorOrganizations, isSuccess: isSuccessOrganizations, data: organizations, error: errorOrganizations } = useFetchGetOrganization({ token })
-    const { isLoading: isLoadingWarehouses, isError: isErrorWarehouses, isSuccess: isSuccessWarehouses, data: warehouses, error: errorWarehouses } = useFetchGetWarehouses({ token })
-    const { isLoading: isLoadingUsers, isError: isErrorUsers, isSuccess: isSuccessUsers, data: users, error: errorUsers } = useFetchGetUsers({ token })
+    const { isLoading: isLoadingContragents, isError: isErrorContragents, isSuccess: isSuccessConragents, data: contragents, error: errorContragets } = useFetchAllContragents({ token })
+    const { isLoading: isLoadingContracts, isError: isErrorContracts, isSuccess: isSuccessContracts, data: contracts, error: errorContracts } = useFetchAllContracts({ token })
+    const { isLoading: isLoadingOrganizations, isError: isErrorOrganizations, isSuccess: isSuccessOrganizations, data: organizations, error: errorOrganizations } = useFetchAllOrganization({ token })
+    const { isLoading: isLoadingWarehouses, isError: isErrorWarehouses, isSuccess: isSuccessWarehouses, data: warehouses, error: errorWarehouses } = useFetchAllWarehouses({ token })
+    const { isLoading: isLoadingUsers, isError: isErrorUsers, isSuccess: isSuccessUsers, data: users, error: errorUsers } = useFetchAllUsers({ token })
 
     const prepareData = useMemo(() => {
         if (isSuccess && (isErrorContragents || isSuccessConragents) && (isErrorContracts || isSuccessContracts) && (isErrorOrganizations || isSuccessOrganizations) && (isErrorWarehouses || isSuccessWarehouses) && (isErrorUsers || isSuccessUsers)) {
-            const prepareContragents = convertArrayToObject(contragents?.result);
+            const prepareContragents = convertArrayToObject(contragents);
             const prepareContracts = convertArrayToObject(contracts);
             const prepareOrganizations = convertArrayToObject(organizations);
             const prepareWarehouses = convertArrayToObject(warehouses);
-            const prepareUsers = convertUsersArrayToObject(users?.result);
+            const prepareUsers = convertUsersArrayToObject(users);
             return getPrepareTableData({ data, contragents: prepareContragents, contracts: prepareContracts, organizations: prepareOrganizations, warehouses: prepareWarehouses, users: prepareUsers })
         }
     }, [isSuccess, isErrorContragents, isSuccessConragents, isErrorContracts, isSuccessContracts, isErrorOrganizations, isSuccessOrganizations, isErrorWarehouses, isSuccessWarehouses, contragents, contracts, organizations, warehouses, isErrorUsers, isSuccessUsers, users, data])
+    console.log(prepareData)
     return {
         data: prepareData,
         total:data?.count,

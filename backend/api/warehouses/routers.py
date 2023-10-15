@@ -1,19 +1,16 @@
-from fastapi import APIRouter, HTTPException
-
-from database.db import database, warehouses
+from typing import Optional
 
 import api.warehouses.schemas as schemas
-
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, check_entity_exists
-from functions.helpers import get_user_by_token
-
+from database.db import database, warehouses
+from fastapi import APIRouter, HTTPException
+from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token
+from sqlalchemy import func, select
 from ws_manager import manager
-from typing import Optional
 
 router = APIRouter(tags=["warehouses"])
 
 
-@router.get("/warehouses/{idx}", response_model=schemas.Warehouse)
+@router.get("/warehouses/{idx}/", response_model=schemas.Warehouse)
 async def get_warehouse_by_id(token: str, idx: int):
     """Получение склада по ID"""
     user = await get_user_by_token(token)
@@ -22,36 +19,30 @@ async def get_warehouse_by_id(token: str, idx: int):
     return warehouse_db
 
 
-@router.get("/warehouses/", response_model=schemas.WarehouseList)
-async def get_warehouses(token: str, name: Optional[str]= None, limit: int = 100, offset: int = 0):
+@router.get("/warehouses/", response_model=schemas.WarehouseListGet)
+async def get_warehouses(token: str, name: Optional[str] = None, limit: int = 100, offset: int = 0):
     """Получение списка складов"""
     user = await get_user_by_token(token)
-    query = (
-        warehouses.select()
-        .where(
-            warehouses.c.owner == user.id,
-            warehouses.c.is_deleted.is_not(True),
-        )
-        .limit(limit)
-        .offset(offset)
-    )
+    filters = [
+        warehouses.c.owner == user.id,
+        warehouses.c.is_deleted.is_not(True),
+    ]
 
     if name:
-        query = (
-            warehouses.select()
-            .where(
-                warehouses.c.owner == user.id,
-                warehouses.c.name.ilike(f"%{name}%"),
-                warehouses.c.is_deleted.is_not(True),
-            )
-            .limit(limit)
-            .offset(offset)
+        filters.append(
+            warehouses.c.name.ilike(f"%{name}%"),
         )
+
+    query = warehouses.select().where(*filters).limit(limit).offset(offset)
 
     warehouses_db = await database.fetch_all(query)
     warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
 
-    return warehouses_db
+    query = select(func.count(warehouses.c.id)).where(*filters)
+
+    warehouses_db_count = await database.fetch_one(query)
+
+    return {"result": warehouses_db, "count": warehouses_db_count.count_1}
 
 
 @router.post("/warehouses/", response_model=schemas.WarehouseList)
@@ -79,13 +70,7 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
         warehouse_id = await database.execute(query)
         inserted_ids.add(warehouse_id)
 
-    query = (
-        warehouses.select()
-        .where(
-            warehouses.c.owner == user.id,
-            warehouses.c.id.in_(inserted_ids)
-        )
-    )
+    query = warehouses.select().where(warehouses.c.owner == user.id, warehouses.c.id.in_(inserted_ids))
     warehouses_db = await database.fetch_all(query)
     warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
 
@@ -104,7 +89,7 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
     return warehouses_db
 
 
-@router.patch("/warehouses/{idx}", response_model=schemas.Warehouse)
+@router.patch("/warehouses/{idx}/", response_model=schemas.Warehouse)
 async def edit_warehouse(
     token: str,
     idx: int,
@@ -120,9 +105,7 @@ async def edit_warehouse(
             await check_entity_exists(warehouses, warehouse_values["parent"], user.id)
 
         query = (
-            warehouses.update()
-            .where(warehouses.c.id == idx, warehouses.c.owner == user.id)
-            .values(warehouse_values)
+            warehouses.update().where(warehouses.c.id == idx, warehouses.c.owner == user.id).values(warehouse_values)
         )
         await database.execute(query)
         warehouse_db = await get_entity_by_id(warehouses, idx, user.id)
@@ -137,7 +120,7 @@ async def edit_warehouse(
     return warehouse_db
 
 
-@router.delete("/warehouses/{idx}", response_model=schemas.Warehouse)
+@router.delete("/warehouses/{idx}/", response_model=schemas.Warehouse)
 async def delete_warehouse(token: str, idx: int):
     """Удаление склада"""
     user = await get_user_by_token(token)
@@ -145,15 +128,11 @@ async def delete_warehouse(token: str, idx: int):
     await get_entity_by_id(warehouses, idx, user.id)
 
     query = (
-        warehouses.update()
-        .where(warehouses.c.id == idx, warehouses.c.owner == user.id)
-        .values({"is_deleted": True})
+        warehouses.update().where(warehouses.c.id == idx, warehouses.c.owner == user.id).values({"is_deleted": True})
     )
     await database.execute(query)
 
-    query = warehouses.select().where(
-        warehouses.c.id == idx, warehouses.c.owner == user.id
-    )
+    query = warehouses.select().where(warehouses.c.id == idx, warehouses.c.owner == user.id)
     warehouse_db = await database.fetch_one(query)
     warehouse_db = datetime_to_timestamp(warehouse_db)
 

@@ -1,8 +1,9 @@
 import { useQuery, useMutation } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetPrices = (options) => {
-  const { token, name, limit = 100000 } = options;
+  const { token, name, limit=10000 } = options;
   const query = useQuery(
     ["prices", token, name],
     async () => {
@@ -11,7 +12,7 @@ export const useFetchGetPrices = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/prices/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     },
     {
       refetchOnWindowFocus: false,
@@ -54,3 +55,6 @@ export const useFetchDeletePrices = (token) => {
   );
   return [mutate, { isLoading, isError, isSuccess }];
 };
+
+export const useFetchAllPrices = ({ token }) =>
+  useFetchAllData({ token, key: "prices", path: "prices/" });

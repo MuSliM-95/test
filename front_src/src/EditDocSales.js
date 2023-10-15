@@ -222,7 +222,7 @@ class EditDocsSales extends React.Component {
 
   findDocSales = async (id) => {
     return fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${id}?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${id}/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -232,7 +232,7 @@ class EditDocsSales extends React.Component {
 
   findContragent = async (id) => {
     return fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -325,7 +325,7 @@ class EditDocsSales extends React.Component {
 
   findContract = async (id) => {
     return fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/contracts/${id}?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/contracts/${id || ''}/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -344,7 +344,7 @@ class EditDocsSales extends React.Component {
 
   findOrg = async (id) => {
     return fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/organizations/${id}?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/organizations/${id}/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -363,7 +363,7 @@ class EditDocsSales extends React.Component {
 
   findWareHouse = async (id) => {
     return fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/warehouses/${id}?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/warehouses/${id}/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -382,7 +382,7 @@ class EditDocsSales extends React.Component {
 
   findNomenclature = async (id) => {
     return fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/nomenclature/${id}?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/nomenclature/${id}/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -417,7 +417,7 @@ class EditDocsSales extends React.Component {
           message.error("Вы не выбрали склад!");
         } else {
           fetch(
-            `https://${process.env.REACT_APP_APP_URL}/api/v1/warehouse_balances/${this.state.current_warehouse.id}?token=${this.props.token}&nomenclature_id=${res.id}`
+            `https://${process.env.REACT_APP_APP_URL}/api/v1/warehouse_balances/${this.state.current_warehouse.id}/?token=${this.props.token}&nomenclature_id=${res.id}`
           )
             .then((response) => response.json())
             .then((body) => {
@@ -483,7 +483,7 @@ class EditDocsSales extends React.Component {
 
   addNomenclature = (values) => {
     fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/prices/${this.state.current_nomenclature.id}?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/prices/${this.state.current_nomenclature.id}/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -624,7 +624,7 @@ class EditDocsSales extends React.Component {
 
       axios
         .patch(
-          `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${this.props.doc.id}?token=${this.props.token}`,
+          `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_sales/${this.props.doc.id}/?token=${this.props.token}`,
           [body]
         )
         .then((response) => {

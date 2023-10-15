@@ -5,7 +5,7 @@ const searchResult = async (api, token, query) => {
     return fetch(`${api}contracts/?token=${token}&name=${query}`)
         .then((response) => response.json())
         .then((body) =>
-            body.map((user) => ({
+            body.result.map((user) => ({
                 label: `${user.name}`,
                 value: user.id,
             })),

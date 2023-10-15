@@ -8,11 +8,12 @@ from functions.helpers import datetime_to_timestamp, get_entity_by_id
 from functions.helpers import get_user_by_token
 
 from ws_manager import manager
+from sqlalchemy import select, func
 
 router = APIRouter(tags=["price_types"])
 
 
-@router.get("/price_types/{idx}", response_model=schemas.PriceType)
+@router.get("/price_types/{idx}/", response_model=schemas.PriceType)
 async def get_price_type_by_id(token: str, idx: int):
     """Получение типа цен по ID"""
     user = await get_user_by_token(token)
@@ -21,7 +22,7 @@ async def get_price_type_by_id(token: str, idx: int):
     return price_type_db
 
 
-@router.get("/price_types/", response_model=schemas.PriceTypeList)
+@router.get("/price_types/", response_model=schemas.PriceTypeListGet)
 async def get_price_types(token: str, limit: int = 100, offset: int = 0):
     """Получение списка типов цен"""
     user = await get_user_by_token(token)
@@ -38,7 +39,17 @@ async def get_price_types(token: str, limit: int = 100, offset: int = 0):
     price_types_db = await database.fetch_all(query)
     price_types_db = [*map(datetime_to_timestamp, price_types_db)]
 
-    return price_types_db
+    query = (
+        select(func.count(price_types.c.id))
+        .where(
+            price_types.c.owner == user.id,
+            price_types.c.is_deleted.is_not(True),
+        )
+    )
+
+    price_types_db_count = await database.fetch_one(query)
+    
+    return {"result": price_types_db, "count": price_types_db_count.count_1}
 
 
 @router.post("/price_types/", response_model=schemas.PriceType)
@@ -67,7 +78,7 @@ async def new_price_type(token: str, price_type: schemas.PriceTypeCreate):
     return price_type_db
 
 
-@router.patch("/price_types/{idx}", response_model=schemas.PriceType)
+@router.patch("/price_types/{idx}/", response_model=schemas.PriceType)
 async def edit_price_type(
     token: str,
     idx: int,
@@ -97,7 +108,7 @@ async def edit_price_type(
     return price_type_db
 
 
-@router.delete("/price_types/{idx}", response_model=schemas.PriceType)
+@router.delete("/price_types/{idx}/", response_model=schemas.PriceType)
 async def delete_price_type(token: str, idx: int):
     """Удаление типа цен"""
     user = await get_user_by_token(token)

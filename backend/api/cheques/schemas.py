@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel
 
@@ -11,3 +11,7 @@ class Cheque(BaseModel):
 
 class Cheques(BaseModel):
     __root__: Optional[list[Cheque]]
+
+class ChequesGet(BaseModel):
+    result: Optional[List[Cheque]]
+    count: int

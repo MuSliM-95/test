@@ -15,3 +15,8 @@ class FunctionList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class FunctionListGet(BaseModel):
+    result: Optional[List[Function]]
+    count: int

@@ -2,6 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 from typing import Optional, List
+from database.db import Operation
 
 
 class WarehouseOperations(str, Enum):
@@ -22,11 +23,14 @@ class Item(BaseModel):
 class Create(BaseModel):
     number: Optional[str]
     dated: Optional[int]
-    operation: Optional[WarehouseOperations]
+    contragent: Optional[int]
+    docs_purchases: Optional[int] = None
+    operation: Optional[str]
+    to_warehouse: Optional[int]
     comment: Optional[str]
-    organization: int
     warehouse: Optional[int]
     goods: Optional[List[Item]]
+    docs_sales_id: Optional[int] = None
 
     class Config:
         orm_mode = True
@@ -55,12 +59,15 @@ class CreateMass(BaseModel):
 
 class ViewInList(BaseModel):
     id: int
+    tags: Optional[str]
     number: Optional[str]
     dated: Optional[int]
+    contragent: Optional[int]
     operation: Optional[str]
     comment: Optional[str]
     organization: int
     warehouse: Optional[int]
+    to_warehouse: Optional[int]
     sum: Optional[float]
     updated_at: int
     created_at: int
@@ -78,3 +85,6 @@ class ListView(BaseModel):
 
     class Config:
         orm_mode = True
+
+class DeleteListView(ViewInList):
+    deleted: Optional[List]

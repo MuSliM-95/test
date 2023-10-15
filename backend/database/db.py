@@ -1,9 +1,35 @@
-import databases
-import sqlalchemy
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, Float, DateTime, Date, JSON, BigInteger, UniqueConstraint, ARRAY, Enum
-from sqlalchemy.sql import func
 import os
 from enum import Enum as ENUM
+
+import databases
+import sqlalchemy
+from sqlalchemy import (
+    ARRAY,
+    JSON,
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.sql import func
+
+
+class OperationType(str, ENUM):
+    plus = "+"
+    minus = "-"
+
+
+class Operation(str, ENUM):
+    incoming = "Приход"
+    outgoing = "Расход"
+    transfer = "Перемещение"
 
 
 class CostType(str, ENUM):
@@ -12,7 +38,7 @@ class CostType(str, ENUM):
 
 
 class Trial(ENUM):
-    secon="secon"
+    secon = "secon"
     link: str
 
 
@@ -37,7 +63,7 @@ tasks = sqlalchemy.Table(
     sqlalchemy.Column("report", String),
     sqlalchemy.Column("integration_id", ForeignKey("integrations.id")),
     sqlalchemy.Column("status", String),
-    sqlalchemy.Column("creator", Integer), # 0 - robot
+    sqlalchemy.Column("creator", Integer),  # 0 - robot
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -47,7 +73,7 @@ jwt_scopes = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("interaction", String, nullable=False),
-    sqlalchemy.Column("scope", String, nullable=False)
+    sqlalchemy.Column("scope", String, nullable=False),
 )
 
 integrations_type = sqlalchemy.Table(
@@ -98,7 +124,7 @@ integrations = sqlalchemy.Table(
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("scopes", Text),
     sqlalchemy.Column("redirect_uri", String),
-    sqlalchemy.Column("url", String)
+    sqlalchemy.Column("url", String),
 )
 
 cboxes = sqlalchemy.Table(
@@ -134,6 +160,7 @@ organizations = sqlalchemy.Table(
     sqlalchemy.Column("tax_type", String),
     sqlalchemy.Column("tax_percent", Float),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -155,6 +182,7 @@ contracts = sqlalchemy.Table(
     sqlalchemy.Column("payment_type", String),
     sqlalchemy.Column("payment_time", String),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -173,6 +201,7 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("category", Integer, ForeignKey("categories.id")),
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -187,7 +216,7 @@ categories = sqlalchemy.Table(
     sqlalchemy.Column("code", Integer),
     sqlalchemy.Column("parent", Integer, ForeignKey("categories.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
-    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("status", Boolean, nullable=False),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -231,6 +260,7 @@ manufacturers = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -246,6 +276,7 @@ prices = sqlalchemy.Table(
     sqlalchemy.Column("date_from", Integer),
     sqlalchemy.Column("date_to", Integer),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -257,6 +288,7 @@ price_types = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -273,10 +305,9 @@ pictures = sqlalchemy.Table(
     sqlalchemy.Column("is_main", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column(
-        "updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    ),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 entity_or_function = sqlalchemy.Table(
@@ -285,9 +316,7 @@ entity_or_function = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False, unique=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column(
-        "updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    ),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 status_entity_function = sqlalchemy.Table(
@@ -298,15 +327,13 @@ status_entity_function = sqlalchemy.Table(
         "entity_or_function",
         String,
         ForeignKey("entity_or_function.name", ondelete="CASCADE", onupdate="CASCADE"),
-        nullable=False
+        nullable=False,
     ),
     sqlalchemy.Column("status", Boolean, nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column(
-        "updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    ),
-    UniqueConstraint("entity_or_function", "cashbox", name="function_cashbox_unique")
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    UniqueConstraint("entity_or_function", "cashbox", name="function_cashbox_unique"),
 )
 
 pboxes = sqlalchemy.Table(
@@ -416,9 +443,7 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("inn", String, nullable=True),
     sqlalchemy.Column("description", Text),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
-
     sqlalchemy.Column("is_deleted", Boolean),
-
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
@@ -687,6 +712,7 @@ docs_purchases = sqlalchemy.Table(
     sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
     sqlalchemy.Column("warehouse", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("purchased_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("sum", Float),
     sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
@@ -714,14 +740,22 @@ docs_warehouse = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("number", String),
+    sqlalchemy.Column("tags", String),
     sqlalchemy.Column("dated", Integer),
     sqlalchemy.Column("operation", String),
     sqlalchemy.Column("comment", String),
+    sqlalchemy.Column("status", Boolean, default=True),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("contract", Integer, ForeignKey("contracts.id")),
+    sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
+    sqlalchemy.Column("docs_purchases", Integer, ForeignKey("docs_purchases.id")),
     sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("warehouse", Integer, ForeignKey("warehouses.id")),
+    sqlalchemy.Column("to_warehouse", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("sum", Float),
     sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -737,6 +771,23 @@ docs_warehouse_goods = sqlalchemy.Table(
     sqlalchemy.Column("price", Float, nullable=False),
     sqlalchemy.Column("quantity", Integer, nullable=False),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+warehouse_register_movement = sqlalchemy.Table(
+    "warehouse_register_movement",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("type_amount", Enum(OperationType)),
+    sqlalchemy.Column("organization_id", Integer, ForeignKey("organizations.id")),
+    sqlalchemy.Column("warehouse_id", Integer, ForeignKey("warehouses.id")),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
+    sqlalchemy.Column("document_sale_id", Integer, ForeignKey("docs_sales.id")),
+    sqlalchemy.Column("document_purchase_id", Integer, ForeignKey("docs_purchases.id")),
+    sqlalchemy.Column("document_warehouse_id", Integer, ForeignKey("docs_warehouse.id")),
+    sqlalchemy.Column("amount", Integer, nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -765,6 +816,7 @@ docs_reconciliation = sqlalchemy.Table(
     sqlalchemy.Column("organization_closing_balance", Float),
     sqlalchemy.Column("contragent_closing_balance", Float),
     sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -791,6 +843,7 @@ distribution_docs = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id")),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("period_start", Integer, nullable=False),
     sqlalchemy.Column("period_end", Integer, nullable=False),
     sqlalchemy.Column("is_preview", Boolean),
@@ -826,6 +879,7 @@ gross_profit_docs = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id")),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("period_start", Integer, nullable=False),
     sqlalchemy.Column("period_end", Integer, nullable=False),
     sqlalchemy.Column("is_deleted", Boolean),
@@ -837,7 +891,9 @@ gross_profit_docs_operations = sqlalchemy.Table(
     "gross_profit_docs_operations",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("gross_profit_doc_id", Integer, ForeignKey("gross_profit_docs.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column(
+        "gross_profit_doc_id", Integer, ForeignKey("gross_profit_docs.id", ondelete="CASCADE"), nullable=False
+    ),
     sqlalchemy.Column("document_sale", Integer, ForeignKey("docs_sales.id"), nullable=False),
     sqlalchemy.Column("net_cost", Float, nullable=False),
     sqlalchemy.Column("sum", Float, nullable=False),
@@ -886,6 +942,9 @@ warehouse_balances = sqlalchemy.Table(
 )
 
 
+
+
+
 messages = sqlalchemy.Table(
     "messages",
     metadata,
@@ -920,7 +979,7 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("status_card", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 loyality_transactions = sqlalchemy.Table(
@@ -944,7 +1003,7 @@ loyality_transactions = sqlalchemy.Table(
     sqlalchemy.Column("dead_at", DateTime),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 loyality_settings = sqlalchemy.Table(
@@ -962,6 +1021,48 @@ loyality_settings = sqlalchemy.Table(
     sqlalchemy.Column("max_percentage", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+doc_generated = sqlalchemy.Table(
+    "doc_generated",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("user_id", ForeignKey("tg_accounts.id")),
+    sqlalchemy.Column("tags", String),
+    sqlalchemy.Column("template_id", ForeignKey("doc_template.id")),
+    sqlalchemy.Column("doc_link", String),
+    sqlalchemy.Column("entity", String),
+    sqlalchemy.Column("entity_id", Integer),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+)
+
+doc_templates = sqlalchemy.Table(
+    "doc_template",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String, nullable=False),
+    sqlalchemy.Column("description", String),
+    sqlalchemy.Column("template_data", String),
+    sqlalchemy.Column("tags", String),
+    sqlalchemy.Column("user_id", Integer),
+    sqlalchemy.Column("created_at", Integer),
+    sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("type", Integer, ForeignKey("type_template.id")),
+)
+
+tag_templates = sqlalchemy.Table(
+    "tag_template",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String, nullable=False),
+)
+
+type_template = sqlalchemy.Table(
+    "type_template",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String, nullable=False),
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"

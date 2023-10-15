@@ -9,7 +9,7 @@ from api.balances.schemas import AccountInfo
 router = APIRouter(tags=["account"])
 
 
-@router.get("/account/info", response_model=AccountInfo)
+@router.get("/account/info/", response_model=AccountInfo)
 async def get_account_info(token: str):
     """Получение информации об аккаунте и оплате"""
     query = users_cboxes_relation.select(

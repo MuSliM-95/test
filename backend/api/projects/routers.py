@@ -16,7 +16,7 @@ import aiofiles
 router = APIRouter(tags=["projects"])
 
 
-@router.get("/projects/{id}", response_model=proj_schemas.Project)
+@router.get("/projects/{id}/", response_model=proj_schemas.Project)
 async def get_project_by_id(token: str, id: int):
     """Получение проекта по ID"""
     query = users_cboxes_relation.select(
@@ -34,7 +34,7 @@ async def get_project_by_id(token: str, id: int):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.get("/projects", response_model=proj_schemas.GetProjects)
+@router.get("/projects/", response_model=proj_schemas.GetProjects)
 async def get_projects(token: str, limit: int = 100, offset: int = 0, sort: str = "created_at:desc",
                        filters: filter_schemas.ProjectsFiltersQuery = Depends()):
     """Получение проектов кассы"""
@@ -72,7 +72,7 @@ async def get_projects(token: str, limit: int = 100, offset: int = 0, sort: str 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.post("/projects")
+@router.post("/projects/")
 async def new_project(token: str, proj: proj_schemas.ProjectCreate):
     """Создание проекта"""
     query = users_cboxes_relation.select(
@@ -100,7 +100,7 @@ async def new_project(token: str, proj: proj_schemas.ProjectCreate):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/projects")
+@router.put("/projects/")
 async def edit_project(token: str, proj: proj_schemas.ProjectEdit):
     """Обновление проекта"""
     query = users_cboxes_relation.select(
@@ -137,7 +137,7 @@ async def edit_project(token: str, proj: proj_schemas.ProjectEdit):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/projects/add_icon")
+@router.put("/projects/add_icon/")
 async def add_icon_to_project(token: str, proj_id: int, icon_file: UploadFile = File(...)):
     query = users_cboxes_relation.select(
         users_cboxes_relation.c.token == token)

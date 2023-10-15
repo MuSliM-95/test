@@ -158,7 +158,7 @@ class RaspilView extends React.Component {
     };
 
     showModal = () => {
-        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/${this.props.payment.id}/childs`, { params: { token: this.props.token } })
+        axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/${this.props.payment.id}/childs/`, { params: { token: this.props.token } })
             .then(response => {
 
                 this.setState({
@@ -197,7 +197,7 @@ class RaspilView extends React.Component {
                 newBody.push({ id: item.id, amount: parseFloat(item.amount), project_id: parseFloat(item.project_id), contragent: parseInt(item.contragent) })
                 return 0
             })
-            axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_split?token=${this.props.token}`, newBody)
+            axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_split/?token=${this.props.token}`, newBody)
                 .then(response => {
                     this.handleCancel();
                 })
@@ -206,7 +206,7 @@ class RaspilView extends React.Component {
     }
 
     handleCancelRaspil = () => {
-        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_split/${this.props.payment.id}?token=${this.props.token}`)
+        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_split/${this.props.payment.id}/?token=${this.props.token}`)
             .then(response => {
                 message.success("Вы успешно отменили распил платежа!")
                 this.handleCancel();

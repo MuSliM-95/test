@@ -20,3 +20,8 @@ class UnitList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class UnitListGet(BaseModel):
+    result: Optional[List[Unit]]
+    count: int

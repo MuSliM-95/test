@@ -1,8 +1,9 @@
 import { useQuery, useMutation } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetNomenclature = (options) => {
-  const { token, name, limit = 100000 } = options;
+  const { token, name, limit = 10000 } = options;
   const query = useQuery(
     ["nomenclature", token, name],
     async () => {
@@ -11,7 +12,7 @@ export const useFetchGetNomenclature = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/nomenclature/`,
         { params }
       );
-      return response.data?.sort((a, b) => a.id - b.id);
+      return response.data.result?.sort((a, b) => a.id - b.id);
     },
     {
       refetchOnWindowFocus: false,
@@ -54,3 +55,7 @@ export const useFetchDeleteNomenclature = (token) => {
   );
   return [mutate, { isLoading, isError, isSuccess }];
 };
+
+export const useFetchAllNomenclature = ({ token }) =>
+  useFetchAllData({ token, key: "nomenclature", path: "nomenclature/" });
+

@@ -51,7 +51,7 @@ price_types_cache = set()
 units_cache = set()
 
 
-@router.get("/docs_sales/{idx}", response_model=schemas.View)
+@router.get("/docs_sales/{idx}/", response_model=schemas.View)
 async def get_by_id(token: str, idx: int):
     """Получение документа по ID"""
     await get_user_by_token(token)
@@ -438,7 +438,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass):
     return docs_sales_db
 
 
-@router.patch("/docs_sales/{idx}", response_model=schemas.ListView)
+@router.patch("/docs_sales/{idx}/", response_model=schemas.ListView)
 async def update(token: str, docs_sales_data: schemas.EditMass):
     """Редактирование документов"""
     user = await get_user_by_token(token)
@@ -736,7 +736,7 @@ async def delete(token: str, ids: list[int]):
     return items_db
 
 
-@router.delete("/docs_sales/{idx}", response_model=schemas.ListView)
+@router.delete("/docs_sales/{idx}/", response_model=schemas.ListView)
 async def delete(token: str, idx: int):
     """Удаление документа"""
     await get_user_by_token(token)

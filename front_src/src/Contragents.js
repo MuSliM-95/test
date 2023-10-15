@@ -172,7 +172,7 @@ class CATable extends React.Component {
     }
 
     componentDidMount() {
-        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents`)
+        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/`)
         const { websocket } = this.props;
 
         websocket.onmessage = message => {
@@ -245,7 +245,7 @@ class CATable extends React.Component {
             dataSource: dataSource,
         });
 
-        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${row.id}`, { params: { token: this.props.query.token } })
+        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${row.id}/`, { params: { token: this.props.query.token } })
             .then(response => {
                 message.success("Вы успешно удалили контрагента");
             }).catch((err) => {
@@ -257,7 +257,7 @@ class CATable extends React.Component {
     edit_request = (row) => {
         let body = Object.assign({}, row);
         delete body['id']
-        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${row.id}?token=${this.props.query.token}`, body)
+        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${row.id}/?token=${this.props.query.token}`, body)
             .then(response => {
                 message.success('Вы успешно изменили контрагента');
             });
@@ -347,7 +347,7 @@ class CATable extends React.Component {
                             total: this.state.count,
                             onChange: page => {
 
-                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents`))
+                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/`))
                             },
                             pageSize: 35,
                             showSizeChanger: false

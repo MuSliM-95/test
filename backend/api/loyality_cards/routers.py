@@ -16,7 +16,7 @@ from fuzzywuzzy import fuzz
 router = APIRouter(tags=["loyality_cards"])
 
 
-@router.get("/loyality_cards/{idx}", response_model=schemas.LoyalityCardGet)
+@router.get("/loyality_cards/{idx}/", response_model=schemas.LoyalityCardGet)
 async def get_loyality_card_by_id(token: str, idx: int):
     """Получение карты по ID"""
     user = await get_user_by_token(token)
@@ -316,7 +316,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
     return loyality_cards_db
 
 
-@router.patch("/loyality_cards/{idx}", response_model=schemas.LoyalityCard)
+@router.patch("/loyality_cards/{idx}/", response_model=schemas.LoyalityCard)
 async def edit_loyality_transaction(
     token: str,
     idx: int,
@@ -357,7 +357,7 @@ async def edit_loyality_transaction(
     return {**loyality_card_db,  **{ "data": { "status": "success" } }}
 
 
-@router.delete("/loyality_cards/{idx}", response_model=schemas.LoyalityCard)
+@router.delete("/loyality_cards/{idx}/", response_model=schemas.LoyalityCard)
 async def delete_loyality_transaction(token: str, idx: int):
     """Удаление карт"""
     user = await get_user_by_token(token)

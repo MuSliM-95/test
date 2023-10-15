@@ -1,8 +1,8 @@
 // ui
 export { EditableCell } from "./ui/Tables/EditableCell";
 export { EditableRow } from "./ui/Tables/EditableRow";
+export { FilterCalendar } from "./ui/Tables/FilterCalendar";
 export { FilterRangePicker } from "./ui/Tables/FilterRangePicker";
-export { EditableCalendar } from "./ui/Tables/EditableCalendar";
 export { PreviewImage } from "./ui/Image/PreviewImage";
 
 // lib

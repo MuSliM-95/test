@@ -41,3 +41,8 @@ class WarehouseList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class WarehouseListGet(BaseModel):
+    result: Optional[List[Warehouse]]
+    count: int

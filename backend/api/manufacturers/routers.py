@@ -9,11 +9,12 @@ from functions.helpers import datetime_to_timestamp, get_entity_by_id
 from functions.helpers import get_user_by_token
 
 from ws_manager import manager
+from sqlalchemy import select, func
 
 router = APIRouter(tags=["manufacturers"])
 
 
-@router.get("/manufacturers/{idx}", response_model=schemas.Manufacturer)
+@router.get("/manufacturers/{idx}/", response_model=schemas.Manufacturer)
 async def get_manufacturer_by_id(token: str, idx: int):
     """Получение производителя по ID"""
     user = await get_user_by_token(token)
@@ -22,7 +23,7 @@ async def get_manufacturer_by_id(token: str, idx: int):
     return manufacturer_db
 
 
-@router.get("/manufacturers/", response_model=schemas.ManufacturerList)
+@router.get("/manufacturers/", response_model=schemas.ManufacturerListGet)
 async def get_manufacturers(token: str, limit: int = 100, offset: int = 0):
     """Получение списка производителей"""
     user = await get_user_by_token(token)
@@ -39,7 +40,17 @@ async def get_manufacturers(token: str, limit: int = 100, offset: int = 0):
     manufacturers_db = await database.fetch_all(query)
     manufacturers_db = [*map(datetime_to_timestamp, manufacturers_db)]
 
-    return manufacturers_db
+    query = (
+        select(func.count(manufacturers.c.id))
+        .where(
+            manufacturers.c.owner == user.id,
+            manufacturers.c.is_deleted.is_not(True),
+        )
+    )
+
+    manufacturers_db_count = await database.fetch_one(query)
+
+    return {"result": manufacturers_db, "count": manufacturers_db_count.count_1}
 
 
 @router.post("/manufacturers/", response_model=schemas.ManufacturerList)
@@ -77,7 +88,7 @@ async def new_manufacturers(token: str, manufacturers_data: schemas.Manufacturer
     return manufacturers_db
 
 
-@router.patch("/manufacturers/{idx}", response_model=schemas.Manufacturer)
+@router.patch("/manufacturers/{idx}/", response_model=schemas.Manufacturer)
 async def edit_manufacturer(
     token: str,
     idx: int,
@@ -107,7 +118,7 @@ async def edit_manufacturer(
     return manufacturer_db
 
 
-@router.delete("/manufacturers/{idx}", response_model=schemas.Manufacturer)
+@router.delete("/manufacturers/{idx}/", response_model=schemas.Manufacturer)
 async def delete_manufacturer(token: str, idx: int):
     """Удаление производителя"""
     user = await get_user_by_token(token)

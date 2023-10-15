@@ -157,7 +157,7 @@ class CreatePayment extends React.Component {
 
         ) {
             requestBody.article_id = current_article.id
-            await axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/articles/${current_article.id}?token=${this.props.token}`, artBody)
+            await axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/articles/${current_article.id}/?token=${this.props.token}`, artBody)
         }
 
         // Если ничего не поменялось
@@ -170,7 +170,7 @@ class CreatePayment extends React.Component {
 
         // Если новый контр
         if (!isArticleCleared && isNewArticle) {
-            const resp = await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/articles?token=${this.props.token}`, artBody)
+            const resp = await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/articles/?token=${this.props.token}`, artBody)
             requestBody.article_id = resp.data.id
         }
 
@@ -223,7 +223,7 @@ class CreatePayment extends React.Component {
                     values.contragent_desc !== current_contragent.description)
             ) {
                 requestBody.contragent = current_contragent.id
-                await axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${current_contragent.id}?token=${this.props.token}`, body)
+                await axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${current_contragent.id}/?token=${this.props.token}`, body)
             }
 
             // Если ничего не поменялось
@@ -239,7 +239,7 @@ class CreatePayment extends React.Component {
 
             // Если новый контр
             if (!isContrCleared && isNewContr) {
-                const resp = await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents?token=${this.props.token}`, body)
+                const resp = await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/?token=${this.props.token}`, body)
                 requestBody.contragent = resp.data.id
             }
 
@@ -262,7 +262,7 @@ class CreatePayment extends React.Component {
 
         requestBody.status = p_status;
         
-        await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments?token=${this.props.token}`, requestBody)
+        await axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/?token=${this.props.token}`, requestBody)
 
         this.handleCancel()
     };
@@ -323,7 +323,7 @@ class CreatePayment extends React.Component {
     }
 
     findArticle = async (id) => {
-        return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/articles/${id}?token=${this.props.token}`)
+        return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/articles/${id}/?token=${this.props.token}`)
             .then((response) => response.json())
             .then((body) => {
                 return body
@@ -333,7 +333,7 @@ class CreatePayment extends React.Component {
 
     fetchNames = async (name) => {
         if (name) {
-            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_meta?token=${this.props.token}&name=${name}`)
+            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_meta/?token=${this.props.token}&name=${name}`)
                 .then((response) => response.json())
                 .then((body) => {
                     return body
@@ -359,7 +359,7 @@ class CreatePayment extends React.Component {
 
     fetchTags = async (name) => {
         if (name) {
-            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_meta?token=${this.props.token}&tags=${name}`)
+            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_meta/?token=${this.props.token}&tags=${name}`)
                 .then((response) => response.json())
                 .then((body) => {
                     return body
@@ -387,7 +387,7 @@ class CreatePayment extends React.Component {
 
     fetchProjects = async (name) => {
         if (name) {
-            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects?token=${this.props.token}&name=${name}`)
+            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/?token=${this.props.token}&name=${name}`)
                 .then((response) => response.json())
                 .then((body) => {
                     return body
@@ -407,7 +407,7 @@ class CreatePayment extends React.Component {
                 })
         }
         else {
-            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects?token=${this.props.token}`)
+            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/?token=${this.props.token}`)
                 .then((response) => response.json())
                 .then((body) => {
                     return body
@@ -432,7 +432,7 @@ class CreatePayment extends React.Component {
 
     fetchPayboxes = async (name) => {
         if (name) {
-            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${this.props.token}&name=${name}`)
+            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${this.props.token}&name=${name}`)
                 .then((response) => response.json())
                 .then((body) => {
                     return body
@@ -458,7 +458,7 @@ class CreatePayment extends React.Component {
                 })
         }
         else {
-            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes?token=${this.props.token}`)
+            return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/?token=${this.props.token}`)
                 .then((response) => response.json())
                 .then((body) => {
                     return body
@@ -486,7 +486,7 @@ class CreatePayment extends React.Component {
     }
 
     findContragent = async (id) => {
-        return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}?token=${this.props.token}`)
+        return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}/?token=${this.props.token}`)
             .then((response) => response.json())
             .then((body) => {
                 return body

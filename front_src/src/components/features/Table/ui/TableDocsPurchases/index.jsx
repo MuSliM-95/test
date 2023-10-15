@@ -32,8 +32,7 @@ export default function TableDocsPurchases() {
     [mutateDeletePurchase, setEditModalId]
   );
 
-  const { data, total, isLoading, isErrorPurchases, isErrorDirectory, errors } =
-    useGetDataTable({ token, current, pageSize });
+  const { data, total, isLoading, isErrorPurchases, isErrorDirectory, errors } = useGetDataTable({ token, current, pageSize });
 
   useEffect(() => {
     if (isErrorPurchases || isErrorDirectory)

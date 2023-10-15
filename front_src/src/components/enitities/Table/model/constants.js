@@ -462,11 +462,6 @@ export const COL_ANALYTICS_CARDS = [
     dataIndex: "first_name",
     ellipsis: true,
   },
-  {
-    title: "Количество",
-    dataIndex: "all_count",
-    ellipsis: true,
-  },
 ];
 
 export const COL_ANALYTICS_EXPANDED = [

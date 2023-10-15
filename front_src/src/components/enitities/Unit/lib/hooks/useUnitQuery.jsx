@@ -1,14 +1,17 @@
 import { useQuery } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
-export const useFetchGetUnits = () => {
+export const useFetchGetUnits = ({ limit, offset }) => {
   const query = useQuery(
-    ["units",],
+    ["units"],
     async () => {
+      const params = { offset, limit };
       const response = await axios.get(
         `https://${process.env.REACT_APP_APP_URL}/api/v1/units/`,
+        { params }
       );
-      return response.data;
+      return response.data.result;
     },
     {
       refetchOnWindowFocus: false,
@@ -17,3 +20,5 @@ export const useFetchGetUnits = () => {
   return query;
 };
 
+export const useFetchAllUnits = () =>
+  useFetchAllData({ key: "units", path: "units/" });

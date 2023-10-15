@@ -13,7 +13,7 @@ from functions.helpers import get_filters_users, raise_wrong_token
 router = APIRouter(tags=["cboxes"])
 
 
-@router.get("/cashbox_users", response_model=user_schemas.CBUsersList)
+@router.get("/cashbox_users/", response_model=user_schemas.CBUsersList)
 async def read_cashbox_users(
     token: str,
     limit: int = 100,
@@ -86,7 +86,7 @@ async def read_cashbox_users(
     raise_wrong_token()
 
 
-@router.put("/cashbox_users", response_model=user_schemas.CBUsers)
+@router.put("/cashbox_users/", response_model=user_schemas.CBUsers)
 async def edit_cashbox_user_status(token: str, user_id: int, status: bool):
     """Обновление статуса юзера кассы"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -131,7 +131,7 @@ async def edit_cashbox_user_status(token: str, user_id: int, status: bool):
     raise_wrong_token()
 
 
-@router.get("/cashboxes_meta")
+@router.get("/cashboxes_meta/")
 async def read_payments_meta(token: str, limit: int = 100, offset: int = 0):
     """Мета юзеров кассы"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)

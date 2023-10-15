@@ -6,7 +6,7 @@ from api.events.schemas import GetEvents
 router = APIRouter(prefix="/events", tags=["events"])
 
 
-@router.get("/{token}", response_model=GetEvents)
+@router.get("/{token}/", response_model=GetEvents)
 async def get_events_route(
     token: str,
     limit: int = Query(10),

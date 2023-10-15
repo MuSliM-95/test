@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, HttpUrl
 
 # class Status(Enum):
@@ -28,6 +28,10 @@ class ShowIntegration(BaseModel):
     payed_to: Optional[str] = ""
     is_payed: Optional[bool] = False
     trial: Optional[str] = ""
+
+class ShowIntegrationGet(BaseModel):
+    result: Optional[List[ShowIntegration]]
+    count: int
 
 class Integration(BaseModel):
     status : bool

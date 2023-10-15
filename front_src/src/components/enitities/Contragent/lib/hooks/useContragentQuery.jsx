@@ -1,5 +1,6 @@
 import { useQuery } from "react-query";
 import axios from "axios";
+import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetContragents = (options) => {
   const { token, name, } = options;
@@ -8,10 +9,10 @@ export const useFetchGetContragents = (options) => {
     async () => {
       const params = { token, name }
       const response = await axios.get(
-        `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents`,
+        `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/`,
         { params }
       );
-      return response.data;
+      return response.data.result;
     },
     {
       refetchOnWindowFocus: false,
@@ -19,3 +20,6 @@ export const useFetchGetContragents = (options) => {
   );
   return query;
 };
+
+export const useFetchAllContragents = ({ token }) =>
+  useFetchAllData({ token, key: "contragents", path: "contragents/" });

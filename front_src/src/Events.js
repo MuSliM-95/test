@@ -80,7 +80,7 @@ class Events extends React.Component {
     }
 
     componentDidMount() {
-        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/events/${this.props.token}`);
+        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/events/${this.props.token}/`);
     }
 
     modalRequest = (body, title) => {
@@ -139,7 +139,7 @@ class Events extends React.Component {
                         {
                             total: this.state.count,
                             onChange: page => {
-                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/events/${this.props.token}`))
+                                this.setState({ currentPage: page, loading: true }, this.fetch(page, `https://${process.env.REACT_APP_APP_URL}/api/v1/events/${this.props.token}/`))
                             },
                             pageSize: 20
                         }

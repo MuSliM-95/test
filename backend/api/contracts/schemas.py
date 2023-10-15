@@ -59,3 +59,8 @@ class ContractList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class ContractListGet(BaseModel):
+    result: Optional[List[Contract]]
+    count: int

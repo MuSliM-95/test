@@ -17,6 +17,7 @@ from functions.helpers import datetime_to_timestamp, get_entity_by_id
 from functions.helpers import get_user_by_token
 
 from ws_manager import manager
+from sqlalchemy import select, func
 
 router = APIRouter(tags=["pictures"])
 
@@ -35,7 +36,7 @@ bucket_name = "apptablecrmcom-default-bucket"
 
 
 
-@router.get("/pictures/{idx}", response_model=schemas.Picture)
+@router.get("/pictures/{idx}/", response_model=schemas.Picture)
 async def get_picture_by_id(token: str, idx: int):
     """Получение картинки по ID"""
     user = await get_user_by_token(token)
@@ -44,7 +45,7 @@ async def get_picture_by_id(token: str, idx: int):
     return picture_db
 
 
-@router.get("/photos/{filename}")
+@router.get("/photos/{filename}/")
 async def get_picture_by_id(filename: str):
     """Получение картинки по ID"""
     async with s3_session.client(**s3_data) as s3:
@@ -64,7 +65,7 @@ async def get_picture_by_id(filename: str):
 
 
 
-@router.get("/pictures/", response_model=schemas.PictureList)
+@router.get("/pictures/", response_model=schemas.PictureListGet)
 async def get_pictures(
     token: str,
     limit: int = 100,
@@ -94,7 +95,18 @@ async def get_pictures(
     pictures_db = await database.fetch_all(query)
     pictures_db = [*map(datetime_to_timestamp, pictures_db)]
 
-    return pictures_db
+    query = (
+        select(func.count(pictures.c.id))
+        .where(
+            pictures.c.owner == user.id,
+            pictures.c.is_deleted.is_not(True),
+            *filters_list,
+        )
+    )
+
+    pictures_db_c = await database.fetch_one(query)
+
+    return {"result": pictures_db, "count": pictures_db_c.count_1}
 
 
 @router.post("/pictures/", response_model=schemas.Picture)
@@ -156,7 +168,7 @@ async def new_picture(
     return picture_db
 
 
-@router.patch("/pictures/{idx}", response_model=schemas.Picture)
+@router.patch("/pictures/{idx}/", response_model=schemas.Picture)
 async def edit_picture(
     token: str,
     idx: int,
@@ -186,7 +198,7 @@ async def edit_picture(
     return picture_db
 
 
-@router.delete("/pictures/{idx}", response_model=schemas.Picture)
+@router.delete("/pictures/{idx}/", response_model=schemas.Picture)
 async def delete_picture(token: str, idx: int):
     """Удаление картинки"""
     user = await get_user_by_token(token)

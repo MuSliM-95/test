@@ -39,3 +39,8 @@ class CategoryList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class CategoryListGet(BaseModel):
+    result: Optional[List[Category]]
+    count: int

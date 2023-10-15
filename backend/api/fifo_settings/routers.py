@@ -10,7 +10,7 @@ from ws_manager import manager
 router = APIRouter(tags=["fifo_settings"])
 
 
-@router.get("/fifo_settings/{idx}", response_model=schemas.View)
+@router.get("/fifo_settings/{idx}/", response_model=schemas.View)
 async def get_by_id(token: str, organization_id: int):
     """Получение настроек по ID организации"""
     await get_user_by_token(token)
@@ -54,7 +54,7 @@ async def create(token: str, fifo_settings_data: schemas.Create):
     return instance
 
 
-@router.patch("/fifo_settings/{organization_id}", response_model=schemas.View)
+@router.patch("/fifo_settings/{organization_id}/", response_model=schemas.View)
 async def update(token: str, organization_id: int, fifo_settings_data: schemas.Edit):
     """Редактирование настроек организации"""
     await get_user_by_token(token)

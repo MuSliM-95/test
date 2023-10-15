@@ -20,14 +20,24 @@ class PriceCreateMass(BaseModel):
         orm_mode = True
 
 
-class PriceEdit(PriceCreate):
+class PriceEdit(BaseModel):
+    id: int
     price: Optional[float]
     nomenclature: Optional[int]
+    price_type: Optional[int]
+    date_from: Optional[int]
+    date_to: Optional[int]
 
+class PriceEditOne(BaseModel):
+    price: Optional[float]
+    price_type: Optional[int]
+    date_from: Optional[int]
+    date_to: Optional[int]
 
 class PriceInList(BaseModel):
     id: int
-    name: str
+    nomenclature_id: int
+    nomenclature_name: str
     type: Optional[str]
     description_short: Optional[str]
     description_long: Optional[str]
@@ -40,7 +50,8 @@ class PriceInList(BaseModel):
     manufacturer_name: Optional[str]
     price: float
     price_type: Optional[str]
-    price_finishes: Optional[int]
+    date_from: Optional[int]
+    date_to: Optional[int]
 
     class Config:
         orm_mode = True
@@ -56,6 +67,11 @@ class PriceList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PriceListGet(BaseModel):
+    result: Optional[List[PriceInList]]
+    count: int
 
 
 class PricePure(BaseModel):

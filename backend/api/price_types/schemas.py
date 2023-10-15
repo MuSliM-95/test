@@ -27,3 +27,7 @@ class PriceTypeList(BaseModel):
 
     class Config:
         orm_mode = True
+
+class PriceTypeListGet(BaseModel):
+    result: Optional[List[PriceType]]
+    count: int

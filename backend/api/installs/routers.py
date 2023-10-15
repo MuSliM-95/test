@@ -24,7 +24,7 @@ async def get_install_route(md5key: str = None, devicetoken: str = None):
     return {"id": install.id, "md5key": install.md5key}
 
 
-@router.post("/new/ios/{key}", response_model=Install)
+@router.post("/new/ios/{key}/", response_model=Install)
 async def create_install_route(key: str, install: InstallCreate):
     if key != ios_key:
         raise HTTPException(
@@ -46,7 +46,7 @@ async def create_install_route(key: str, install: InstallCreate):
     return {"id": install_id[1], "md5key": md5}
 
 
-@router.post("/ios/link")
+@router.post("/ios/link/")
 async def install_bundle_user_route(tgtoken: str, md5key: str):
     status = await install_bundle_user(tg_token=tgtoken, md5key=md5key)
     if not status:
@@ -57,7 +57,7 @@ async def install_bundle_user_route(tgtoken: str, md5key: str):
     return {"success": "link created"}
 
 
-@router.post("/ios/delink")
+@router.post("/ios/delink/")
 async def delink_install_bundle_user_route(tgtoken: str, md5key: str):
     status = await delink_install(tg_token=tgtoken, md5key=md5key)
     if not status:
@@ -68,7 +68,7 @@ async def delink_install_bundle_user_route(tgtoken: str, md5key: str):
     return {"success": "delink bundle"}
 
 
-@router.patch("/settings/{md5key}")
+@router.patch("/settings/{md5key}/")
 async def set_settings_install_route(md5key: str, settings: InstallSettings):
     await set_settings_install(md5key=md5key, settings=settings.dict())
     return {"success": "settings updated"}

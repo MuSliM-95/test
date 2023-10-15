@@ -364,7 +364,7 @@ class LoyalityTransactions extends React.Component {
 			dataSource: dataSource,
 		});
 
-		axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_transactions/${row.id}`, { params: { token: this.props.query.token } })
+		axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_transactions/${row.id}/`, { params: { token: this.props.query.token } })
 			.then(response => {
 				message.success("Вы успешно удалили платеж");
 			});
@@ -489,7 +489,7 @@ class LoyalityTransactions extends React.Component {
 		}
 
 		if (Object.keys(edit_dict).length !== 0) {
-			axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_transactions/${id}?token=${this.props.query.token}`, edit_dict)
+			axios.patch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_transactions/${id}/?token=${this.props.query.token}`, edit_dict)
 			const newData = [...this.state.dataSource];
 			const index = newData.findIndex((item) => item.id === id);
 
@@ -613,7 +613,7 @@ class LoyalityTransactions extends React.Component {
 				})
 		}
 		else {
-			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards?token=${this.props.query.token}`)
+			return fetch(`https://${process.env.REACT_APP_APP_URL}/api/v1/loyality_cards/?token=${this.props.query.token}`)
 				.then((response) => response.json())
 				.then((body) => {
 					return body

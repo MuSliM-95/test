@@ -102,7 +102,7 @@ const Analytics = ({listPayment, query, filter, websocket}) => {
 			}
 		}
         
-		axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments`, params)
+		axios.get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/`, params)
 		.then(response => {
 			const newArr =  [...new Set(response.data.result.map(item => ({type: item.type, amount: item.amount, date: item.date, name:item.name})))]
 			setArr(newArr)

@@ -73,6 +73,12 @@ class ListView(BaseModel):
         orm_mode = True
 
 
+class ListViewGet(BaseModel):
+    result: Optional[List[ViewInList]]
+    count: int
+
+
+
 class CreateListView(BaseModel):
     results: Optional[List[ViewInList]]
     errors: CreateErrorMass

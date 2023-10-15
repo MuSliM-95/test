@@ -150,7 +150,7 @@ class Raspil extends React.Component {
                 ds[i].ca = parseInt(ds[i].ca)
             }
         }
-        axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_split/${this.props.payment.id}?token=${this.props.token}`, ds)
+        axios.post(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments_split/${this.props.payment.id}/?token=${this.props.token}`, ds)
             .then(response => {
                 message.success(<>Вы успешно создали проект</>);
             });

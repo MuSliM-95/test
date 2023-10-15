@@ -186,14 +186,14 @@ class UsersTable extends React.Component {
     }
 
     handleChangeStatus = (checked, row) => {
-        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users?token=${this.props.query.token}&user_id=${row.id}&status=${checked}`)
+        axios.put(`https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users/?token=${this.props.query.token}&user_id=${row.id}&status=${checked}`)
             .then(response => {
                 message.success(<>Вы успешно изменили статус</>);
             });
     }
 
     componentDidMount() {
-        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users`)
+        this.fetch(1, `https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users/`)
         const { websocket } = this.props;
 
         websocket.onmessage = message => {

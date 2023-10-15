@@ -16,7 +16,7 @@ from datetime import datetime
 router = APIRouter(tags=["contragents"])
 
 
-@router.get("/contragents")
+@router.get("/contragents/")
 async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQuery = Depends(), limit: int = 100,
                                 offset: int = 0, sort: str = "created_at:desc"):
     """Получение меты контрагентов"""
@@ -54,7 +54,7 @@ async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQue
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.post("/contragents")
+@router.post("/contragents/")
 async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCreate, List[ca_schemas.ContragentCreate]]):
     """Создание контрагента"""
     query = users_cboxes_relation.select(
@@ -91,7 +91,7 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.get("/contragents/{id}")
+@router.get("/contragents/{id}/")
 async def get_contragent_by_id(token: str, id: int):
     """Получение контрагента по ID"""
     query = users_cboxes_relation.select(
@@ -112,7 +112,7 @@ async def get_contragent_by_id(token: str, id: int):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.put("/contragents/{id}")
+@router.put("/contragents/{id}/")
 async def update_contragent_data(token: str, ca_body: ca_schemas.ContragentEdit, id: int):
     """Обновление контрагента"""
     query = users_cboxes_relation.select(
@@ -142,7 +142,7 @@ async def update_contragent_data(token: str, ca_body: ca_schemas.ContragentEdit,
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-@router.delete("/contragents/{id}")
+@router.delete("/contragents/{id}/")
 async def delete_contragent(token: str, id: int):
     """Удаление контрагента"""
     query = users_cboxes_relation.select(

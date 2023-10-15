@@ -11,21 +11,21 @@ import "handsontable/dist/handsontable.full.min.css";
 
 import { PricesHandsontableContext } from "../../../../shared/lib/hooks/context/getPricesHandsontableContext";
 import {
-  useFetchGetPrices,
+  useFetchAllPrices,
   useFetchCreatePrice,
   useFetchEditPrice,
   useFetchDeletePrices,
 } from "../../../../enitities/Price/lib/hooks/usePriceQuery";
 import {
-  useFetchGetNomenclature,
+  useFetchAllNomenclature,
   useFetchEditNomenclature,
   useFetchCreateNomenclature,
   useFetchDeleteNomenclature,
 } from "../../../../enitities/Nomenclature/lib/hooks/useNomenclatureQuery";
-import { useFetchGetPriceTypes } from "../../../../enitities/PriceType/lib/hooks/usePriceTypeQuery";
-import { useFetchGetManufactures } from "../../../../enitities/Manufacture/lib/hooks/useManufactureQuery";
-import { useFetchGetUnits } from "../../../../enitities/Unit/lib/hooks/useUnitQuery";
-import { useFetchGetCategories } from "../../../../enitities/Category/lib/hooks/useCategoryQuery";
+import { useFetchAllPricesType } from "../../../../enitities/PriceType/lib/hooks/usePriceTypeQuery";
+import { useFetchAllManufacturers } from "../../../../enitities/Manufacture/lib/hooks/useManufactureQuery";
+import { useFetchAllUnits } from "../../../../enitities/Unit/lib/hooks/useUnitQuery";
+import { useFetchAllCategories } from "../../../../enitities/Category/lib/hooks/useCategoryQuery";
 
 import {
   getPreparePrices,
@@ -50,41 +50,44 @@ export default function TableDocsPurchases() {
 
   const queryClient = useQueryClient();
 
+  const queryKeys = queryClient.getQueryCache()
+
   const { token, websocket } = useContext(PricesHandsontableContext);
   const {
     isLoading: isLoadingPrices,
     isError: isErrorPrices,
     data: prices,
-  } = useFetchGetPrices({ token });
+  } = useFetchAllPrices({ token });
   const {
     isLoading: isLoadingNomenclatures,
     isError: isErrorNomenclatures,
     data: nomenclatures = [],
     isSuccess: isSuccessNomenclatures,
-  } = useFetchGetNomenclature({ token });
+  } = useFetchAllNomenclature({ token });
+  
   const {
     isLoading: isLoadingPriceTypes,
     isError: isErrorPriceTypes,
     data: priceTypes,
-  } = useFetchGetPriceTypes({ token });
+  } = useFetchAllPricesType({ token });
   const {
     isLoading: isLoadingManufactures,
     isError: isErrorManufactures,
     data: manufactures,
     isSuccess: isSuccessManufactures,
-  } = useFetchGetManufactures({ token });
+  } = useFetchAllManufacturers({ token });
   const {
     isLoading: isLoadingUnits,
     isError: isErrorUnits,
     data: units,
-  } = useFetchGetUnits();
+  } = useFetchAllUnits();
 
   const {
     isLoading: isLoadingCategories,
     isError: isErrorCategories,
     data: categories,
     isSuccess: isSuccessCategories,
-  } = useFetchGetCategories({ token });
+  } = useFetchAllCategories({ token });
 
   const [
     mutateEditNomenclatures,
@@ -193,8 +196,8 @@ export default function TableDocsPurchases() {
     isSuccessEdit,
     isSuccessCreate,
     changeCount,
-    nomenclatures?.length,
-    prices?.length,
+    nomenclatures,
+    prices,
     isError,
   ]);
 

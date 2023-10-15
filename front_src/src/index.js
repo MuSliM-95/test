@@ -158,7 +158,11 @@ const nav_items = (token) => [
     icon: <HistoryOutlined />,
   },
   {
-    label: <Link to={`/loyality_settings?token=${token}`}>Настройки карты лояльности</Link>,
+    label: (
+      <Link to={`/loyality_settings?token=${token}`}>
+        Настройки карты лояльности
+      </Link>
+    ),
     key: "loyality_settings",
     icon: <HistoryOutlined />,
   },
@@ -264,7 +268,7 @@ class LogIn extends React.Component {
     const { date_from, date_to } = currentMonthRange();
 
     axios
-      .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/cashboxes_meta`, {
+      .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/cashboxes_meta/`, {
         params: { token: params.token },
       })
       .then((response) => {
@@ -301,7 +305,7 @@ class LogIn extends React.Component {
         });
 
         axios
-          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes`, {
+          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payboxes/`, {
             params: { token: params.token, limit: 35, offset: 0 },
           })
           .then((response) => {
@@ -334,7 +338,7 @@ class LogIn extends React.Component {
           });
 
         axios
-          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments`, {
+          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/payments/`, {
             params: { ...params, limit: 35, offset: 0 },
           })
           .then((response) => {
@@ -392,7 +396,7 @@ class LogIn extends React.Component {
           });
 
         axios
-          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects`, {
+          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/projects/`, {
             params: { token: params.token, limit: 35, offset: 0 },
           })
           .then((response) => {
@@ -426,7 +430,7 @@ class LogIn extends React.Component {
 
         axios
           .get(
-            `https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users`,
+            `https://${process.env.REACT_APP_APP_URL}/api/v1/cashbox_users/`,
             {
               params: { token: params.token, limit: 100, offset: 0 },
             }
@@ -468,11 +472,10 @@ class LogIn extends React.Component {
           .then((response) => {
             Loading[4] = true;
             let options_list = [];
-
-            for (var i in response.data) {
+            for (var i in response.data.result) {
               options_list.push({
-                value: `${response.data[i].id}`,
-                label: response.data[i].short_name,
+                value: `${response.data.result[i].id}`,
+                label: response.data.result[i].short_name,
               });
             }
 
@@ -501,7 +504,7 @@ class LogIn extends React.Component {
           });
 
         axios
-          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents`, {
+          .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/`, {
             params: { token: params.token, limit: 35, offset: 0 },
           })
           .then((response) => {
@@ -561,7 +564,8 @@ class LogIn extends React.Component {
               .then((res) => {
                 Loading[7] = true;
                 this.setState({
-                  categoriesData: res.data,
+                  categoriesData: res.data.result,
+                  categoriesDataCount: res.data.count,
                 });
               });
 
@@ -575,7 +579,8 @@ class LogIn extends React.Component {
               .then((res) => {
                 Loading[8] = true;
                 this.setState({
-                  nomenclatureData: res.data,
+                  nomenclatureData: res.data.result,
+                  nomenclatureDataCount: res.data.count,
                 });
               });
             axios
@@ -587,7 +592,10 @@ class LogIn extends React.Component {
               )
               .then((res) => {
                 Loading[9] = true;
-                this.setState({ manufacturersData: res.data });
+                this.setState({
+                  manufacturersData: res.data.result,
+                  manufacturersDataCount: res.data.count,
+                });
               });
             axios
               .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/units/`, {
@@ -595,7 +603,10 @@ class LogIn extends React.Component {
               })
               .then((res) => {
                 Loading[10] = true;
-                this.setState({ unitsData: res.data });
+                this.setState({
+                  unitsData: res.data.result,
+                  unitsDataCount: res.data.count,
+                });
               });
             axios
               .get(
@@ -606,7 +617,10 @@ class LogIn extends React.Component {
               )
               .then((res) => {
                 Loading[11] = true;
-                this.setState({ organizationsData: res.data });
+                this.setState({
+                  organizationsData: res.data.result,
+                  organizationsDataCount: res.data.count,
+                });
               });
             axios
               .get(
@@ -617,7 +631,10 @@ class LogIn extends React.Component {
               )
               .then((res) => {
                 Loading[12] = true;
-                this.setState({ contractsData: res.data });
+                this.setState({
+                  contractsData: res.data.result,
+                  contractsDataCount: res.data.count,
+                });
               });
             axios
               .get(
@@ -628,7 +645,10 @@ class LogIn extends React.Component {
               )
               .then((res) => {
                 Loading[13] = true;
-                this.setState({ warehousesData: res.data });
+                this.setState({
+                  warehousesData: res.data.result,
+                  warehousesDataCount: res.data.count,
+                });
               });
             axios
               .get(
@@ -639,7 +659,10 @@ class LogIn extends React.Component {
               )
               .then((res) => {
                 Loading[14] = true;
-                this.setState({ warehouseDocsData: res.data });
+                this.setState({
+                  warehouseDocsData: res.data.result,
+                  warehouseDocsDataCount: res.data.count,
+                });
               });
             axios
               .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/prices/`, {
@@ -647,7 +670,10 @@ class LogIn extends React.Component {
               })
               .then((res) => {
                 Loading[15] = true;
-                this.setState({ pricesData: res.data });
+                this.setState({
+                  pricesData: res.data.result,
+                  pricesDataCount: res.data.count,
+                });
               });
             axios
               .get(
@@ -658,7 +684,10 @@ class LogIn extends React.Component {
               )
               .then((res) => {
                 Loading[16] = true;
-                this.setState({ priceTypeData: res.data });
+                this.setState({
+                  priceTypeData: res.data.result,
+                  priceTypeDataCount: res.data.count,
+                });
               });
             axios
               .get(
@@ -669,7 +698,10 @@ class LogIn extends React.Component {
               )
               .then((res) => {
                 Loading[17] = true;
-                this.setState({ loyalitySettingsData: res.data });
+                this.setState({
+                  loyalitySettingsData: res.data.result,
+                  loyalitySettingsDataCount: res.data.count,
+                });
               });
             axios
               .get(
@@ -701,7 +733,7 @@ class LogIn extends React.Component {
 
   ws_connect = () => {
     var ws = new WebSocket(
-      `wss://${process.env.REACT_APP_APP_URL}/ws/` + params.token
+      `wss://${process.env.REACT_APP_APP_URL}/ws/${params.token}/`
     );
     let that = this; // cache the this
     var connectInterval;
@@ -849,7 +881,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/payboxes"
                             element={
@@ -863,7 +894,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/loyality_cards"
                             element={
@@ -878,7 +908,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/loyality_transactions"
                             element={
@@ -893,7 +922,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/analytecs"
                             element={
@@ -905,7 +933,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/projects"
                             element={
@@ -917,7 +944,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/integrations"
                             element={
@@ -927,7 +953,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/events"
                             element={
@@ -937,7 +962,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/users"
                             element={
@@ -950,7 +974,6 @@ class LogIn extends React.Component {
                               />
                             }
                           />
-
                           <Route
                             path="/contragents"
                             element={

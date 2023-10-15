@@ -28,7 +28,7 @@ export default function EditCategory({ record, handleSave }) {
       })
       .then((res) => {
         const parent = [];
-        for (let item of res.data) {
+        for (let item of res.data.result) {
           parent.push({ value: item.id, label: item.name });
         }
         setParent(parent);
