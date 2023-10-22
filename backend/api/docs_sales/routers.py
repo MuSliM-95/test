@@ -15,21 +15,23 @@ from database.db import (
     loyality_transactions,
     warehouses,
     users_cboxes_relation,
+    price_types, warehouse_balances,
     nomenclature,
     docs_warehouse,
-    price_types, warehouse_balances,
+
 )
 import datetime
 
 from api.loyality_transactions.routers import raschet_bonuses
 from functions.users import raschet
 
-from api.docs_warehouses.routers import create as create_warehouse_doc
-from api.docs_warehouses.routers import update as update_warehouse_doc
-
 import asyncio
 
 from . import schemas
+
+from api.docs_warehouses.routers import create as create_warehouse_doc
+from api.docs_warehouses.routers import update as update_warehouse_doc
+
 
 from functions.helpers import (
     datetime_to_timestamp,
@@ -234,7 +236,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass):
             del instance_values["goods"]
         except KeyError:
             pass
-
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
         inserted_ids.add(instance_id)
@@ -450,10 +451,10 @@ async def create(token: str, docs_sales_data: schemas.CreateMass):
 
         await create_warehouse_doc(token, body)
 
+
     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
-
 
     await manager.send_message(
         token,
@@ -747,6 +748,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
             }]
 
             await update_warehouse_doc(token, body)
+
 
     query = docs_sales.select().where(docs_sales.c.id.in_(updated_ids))
     docs_sales_db = await database.fetch_all(query)

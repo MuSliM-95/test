@@ -368,7 +368,7 @@ async def delete(token: str, ids: list[int]):
 
 
 @router.post("/alt_docs_warehouse/",
-             tags=["Alternative docs_warehouse"], response_model=Page[schemas.ListView])
+             tags=["Alternative docs_warehouse"], response_model=schemas.ListView)
 async def create(
         token: str,
         docs_warehouse_data: schemas.CreateMass):
@@ -397,7 +397,7 @@ async def create(
         },
     )
 
-    return paginate(docs_warehouse_db)
+    return docs_warehouse_db
 
 
 add_pagination(router)

@@ -12,7 +12,7 @@ from PIL import Image
 from database.db import database, doc_generated, doc_templates
 from functions.helpers import get_user_by_token
 import base64
-from sqlalchemy import or_
+from sqlalchemy import or_, desc
 from os import environ
 
 import aioboto3
@@ -121,7 +121,7 @@ async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, 
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
-        query = doc_generated.select().where(or_(*filter_tags)).limit(limit).offset(offset)
+        query = doc_generated.select().where(or_(*filter_tags)).order_by(desc(doc_generated.c.created_at)).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result, 'tags': ','.join(tags)}
     else:

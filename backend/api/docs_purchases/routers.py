@@ -263,6 +263,7 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
 
         await create_warehouse_doc(token, body)
 
+
     query = docs_purchases.select().where(docs_purchases.c.id.in_(inserted_ids))
     docs_purchases_db = await database.fetch_all(query)
     docs_purchases_db = [*map(datetime_to_timestamp, docs_purchases_db)]
@@ -407,6 +408,7 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
             }]
 
             await update_warehouse_doc(token, body)
+
 
     query = docs_purchases.select().where(docs_purchases.c.id.in_(updated_ids))
     docs_purchases_db = await database.fetch_all(query)

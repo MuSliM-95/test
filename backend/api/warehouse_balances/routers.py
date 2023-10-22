@@ -108,6 +108,7 @@ async def alt_get_warehouse_balances(
                            ))
 
     warehouse_balances_db = await database.fetch_all(query)
+    # warehouse_balances_db = [*map(datetime_to_timestamp, warehouse_balances_db)]
     res = []
     for warehouse_balance in warehouse_balances_db:
         balance_dict = dict(warehouse_balance)
@@ -118,8 +119,6 @@ async def alt_get_warehouse_balances(
 
         res.append(balance_dict)
 
-
-    # warehouse_balances_db = [*map(datetime_to_timestamp, warehouse_balances_db)]
     return paginate(res)
 
 add_pagination(router)

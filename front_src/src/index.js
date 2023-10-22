@@ -41,6 +41,7 @@ import Analytics from "./components/analytics";
 import LoyalityCards from "./LoyalityCards";
 import LoyalityTransactions from "./LoyalityTransactions";
 import DocsSales from "./DocsSales";
+import WarehousesBalances from "./WarehousesBalances";
 import {
   TableCategoriesPage,
   TableNomenclature,
@@ -55,7 +56,6 @@ import {
   TableLoyalityReport,
 } from "./components/pages/";
 import { currentMonthRange } from "./components/shared";
-import WarehousesBalances from "./WarehousesBalances";
 
 const { Option } = Select;
 const { Header, Content, Footer, Sider } = Layout;
@@ -153,6 +153,7 @@ const nav_items = (token) => [
     key: "warehouses_balances",
     icon: <HistoryOutlined />,
   },
+
   {
     label: <Link to={`/docs_warehouse?token=${token}`}>Документы склада</Link>,
     key: "docs_warehouse",
@@ -255,7 +256,7 @@ class LogIn extends React.Component {
         false,
         false,
         false,
-        false
+        false,
       ],
       authError403: false,
       cboxData: {},
