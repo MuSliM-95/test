@@ -55,6 +55,7 @@ import {
   TableLoyalityReport,
 } from "./components/pages/";
 import { currentMonthRange } from "./components/shared";
+import WarehousesBalances from "./WarehousesBalances";
 
 const { Option } = Select;
 const { Header, Content, Footer, Sider } = Layout;
@@ -145,6 +146,11 @@ const nav_items = (token) => [
   {
     label: <Link to={`/warehouses?token=${token}`}>Складские помещения</Link>,
     key: "warehouses",
+    icon: <HistoryOutlined />,
+  },
+  {
+    label: <Link to={`/warehouses_balances?token=${token}`}>Балансы складов</Link>,
+    key: "warehouses_balances",
     icon: <HistoryOutlined />,
   },
   {
@@ -249,7 +255,7 @@ class LogIn extends React.Component {
         false,
         false,
         false,
-        false,
+        false
       ],
       authError403: false,
       cboxData: {},
@@ -982,7 +988,7 @@ class LogIn extends React.Component {
                                 c={this.state.CACount}
                                 ds={this.state.CADS}
                                 websocket={this.state.ws}
-                                // meta={this.state.CAAC}
+                              // meta={this.state.CAAC}
                               />
                             }
                           />
@@ -1035,6 +1041,16 @@ class LogIn extends React.Component {
                             path="/warehouses"
                             element={
                               <TableWarehouses
+                                token={params.token}
+                                websocket={this.state.ws}
+                                initialData={this.state.warehousesData}
+                              />
+                            }
+                          />
+                          <Route
+                            path="/warehouses_balances"
+                            element={
+                              <WarehousesBalances
                                 token={params.token}
                                 websocket={this.state.ws}
                                 initialData={this.state.warehousesData}

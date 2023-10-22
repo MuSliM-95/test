@@ -42,7 +42,7 @@ units_cache = set()
 async def get_by_id(token: str, idx: int):
     """Получение документа по ID"""
     await get_user_by_token(token)
-    query = docs_warehouse.select().where(docs_warehouse.c.id == idx, docs_warehouse.c.is_deleted.is_not(True))
+    query = docs_warehouse.select().where(docs_warehouse.c.id == idx, docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.status == True)
     instance_db = await database.fetch_one(query)
 
     if not instance_db:
@@ -62,7 +62,7 @@ async def get_by_id(token: str, idx: int):
 async def get_list(token: str, limit: int = 100, offset: int = 0):
     """Получение списка документов"""
     await get_user_by_token(token)
-    query = docs_warehouse.select().where(docs_warehouse.c.is_deleted.is_not(True)).limit(limit).offset(offset)
+    query = docs_warehouse.select().where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.status == True).limit(limit).offset(offset)
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
     return paginate(items_db)

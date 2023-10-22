@@ -16,8 +16,11 @@ class View(BaseModel):
 
 class ViewAlt(BaseModel):
     id: int
+    name: str
     organization_id: Optional[int]
+    organization_name: Optional[str]
     warehouse_id: Optional[int]
+    warehouse_name: Optional[str]
     current_amount: int
 
 

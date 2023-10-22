@@ -4,7 +4,7 @@ from api.pagination.pagination import Page
 from fastapi import APIRouter
 from sqlalchemy import select, func, desc, case
 
-from database.db import database, warehouse_balances, warehouses, warehouse_register_movement, nomenclature, OperationType
+from database.db import database, warehouse_balances, warehouses, warehouse_register_movement, nomenclature, OperationType, organizations
 from . import schemas
 
 from functions.helpers import datetime_to_timestamp, check_entity_exists
@@ -108,7 +108,18 @@ async def alt_get_warehouse_balances(
                            ))
 
     warehouse_balances_db = await database.fetch_all(query)
+    res = []
+    for warehouse_balance in warehouse_balances_db:
+        balance_dict = dict(warehouse_balance)
+        organization_db = await database.fetch_one(organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
+        warehouse_db = await database.fetch_one(warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id))
+        balance_dict['organization_name'] = organization_db.short_name
+        balance_dict['warehouse_name'] = warehouse_db.name
+
+        res.append(balance_dict)
+
+
     # warehouse_balances_db = [*map(datetime_to_timestamp, warehouse_balances_db)]
-    return paginate(warehouse_balances_db)
+    return paginate(res)
 
 add_pagination(router)

@@ -9,6 +9,7 @@ from database.db import (
     users_cboxes_relation,
     warehouse_balances,
     warehouses,
+    docs_warehouse
 )
 from fastapi import APIRouter, HTTPException
 from fastapi_pagination import Page, paginate
@@ -24,6 +25,9 @@ from sqlalchemy import desc, func, select
 from ws_manager import manager
 
 from . import schemas
+
+from api.docs_warehouses.routers import create as create_warehouse_doc
+from api.docs_warehouses.routers import update as update_warehouse_doc
 
 router = APIRouter(tags=["docs_purchases"])
 
@@ -232,6 +236,33 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
         query = docs_purchases.update().where(docs_purchases.c.id == instance_id).values({"sum": items_sum})
         await database.execute(query)
 
+        goods_res = []
+        for good in goods:
+            nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+            if nomenclature_db.type == "product":
+                goods_res.append(
+                    {
+                        "price_type": good['price_type'],
+                        "price": good['price'],
+                        "quantity": good['quantity'],
+                        "unit": good['unit'],
+                        "nomenclature": good['nomenclature']
+                    }
+                )
+
+
+        body = [{
+            "dated": instance_values['dated'],
+            "contragent": instance_values['contragent'],
+            "operation": "incoming",
+            "comment": instance_values['comment'],
+            "warehouse": instance_values['warehouse'],
+            "docs_sales_id": instance_id,
+            "goods": goods_res
+        }]
+
+        await create_warehouse_doc(token, body)
+
     query = docs_purchases.select().where(docs_purchases.c.id.in_(inserted_ids))
     docs_purchases_db = await database.fetch_all(query)
     docs_purchases_db = [*map(datetime_to_timestamp, docs_purchases_db)]
@@ -346,6 +377,36 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
 
             query = docs_purchases.update().where(docs_purchases.c.id == instance_id).values({"sum": items_sum})
             await database.execute(query)
+
+            doc_warehouse = await database.fetch_one(docs_warehouse.select().where(docs_warehouse.c.docs_sales_id == instance_id).order_by(desc(docs_warehouse.c.id)))
+
+            goods_res = []
+            for good in goods:
+                nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+                if nomenclature_db.type == "product":
+                    goods_res.append(
+                        {
+                            "price_type": good['price_type'],
+                            "price": good['price'],
+                            "quantity": good['quantity'],
+                            "unit": good['unit'],
+                            "nomenclature": good['nomenclature']
+                        }
+                    )
+
+
+            body = [{
+                "id": doc_warehouse.id,
+                "dated": instance_values['dated'],
+                "contragent": instance_values['contragent'],
+                "operation": "incoming",
+                "comment": instance_values['comment'],
+                "warehouse": instance_values['warehouse'],
+                "docs_sales_id": instance_id,
+                "goods": goods_res
+            }]
+
+            await update_warehouse_doc(token, body)
 
     query = docs_purchases.select().where(docs_purchases.c.id.in_(updated_ids))
     docs_purchases_db = await database.fetch_all(query)
