@@ -369,7 +369,7 @@ async def delete(token: str, ids: list[int]):
 
 @router.post("/alt_docs_warehouse/",
              tags=["Alternative docs_warehouse"], response_model=schemas.ListView)
-async def create(
+async def create_alt(
         token: str,
         docs_warehouse_data: schemas.CreateMass):
     """

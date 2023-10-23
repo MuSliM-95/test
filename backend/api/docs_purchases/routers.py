@@ -9,7 +9,8 @@ from database.db import (
     users_cboxes_relation,
     warehouse_balances,
     warehouses,
-    docs_warehouse
+    docs_warehouse,
+    prices
 )
 from fastapi import APIRouter, HTTPException
 from fastapi_pagination import Page, paginate
@@ -26,8 +27,10 @@ from ws_manager import manager
 
 from . import schemas
 
-from api.docs_warehouses.routers import create as create_warehouse_doc
+from api.docs_warehouses.routers import create_alt as create_warehouse_doc
 from api.docs_warehouses.routers import update as update_warehouse_doc
+
+from api.docs_warehouses.schemas import CreateMass, EditMass
 
 router = APIRouter(tags=["docs_purchases"])
 
@@ -239,11 +242,12 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
         goods_res = []
         for good in goods:
             nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+            price_db = await database.fetch_one(prices.select().where(prices.c.nomenclature == good['nomenclature']))
             if nomenclature_db.type == "product":
                 goods_res.append(
                     {
-                        "price_type": good['price_type'],
-                        "price": good['price'],
+                        "price_type": price_db.price_type,
+                        "price": price_db.price,
                         "quantity": good['quantity'],
                         "unit": good['unit'],
                         "nomenclature": good['nomenclature']
@@ -251,7 +255,7 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
                 )
 
 
-        body = [{
+        body = CreateMass(__root__=[{
             "dated": instance_values['dated'],
             "contragent": instance_values['contragent'],
             "operation": "incoming",
@@ -259,7 +263,7 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
             "warehouse": instance_values['warehouse'],
             "docs_sales_id": instance_id,
             "goods": goods_res
-        }]
+        }])
 
         await create_warehouse_doc(token, body)
 
@@ -384,11 +388,12 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
             goods_res = []
             for good in goods:
                 nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+                price_db = await database.fetch_one(prices.select().where(prices.c.nomenclature == good['nomenclature']))
                 if nomenclature_db.type == "product":
                     goods_res.append(
                         {
-                            "price_type": good['price_type'],
-                            "price": good['price'],
+                            "price_type": price_db.price_type,
+                            "price": price_db.price,
                             "quantity": good['quantity'],
                             "unit": good['unit'],
                             "nomenclature": good['nomenclature']
@@ -396,7 +401,7 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
                     )
 
 
-            body = [{
+            body = EditMass(__root__=[{
                 "id": doc_warehouse.id,
                 "dated": instance_values['dated'],
                 "contragent": instance_values['contragent'],
@@ -405,7 +410,7 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
                 "warehouse": instance_values['warehouse'],
                 "docs_sales_id": instance_id,
                 "goods": goods_res
-            }]
+            }])
 
             await update_warehouse_doc(token, body)
 
