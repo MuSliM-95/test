@@ -61,10 +61,6 @@ async def set_data_doc_warehouse(**kwargs):
     entity['created_by'] = users_cboxes.get('user')
     entity['cashbox'] = users_cboxes.get('cashbox_id')
     entity['is_deleted'] = False
-
-    contract = await database.fetch_one(contracts.select().where(contracts.c.owner == users_cboxes.id))
-
-    entity['contract'] = contract.get('id')
     organization = await database.fetch_one(organizations.select().where(organizations.c.owner == users_cboxes.id))
     entity['organization'] = organization.get('id')
 
@@ -120,7 +116,6 @@ async def insert_goods(entity, doc_id, type_operation):
         items_sum = 0
         for item in entity.get('goods'):
             item["docs_warehouse_id"] = doc_id
-
             query = docs_warehouse_goods.insert().values(item)
             await database.execute(query)
             items_sum += item["price"] * item["quantity"]
@@ -133,7 +128,7 @@ async def insert_goods(entity, doc_id, type_operation):
                         "nomenclature_id": item["nomenclature"],
                         "document_warehouse_id": doc_id,
                         "amount": item['quantity'],
-                        "cashbox_id": entity['created_by'],
+                        "cashbox_id": entity['cashbox'],
                     })
                 await database.execute(query)
             except Exception as err:

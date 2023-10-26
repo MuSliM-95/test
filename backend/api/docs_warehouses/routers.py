@@ -369,7 +369,7 @@ async def delete(token: str, ids: list[int]):
 
 @router.post("/alt_docs_warehouse/",
              tags=["Alternative docs_warehouse"], response_model=schemas.ListView)
-async def create_alt(
+async def create(
         token: str,
         docs_warehouse_data: schemas.CreateMass):
     """
@@ -383,7 +383,6 @@ async def create_alt(
     docs_warehouse_data = docs_warehouse_data.dict()
     for doc in docs_warehouse_data["__root__"]:
         response.append(await call_type_movement(doc['operation'], entity_values=doc, token=token))
-
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
     docs_warehouse_db = await database.fetch_all(query)
     docs_warehouse_db = [*map(datetime_to_timestamp, docs_warehouse_db)]
@@ -400,4 +399,4 @@ async def create_alt(
     return docs_warehouse_db
 
 
-add_pagination(router)
+

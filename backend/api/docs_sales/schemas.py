@@ -121,3 +121,4 @@ class CountRes(BaseModel):
 
 class FilterSchema(BaseModel):
     tags: Optional[str]
+    dated: Optional[int]
