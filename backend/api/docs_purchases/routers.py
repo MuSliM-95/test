@@ -27,7 +27,7 @@ from ws_manager import manager
 
 from . import schemas
 
-from api.docs_warehouses.routers import create_alt as create_warehouse_doc
+from api.docs_warehouses.utils import create_warehouse_docs
 from api.docs_warehouses.routers import update as update_warehouse_doc
 
 from api.docs_warehouses.schemas import CreateMass, EditMass
@@ -242,12 +242,11 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
         goods_res = []
         for good in goods:
             nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
-            price_db = await database.fetch_one(prices.select().where(prices.c.nomenclature == good['nomenclature']))
             if nomenclature_db.type == "product":
                 goods_res.append(
                     {
-                        "price_type": price_db.price_type,
-                        "price": price_db.price,
+                        "price_type": 1,
+                        "price": 0,
                         "quantity": good['quantity'],
                         "unit": good['unit'],
                         "nomenclature": good['nomenclature']
@@ -255,17 +254,27 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
                 )
 
 
-        body = CreateMass(__root__=[{
+        body = {
+            "number": None,
             "dated": instance_values['dated'],
+            "docs_purchases": None,
+            "to_warehouse": None,
+            "status": True,
             "contragent": instance_values['contragent'],
             "operation": "incoming",
             "comment": instance_values['comment'],
             "warehouse": instance_values['warehouse'],
             "docs_sales_id": instance_id,
             "goods": goods_res
-        }])
+        }
 
-        await create_warehouse_doc(token, body)
+        await create_warehouse_docs(token, body)
+
+        body['operation'] = "outgoing"
+        body['docs_purchases'] = None
+        body['number'] = None
+        body['to_warehouse'] = None
+        await create_warehouse_docs(token, body)
 
 
     query = docs_purchases.select().where(docs_purchases.c.id.in_(inserted_ids))
