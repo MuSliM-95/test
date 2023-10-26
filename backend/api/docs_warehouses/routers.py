@@ -65,7 +65,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0):
     query = docs_warehouse.select().where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.status == True).limit(limit).offset(offset)
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
-    return items_db
+    return paginate(items_db)
 
 
 async def check_foreign_keys(instance_values, user, exceptions) -> bool:
@@ -399,4 +399,4 @@ async def create(
     return docs_warehouse_db
 
 
-
+add_pagination(router)
