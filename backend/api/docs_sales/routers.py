@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select
 
 from database.db import (
     database,
@@ -90,7 +90,8 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, filters: schem
     """Получение списка документов"""
     user = await get_user_by_token(token)
     query = (
-        docs_sales.select()
+        docs_sales
+        .select()
         .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
         .limit(limit)
         .offset(offset)
@@ -100,12 +101,15 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, filters: schem
     if filters.tags:
         tags = list(map(lambda x: x.strip().lower(), filters.tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: docs_sales.c.tags.ilike(f'%{x}%'), tags))
-        query = query.filter(or_(*filter_tags))
+        query = query.filter(and_(*filter_tags))
+
 
     if filters.dated:
-        query = query.filter(docs_sales.c.dated == filters.dated)
+        print(round(filters.dated/100000))
+        query = query.filter(docs_sales.c.dated/100000 == int(str(filters.dated)[:5]))
+        print(query)
 
-    
+    print(query)
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
     items_db = [*map(add_nomenclature_count, items_db)]
