@@ -265,7 +265,7 @@ async def outgoing(entity_values, token):
     """
     try:
         goods: list = entity_values['goods']
-        await check_exist_amount(goods=goods, warehouse=entity_values["warehouse"])
+        # await check_exist_amount(goods=goods, warehouse=entity_values["warehouse"])
         entity = await set_data_doc_warehouse(entity_values=entity_values, token=token)
         doc_id = await insert_docs_warehouse(entity=entity)
         entity.update({'goods': goods})
@@ -287,7 +287,7 @@ async def transfer(entity_values, token):
     try:
         goods: list = entity_values['goods']
         entity = await set_data_doc_warehouse(entity_values=entity_values, token=token)
-        await check_exist_amount(goods=goods, warehouse=entity_values["warehouse"])
+        # await check_exist_amount(goods=goods, warehouse=entity_values["warehouse"])
         doc_id = await insert_docs_warehouse(entity=entity)
 
         entity.update({'goods': goods})
