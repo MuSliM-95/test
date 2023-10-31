@@ -8,9 +8,11 @@ from database.db import (
     warehouse_balances,
     warehouse_register_movement,
     warehouses,
+    OperationType
 )
 from . import schemas
 from fastapi import APIRouter, HTTPException
+from fastapi.encoders import jsonable_encoder
 from fastapi_pagination import add_pagination, paginate
 from api.pagination.pagination import Page
 from functions.helpers import (
@@ -25,7 +27,7 @@ from ws_manager import manager
 
 from typing import List
 
-from api.docs_warehouses.func_warehouse import call_type_movement
+from api.docs_warehouses.func_warehouse import call_type_movement, set_data_doc_warehouse, update_docs_warehouse, update_goods_warehouse
 
 router = APIRouter(tags=["docs_warehouse"])
 
@@ -397,6 +399,66 @@ async def create(
     )
 
     return docs_warehouse_db
+
+
+@database.transaction()
+@router.patch("/alt_docs_warehouse/",
+              tags=["Alternative docs_warehouse"],
+              response_model=schemas.ListView)
+async def update(token: str, docs_warehouse_data: schemas.EditMass):
+    """
+    Обновление
+    """
+    response: list = []
+    docs_warehouse_data = docs_warehouse_data.dict(exclude_unset=True)
+
+    for doc in docs_warehouse_data["__root__"]:
+
+        if doc.get('goods'):
+            goods: list = doc['goods']
+            del doc['goods']
+
+        else:
+            goods = await database.fetch_all(docs_warehouse_goods.select().where(docs_warehouse_goods.c.docs_warehouse_id == doc['id']))
+
+        stored_item_data = await database.fetch_one(
+            docs_warehouse.select().where(docs_warehouse.c.id == doc['id']))
+        stored_item_model = schemas.Edit(**stored_item_data)
+        updated_item = stored_item_model.copy(update=doc)
+        doc = jsonable_encoder(updated_item)
+        del doc['goods']
+        print(doc)
+
+        entity = await set_data_doc_warehouse(entity_values=doc, token=token)
+        doc_id = await update_docs_warehouse(entity=entity)
+        entity.update({'goods': goods})
+        if entity['operation'] == "incoming":
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
+            response.append(doc_id)
+        if entity['operation'] == "outgoing":
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+            response.append(doc_id)
+        if entity['operation'] == "transfer":
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+            entity.update({'warehouse': entity['to_warehouse']})
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
+        response.append(doc_id)
+
+    query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
+    docs_warehouse_db = await database.fetch_all(query)
+    docs_warehouse_db = [*map(datetime_to_timestamp, docs_warehouse_db)]
+
+    await manager.send_message(
+        token,
+        {
+            "action": "create",
+            "target": "docs_warehouse",
+            "result": docs_warehouse_db,
+        },
+    )
+
+    return docs_warehouse_db
+
 
 add_pagination(router)
 

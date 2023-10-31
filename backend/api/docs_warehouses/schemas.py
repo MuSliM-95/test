@@ -27,6 +27,7 @@ class Create(BaseModel):
     docs_purchases: Optional[int] = None
     operation: Optional[str]
     to_warehouse: Optional[int]
+    status: Optional[bool]
     comment: Optional[str]
     warehouse: Optional[int]
     goods: Optional[List[Item]]
@@ -67,6 +68,7 @@ class ViewInList(BaseModel):
     operation: Optional[str]
     comment: Optional[str]
     organization: int
+    status: Optional[bool]
     warehouse: Optional[int]
     to_warehouse: Optional[int]
     sum: Optional[float]

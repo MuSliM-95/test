@@ -455,18 +455,14 @@ async def create(token: str, docs_sales_data: schemas.CreateMass):
             "docs_purchases": None,
             "to_warehouse": None,
             "status": True,
-            "tags": instance_values['tags'],
             "contragent": instance_values['contragent'],
-            "operation": "incoming",
+            "operation": "outgoing",
             "comment": instance_values['comment'],
             "warehouse": instance_values['warehouse'],
             "docs_sales_id": instance_id,
             "goods": goods_res
         }
 
-        await create_warehouse_docs(token, body)
-
-        body['operation'] = "outgoing"
         body['docs_purchases'] = None
         body['number'] = None
         body['to_warehouse'] = None
