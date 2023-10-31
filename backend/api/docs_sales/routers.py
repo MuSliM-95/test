@@ -454,7 +454,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass):
             "dated": instance_values['dated'],
             "docs_purchases": None,
             "to_warehouse": None,
-            "status": True,
+            "status": False,
             "contragent": instance_values['contragent'],
             "operation": "outgoing",
             "comment": instance_values['comment'],
