@@ -92,6 +92,7 @@ class ViewInList(BaseModel):
     tax_included: Optional[bool]
     tax_active: Optional[bool]
     sales_manager: Optional[int]
+    goods: Optional[List[Item]]
     updated_at: int
     created_at: int
 

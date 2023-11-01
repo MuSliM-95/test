@@ -86,7 +86,7 @@ async def get_by_id(token: str, idx: int):
 
 
 @router.get("/docs_sales/", response_model=schemas.CountRes)
-async def get_list(token: str, limit: int = 100, offset: int = 0, filters: schemas.FilterSchema = Depends()):
+async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bool = False, filters: schemas.FilterSchema = Depends()):
     """Получение списка документов"""
     user = await get_user_by_token(token)
     query = (
@@ -97,6 +97,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, filters: schem
         .offset(offset)
         .order_by(desc(docs_sales.c.id))
     )
+
 
     if filters.tags:
         tags = list(map(lambda x: x.strip().lower(), filters.tags.replace(' ', '').strip().split(',')))
@@ -109,7 +110,6 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, filters: schem
         query = query.filter(docs_sales.c.dated/100000 == int(str(filters.dated)[:5]))
         print(query)
 
-    print(query)
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
     items_db = [*map(add_nomenclature_count, items_db)]
@@ -118,6 +118,17 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, filters: schem
     items_db = [await instance for instance in items_db]
 
     count = len(items_db)
+
+    if show_goods:
+        for item in items_db:
+            query = docs_sales_goods.select().where(docs_sales_goods.c.docs_sales_id == item['id'])
+            goods_db = await database.fetch_all(query)
+            goods_db = [*map(datetime_to_timestamp, goods_db)]
+
+            goods_db = [*map(add_nomenclature_name_to_goods, goods_db)]
+            goods_db = [await instance for instance in goods_db]
+
+            item['goods'] = goods_db
 
     return {"result": items_db, "count": count}
 
