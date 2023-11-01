@@ -202,7 +202,7 @@ async def check_foreign_keys(instance_values, user, exceptions) -> bool:
 
 
 @router.post("/docs_sales/", response_model=schemas.ListView)
-async def create(token: str, docs_sales_data: schemas.CreateMass):
+async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: bool = True):
     """Создание документов"""
     user = await get_user_by_token(token)
 
@@ -445,39 +445,41 @@ async def create(token: str, docs_sales_data: schemas.CreateMass):
         )
         await database.execute(query)
 
-        goods_res = []
-        for good in goods:
-            nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
-            if nomenclature_db.type == "product":
-                goods_res.append(
-                    {
-                        "price_type": 1,
-                        "price": 0,
-                        "quantity": good['quantity'],
-                        "unit": good['unit'],
-                        "nomenclature": good['nomenclature']
-                    }
-                )
+        if generate_out:
+
+            goods_res = []
+            for good in goods:
+                nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+                if nomenclature_db.type == "product":
+                    goods_res.append(
+                        {
+                            "price_type": 1,
+                            "price": 0,
+                            "quantity": good['quantity'],
+                            "unit": good['unit'],
+                            "nomenclature": good['nomenclature']
+                        }
+                    )
 
 
-        body = {
-            "number": None,
-            "dated": instance_values['dated'],
-            "docs_purchases": None,
-            "to_warehouse": None,
-            "status": False,
-            "contragent": instance_values['contragent'],
-            "operation": "outgoing",
-            "comment": instance_values['comment'],
-            "warehouse": instance_values['warehouse'],
-            "docs_sales_id": instance_id,
-            "goods": goods_res
-        }
+            body = {
+                "number": None,
+                "dated": instance_values['dated'],
+                "docs_purchases": None,
+                "to_warehouse": None,
+                "status": False,
+                "contragent": instance_values['contragent'],
+                "operation": "outgoing",
+                "comment": instance_values['comment'],
+                "warehouse": instance_values['warehouse'],
+                "docs_sales_id": instance_id,
+                "goods": goods_res
+            }
 
-        body['docs_purchases'] = None
-        body['number'] = None
-        body['to_warehouse'] = None
-        await create_warehouse_docs(token, body)
+            body['docs_purchases'] = None
+            body['number'] = None
+            body['to_warehouse'] = None
+            await create_warehouse_docs(token, body)
 
 
     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
