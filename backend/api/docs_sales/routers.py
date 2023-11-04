@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select
+from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select, asc
 
 from database.db import (
     database,
@@ -117,7 +117,10 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     items_db = [*map(raschet_oplat, items_db)]
     items_db = [await instance for instance in items_db]
 
-    count = len(items_db)
+    query = (
+        select(func.count(docs_sales.c.id)).where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
+    )
+    count = await database.fetch_one(query)
 
     if show_goods:
         for item in items_db:
@@ -130,7 +133,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
             item['goods'] = goods_db
 
-    return {"result": items_db, "count": count}
+    return {"result": items_db, "count": count.count_1}
 
 
 async def check_foreign_keys(instance_values, user, exceptions) -> bool:
@@ -209,13 +212,13 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
     inserted_ids = set()
     exceptions = []
 
-    q = docs_sales.select().where(
-        docs_sales.c.cashbox == user.cashbox_id,
-        docs_sales.c.status == True,
-        docs_sales.c.is_deleted == False
-    )
-    docs_db = await database.fetch_all(q)
-    number = len(docs_db) + 1
+    # q = docs_sales.select().where(
+    #     docs_sales.c.cashbox == user.cashbox_id,
+    #     docs_sales.c.status == True,
+    #     docs_sales.c.is_deleted == False
+    # )
+    # docs_db = await database.fetch_all(q)
+    # number = len(docs_db) + 1
 
     for instance_values in docs_sales_data.dict()["__root__"]:
         instance_values["created_by"] = user.id
@@ -223,9 +226,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         instance_values["is_deleted"] = False
         instance_values["cashbox"] = user.cashbox_id
 
-        if not instance_values['number']:
-            instance_values['number'] = str(number)
-            number += 1
+        # if not instance_values['number']:
+        #     instance_values['number'] = str(number)
+        #     number += 1
 
         paid_rubles = instance_values["paid_rubles"]
         paid_lt = instance_values["paid_lt"]
@@ -485,6 +488,18 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
+
+    q = docs_sales.select().where(
+        docs_sales.c.cashbox == user.cashbox_id,
+        docs_sales.c.is_deleted == False
+    ).order_by(asc(docs_sales.c.id))
+
+    docs_db = await database.fetch_all(q)
+
+    for i in range(0, len(docs_db)):
+        if not docs_db[i].number:
+            q = docs_sales.update().where(docs_sales.c.id == docs_db[i].id).values({ "number": str(i + 1) })
+            await database.execute(q)
 
     await manager.send_message(
         token,

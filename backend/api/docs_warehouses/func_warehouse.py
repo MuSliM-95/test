@@ -132,7 +132,7 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                                 "document_purchase_id": entity.get('docs_purchases'),
                                 "document_warehouse_id": doc_id,
                                 "amount": item['quantity'],
-                                "cashbox_id": entity['created_by'],
+                                "cashbox_id": entity['cashbox'],
                             })
                         await database.execute(query)
                     else:
@@ -146,7 +146,7 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                                 "nomenclature_id": item["nomenclature"],
                                 "document_warehouse_id": doc_id,
                                 "amount": item['quantity'],
-                                "cashbox_id": entity['created_by'],
+                                "cashbox_id": entity['cashbox'],
                             })
                         await database.execute(query)
                 except Exception as err:

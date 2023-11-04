@@ -45,7 +45,7 @@ export const API = {
         .catch((err) => Promise.reject(err)),
     get: (token, url) => async (id, params) =>
       await axiosInstance
-        .get(`${url}/${id || ""}?token=${token}`, { params: params || "" })
+        .get(`${url}/${id || ""}/?token=${token}`, { params: params || "" })
         .then((item) => item.data)
         .catch((err) => Promise.reject(err)),
   },

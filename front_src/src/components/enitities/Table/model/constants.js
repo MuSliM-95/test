@@ -281,6 +281,11 @@ export const COL_WAREHOUSES_DOCS = [
     dataIndex: "operation",
   },
   {
+    title: "Статус",
+    dataIndex: "status",
+    width: "100px"
+  },
+  {
     title: "Комментарий",
     dataIndex: "comment",
     ellipsis: true,

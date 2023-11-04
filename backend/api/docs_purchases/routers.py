@@ -236,32 +236,32 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
         query = docs_purchases.update().where(docs_purchases.c.id == instance_id).values({"sum": items_sum})
         await database.execute(query)
 
-        goods_res = []
-        for good in goods:
-            nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
-            if nomenclature_db.type == "product":
-                goods_res.append(
-                    {
-                        "price_type": good['price_type'],
-                        "price": good['price'],
-                        "quantity": good['quantity'],
-                        "unit": good['unit'],
-                        "nomenclature": good['nomenclature']
-                    }
-                )
+        # goods_res = []
+        # for good in goods:
+        #     nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+        #     if nomenclature_db.type == "product":
+        #         goods_res.append(
+        #             {
+        #                 "price_type": good['price_type'],
+        #                 "price": good['price'],
+        #                 "quantity": good['quantity'],
+        #                 "unit": good['unit'],
+        #                 "nomenclature": good['nomenclature']
+        #             }
+        #         )
 
 
-        body = [{
-            "dated": instance_values['dated'],
-            "contragent": instance_values['contragent'],
-            "operation": "incoming",
-            "comment": instance_values['comment'],
-            "warehouse": instance_values['warehouse'],
-            "docs_sales_id": instance_id,
-            "goods": goods_res
-        }]
+        # body = [{
+        #     "dated": instance_values['dated'],
+        #     "contragent": instance_values['contragent'],
+        #     "operation": "incoming",
+        #     "comment": instance_values['comment'],
+        #     "warehouse": instance_values['warehouse'],
+        #     "docs_sales_id": instance_id,
+        #     "goods": goods_res
+        # }]
 
-        await create_warehouse_doc(token, body)
+        # await create_warehouse_doc(token, body)
 
 
     query = docs_purchases.select().where(docs_purchases.c.id.in_(inserted_ids))

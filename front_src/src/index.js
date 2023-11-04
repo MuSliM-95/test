@@ -1065,6 +1065,7 @@ class LogIn extends React.Component {
                                 token={params.token}
                                 websocket={this.state.ws}
                                 initialData={this.state.warehouseDocsData}
+                                docsCount={this.state.warehouseDocsDataCount}
                                 warehousesData={this.state.warehousesData}
                                 nomenclatureData={this.state.nomenclatureData}
                                 organizationsData={this.state.organizationsData}

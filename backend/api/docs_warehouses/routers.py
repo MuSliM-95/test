@@ -11,7 +11,7 @@ from database.db import (
     OperationType
 )
 from . import schemas
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi_pagination import add_pagination, paginate
 from api.pagination.pagination import Page
@@ -22,7 +22,7 @@ from functions.helpers import (
     datetime_to_timestamp,
     get_user_by_token,
 )
-from sqlalchemy import desc
+from sqlalchemy import desc, asc, select, func
 from ws_manager import manager
 
 from typing import List
@@ -39,12 +39,15 @@ users_cache = set()
 price_types_cache = set()
 units_cache = set()
 
+Page = Page.with_custom_options(
+    size=Query(10, ge=1, le=100),
+)
 
 @router.get("/docs_warehouse/{idx}/", response_model=schemas.View)
 async def get_by_id(token: str, idx: int):
     """Получение документа по ID"""
     await get_user_by_token(token)
-    query = docs_warehouse.select().where(docs_warehouse.c.id == idx, docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.status == True)
+    query = docs_warehouse.select().where(docs_warehouse.c.id == idx, docs_warehouse.c.is_deleted.is_not(True))
     instance_db = await database.fetch_one(query)
 
     if not instance_db:
@@ -60,14 +63,29 @@ async def get_by_id(token: str, idx: int):
     return instance_db
 
 
-@router.get("/docs_warehouse/", response_model=Page[schemas.ViewInList])
-async def get_list(token: str, limit: int = 100, offset: int = 0):
+@router.get("/docs_warehouse/", response_model=schemas.GetDocsWarehouse)
+async def get_list(token: str, limit: int = 10, offset: int = 0, datefrom: int = None, dateto: int = None):
     """Получение списка документов"""
-    await get_user_by_token(token)
-    query = docs_warehouse.select().where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.status == True).limit(limit).offset(offset)
+    filters_list = []
+    user = await get_user_by_token(token)
+
+    if datefrom and not dateto:
+        filters_list.append(docs_warehouse.c.dated >= datefrom)
+    if not datefrom and dateto:
+        filters_list.append(docs_warehouse.c.dated <= dateto)
+    if datefrom and dateto:
+        filters_list.append(docs_warehouse.c.dated >= datefrom)
+        filters_list.append(docs_warehouse.c.dated <= dateto)
+    
+
+    query = docs_warehouse.select().where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.cashbox == user.cashbox_id).order_by(desc(docs_warehouse.c.id)).where(*filters_list).limit(limit).offset(offset)
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
-    return paginate(items_db)
+
+    query = select(func.count(docs_warehouse.c.id)).where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.cashbox == user.cashbox_id).where(*filters_list)
+    count = await database.fetch_one(query)
+
+    return {"result": items_db, "count": count.count_1}
 
 
 async def check_foreign_keys(instance_values, user, exceptions) -> bool:
@@ -207,7 +225,7 @@ async def create(token: str, docs_warehouse_data: schemas.CreateMass):
     return docs_warehouse_db
 
 
-@router.patch("/docs_warehouse/{idx}/", response_model=schemas.ListView)
+@router.patch("/docs_warehouse/", response_model=schemas.ListView)
 async def update(token: str, docs_warehouse_data: schemas.EditMass):
     """Редактирование документов"""
     user = await get_user_by_token(token)
@@ -383,11 +401,24 @@ async def create(
     """
     response: list = []
     docs_warehouse_data = docs_warehouse_data.dict()
+    user = await get_user_by_token(token)
     for doc in docs_warehouse_data["__root__"]:
         response.append(await call_type_movement(doc['operation'], entity_values=doc, token=token))
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
     docs_warehouse_db = await database.fetch_all(query)
     docs_warehouse_db = [*map(datetime_to_timestamp, docs_warehouse_db)]
+
+    q = docs_warehouse.select().where(
+        docs_warehouse.c.cashbox == user.cashbox_id,
+        docs_warehouse.c.is_deleted == False
+    ).order_by(asc(docs_warehouse.c.id))
+
+    docs_db = await database.fetch_all(q)
+
+    for i in range(0, len(docs_db)):
+        if not docs_db[i].number:
+            q = docs_warehouse.update().where(docs_warehouse.c.id == docs_db[i].id).values({ "number": str(i + 1) })
+            await database.execute(q)
 
     await manager.send_message(
         token,
@@ -427,7 +458,6 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
         updated_item = stored_item_model.copy(update=doc)
         doc = jsonable_encoder(updated_item)
         del doc['goods']
-        print(doc)
 
         entity = await set_data_doc_warehouse(entity_values=doc, token=token)
         doc_id = await update_docs_warehouse(entity=entity)
