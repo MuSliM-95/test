@@ -149,9 +149,7 @@ const nav_items = (token) => [
     icon: <HistoryOutlined />,
   },
   {
-    label: (
-      <Link to={`/warehouses_balances?token=${token}`}>Балансы складов</Link>
-    ),
+    label: <Link to={`/warehouses_balances?token=${token}`}>Балансы складов</Link>,
     key: "warehouses_balances",
     icon: <HistoryOutlined />,
   },
@@ -991,7 +989,7 @@ class LogIn extends React.Component {
                                 c={this.state.CACount}
                                 ds={this.state.CADS}
                                 websocket={this.state.ws}
-                                // meta={this.state.CAAC}
+                              // meta={this.state.CAAC}
                               />
                             }
                           />

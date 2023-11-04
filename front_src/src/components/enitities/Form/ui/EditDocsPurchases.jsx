@@ -26,6 +26,7 @@ export default function EditDocsPurchasesModal({ isLoadingEdit, isErrorEdit, err
 
   const { setFields, resetFields, setFieldsValue } = form;
 
+
   const currentNomenclatureId = Form.useWatch('nomenclature', form);
   const currentQuantity = Form.useWatch('quantity', form);
   const newGoodsData = useMemo(() => getNewGoodsData({ data, currentNomenclatureId, currentQuantity }), [data, currentNomenclatureId, currentQuantity])

@@ -124,7 +124,7 @@ export default function TableNomenclature() {
         handleRemove={API.crud.remove(token, pathname)}
         handleSaveImage={handleSaveImage}
         handleDeleteImage={API.pictures.removeImage(token)}
-      // queryOffsetData={queryOffsetData}
+        // queryOffsetData={queryOffsetData}
       />
     </>
   );

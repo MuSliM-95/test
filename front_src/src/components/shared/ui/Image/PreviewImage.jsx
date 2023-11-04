@@ -3,7 +3,7 @@ import { Image } from "antd";
 
 export const PreviewImage = ({ items, witdh }) => {
   const [visible, setVisible] = useState(false);
-
+  
   return (
     <>
       <Image
