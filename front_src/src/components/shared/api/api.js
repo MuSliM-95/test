@@ -21,7 +21,7 @@ export const API = {
     },
     edit: (token, url) => async (data, id) =>
       await axiosInstance
-        .patch(`${url}/${data.id || id}?token=${token}`, data)
+        .patch(`${url}/?token=${token}`, data)
         .then((result) => {
           message.success("Строка была успешнo отредактирована");
           return result;

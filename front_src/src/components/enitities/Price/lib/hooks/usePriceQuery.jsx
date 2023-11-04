@@ -3,7 +3,7 @@ import axios from "axios";
 import { useFetchAllData } from "../../../../../hooks";
 
 export const useFetchGetPrices = (options) => {
-  const { token, name, limit=10000 } = options;
+  const { token, name, limit = 10000 } = options;
   const query = useQuery(
     ["prices", token, name],
     async () => {

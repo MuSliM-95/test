@@ -42,6 +42,7 @@ export default function WarehousesDocs({
     warehousesData,
     priceTypesData,
   } = useContext(WarehousesDocsContext);
+  
   const [newData, setNewData] = useState([]);
   const [units, setUnits] = useState([]);
   const [nomenclatures, setNomenclatures] = useState([]);

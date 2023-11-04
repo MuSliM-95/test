@@ -34,6 +34,9 @@ export default function TableDocsPurchases() {
 
   const { data, total, isLoading, isErrorPurchases, isErrorDirectory, errors } = useGetDataTable({ token, current, pageSize });
 
+
+  console.log(total, 'total')
+
   useEffect(() => {
     if (isErrorPurchases || isErrorDirectory)
       errors?.forEach((error) => {

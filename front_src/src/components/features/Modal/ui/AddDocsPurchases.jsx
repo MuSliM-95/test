@@ -4,9 +4,9 @@ import { useFetchCreatePurchase } from "../../../enitities/Purchase/lib/hooks/us
 
 import { DocsPurchasesContext } from "../../../shared/lib/hooks/context/getDocsPurchasesContext";
 import { DocsPurchasesModal } from "../../../enitities/Form";
-import {prepareDataForCreate} from "../../../features/Table/ui/TableDocsPurchases/utils/modal"
+import { prepareDataForCreate } from "../../../features/Table/ui/TableDocsPurchases/utils/modal"
 
-export default function CreateModal({ isOpen, setOpen }){
+export default function CreateModal({ isOpen, setOpen }) {
     const [goods, setGoods] = useState([]);
     const { token } = useContext(DocsPurchasesContext);
 
@@ -16,7 +16,6 @@ export default function CreateModal({ isOpen, setOpen }){
             setOpen(false);
             setGoods([])
         });
-
 
 
     const [form] = Form.useForm();
@@ -61,7 +60,7 @@ export default function CreateModal({ isOpen, setOpen }){
                     token={token}
                     goods={goods}
                     setGoods={setGoods}
-                    />
+                />
             </Modal>
         </>
     );

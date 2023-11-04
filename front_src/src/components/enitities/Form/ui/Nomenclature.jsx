@@ -55,7 +55,7 @@ export default function Nomenclature({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manufacturersData, categoriesData, unitsData]);
-  
+
   return (
     <Form
       {...formItemLayout}

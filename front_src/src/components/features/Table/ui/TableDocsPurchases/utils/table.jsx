@@ -17,17 +17,25 @@ const getNewGoodsData = ({ data, currentNomenclatureId, currentQuantity }) => {
     const currentPrice = data?.prices?.find((price) => price.name === currentNomenclature?.name)
     const cuarrentPriceTypes = data?.priceTypes?.find((item) => item?.name === currentPrice?.price_type)
 
-        return {
-            nomenclature: { label: currentNomenclature?.name, value: currentNomenclature?.id },
-            price_type: { label: cuarrentPriceTypes?.name, value: cuarrentPriceTypes?.id },
-            price: currentPrice?.price,
-            quantity: +currentQuantity,
-            unit: { value: currentNomenclature?.unit, label: currentNomenclature?.unit_name }
-        }
+    return {
+        nomenclature: { label: currentNomenclature?.name, value: currentNomenclature?.id },
+        price_type: { label: cuarrentPriceTypes?.name, value: cuarrentPriceTypes?.id },
+        price: currentPrice?.price,
+        quantity: +currentQuantity,
+        unit: { value: currentNomenclature?.unit, label: currentNomenclature?.unit_name }
+    }
 }
 
 const getPrepareTableData = ({ data, contragents, contracts, organizations, warehouses, users }) => {
-    return data?.result?.map((item) => ({
+    let result = []
+
+    if (data?.result) {
+        result = data.result
+    } else if (data?.length) {
+        result = data
+    }
+
+    return result.map((item) => ({
         ...item,
         client: contragents[item.client] || item.client,
         contragent: contragents[item.contragent] || item.contragent,
@@ -49,13 +57,14 @@ const convertArrayToObject = (arr) => {
 const convertUsersArrayToObject = (arr) => {
     const obj = {};
     arr?.forEach(({ id, username, last_name, first_name, }) => {
-        obj[id] = (last_name || first_name) ? `${first_name || ''} ${last_name || ""}`:username;
+        obj[id] = (last_name || first_name) ? `${first_name || ''} ${last_name || ""}` : username;
     });
     return obj;
 }
 
 const useGetDataTable = ({ token, current, pageSize }) => {
-    const { isLoading, isError, isSuccess, data, error } = useFetchGetPurchases({ token,current, pageSize });
+    const { isLoading, isError, isSuccess, data, error } = useFetchGetPurchases({ token, current, pageSize });
+
     const { isLoading: isLoadingContragents, isError: isErrorContragents, isSuccess: isSuccessConragents, data: contragents, error: errorContragets } = useFetchAllContragents({ token })
     const { isLoading: isLoadingContracts, isError: isErrorContracts, isSuccess: isSuccessContracts, data: contracts, error: errorContracts } = useFetchAllContracts({ token })
     const { isLoading: isLoadingOrganizations, isError: isErrorOrganizations, isSuccess: isSuccessOrganizations, data: organizations, error: errorOrganizations } = useFetchAllOrganization({ token })
@@ -69,13 +78,14 @@ const useGetDataTable = ({ token, current, pageSize }) => {
             const prepareOrganizations = convertArrayToObject(organizations);
             const prepareWarehouses = convertArrayToObject(warehouses);
             const prepareUsers = convertUsersArrayToObject(users);
-            return getPrepareTableData({ data, contragents: prepareContragents, contracts: prepareContracts, organizations: prepareOrganizations, warehouses: prepareWarehouses, users: prepareUsers })
+            const result = getPrepareTableData({ data, contragents: prepareContragents, contracts: prepareContracts, organizations: prepareOrganizations, warehouses: prepareWarehouses, users: prepareUsers })
+            return result
         }
     }, [isSuccess, isErrorContragents, isSuccessConragents, isErrorContracts, isSuccessContracts, isErrorOrganizations, isSuccessOrganizations, isErrorWarehouses, isSuccessWarehouses, contragents, contracts, organizations, warehouses, isErrorUsers, isSuccessUsers, users, data])
-    console.log(prepareData)
+
     return {
         data: prepareData,
-        total:data?.count,
+        total: data?.count,
         isLoading: isLoading || isLoadingContragents || isLoadingContracts || isLoadingOrganizations || isLoadingWarehouses || isLoadingUsers,
         isErrorPurchases: isError,
         isErrorDirectory: isErrorContragents || isErrorContracts || isErrorOrganizations || isErrorWarehouses || isErrorUsers,

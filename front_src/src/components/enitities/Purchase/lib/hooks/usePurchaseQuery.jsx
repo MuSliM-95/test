@@ -6,12 +6,12 @@ export const useFetchGetPurchases = (options) => {
   const query = useQuery(
     ["purchases", current, pageSize, token],
     async () => {
-      const params= { token, limit: pageSize, offset: (current-1) * +pageSize || undefined }
+      const params = { token, limit: pageSize, offset: (current - 1) * +pageSize || undefined }
       const response = await axios.get(
         `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/`,
         { params }
       );
-      return response.data.result;
+      return response.data;
     }
   );
   return query;
@@ -28,10 +28,10 @@ export const useFetchGetPurchaseById = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${id}/`,
         { params }
       );
-      return response.data.result;
+      return response.data;
     },
     {
-      enabled: id !== null&&id !== undefined,
+      enabled: id !== null && id !== undefined,
     }
   );
   return query;
@@ -39,7 +39,7 @@ export const useFetchGetPurchaseById = (options) => {
 
 export const useFetchCreatePurchase = (token, onSuccess) => {
   const queryClient = useQueryClient();
-  const { mutate, isLoading, isError,error } = useMutation(
+  const { mutate, isLoading, isError, error } = useMutation(
     async (options) =>
       await axios.post(
         `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/?token=${token}`,

@@ -12,7 +12,7 @@ export const useFetchGetContragents = (options) => {
         `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/`,
         { params }
       );
-      return response.data.result;
+      return response.data;
     },
     {
       refetchOnWindowFocus: false,

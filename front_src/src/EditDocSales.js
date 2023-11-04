@@ -106,7 +106,7 @@ const EditableCell = ({
       name={dataIndex}
       rules={[
         {
-          required: dataIndex !== 'amount',
+          required: dataIndex !== "amount",
           message: `${title} обязательно для ввода.`,
         },
       ]}
@@ -325,7 +325,9 @@ class EditDocsSales extends React.Component {
 
   findContract = async (id) => {
     return fetch(
-      `https://${process.env.REACT_APP_APP_URL}/api/v1/contracts/${id || ''}/?token=${this.props.token}`
+      `https://${process.env.REACT_APP_APP_URL}/api/v1/contracts/${
+        id || ""
+      }/?token=${this.props.token}`
     )
       .then((response) => response.json())
       .then((body) => {
@@ -617,7 +619,7 @@ class EditDocsSales extends React.Component {
         body.goods.push(good_body);
         return 0;
       });
-      
+
       body.paid_rubles = this.finRef.current.getFieldValue("rubles");
       body.paid_lt = this.finRef.current.getFieldValue("lt");
       body.id = this.props.doc.id;

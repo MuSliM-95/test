@@ -7,6 +7,7 @@ import { EditDocsPurchasesForm } from "../../../enitities/Form";
 import { prepareDataForCreate } from "../../../features/Table/ui/TableDocsPurchases/utils/modal"
 
 export default function EditModal({ editModalId, setEditModalId }) {
+  console.log(editModalId)
   const { token } = useContext(DocsPurchasesContext);
   const [goods, setGoods] = useState([]);
 

@@ -9,7 +9,7 @@ export const useFetchAllData = ({ token, key, path }) => {
       let offset = 0;
       const url = `https://${process.env.REACT_APP_APP_URL}/api/v1/${path}/`;
       const response = await axios.get(url, {
-        params: { token, limit,offset },
+        params: { token, limit, offset },
       });
       const count = response?.data?.count || 0;
       let result = response?.data?.result || [];
