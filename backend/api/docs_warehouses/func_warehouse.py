@@ -219,7 +219,7 @@ async def insert_goods(entity, doc_id, type_operation):
                             "nomenclature_id": item["nomenclature"],
                             "document_warehouse_id": doc_id,
                             "amount": item['quantity'],
-                            "cashbox_id": entity['created_by'],
+                            "cashbox_id": entity['cashbox'],
                         })
                     await database.execute(query)
             except Exception as err:
