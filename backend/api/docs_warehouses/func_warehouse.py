@@ -103,14 +103,19 @@ async def update_docs_warehouse(entity):
 async def update_goods_warehouse(entity, doc_id, type_operation):
     try:
         items_sum = 0
+
+        goods_db = [dict(item) for item in await database.fetch_all(
+            docs_warehouse_goods
+            .select()
+            .where(docs_warehouse_goods.c.docs_warehouse_id == doc_id))]
+        ids_good = [good['id'] for good in goods_db]
+        query = docs_warehouse_goods.delete().where(docs_warehouse_goods.c.id.in_(ids_good))
+        await database.execute(query)
+
         for item in entity.get('goods'):
-            query = docs_warehouse_goods.update()\
-                .where(
-                and_(docs_warehouse_goods.c.docs_warehouse_id == doc_id,
-                     docs_warehouse_goods.c.nomenclature == item['nomenclature']))\
-                .values(item)
+            item['docs_warehouse_id'] = doc_id
+            query = docs_warehouse_goods.insert().values(item)
             await database.execute(query)
-            items_sum += item["price"] * item["quantity"]
             if entity['status']:
                 try:
                     query = await database.fetch_one(
