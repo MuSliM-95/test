@@ -14,8 +14,7 @@ import {
   Button,
   Table,
   Popconfirm,
-  Row,
-  Col,
+  Layout,
   message,
 } from "antd";
 import { COL_WAREHOUSES_DOCS_GOODS } from "../../Table/model/constants";
@@ -26,6 +25,27 @@ import { setColumnCellProps } from "../../Table/lib/setCollumnCellProps";
 import { DeleteOutlined } from "@ant-design/icons";
 import { EditableRow, EditableCell } from "../../../shared";
 import "./style.css";
+
+const { Header, Sider, Content } = Layout;
+
+const headerStyle = {
+  textAlign: "center",
+  color: "#fff",
+  height: 64,
+  paddingInline: 50,
+  lineHeight: "64px",
+  backgroundColor: "white",
+};
+const contentStyle = {
+  textAlign: "center",
+  lineHeight: "120px",
+  color: "#fff",
+  backgroundColor: "white",
+};
+const siderStyle = {
+  textAlign: "center",
+  backgroundColor: "white",
+};
 
 export default function WarehousesDocs({
   formContext,
@@ -268,15 +288,15 @@ export default function WarehousesDocs({
   }, [nomenclatureData]);
 
   return (
-    <Row>
-      <Col flex={"0 0 400px"}>
+    <Layout>
+      <Sider style={siderStyle}>
         <Form
-          {...formItemLayout}
+          // {...formItemLayout}
           form={formContext}
-          initialValues={newData}
+          // initialValues={newData}
           onChange={handleIsChanges}
-          layout={"horizontal"}
-          style={{ maxWidth: "100%" }}
+          layout="vertical"
+          style={{ marginLeft: 10, marginRight: 10, marginTop: 10 }}
         >
           <Form.Item label={"Номер"} name={"number"}>
             <Input />
@@ -303,94 +323,112 @@ export default function WarehousesDocs({
           </Form.Item>
           <Form.Item name={"goods"} initialValue={[]} noStyle></Form.Item>
         </Form>
-      </Col>
-      <Col flex={"2 0 200px"}>
-        <Form
-          form={formTableContext}
-          onFinish={handleAddGoods}
-          layout="inline"
-          style={{ width: "100%", marginBottom: "20px" }}
+      </Sider>
+      <Layout>
+        <Header style={headerStyle}>
+          <Form
+            form={formTableContext}
+            onFinish={handleAddGoods}
+            layout="inline"
+            style={{ width: "100%", marginBottom: "20px" }}
+          >
+            <Form.Item
+              rules={[{ required: true, message: "Заполните поле" }]}
+              name={"nomenclature"}
+            >
+              <Select
+                showSearch
+                placeholder={"Номенклатура"}
+                options={nomenclatures}
+                filterOption={false}
+                onSearch={fetchNomenclatureList}
+                style={{ minWidth: "300px" }}
+                onSelect={(id) => searchPriceById(id)}
+              />
+            </Form.Item>
+            <Form.Item
+              rules={[{ required: true, message: "Заполните поле" }]}
+              name={"quantity"}
+            >
+              <Input
+                placeholder="Количество"
+                type={"number"}
+                addonAfter={
+                  <>
+                    <Form.Item name={"unit"} noStyle>
+                      <Select
+                        showSearch
+                        filterOption={(input, option) =>
+                          (option?.label ?? "")
+                            .toLowerCase()
+                            .includes(input.toLowerCase())
+                        }
+                        placeholder={"Единица"}
+                        options={units}
+                        style={{ width: "150px" }}
+                      />
+                    </Form.Item>
+                  </>
+                }
+              />
+            </Form.Item>
+            <Form.Item
+              rules={[{ required: true, message: "Заполните поле" }]}
+              name={"price"}
+            >
+              <Input
+                type={"number"}
+                placeholder={"Цена"}
+                addonAfter={
+                  <>
+                    <Form.Item name={"price_type"} noStyle>
+                      <Select
+                        placeholder={"Тип"}
+                        options={priceType}
+                        style={{ width: "150px" }}
+                      />
+                    </Form.Item>
+                  </>
+                }
+              />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">
+                Добавить продукт
+              </Button>
+            </Form.Item>
+          </Form>
+        </Header>
+        <Content style={contentStyle}>
+          <Table
+            columns={columns}
+            dataSource={newData.goods}
+            components={{
+              body: {
+                row: EditableRow,
+                cell: EditableCell,
+              },
+            }}
+            bordered
+            size="small"
+            rowClassName={() => "editable-row"}
+          />
+        </Content>
+      </Layout>
+      <Sider style={siderStyle}>
+        <Button
+          onClick={() => this.finish("add_proc")}
+          style={{ width: "100%", marginTop: 500, marginLeft: 10 }}
         >
-          <Form.Item
-            rules={[{ required: true, message: "Заполните поле" }]}
-            name={"nomenclature"}
-          >
-            <Select
-              showSearch
-              placeholder={"Номенклатура"}
-              options={nomenclatures}
-              filterOption={false}
-              onSearch={fetchNomenclatureList}
-              style={{ minWidth: "300px" }}
-              onSelect={(id) => searchPriceById(id)}
-            />
-          </Form.Item>
-          <Form.Item
-            rules={[{ required: true, message: "Заполните поле" }]}
-            name={"quantity"}
-          >
-            <Input
-              placeholder="Количество"
-              type={"number"}
-              addonAfter={
-                <>
-                  <Form.Item name={"unit"} noStyle>
-                    <Select
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? "")
-                          .toLowerCase()
-                          .includes(input.toLowerCase())
-                      }
-                      placeholder={"Единица"}
-                      options={units}
-                      style={{ width: "150px" }}
-                    />
-                  </Form.Item>
-                </>
-              }
-            />
-          </Form.Item>
-          <Form.Item
-            rules={[{ required: true, message: "Заполните поле" }]}
-            name={"price"}
-          >
-            <Input
-              type={"number"}
-              placeholder={"Цена"}
-              addonAfter={
-                <>
-                  <Form.Item name={"price_type"} noStyle>
-                    <Select
-                      placeholder={"Тип"}
-                      options={priceType}
-                      style={{ width: "150px" }}
-                    />
-                  </Form.Item>
-                </>
-              }
-            />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              Добавить продукт
-            </Button>
-          </Form.Item>
-        </Form>
-        <Table
-          columns={columns}
-          dataSource={newData.goods}
-          components={{
-            body: {
-              row: EditableRow,
-              cell: EditableCell,
-            },
-          }}
-          bordered
-          size="small"
-          rowClassName={() => "editable-row"}
-        />
-      </Col>
-    </Row>
+          Создать и провести
+        </Button>
+        <Button
+          onClick={() => this.finish("only_add")}
+          style={{ marginTop: 10, width: "100%", marginLeft: 10 }}
+        >
+          Только создать
+        </Button>
+      </Sider>
+    </Layout>
   );
 }

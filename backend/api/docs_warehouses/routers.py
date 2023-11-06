@@ -64,7 +64,7 @@ async def get_by_id(token: str, idx: int):
 
 
 @router.get("/docs_warehouse/", response_model=schemas.GetDocsWarehouse)
-async def get_list(token: str, limit: int = 10, offset: int = 0, datefrom: int = None, dateto: int = None):
+async def get_list(token: str, limit: int = 10, offset: int = 0, datefrom: int = None, dateto: int = None, tags: str = None):
     """Получение списка документов"""
     filters_list = []
     user = await get_user_by_token(token)
@@ -77,6 +77,8 @@ async def get_list(token: str, limit: int = 10, offset: int = 0, datefrom: int =
         filters_list.append(docs_warehouse.c.dated >= datefrom)
         filters_list.append(docs_warehouse.c.dated <= dateto)
     
+    if tags:
+        filters_list.append(docs_warehouse.c.tags.ilike(f"%{tags}%"))
 
     query = docs_warehouse.select().where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.cashbox == user.cashbox_id).order_by(desc(docs_warehouse.c.id)).where(*filters_list).limit(limit).offset(offset)
     items_db = await database.fetch_all(query)

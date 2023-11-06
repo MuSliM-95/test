@@ -2,7 +2,7 @@ import React from 'react'
 import { AutoComplete } from 'antd'
 
 const searchResult = async (api, token, query) => {
-    return fetch(`${api}contragents?token=${token}&name=${query}`)
+    return fetch(`${api}contragents/?token=${token}&name=${query}`)
         .then((response) => response.json())
         .then((body) =>
             body.result.map((user) => ({

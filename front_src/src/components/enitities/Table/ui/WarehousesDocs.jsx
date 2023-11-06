@@ -53,6 +53,8 @@ export default function WarehousesDocs({
 
   const findRun = () => {
 
+    setLoading(true)
+
     let params = { token: token, offset: 0, limit: 100000 }
     let dates = {}
 
@@ -81,6 +83,7 @@ export default function WarehousesDocs({
             statusesArr
           )
           .then((res) => {
+            setLoading(false)
             message.info("Вы провели документы за промежуток!")
           });
 
@@ -190,7 +193,7 @@ export default function WarehousesDocs({
   return (
     <>
       <Space direction="horizontal">
-        <RangePicker onChange={(dates) => getStamps(dates)} />
+        <RangePicker format={"DD.MM.YYYY"} placeholder={[ "Дата начала", "Дата окончания" ]} style={{ marginLeft: 5 }} onChange={(dates) => getStamps(dates)} />
 
         <Button onClick={() => find()} htmlType="submit" icon={<SearchOutlined />}>Найти</Button>
         <Button onClick={() => findRun()} htmlType="submit" icon={<SearchOutlined />}>Найти и провести</Button>
