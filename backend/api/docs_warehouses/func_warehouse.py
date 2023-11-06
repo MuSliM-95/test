@@ -201,14 +201,15 @@ async def check_exist_amount(goods, warehouse):
 
 
 @database.transaction()
-async def insert_goods(entity, doc_id, type_operation):
+async def insert_goods(entity, doc_id, type_operation, not_create_goods: bool = False):
     try:
         items_sum = 0
         for item in entity.get('goods'):
-            item["docs_warehouse_id"] = doc_id
-            query = docs_warehouse_goods.insert().values(item)
-            await database.execute(query)
-            items_sum += item["price"] * item["quantity"]
+            if not not_create_goods:
+                item["docs_warehouse_id"] = doc_id
+                query = docs_warehouse_goods.insert().values(item)
+                await database.execute(query)
+                items_sum += item["price"] * item["quantity"]
             try:
                 if entity['status']:
                     query = warehouse_register_movement.insert().values(
@@ -293,7 +294,7 @@ async def transfer(entity_values, token):
         entity.update({'goods': goods})
         await insert_goods(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
         entity.update({'warehouse': entity['to_warehouse']})
-        await insert_goods(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
+        await insert_goods(entity=entity, doc_id=doc_id, type_operation=OperationType.plus, not_create_goods=True)
         return doc_id
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
