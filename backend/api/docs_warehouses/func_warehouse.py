@@ -111,51 +111,6 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
         ids_good = [good['id'] for good in goods_db]
         query = docs_warehouse_goods.delete().where(docs_warehouse_goods.c.id.in_(ids_good))
         await database.execute(query)
-
-        for item in entity.get('goods'):
-            item['docs_warehouse_id'] = doc_id
-            query = docs_warehouse_goods.insert().values(item)
-            await database.execute(query)
-            if entity['status']:
-                try:
-                    query = await database.fetch_one(
-                        warehouse_register_movement.select()
-                        .where(and_(warehouse_register_movement.c.nomenclature_id == item['nomenclature'],
-                                    warehouse_register_movement.c.document_warehouse_id == doc_id)))
-                    if query is not None:
-
-                        query = warehouse_register_movement.update().where(and_(
-                            warehouse_register_movement.c.document_warehouse_id == doc_id,
-                            warehouse_register_movement.c.nomenclature_id == item['nomenclature']
-                            )
-                        ).values({
-                                "organization_id": entity["organization"],
-                                "type_amount": type_operation,
-                                "warehouse_id": entity["warehouse"],
-                                "nomenclature_id": item["nomenclature"],
-                                "document_sale_id": entity.get('docs_sales_id'),
-                                "document_purchase_id": entity.get('docs_purchases'),
-                                "document_warehouse_id": doc_id,
-                                "amount": item['quantity'],
-                                "cashbox_id": entity['cashbox'],
-                            })
-                        await database.execute(query)
-                    else:
-                        query = warehouse_register_movement.insert().values(
-                            {
-                                "organization_id": entity["organization"],
-                                "type_amount": type_operation,
-                                "warehouse_id": entity["warehouse"],
-                                "document_sale_id": entity.get('docs_sales_id'),
-                                "document_purchase_id": entity.get('docs_purchases'),
-                                "nomenclature_id": item["nomenclature"],
-                                "document_warehouse_id": doc_id,
-                                "amount": item['quantity'],
-                                "cashbox_id": entity['cashbox'],
-                            })
-                        await database.execute(query)
-                except Exception as err:
-                    raise Exception(f"error update record in warehouse_register_movement: {str(err)}")
         if not entity['status']:
             try:
                 query = warehouse_register_movement.delete().where(
@@ -163,6 +118,30 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                 await database.execute(query)
             except Exception as err:
                 raise Exception(f"error delete record in warehouse_register_movement: {str(err)}")
+        else:
+            query = warehouse_register_movement.delete().where(
+                warehouse_register_movement.c.document_warehouse_id == doc_id)
+            await database.execute(query)
+            for item in entity.get('goods'):
+                item['docs_warehouse_id'] = doc_id
+                query = docs_warehouse_goods.insert().values(item)
+                await database.execute(query)
+                try:
+                    query = warehouse_register_movement.insert().values(
+                                {
+                                    "organization_id": entity["organization"],
+                                    "type_amount": type_operation,
+                                    "warehouse_id": entity["warehouse"],
+                                    "document_sale_id": entity.get('docs_sales_id'),
+                                    "document_purchase_id": entity.get('docs_purchases'),
+                                    "nomenclature_id": item["nomenclature"],
+                                    "document_warehouse_id": doc_id,
+                                    "amount": item['quantity'],
+                                    "cashbox_id": entity['cashbox'],
+                                })
+                    await database.execute(query)
+                except Exception as err:
+                    raise Exception(f"error update record in warehouse_register_movement: {str(err)}")
         query = (
             docs_warehouse.update()
             .where(docs_warehouse.c.id == doc_id)
