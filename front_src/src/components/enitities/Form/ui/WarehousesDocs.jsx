@@ -69,7 +69,7 @@ export default function WarehousesDocs({
   const [warehouses, setWarehouses] = useState([]);
   const [priceType, setPriceType] = useState([]);
   const { TextArea } = Input;
-  const formItemLayout = { labelCol: { span: 7 }, wrapperCol: { span: 15 } };
+  // const formItemLayout = { labelCol: { span: 7 }, wrapperCol: { span: 15 } };
   const editableCell = (options) => (cell) => (record, index) => ({
     record,
     index,
