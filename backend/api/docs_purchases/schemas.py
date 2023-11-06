@@ -9,6 +9,10 @@ class Item(BaseModel):
     quantity: int
     unit: Optional[int]
 
+class ItemGet(Item):
+    nomenclature_name: Optional[str]
+    unit_name: Optional[str]
+
 
 class Create(BaseModel):
     number: Optional[str]
@@ -18,6 +22,7 @@ class Create(BaseModel):
     client: Optional[int]
     contragent: Optional[int]
     contract: Optional[int]
+    status: Optional[bool]
     organization: int
     warehouse: Optional[int]
     purchased_by: Optional[int]
@@ -71,7 +76,7 @@ class ViewResult(BaseModel):
     count: int
 
 class View(ViewInList):
-    goods: Optional[List[Item]]
+    goods: Optional[List[ItemGet]]
 
     class Config:
         orm_mode = True

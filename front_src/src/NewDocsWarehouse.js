@@ -669,7 +669,7 @@ class NewDocsWarehouse extends React.Component {
                                 </Form.Item>
 
                                 <Form.Item label="На дату" name="dated">
-                                    <DatePicker placeholder="Выберите дату" format={"DD.MM.YYYY"} onChange={(date) => this.setState({ dated: date })} />
+                                    <DatePicker style={{ width: "100%" }} placeholder="Выберите дату" format={"DD.MM.YYYY"} onChange={(date) => this.setState({ dated: date })} />
                                 </Form.Item>
 
                                 <Form.Item label="Организация" name="organization">

@@ -49,13 +49,14 @@ import {
   TableContracts,
   TableWarehouses,
   TablePrices,
-  TableDocsPurchases,
+  // TableDocsPurchases,
   TablePricesHandsontable,
   TableLoyalitySettings,
   TableLoyalityReport,
 } from "./components/pages/";
 import { currentMonthRange } from "./components/shared";
 import DocsWarehouse from "./DocsWarehouse";
+import DocsPurchases from "./DocsPurchases";
 
 const { Option } = Select;
 const { Header, Content, Footer, Sider } = Layout;
@@ -1126,8 +1127,12 @@ class LogIn extends React.Component {
                           <Route
                             path="/docs_purchases"
                             element={
-                              <TableDocsPurchases
-                                token={params.token}
+                              <DocsPurchases
+                                contractsData={this.state.contractsData}
+                                warehousesDS={this.state.warehousesData}
+                                contragentsInfo={this.state.CADS}
+                                organizationsDS={this.state.organizationsData}
+                                query={params}
                                 websocket={this.state.ws}
                               />
                             }

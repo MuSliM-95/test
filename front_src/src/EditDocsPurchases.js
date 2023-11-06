@@ -10,16 +10,9 @@ import {
     Space,
     Table,
     Popconfirm,
-    Select,
-    DatePicker
 } from "antd";
-
 import ContragentAutocomplete from "./ContragentAutocomplete";
-import NomAutocomplete from "./NomenclatureAutoComplete";
-import WareHousesAutocomplete from "./WarehouseAutocomplete";
-import OrganizationAutocomplete from "./OrganizationAutocomplete";
-
-import dayjs from "dayjs";
+import ContractAutocomplete from "./ContractAutocomplete";
 
 import {
     PlusOutlined,
@@ -29,7 +22,10 @@ import {
     DeleteOutlined,
     EditOutlined,
 } from "@ant-design/icons";
+import NomAutocomplete from "./NomenclatureAutoComplete";
+import WareHousesAutocomplete from "./WarehouseAutocomplete";
 import axios from "axios";
+import OrganizationAutocomplete from "./OrganizationAutocomplete";
 
 const { Header, Sider, Content } = Layout;
 
@@ -41,14 +37,12 @@ const headerStyle = {
     lineHeight: "64px",
     backgroundColor: "white",
 };
-
 const contentStyle = {
     textAlign: "center",
     lineHeight: "120px",
     color: "#fff",
     backgroundColor: "white",
 };
-
 const siderStyle = {
     textAlign: "center",
     backgroundColor: "white",
@@ -103,6 +97,7 @@ const EditableCell = ({
     };
 
     let childNode = children;
+
     let ed = editing ? (
         <Form.Item
             style={{
@@ -111,7 +106,7 @@ const EditableCell = ({
             name={dataIndex}
             rules={[
                 {
-                    required: dataIndex !== "amount",
+                    required: dataIndex !== 'amount',
                     message: `${title} обязательно для ввода.`,
                 },
             ]}
@@ -145,7 +140,7 @@ const EditableCell = ({
     return <td {...restProps}>{childNode}</td>;
 };
 
-class EditDocsWarehouse extends React.Component {
+class EditDocsPurchases extends React.Component {
     constructor(props) {
         super(props);
 
@@ -162,7 +157,6 @@ class EditDocsWarehouse extends React.Component {
             amount_without_discount: 0,
             amount_with_discount: 0,
             amount_discount: 0,
-            is_transfer: this.props.doc.operation === "transfer",
             nomDS: [],
         };
         this.api = `https://${process.env.REACT_APP_APP_URL}/api/v1/`;
@@ -170,8 +164,6 @@ class EditDocsWarehouse extends React.Component {
         this.leftBarIV = {
             number: this.props.doc.number,
             comment: this.props.doc.comment,
-            dated: dayjs(this.props.doc.dated * 1000),
-            operation: this.props.doc.operation
         };
 
         this.columns = [
@@ -222,6 +214,26 @@ class EditDocsWarehouse extends React.Component {
         ];
     }
 
+    findDocSales = async (id) => {
+        return fetch(
+            `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/${id}/?token=${this.props.token}`
+        )
+            .then((response) => response.json())
+            .then((body) => {
+                return body;
+            });
+    };
+
+    findContragent = async (id) => {
+        return fetch(
+            `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}/?token=${this.props.token}`
+        )
+            .then((response) => response.json())
+            .then((body) => {
+                return body;
+            });
+    };
+
     handleSave = (row) => {
         const newData = [...this.state.nomDS];
         const index = newData.findIndex((item) => row.id === item.id);
@@ -241,10 +253,38 @@ class EditDocsWarehouse extends React.Component {
         this.setState(
             {
                 nomDS: newData,
-            },
+            }
         );
 
         // this.edit_request(newData.splice(index, 1, { ...item, ...row })[0]);
+    };
+
+    onSelectCa = (val) => {
+        this.findContragent(val).then((res) => {
+            this.setState({ current_contragent: res });
+            this.formRef.current.setFieldsValue({
+                contragent: res.name,
+            });
+        });
+    };
+
+    findContract = async (id) => {
+        return fetch(
+            `https://${process.env.REACT_APP_APP_URL}/api/v1/contracts/${id || ''}/?token=${this.props.token}`
+        )
+            .then((response) => response.json())
+            .then((body) => {
+                return body;
+            });
+    };
+
+    onSelectContract = (val) => {
+        this.findContract(val).then((res) => {
+            this.setState({ current_contract: res });
+            this.formRef.current.setFieldsValue({
+                contract: res.name,
+            });
+        });
     };
 
     findOrg = async (id) => {
@@ -285,15 +325,6 @@ class EditDocsWarehouse extends React.Component {
         });
     };
 
-    onSelectWareHouseTo = (val) => {
-        this.findWareHouse(val).then((res) => {
-            this.setState({ current_warehouse_to: res });
-            this.formRef.current.setFieldsValue({
-                warehouse_to: res.name,
-            });
-        });
-    };
-
     findNomenclature = async (id) => {
         return fetch(
             `https://${process.env.REACT_APP_APP_URL}/api/v1/nomenclature/${id}/?token=${this.props.token}`
@@ -330,18 +361,17 @@ class EditDocsWarehouse extends React.Component {
                     message.error("Вы не выбрали склад!");
                 } else {
                     fetch(
-                        `https://${process.env.REACT_APP_APP_URL}/api/v1/alt_warehouse_balances/?token=${this.props.token}&nomenclature_id=${res.id}&warehouse_id=${this.state.current_warehouse.id}`
+                        `https://${process.env.REACT_APP_APP_URL}/api/v1/warehouse_balances/${this.state.current_warehouse.id}/?token=${this.props.token}&nomenclature_id=${res.id}`
                     )
                         .then((response) => response.json())
                         .then((body) => {
-                            if (body.result.length > 0) {
+                            if (body > 0) {
                                 this.formRefNom.current.setFieldsValue({
                                     count: 1,
                                 });
-                                console.log(body.result.current_amount)
                                 this.setState({
                                     nomenclature_min: 1,
-                                    nomenclature_max: body.result[0].current_amount,
+                                    nomenclature_max: body,
                                     addNomButtonDisabled: false,
                                 });
                             } else {
@@ -366,25 +396,6 @@ class EditDocsWarehouse extends React.Component {
                     addNomButtonDisabled: false,
                 });
             }
-        });
-    };
-
-    findContragent = async (id) => {
-        return fetch(
-            `https://${process.env.REACT_APP_APP_URL}/api/v1/contragents/${id}/?token=${this.props.token}`
-        )
-            .then((response) => response.json())
-            .then((body) => {
-                return body;
-            });
-    };
-
-    onSelectCa = (val) => {
-        this.findContragent(val).then((res) => {
-            this.setState({ current_contragent: res });
-            this.formRef.current.setFieldsValue({
-                contragent: res.name,
-            });
         });
     };
 
@@ -416,212 +427,73 @@ class EditDocsWarehouse extends React.Component {
 
     addNomenclature = (values) => {
         fetch(
-            `https://${process.env.REACT_APP_APP_URL}/api/v1/alt_prices/${this.state.current_nomenclature.id}/?token=${this.props.token}`
+            `https://${process.env.REACT_APP_APP_URL}/api/v1/prices/${this.state.current_nomenclature.id}/?token=${this.props.token}`
         )
             .then((response) => response.json())
             .then((body) => {
-                if (!body.detail) {
-                    let item = {
-                        id: this.state.current_nomenclature.id,
-                        name: values.nomenclature,
-                        amount: body.price?.toFixed(2) || 0,
-                        discount: 0,
-                        count: values.count,
-                        unit: this.state.current_nomenclature.unit_name,
-                        final_amount: (
-                            parseFloat(body.price) * parseFloat(values.count)
-                        ).toFixed(2),
-                    };
-
-                    if (!body.price) {
-                        item.final_amount = 0;
-                    }
-
-                    const DS = [...this.state.nomDS];
-                    const index = DS.findIndex(
-                        (item) => this.state.current_nomenclature.id === item.id
-                    );
-
-                    if (index !== -1) {
-                        const item = DS[index];
-                        //if (item.count < this.state.nomenclature_max) {
-                        item.count = parseInt(item.count + values.count);
-                        item.final_amount = (
-                            parseFloat(item.count) * parseFloat(item.amount) -
-                            parseFloat(item.discount)
-                        ).toFixed(2);
-                        this.setState({ nomDS: DS });
-                        //}
-                        //else {
-                        //    message.error("На складе нет такого количества")
-                        //}
-                    } else {
-                        DS.unshift(item);
-                        this.setState({ nomDS: DS });
-                    }
-                }
-                else {
-                    let item = {
-                        id: this.state.current_nomenclature.id,
-                        name: values.nomenclature,
-                        amount: 0,
-                        count: values.count,
-                        unit: this.state.current_nomenclature.unit_name,
-                        final_amount: 0,
-                    };
-
-                    const DS = [...this.state.nomDS];
-                    const index = DS.findIndex(
-                        (item) => this.state.current_nomenclature.id === item.id
-                    );
-
-
-                    if (index !== -1) {
-                        const item = DS[index];
-                        item.count = parseInt(item.count + values.count);
-                        item.final_amount = (
-                            parseFloat(item.count) * parseFloat(item.amount)
-                        ).toFixed(2);
-                        this.setState({ nomDS: DS });
-
-                    } else {
-                        DS.unshift(item);
-                        this.setState({ nomDS: DS });
-                    }
-                }
-
-            });
-    };
-
-    finish = (action) => {
-        const { nomDS } = this.state;
-
-        let body = {
-            number: this.formRef.current.getFieldValue("number"),
-            dated: this.formRef.current.getFieldValue("dated") ? this.formRef.current.getFieldValue("dated").unix() : Math.floor(Date.now() / 1000),
-            operation: this.formRef.current.getFieldValue("operation"),
-            comment: this.formRef.current.getFieldValue("comment"),
-            goods: [],
-        };
-
-        body.id = this.props.doc.id
-
-        if (this.state.is_transfer && this.state.current_warehouse_to) {
-            body.to_warehouse = this.state.current_warehouse_to.id
-        }
-
-        if (this.props.tags !== undefined) {
-            body.tags = this.props.tags;
-        }
-
-        if (!this.state.current_warehouse || !this.state.current_organization) {
-            message.error("Вы не выбрали склад или организацию!");
-        } else {
-            body.warehouse = this.state.current_warehouse.id;
-
-            if (this.state.current_contragent) {
-                if (this.state.current_contragent.contragent) {
-                    body.contragent = this.state.current_contragent.contragent;
-                } else {
-                    body.contragent = this.state.current_contragent.id;
-                }
-            }
-
-            if (this.state.current_organization) {
-                body.organization = this.state.current_organization.id;
-            }
-
-            nomDS.map((item) => {
-                let good_body = {
-                    price: parseFloat(item.amount),
-                    price_type: 1,
-                    quantity: parseInt(item.count),
-                    unit: 116,
-                    nomenclature: item.id,
+                let item = {
+                    id: this.state.current_nomenclature.id,
+                    name: values.nomenclature,
+                    amount: body.price?.toFixed(2) || 0,
+                    discount: 0,
+                    count: values.count,
+                    unit: this.state.current_nomenclature.unit_name,
+                    final_amount: (
+                        parseFloat(body.price) * parseFloat(values.count)
+                    ).toFixed(2),
                 };
-                body.goods.push(good_body);
-                return 0;
-            });
 
-            if (action === "add_proc") {
-                body.status = true;
-            } else if (action === "only_add") {
-                body.status = false;
-            }
+                if (values.discount > 0) {
+                    const { discount_type } = this.state;
 
-            axios
-                .patch(
-                    `https://${process.env.REACT_APP_APP_URL}/api/v1/alt_docs_warehouse/?token=${this.props.token}`,
-                    [body]
-                )
-                .then((response) => {
-                    message.success("Вы успешно изменили документ");
-                    this.setState({ isModalVisible: false });
-                });
-        }
-    };
+                    if (discount_type === "percent") {
+                        const amount = parseFloat(item.amount);
+                        const onePerc = amount / 100;
 
-    setFinishPrices = (total) => {
-        if (this.state.loyality_card) {
-            const loyalityBalance = this.state.loyality_card.balance;
-            const maxDiscount = this.state.loyality_card.max_percentage;
-            const availableDiscount = (loyalityBalance / 100) * maxDiscount;
-            const rublesWithDiscount = total - availableDiscount;
-            if (rublesWithDiscount <= 0) {
-                const rubles = 0;
-                const loyality = availableDiscount + rublesWithDiscount;
-                this.finRef.current.setFieldValue("lt", loyality);
-                this.finRef.current.setFieldValue("rubles", rubles);
-                this.setState({
-                    max_paid_loyality: availableDiscount,
-                });
-                return null;
-            }
-            this.finRef.current.setFieldValue("lt", availableDiscount);
-            this.finRef.current.setFieldValue("rubles", rublesWithDiscount);
-            this.setState({
-                max_paid_loyality: availableDiscount,
-            });
-        }
-    };
+                        item.discount = (onePerc * values.discount).toFixed(2);
+                        item.final_amount = (item.final_amount - item.discount).toFixed(2);
+                    } else {
+                        item.discount = values.discount.toFixed(2);
+                        item.final_amount = (item.final_amount - item.discount).toFixed(2);
+                    }
+                }
 
-    onRecalculateLoyality = (value) => {
-        if (this.state.loyality_card) {
-            const total = this.state.amount_without_discount;
-            const diff = Math.abs(total - value);
-            this.finRef.current.setFieldValue("lt", diff);
-        }
-    };
+                const DS = [...this.state.nomDS];
+                const index = DS.findIndex(
+                    (item) => this.state.current_nomenclature.id === item.id
+                );
 
-    onRecalculateRubles = (value) => {
-        const total = this.state.amount_without_discount;
-        const diff = Math.abs(total - value);
-        this.finRef.current.setFieldValue("rubles", diff);
-    };
-
-    findDocWarehouse = async (id) => {
-        return fetch(
-            `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_warehouse/${id}/?token=${this.props.token}`
-        )
-            .then((response) => response.json())
-            .then((body) => {
-                return body;
+                if (index !== -1) {
+                    const item = DS[index];
+                    //if (item.count < this.state.nomenclature_max) {
+                    item.count = parseInt(item.count + values.count);
+                    item.final_amount = (
+                        parseFloat(item.count) * parseFloat(item.amount) -
+                        parseFloat(item.discount)
+                    ).toFixed(2);
+                    this.setState({ nomDS: DS });
+                    //}
+                    //else {
+                    //    message.error("На складе нет такого количества")
+                    //}
+                } else {
+                    DS.unshift(item);
+                    this.setState({ nomDS: DS });
+                }
             });
     };
 
     showModal = () => {
-        this.findDocWarehouse(this.props.doc.id).then((res) => {
+        this.findDocSales(this.props.doc.id).then((res) => {
+            console.log(res)
             this.onSelectCa(res.contragent);
+            this.onSelectContract(res.contract);
             this.onSelectWareHouse(res.warehouse);
-            if (this.state.is_transfer) {
-                this.onSelectWareHouseTo(res.to_warehouse)
-            }
             this.onSelectOrg(res.organization);
 
             let nomDS = [];
 
             res.goods.forEach(function (arrayItem) {
-                console.log(res.goods)
                 let item = {
                     id: arrayItem.nomenclature,
                     name: arrayItem.nomenclature_name,
@@ -642,8 +514,69 @@ class EditDocsWarehouse extends React.Component {
         this.setState({ isModalVisible: true });
     };
 
-    render() {
+    finish = (action) => {
+        const { nomDS } = this.state;
 
+        let body = {
+            number: this.formRef.current.getFieldValue("number"),
+            dated: Math.floor(Date.now() / 1000),
+            operation: "Заказ",
+            comment: this.formRef.current.getFieldValue("comment"),
+            tax_included: true,
+            tax_active: true,
+            goods: [],
+        };
+
+        if (this.props.tags !== undefined) {
+            body.tags = this.props.tags;
+        }
+
+        if (this.state.loyality_card) {
+            body.loyality_card_id = this.state.loyality_card.id;
+        }
+
+        if (!this.state.current_warehouse || !this.state.current_organization) {
+            message.error("Вы не выбрали склад или организацию!");
+        } else {
+            body.warehouse = this.state.current_warehouse.id;
+            if (this.state.current_contragent) {
+                body.contragent = this.state.current_contragent.id;
+            }
+            if (this.state.current_contract) {
+                body.contract = this.state.current_contract.id;
+            }
+            if (this.state.current_organization) {
+                body.organization = this.state.current_organization.id;
+            }
+
+            nomDS.map((item) => {
+                let good_body = {
+                    price_type: 1,
+                    price: parseFloat(item.amount),
+                    quantity: parseInt(item.count),
+                    unit: 116,
+                    nomenclature: item.id,
+                };
+                body.goods.push(good_body);
+                return 0;
+            });
+
+            body.id = this.props.doc.id;
+
+            axios
+                .patch(
+                    `https://${process.env.REACT_APP_APP_URL}/api/v1/docs_purchases/?token=${this.props.token}`,
+                    [body]
+                )
+                .then((response) => {
+                    message.success("Вы успешно изменили документ");
+                    this.setState({ isModalVisible: false });
+                });
+        }
+    };
+
+
+    render() {
         const handleCancel = () => {
             this.setState({ isModalVisible: false });
         };
@@ -683,7 +616,7 @@ class EditDocsWarehouse extends React.Component {
                     width={1800}
                     destroyOnClose={true}
                     footer={null}
-                    title="Проведение документа склада"
+                    title="Проведение документа продаж"
                     open={this.state.isModalVisible}
                     onCancel={handleCancel}
                 >
@@ -692,63 +625,17 @@ class EditDocsWarehouse extends React.Component {
                             <Form
                                 name="basic"
                                 ref={this.formRef}
-                                initialValues={this.leftBarIV}
                                 layout="vertical"
                                 style={{ marginLeft: 10, marginRight: 10, marginTop: 10 }}
+                                initialValues={this.leftBarIV}
                             // onFinish={onFinish}
                             >
                                 <Form.Item label="Номер" name="number">
                                     <Input />
                                 </Form.Item>
-
-                                <Form.Item label="Операция" name="operation">
-                                    <Select
-                                        onChange={(selected) => {
-                                            if (selected === "transfer") {
-                                                this.setState({ is_transfer: true })
-                                            }
-                                            else {
-                                                this.setState({ is_transfer: false })
-                                            }
-                                        }}
-                                        options={[
-                                            {
-                                                value: 'outgoing',
-                                                label: 'Расход',
-                                            },
-                                            {
-                                                value: 'incoming',
-                                                label: 'Приход',
-                                            },
-                                            {
-                                                value: 'transfer',
-                                                label: 'Перемещение',
-                                            }
-                                        ]}
-                                    />
-                                </Form.Item>
-
                                 <Form.Item label="Комментарий" name="comment">
                                     <Input />
                                 </Form.Item>
-
-                                <Form.Item label="Склад" name="warehouse">
-                                    <WareHousesAutocomplete
-                                        api={this.api}
-                                        token={this.props.token}
-                                        onSelect={this.onSelectWareHouse}
-                                    />
-                                </Form.Item>
-
-                                <Form.Item label="Склад зачисления" name="warehouse_to">
-                                    <WareHousesAutocomplete
-                                        disabled={!this.state.is_transfer}
-                                        api={this.api}
-                                        token={this.props.token}
-                                        onSelect={this.onSelectWareHouseTo}
-                                    />
-                                </Form.Item>
-
                                 <Form.Item label="Контрагент" name="contragent">
                                     <ContragentAutocomplete
                                         api={this.api}
@@ -757,8 +644,20 @@ class EditDocsWarehouse extends React.Component {
                                     />
                                 </Form.Item>
 
-                                <Form.Item label="На дату" name="dated">
-                                    <DatePicker style={{ width: "100%" }} placeholder="Выберите дату" format={"DD.MM.YYYY"} onChange={(date) => this.setState({ dated: date })} />
+                                <Form.Item label="Договор" name="contract">
+                                    <ContractAutocomplete
+                                        api={this.api}
+                                        token={this.props.token}
+                                        onSelect={this.onSelectContract}
+                                    />
+                                </Form.Item>
+
+                                <Form.Item label="Склад отгрузки" name="warehouse">
+                                    <WareHousesAutocomplete
+                                        api={this.api}
+                                        token={this.props.token}
+                                        onSelect={this.onSelectWareHouse}
+                                    />
                                 </Form.Item>
 
                                 <Form.Item label="Организация" name="organization">
@@ -857,14 +756,13 @@ class EditDocsWarehouse extends React.Component {
                             </Content>
                         </Layout>
                         <Sider style={siderStyle}>
-
-
                             <Button
                                 onClick={() => this.finish("add_proc")}
                                 style={{ width: "100%" }}
                             >
                                 Изменить
                             </Button>
+                            {/* <Button onClick={() => this.finish("only_add")} style={{ marginTop: 10 }}>Только создать</Button> */}
                         </Sider>
                     </Layout>
                 </Modal>
@@ -873,4 +771,4 @@ class EditDocsWarehouse extends React.Component {
     }
 }
 
-export default EditDocsWarehouse;
+export default EditDocsPurchases;
