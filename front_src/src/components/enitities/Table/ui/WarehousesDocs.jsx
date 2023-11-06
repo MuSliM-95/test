@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Table, Button, Popconfirm, Switch, Space, DatePicker, message } from "antd";
 import { DeleteOutlined, SearchOutlined } from "@ant-design/icons";
 import { EditableCell, EditableRow, WarehousesDocsContext } from "../../../shared";
@@ -31,6 +31,10 @@ export default function WarehousesDocs({
   const [loading, setLoading] = useState(false);
   const [filterTime, setFilterTime] = useState([]);
   const [count, setCount] = useState(docsCount);
+
+  useEffect(() => {
+    setDataSource(newData)
+  }, [newData])
 
   const getStamps = (datesArr) => {
 

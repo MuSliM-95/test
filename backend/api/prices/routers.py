@@ -83,6 +83,74 @@ async def get_price_by_id(token: str, idx: int):
 
     else:
         raise HTTPException(404, "Такой цены не найдено")
+    
+
+@router.get("/alt_prices/{idx}/", response_model=schemas.Price)
+async def get_price_by_id(token: str, idx: int):
+    """Получение цены по ID номенклатуры"""
+    user = await get_user_by_token(token)
+
+    q = nomenclature.select().where(
+            nomenclature.c.id == idx,
+            nomenclature.c.owner == user.id,
+            nomenclature.c.is_deleted == False,
+        )
+    nom_db = await database.fetch_one(q)
+
+    if nom_db:
+
+        q = prices.select().where(prices.c.nomenclature == nom_db.id, prices.c.owner == user.id, prices.c.is_deleted == False)
+        price_db = await database.fetch_one(q)
+
+        if price_db:
+            response_body = {**dict(price_db)}
+
+            response_body["id"] = price_db.id
+            response_body["price"] = price_db.price
+            response_body["date_to"] = price_db.date_to
+            response_body["date_from"] = price_db.date_from
+            response_body["updated_at"] = price_db.updated_at
+            response_body["created_at"] = price_db.created_at
+
+            if price_db.price_type:
+                q = price_types.select().where(price_types.c.id == price_db.price_type)
+                price_type = await database.fetch_one(q)
+
+                if price_type:
+                    response_body["price_type"] = price_type.name
+
+            response_body["nomenclature_id"] = nom_db.id
+            response_body["nomenclature_name"] = nom_db.name
+
+            if nom_db.unit:
+                q = units.select().where(units.c.id == nom_db.unit)
+                unit = await database.fetch_one(q)
+
+                if unit:
+                    response_body["unit"] = unit.id
+                    response_body["unit_name"] = unit.name
+
+                if nom_db.category:
+                    q = categories.select().where(categories.c.id == nom_db.category)
+                    category = await database.fetch_one(q)
+
+                    if category:
+                        response_body["category"] = category.id
+                        response_body["category_name"] = category.name
+
+                if nom_db.manufacturer:
+                    q = manufacturers.select().where(manufacturers.c.id == nom_db.manufacturer)
+                    manufacturer = await database.fetch_one(q)
+
+                    if manufacturer:
+                        response_body["manufacturer"] = manufacturer.id
+                        response_body["manufacturer_name"] = manufacturer.name
+
+            response_body = datetime_to_timestamp(response_body)
+            return response_body
+
+        else:
+            raise HTTPException(404, "Такой цены не найдено")
 
 
 @router.get("/prices/", response_model=schemas.PriceListGet)

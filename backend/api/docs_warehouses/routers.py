@@ -4,10 +4,12 @@ from database.db import (
     docs_warehouse,
     docs_warehouse_goods,
     organizations,
+    nomenclature,
     price_types,
     warehouse_balances,
     warehouse_register_movement,
     warehouses,
+    units,
     OperationType
 )
 from . import schemas
@@ -58,7 +60,23 @@ async def get_by_id(token: str, idx: int):
     query = docs_warehouse_goods.select().where(docs_warehouse_goods.c.docs_warehouse_id == idx)
     goods_db = await database.fetch_all(query)
     goods_db = [*map(datetime_to_timestamp, goods_db)]
-    instance_db["goods"] = goods_db
+    # instance_db["goods"] = goods_db
+
+    goods = []
+    for good in goods_db:
+        nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good["nomenclature"]))
+        unit_db = await database.fetch_one(units.select().where(units.c.id == good['unit']))
+        goods.append({
+            "price_type": good['price_type'],
+            "price": good['price'],
+            "quantity": good['quantity'],
+            "unit": good['unit'],
+            "nomenclature": good['nomenclature'],
+            "unit_name": unit_db.name,
+            "nomenclature_name": nomenclature_db.name
+        })
+
+    instance_db["goods"] = goods
 
     return instance_db
 
@@ -483,7 +501,7 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
     await manager.send_message(
         token,
         {
-            "action": "create",
+            "action": "edit",
             "target": "docs_warehouse",
             "result": docs_warehouse_db,
         },

@@ -48,7 +48,6 @@ import {
   TableOrganizations,
   TableContracts,
   TableWarehouses,
-  TableWarehousesDocs,
   TablePrices,
   TableDocsPurchases,
   TablePricesHandsontable,
@@ -56,6 +55,7 @@ import {
   TableLoyalityReport,
 } from "./components/pages/";
 import { currentMonthRange } from "./components/shared";
+import DocsWarehouse from "./DocsWarehouse";
 
 const { Option } = Select;
 const { Header, Content, Footer, Sider } = Layout;
@@ -1061,8 +1061,9 @@ class LogIn extends React.Component {
                           <Route
                             path="/docs_warehouse"
                             element={
-                              <TableWarehousesDocs
+                              <DocsWarehouse
                                 token={params.token}
+                                query={params}
                                 websocket={this.state.ws}
                                 initialData={this.state.warehouseDocsData}
                                 docsCount={this.state.warehouseDocsDataCount}

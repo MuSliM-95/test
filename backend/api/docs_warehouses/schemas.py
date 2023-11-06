@@ -19,6 +19,10 @@ class Item(BaseModel):
     unit: Optional[int]
     nomenclature: int
 
+class ItemGet(Item):
+    nomenclature_name: Optional[str]
+    unit_name: Optional[str]
+
 
 class Create(BaseModel):
     number: Optional[str]
@@ -79,8 +83,9 @@ class GetDocsWarehouse(BaseModel):
     result: List[ViewInList]
     count: int
 
+
 class View(ViewInList):
-    goods: Optional[List[Item]]
+    goods: Optional[List[ItemGet]]
 
     class Config:
         orm_mode = True
