@@ -31,6 +31,7 @@ from . import schemas
 
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.docs_warehouses.routers import update as update_warehouse_doc
+from api.docs_warehouses.schemas import EditMass as WarehouseUpdate
 
 
 from functions.helpers import (
@@ -356,7 +357,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "article": "Продажи",
                 "paybox": payboxes[0].id,
                 "date": int(datetime.datetime.now().timestamp()),
-                "account": user.id,
+                "account": user.user,
                 "cashbox": user.cashbox_id,
                 "is_deleted": False,
                 "created_at": int(datetime.datetime.now().timestamp()),
@@ -607,7 +608,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                     "amount": instance_values.get("paid_rubles"),
                     "paybox": payboxes[0].id,
                     "date": int(datetime.datetime.now().timestamp()),
-                    "account": user.id,
+                    "account": user.user,
                     "cashbox": user.cashbox_id,
                     "is_deleted": False,
                     "created_at": int(datetime.datetime.now().timestamp()),
@@ -690,6 +691,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
                     asyncio.create_task(raschet_bonuses(user))
 
+        if instance_values.get("paid_rubles"):
+            del instance_values['paid_rubles']
         query = (
             docs_sales.update()
             .where(docs_sales.c.id == instance_values["id"])
@@ -752,7 +755,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                             "document_sale_id": instance_id,
                             "outgoing_amount": item["quantity"],
                             "current_amount": warehouse_amount - item["quantity"],
-                            "cashbox_id": user.id,
+                            "cashbox_id": user.cashbox_id,
                         }
                     )
                     await database.execute(query)
@@ -772,8 +775,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                 if nomenclature_db.type == "product":
                     goods_res.append(
                         {
-                            "price_type": good['price_type'],
-                            "price": good['price'],
+                            "price_type": 1,
+                            "price": 0,
                             "quantity": good['quantity'],
                             "unit": good['unit'],
                             "nomenclature": good['nomenclature']
@@ -781,16 +784,22 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                     )
 
 
-            body = [{
+            body = WarehouseUpdate(__root__=[
+                {
                 "id": doc_warehouse.id,
+                "number": None,
                 "dated": instance_values['dated'],
+                "docs_purchases": None,
+                "to_warehouse": None,
+                "status": False,
                 "contragent": instance_values['contragent'],
                 "operation": "outgoing",
                 "comment": instance_values['comment'],
                 "warehouse": instance_values['warehouse'],
                 "docs_sales_id": instance_id,
                 "goods": goods_res
-            }]
+            }
+            ])
 
             await update_warehouse_doc(token, body)
 
