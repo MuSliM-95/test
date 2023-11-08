@@ -401,7 +401,7 @@ class DocsWarehouse extends React.Component {
             dataSource: dataSource,
         });
 
-        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/docs_warehouse/?token=${this.props.query.token}`, [row.id])
+        axios.delete(`https://${process.env.REACT_APP_APP_URL}/api/v1/docs_warehouse/?token=${this.props.query.token}`, { data: [row.id] })
             .then(response => {
                 message.success("Вы успешно удалили документ склада");
             }).catch((err) => {
