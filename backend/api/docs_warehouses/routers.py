@@ -360,7 +360,7 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
     return docs_warehouse_db
 
 
-@router.delete("/docs_warehouse/{idx}/")
+@router.delete("/docs_warehouse/")
 @database.transaction()
 async def delete(token: str, ids: list[int]):
     """Удаление документов"""
