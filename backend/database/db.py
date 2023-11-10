@@ -771,7 +771,7 @@ docs_warehouse_goods = sqlalchemy.Table(
     sqlalchemy.Column("nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False),
     sqlalchemy.Column("price_type", Integer, ForeignKey("price_types.id")),
     sqlalchemy.Column("price", Float, nullable=False),
-    sqlalchemy.Column("quantity", Integer, nullable=False),
+    sqlalchemy.Column("quantity", Float, nullable=False),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),

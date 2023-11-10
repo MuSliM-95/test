@@ -219,7 +219,7 @@ class NewDocsWarehouse extends React.Component {
 
         row.amount = parseFloat(row.amount).toFixed(2);
         row.discount = parseFloat(row.discount).toFixed(2);
-        row.count = parseInt(row.count);
+        row.count = parseFloat(row.count).toFixed(3);
         row.final_amount = parseFloat(row.amount * row.count).toFixed(2);
 
         if (row.discount > 0) {
@@ -491,7 +491,7 @@ class NewDocsWarehouse extends React.Component {
                 let good_body = {
                     price: parseFloat(item.amount),
                     price_type: 1,
-                    quantity: parseInt(item.count),
+                    quantity: parseFloat(item.count),
                     unit: 116,
                     nomenclature: item.id,
                 };

@@ -15,7 +15,7 @@ class WarehouseOperations(str, Enum):
 class Item(BaseModel):
     price_type: Optional[int]
     price: float
-    quantity: int
+    quantity: float
     unit: Optional[int]
     nomenclature: int
 

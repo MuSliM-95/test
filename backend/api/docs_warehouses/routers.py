@@ -423,6 +423,17 @@ async def create(
     docs_warehouse_data = docs_warehouse_data.dict()
     user = await get_user_by_token(token)
     for doc in docs_warehouse_data["__root__"]:
+
+        for doc_good in doc['goods']:
+            if not doc_good['unit']:
+                q = nomenclature.select().where(nomenclature.c.id == doc_good['nomenclature'])
+                nom_db = await database.fetch_one(q)
+                if nom_db:
+                    if nom_db.unit:
+                        doc_good['unit'] = nom_db.unit
+                    else:
+                        doc_good['unit'] = 116
+
         response.append(await call_type_movement(doc['operation'], entity_values=doc, token=token))
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
     docs_warehouse_db = await database.fetch_all(query)

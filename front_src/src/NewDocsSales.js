@@ -260,7 +260,7 @@ class NewDocsSales extends React.Component {
 
     row.amount = parseFloat(row.amount).toFixed(2);
     row.discount = parseFloat(row.discount).toFixed(2);
-    row.count = parseInt(row.count);
+    row.count = parseFloat(row.count).toFixed(3);
     row.final_amount = parseFloat(row.amount * row.count).toFixed(2);
 
     if (row.discount > 0) {
@@ -570,7 +570,7 @@ class NewDocsSales extends React.Component {
       nomDS.map((item) => {
         let good_body = {
           price: parseFloat(item.amount),
-          quantity: parseInt(item.count),
+          quantity: parseFloat(item.count),
           unit: 116,
           discount: parseFloat(item.discount),
           sum_discounted: parseFloat(item.discount),
