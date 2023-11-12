@@ -6,7 +6,7 @@ class Item(BaseModel):
     nomenclature: int
     price_type: Optional[int]
     price: float
-    quantity: int
+    quantity: float
     unit: Optional[int]
 
 class ItemGet(Item):

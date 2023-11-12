@@ -5,7 +5,7 @@ export const API = {
   pictures: {
     removeImage: (token) => async (id) =>
       await axiosInstance
-        .delete(`/pictures/${id}?token=${token}`)
+        .delete(`/pictures/${id}/?token=${token}`)
         .then(() => message.success("Изображение было удалено"))
         .catch((err) => Promise.reject(err)),
   },
@@ -21,7 +21,7 @@ export const API = {
     },
     edit: (token, url) => async (data, id) =>
       await axiosInstance
-        .patch(`${url}/${data.id || id}?token=${token}`, data)
+        .patch(`${url}/${data.id || id}/?token=${token}`, data)
         .then((result) => {
           message.success("Строка была успешнo отредактирована");
           return result;
@@ -38,7 +38,7 @@ export const API = {
     remove: (token, url) => async (id, data) =>
       await axiosInstance
         .delete(
-          `${url}/${id}?token=${token}`,
+          `${url}/${id}/?token=${token}`,
           !!data ? { data: data } : undefined
         )
         .then(() => message.success("Строка была успешно удалена"))

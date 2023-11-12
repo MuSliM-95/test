@@ -92,7 +92,7 @@ async def edit_organization(
             .values(organization_values)
         )
         await database.execute(query)
-        organization_db = get_entity_by_id(organizations, idx, user.id)
+        organization_db = await get_entity_by_id(organizations, idx, user.id)
 
     organization_db = datetime_to_timestamp(organization_db)
 

@@ -7,7 +7,7 @@ from typing import Optional, List
 class Item(BaseModel):
     price_type: Optional[int]
     price: float
-    quantity: int
+    quantity: float
     unit: Optional[int]
     unit_name: Optional[str]
     tax: Optional[float]

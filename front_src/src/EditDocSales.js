@@ -335,7 +335,7 @@ class EditDocsSales extends React.Component {
 
   onSelectContract = (val) => {
     this.findContract(val).then((res) => {
-      this.setState({ current_contragent: res });
+      this.setState({ current_contract: res });
       this.formRef.current.setFieldsValue({
         contract: res.name,
       });
@@ -576,6 +576,7 @@ class EditDocsSales extends React.Component {
     let body = {
       number: this.formRef.current.getFieldValue("number"),
       dated: Math.floor(Date.now() / 1000),
+
       operation: "Заказ",
       comment: this.formRef.current.getFieldValue("comment"),
       tax_included: true,
