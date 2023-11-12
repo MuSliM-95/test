@@ -288,7 +288,7 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
         body['docs_purchases'] = None
         body['number'] = None
         body['to_warehouse'] = None
-        await create_warehouse_docs(token, body)
+        await create_warehouse_docs(token, body, user.cashbox_id)
 
     q = docs_purchases.select().where(
         docs_purchases.c.cashbox == user.cashbox_id,
