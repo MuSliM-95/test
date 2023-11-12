@@ -483,7 +483,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             body['docs_purchases'] = None
             body['number'] = None
             body['to_warehouse'] = None
-            await create_warehouse_docs(token, body)
+            await create_warehouse_docs(token, body, user.cashbox_id)
 
 
     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))

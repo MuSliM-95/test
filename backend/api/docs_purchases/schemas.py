@@ -58,6 +58,7 @@ class ViewInList(BaseModel):
     id: int
     number: Optional[str]
     dated: Optional[int]
+    status: bool
     operation: Optional[str]
     comment: Optional[str]
     client: Optional[int]
