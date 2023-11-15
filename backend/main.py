@@ -60,8 +60,7 @@ from api.docs_generate.routers import router as doc_generate_router
 
 
 sentry_sdk.init(
-    dsn="http://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
-
+    dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
     # Set traces_sample_rate to 1.0 to capture 100%
     # of transactions for performance monitoring.
     # We recommend adjusting this value in production,
