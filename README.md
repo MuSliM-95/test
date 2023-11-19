@@ -1,4 +1,4 @@
-# Tablecrm.com 1
+# Tablecrm.com
 
 
 ## Getting started
