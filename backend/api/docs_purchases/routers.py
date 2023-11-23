@@ -79,14 +79,14 @@ async def get_by_id(token: str, idx: int):
 @router.get("/docs_purchases/", response_model=schemas.ViewResult)
 async def get_list(token: str, limit: int = 100, offset: int = 0, tags: str = None):
     """Получение списка документов"""
-    await get_user_by_token(token)
+    user = await get_user_by_token(token)
     filters_list = []
     if tags:
         filters_list.append(docs_warehouse.c.tags.ilike(f"%{tags}%"))
 
-    query = docs_purchases.select().where(docs_purchases.c.is_deleted.is_not(True)).where(*filters_list).order_by(desc(docs_purchases.c.id)).limit(limit).offset(offset)
+    query = docs_purchases.select().where(docs_purchases.c.is_deleted.is_not(True), docs_purchases.c.cashbox == user.cashbox_id).where(*filters_list).order_by(desc(docs_purchases.c.id)).limit(limit).offset(offset)
     
-    query_count = select(func.count(docs_purchases.c.id)).where(docs_purchases.c.is_deleted.is_not(True)).where(*filters_list)
+    query_count = select(func.count(docs_purchases.c.id)).where(docs_purchases.c.is_deleted.is_not(True), docs_purchases.c.cashbox == user.cashbox_id).where(*filters_list)
     count = await database.fetch_one(query_count)
 
     items_db = await database.fetch_all(query)
@@ -472,16 +472,16 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
 @router.delete("/docs_purchases/", response_model=schemas.ListView)
 async def delete(token: str, ids: list[int]):
     """Удаление документов"""
-    await get_user_by_token(token)
+    user = await get_user_by_token(token)
 
-    query = docs_purchases.select().where(docs_purchases.c.id.in_(ids), docs_purchases.c.is_deleted.is_not(True))
+    query = docs_purchases.select().where(docs_purchases.c.id.in_(ids), docs_purchases.c.is_deleted.is_not(True), docs_purchases.c.cashbox == user.cashbox_id)
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
 
     if items_db:
         query = (
             docs_purchases.update()
-            .where(docs_purchases.c.id.in_(ids), docs_purchases.c.is_deleted.is_not(True))
+            .where(docs_purchases.c.id.in_(ids), docs_purchases.c.is_deleted.is_not(True), docs_purchases.c.cashbox == user.cashbox_id)
             .values({"is_deleted": True})
         )
         await database.execute(query)
