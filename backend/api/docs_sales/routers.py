@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select, asc
+from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select, asc, Date
 
 from database.db import (
     database,
@@ -107,8 +107,8 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
 
     if filters.dated:
-        print(round(filters.dated/100000))
-        query = query.filter(docs_sales.c.dated/100000 == int(str(filters.dated)[:5]))
+        query = query.filter(
+            func.date(func.to_timestamp(docs_sales.c.dated)) == datetime.datetime.fromtimestamp(filters.dated).date())
         print(query)
 
     items_db = await database.fetch_all(query)
