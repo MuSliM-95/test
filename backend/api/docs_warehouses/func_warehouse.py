@@ -116,6 +116,11 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                 query = warehouse_register_movement.delete().where(
                     warehouse_register_movement.c.document_warehouse_id == doc_id)
                 await database.execute(query)
+                for item in entity.get('goods'):
+                    item = dict(item)
+                    item['docs_warehouse_id'] = doc_id
+                    query = docs_warehouse_goods.insert().values(item)
+                    await database.execute(query)
             except Exception as err:
                 raise Exception(f"error delete record in warehouse_register_movement: {str(err)}")
         else:
