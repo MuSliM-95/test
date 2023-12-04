@@ -123,6 +123,7 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                 warehouse_register_movement.c.document_warehouse_id == doc_id)
             await database.execute(query)
             for item in entity.get('goods'):
+                item = dict(item)
                 item['docs_warehouse_id'] = doc_id
                 query = docs_warehouse_goods.insert().values(item)
                 await database.execute(query)
