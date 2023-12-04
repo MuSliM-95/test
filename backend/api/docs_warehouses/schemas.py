@@ -19,6 +19,21 @@ class Item(BaseModel):
     unit: Optional[int]
     nomenclature: int
 
+
+class ItemGood(BaseModel):
+    price_type: Optional[int]
+    price: float
+    quantity: float
+    unit: Optional[int]
+    unit_name: Optional[str]
+    tax: Optional[float]
+    discount: Optional[float]
+    sum_discounted: Optional[float]
+    status: Optional[str]
+    nomenclature: int
+    nomenclature_name: Optional[str]
+
+
 class ItemGet(Item):
     nomenclature_name: Optional[str]
     unit_name: Optional[str]
@@ -79,8 +94,16 @@ class ViewInList(BaseModel):
     updated_at: int
     created_at: int
 
+
+class ViewForGoods(ViewInList):
+    goods: Optional[List[ItemGood]]
+
+    class Config:
+        orm_mode = True
+
+
 class GetDocsWarehouse(BaseModel):
-    result: List[ViewInList]
+    result: List[ViewForGoods]
     count: int
 
 
@@ -99,3 +122,8 @@ class ListView(BaseModel):
 
 class DeleteListView(ViewInList):
     deleted: Optional[List]
+
+
+
+
+

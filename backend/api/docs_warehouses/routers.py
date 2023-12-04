@@ -10,7 +10,8 @@ from database.db import (
     warehouse_register_movement,
     warehouses,
     units,
-    OperationType
+    OperationType,
+    docs_warehouse_goods
 )
 from . import schemas
 from fastapi import APIRouter, HTTPException, Query
@@ -18,11 +19,11 @@ from fastapi.encoders import jsonable_encoder
 from fastapi_pagination import add_pagination, paginate
 from api.pagination.pagination import Page
 from functions.helpers import (
-    check_entity_exists,
-    check_period_blocked,
-    check_unit_exists,
-    datetime_to_timestamp,
-    get_user_by_token,
+    check_entity_exists ,
+    check_period_blocked ,
+    check_unit_exists ,
+    datetime_to_timestamp ,
+    get_user_by_token , add_nomenclature_name_to_goods ,
 )
 from sqlalchemy import desc, asc, select, func
 from ws_manager import manager
@@ -82,7 +83,7 @@ async def get_by_id(token: str, idx: int):
 
 
 @router.get("/docs_warehouse/", response_model=schemas.GetDocsWarehouse)
-async def get_list(token: str, limit: int = 10, offset: int = 0, datefrom: int = None, dateto: int = None, tags: str = None):
+async def get_list(token: str, operation: str = '', show_goods: bool = False, limit: int = 10, offset: int = 0, datefrom: int = None, dateto: int = None, tags: str = None):
     """Получение списка документов"""
     filters_list = []
     user = await get_user_by_token(token)
@@ -98,9 +99,24 @@ async def get_list(token: str, limit: int = 10, offset: int = 0, datefrom: int =
     if tags:
         filters_list.append(docs_warehouse.c.tags.ilike(f"%{tags}%"))
 
+    if operation:
+        filters_list.append(docs_warehouse.c.operation == operation)
+
     query = docs_warehouse.select().where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.cashbox == user.cashbox_id).order_by(desc(docs_warehouse.c.id)).where(*filters_list).limit(limit).offset(offset)
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
+
+    if show_goods:
+        for item in items_db:
+            query = docs_warehouse_goods.select().where(docs_warehouse_goods.c.docs_warehouse_id == item['id'])
+            goods_db = await database.fetch_all(query)
+            print(goods_db)
+            goods_db = [*map(datetime_to_timestamp, goods_db)]
+
+            goods_db = [*map(add_nomenclature_name_to_goods, goods_db)]
+            goods_db = [await instance for instance in goods_db]
+            print(goods_db)
+            item['goods'] = goods_db
 
     query = select(func.count(docs_warehouse.c.id)).where(docs_warehouse.c.is_deleted.is_not(True), docs_warehouse.c.cashbox == user.cashbox_id).where(*filters_list)
     count = await database.fetch_one(query)
