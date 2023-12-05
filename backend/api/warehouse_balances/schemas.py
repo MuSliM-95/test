@@ -8,7 +8,7 @@ class View(BaseModel):
     warehouse_id: Optional[int]
     incoming_amount: Optional[int]
     outgoing_amount: Optional[int]
-    current_amount: int
+    current_amount: float
     cashbox_id: Optional[int]
     updated_at: int
     created_at: int
@@ -21,7 +21,7 @@ class ViewAlt(BaseModel):
     organization_name: Optional[str]
     warehouse_id: Optional[int]
     warehouse_name: Optional[str]
-    current_amount: int
+    current_amount: float
 
 
 class ListView(BaseModel):
@@ -38,7 +38,7 @@ class RegisterStockView(BaseModel):
     nomenclature_id: Optional[int]
     incoming_amount: Optional[int]
     outgoing_amount: Optional[int]
-    current_amount: int
+    current_amount: float
     cashbox_id: Optional[int]
     updated_at: int
     created_at: int
