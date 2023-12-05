@@ -114,7 +114,9 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
         if not entity['status']:
             try:
                 query = warehouse_register_movement.delete().where(
-                    warehouse_register_movement.c.document_warehouse_id == doc_id)
+                    and_(warehouse_register_movement.c.document_warehouse_id == doc_id,
+                         warehouse_register_movement.c.type_amount == type_operation
+                         ))
                 await database.execute(query)
                 for item in entity.get('goods'):
                     item = dict(item)
@@ -125,7 +127,10 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                 raise Exception(f"error delete record in warehouse_register_movement: {str(err)}")
         else:
             query = warehouse_register_movement.delete().where(
-                warehouse_register_movement.c.document_warehouse_id == doc_id)
+                and_(
+                    warehouse_register_movement.c.document_warehouse_id == doc_id,
+                    warehouse_register_movement.c.type_amount == type_operation
+                    ))
             await database.execute(query)
             for item in entity.get('goods'):
                 item = dict(item)
