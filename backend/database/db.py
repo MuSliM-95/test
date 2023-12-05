@@ -788,7 +788,7 @@ warehouse_register_movement = sqlalchemy.Table(
     sqlalchemy.Column("document_sale_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("document_purchase_id", Integer, ForeignKey("docs_purchases.id")),
     sqlalchemy.Column("document_warehouse_id", Integer, ForeignKey("docs_warehouse.id")),
-    sqlalchemy.Column("amount", Integer, nullable=False),
+    sqlalchemy.Column("amount", Float, nullable=False),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
