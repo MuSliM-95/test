@@ -208,6 +208,20 @@ services:
     command: -config.file=/etc/promtail/config.yaml
     networks:
       - nginx-proxy
+
+  telegraf:
+    image: telegraf:latest
+    restart: always
+    container_name: telegraf
+    hostname: telegraf
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+      - /var/log/nginx:/var/log/nginx
+    ports:
+      - 9126:9126
+    command: telegraf --config /etc/telegraf/telegraf.conf
+    networks:
+      - nginx-proxy
     
 
 volumes:
