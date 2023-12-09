@@ -536,7 +536,7 @@ class EditDocsWarehouse extends React.Component {
                     price: parseFloat(item.amount),
                     price_type: 1,
                     quantity: parseFloat(item.count),
-                    unit: 116,
+                    // unit: 116,
                     nomenclature: item.id,
                 };
                 body.goods.push(good_body);
