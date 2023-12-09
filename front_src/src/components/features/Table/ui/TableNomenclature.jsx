@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useState,
+  useMemo
 } from "react";
 import axios from "axios";
 import { NomenclatureContext } from "../../../shared/lib/hooks/context/getNomenclatureContext";
@@ -12,24 +13,54 @@ import { saveRow, removeRow, addRow } from "../../../shared";
 import { API } from "../../../shared/api/api";
 import { useLocation } from "react-router-dom";
 
+import useDebounce from "src/hooks/useDebounce";
+
+
+import { Space, Input } from 'antd'
+import { AddNomenclatureButton } from "../../../widgets/Button";
+
 export default function TableNomenclature() {
-  const { token, websocket, initialData } = useContext(NomenclatureContext);
+  const { token, websocket, initialData, nomenclatureDataCount } = useContext(NomenclatureContext);
+
+
   const { pathname } = useLocation();
   const [dataSource, setDataSource] = useState(initialData);
-  // const queryOffsetData = (page, pageSize) => {
-  //   axios
-  //     .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/manufacturers/`, {
-  //       params: {
-  //         token: token,
-  //         offset: page * pageSize - pageSize,
-  //         limit: pageSize,
-  //       },
-  //     })
-  //     .then((res) => {
-  //       setDataSource(res.data);
-  //       return res.data;
-  //     });
-  // };
+  const [total, setTotal] = useState(nomenclatureDataCount)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const [search, setSearch] = useState('')
+
+  const debauncedSearch = useDebounce(search, 400)
+
+  const queryOffsetData = (page, pageSize, name) => {
+    axios
+      .get(`https://${process.env.REACT_APP_APP_URL}/api/v1/nomenclature/`, {
+        params: {
+          token: token,
+          offset: page * pageSize - pageSize,
+          limit: pageSize,
+          ...(name ? { name, } : {})
+        },
+      })
+      .then((res) => {
+        setDataSource(res.data.result);
+        setTotal(res.data.count)
+        setPage(page)
+        setPageSize(pageSize)
+        return res.data;
+      });
+  };
+
+  useEffect(() => {
+    const response = async () => {
+      await queryOffsetData(1, 10, debauncedSearch)
+    }
+
+    response()
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debauncedSearch])
 
   const handleSaveImage = (picture) => {
     const newData = JSON.parse(JSON.stringify(dataSource));
@@ -118,14 +149,25 @@ export default function TableNomenclature() {
 
   return (
     <>
-      <Nomenclature
-        dataSource={dataSource}
-        handleSave={API.crud.edit(token, pathname)}
-        handleRemove={API.crud.remove(token, pathname)}
-        handleSaveImage={handleSaveImage}
-        handleDeleteImage={API.pictures.removeImage(token)}
-        // queryOffsetData={queryOffsetData}
-      />
+      <Space style={{ marginBottom: 15 }}>
+        <AddNomenclatureButton />
+        <Input placeholder="Поиск" value={search} onChange={e => setSearch(e.target.value)} />
+      </Space>
+      {useMemo(() => (
+        <Nomenclature
+          page={page}
+          dataSource={dataSource}
+          handleSave={API.crud.edit(token, pathname)}
+          handleRemove={API.crud.remove(token, pathname)}
+          handleSaveImage={handleSaveImage}
+          handleDeleteImage={API.pictures.removeImage(token)}
+          queryOffsetData={queryOffsetData}
+          total={total}
+          search={search}
+          pageSize={pageSize}
+        />
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      ), [dataSource, page, API, total, pageSize])}
     </>
   );
 }

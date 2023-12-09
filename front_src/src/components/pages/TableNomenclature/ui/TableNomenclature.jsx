@@ -1,6 +1,5 @@
 import React from "react";
 import { TableNomenclature } from "../../../features/Table";
-import { AddNomenclatureButton } from "../../../widgets/Button";
 import { NomenclatureContext } from "../../../shared/lib/hooks/context/getNomenclatureContext";
 import { useLocation } from "react-router-dom";
 
@@ -10,8 +9,10 @@ export default function TableCategoriesPage({
   initialData,
   manufacturersData,
   categoriesData,
+  nomenclatureDataCount,
   unitsData,
 }) {
+
   const { pathname } = useLocation();
   return (
     <NomenclatureContext.Provider
@@ -23,9 +24,9 @@ export default function TableCategoriesPage({
         categoriesData,
         unitsData,
         pathname,
+        nomenclatureDataCount,
       }}
     >
-      <AddNomenclatureButton />
       <TableNomenclature />
     </NomenclatureContext.Provider>
   );

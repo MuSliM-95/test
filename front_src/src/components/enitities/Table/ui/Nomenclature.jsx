@@ -8,12 +8,37 @@ import { setColumnCellProps } from "../lib/setCollumnCellProps";
 
 export default function Nomenclature({
   handleRemove,
+  total,
   handleSave,
   handleSaveImage,
   handleDeleteImage,
+  queryOffsetData,
   dataSource,
+  name,
+  page, pageSize,
 }) {
   const columns = useMemo(() => setColumnCellProps(COL_NOMENCLATURE, {
+    type: [
+      {
+        key: "render",
+        action: (record) => {
+          if (!record) {
+            return 'Не указано'
+          }
+
+          if (record === 'product') {
+            return "Товар"
+          }
+
+          if (record === 'service') {
+            return 'Услуга'
+          }
+
+          return record
+
+        }
+      }
+    ],
     name: [
       {
         key: "render",
@@ -47,7 +72,7 @@ export default function Nomenclature({
     pictures: [
       {
         key: "render",
-        action: (record) => <PreviewImage items={record} witdh={100} height={190}/>,
+        action: (record) => <PreviewImage items={record} witdh={100} height={190} />,
       },
     ],
     action: [
@@ -91,17 +116,15 @@ export default function Nomenclature({
             row: EditableRow,
           },
         }}
-        // loading={loading}
-        // pagination={{
-        //   pageSize: 20,
-        //   onChange: async (page, pageSize) => {
-        //     setLoading(true);
-        //     const res = await queryOffsetData(page, pageSize);
-        //     console.log(res);
-        //   },
-        // }}
+        pagination={{
+          current: page,
+          pageSize: pageSize,
+          total: total,
+          showSizeChanger: true,
+          onShowSizeChange: async (_, size) => await queryOffsetData(page, size, name),
+          onChange: async (page, pageSize) => await queryOffsetData(page, pageSize, name)
+        }}
         bordered
-        size="small"
         rowClassName={() => "editable-row"}
         style={{ width: "100%" }}
       />

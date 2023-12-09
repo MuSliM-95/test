@@ -10,7 +10,7 @@ export default function AddNomenclatureButton() {
   const [isOpen, setOpen] = useState(false);
   return (
     <>
-      <Button onClick={() => setOpen(true)} style={{ marginBottom: 15 }}>
+      <Button onClick={() => setOpen(true)}>
         Добавить номенклатуру
       </Button>
       {isOpen ? (

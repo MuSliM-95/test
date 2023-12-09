@@ -1011,6 +1011,9 @@ class LogIn extends React.Component {
                                 token={params.token}
                                 websocket={this.state.ws}
                                 initialData={this.state.nomenclatureData}
+                                nomenclatureDataCount={
+                                  this.state.nomenclatureDataCount
+                                }
                                 manufacturersData={this.state.manufacturersData}
                                 categoriesData={this.state.categoriesData}
                                 unitsData={this.state.unitsData}

@@ -2,14 +2,28 @@ import React from 'react'
 import { AutoComplete } from 'antd'
 
 const searchResult = async (api, token, query, by) => {
-  return fetch(`${api}contragents?token=${token}&${by}=${query}`)
-    .then((response) => response.json())
-    .then((body) =>
-      body.result.map((user) => ({
-        label: by === "phone" ? `${user.phone}` : `${user.inn}`,
-        value: user.id,
-      })),
-    )
+  if (query) {
+    return fetch(`${api}contragents/?token=${token}&${by}=${query}`)
+      .then((response) => response.json())
+      .then((body) =>
+        body.result.map((user) => ({
+          label: by === "phone" ? `${user.phone}` : `${user.inn}`,
+          value: user.id,
+        })),
+      )
+      .then((data) => data.filter((ca) => ca.label !== "null"))
+  }
+  else {
+    return fetch(`${api}contragents/?token=${token}`)
+      .then((response) => response.json())
+      .then((body) =>
+        body.result.map((user) => ({
+          label: by === "phone" ? `${user.phone}` : `${user.inn}`,
+          value: user.id,
+        })),
+      )
+      .then((data) => data.filter((ca) => ca.label !== "null"))
+  }
 }
 
 class NumericAutoComplete extends React.Component {
