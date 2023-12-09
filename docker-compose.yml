@@ -216,7 +216,7 @@ services:
     hostname: telegraf
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
-      - /var/log/nginx:/var/log/nginx
+      - /var/log:/var/log
     ports:
       - 9126:9126
     command: telegraf --config /etc/telegraf/telegraf.conf
