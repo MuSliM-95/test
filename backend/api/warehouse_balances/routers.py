@@ -123,6 +123,50 @@ async def alt_get_warehouse_balances(
                            ))
 
     warehouse_balances_db = await database.fetch_all(query)
+
+
+
+    selection_conditions = [warehouse_register_movement.c.warehouse_id == warehouse_id]
+    if nomenclature_id is not None:
+        selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
+    if organization_id is not None:
+        selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
+    await get_user_by_token(token)
+    q = case(
+        [
+            (
+                warehouse_register_movement.c.type_amount == 'minus',
+                warehouse_register_movement.c.amount * (-1)
+            )
+        ],
+        else_=warehouse_register_movement.c.amount
+
+    )
+    query = (
+        select(
+            nomenclature.c.id,
+            nomenclature.c.name,
+            nomenclature.c.category,
+            warehouse_register_movement.c.organization_id,
+            warehouse_register_movement.c.warehouse_id,
+            func.sum(q).label("current_amount"))
+        .where(*selection_conditions)
+        .limit(limit)
+        .offset(offset)
+    ).group_by(
+               nomenclature.c.name,
+               nomenclature.c.id,
+               warehouse_register_movement.c.organization_id,
+               warehouse_register_movement.c.warehouse_id
+               )\
+        .select_from(warehouse_register_movement
+                     .join(nomenclature,
+                           warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                           ))
+
+    warehouse_balances_db_curr = await database.fetch_all(query)
+
+
     # warehouse_balances_db = [*map(datetime_to_timestamp, warehouse_balances_db)]
     res = []
 
@@ -131,6 +175,9 @@ async def alt_get_warehouse_balances(
     res_with_cats = []
 
     for warehouse_balance in warehouse_balances_db:
+
+        current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
+
         balance_dict = dict(warehouse_balance)
 
         organization_db = await database.fetch_one(organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
@@ -156,7 +203,7 @@ async def alt_get_warehouse_balances(
                 minus_amount += reg_event.amount
         
 
-
+        balance_dict['now_ost'] = current[0].current_amount
         balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
         balance_dict['plus_amount'] = plus_amount
         balance_dict['minus_amount'] = minus_amount

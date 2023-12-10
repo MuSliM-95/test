@@ -26,6 +26,7 @@ class ViewAlt(BaseModel):
     plus_amount: float
     minus_amount: float
     start_ost: float
+    now_ost: float
 
 
 class ViewAltList(BaseModel):

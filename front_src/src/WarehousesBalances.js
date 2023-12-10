@@ -45,6 +45,11 @@ class WarehousesBalances extends Component {
                 dataIndex: 'current_amount',
                 key: 'current_amount',
             },
+            {
+                title: 'Текущий остаток',
+                dataIndex: 'now_ost',
+                key: 'now_ost',
+            },
         ];
 
         this.state = {
