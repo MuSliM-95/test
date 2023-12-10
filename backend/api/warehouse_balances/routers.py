@@ -1,11 +1,12 @@
-from typing import Optional
+from typing import Optional, List
 from fastapi_pagination import paginate, add_pagination
 from api.pagination.pagination import Page
 from fastapi import APIRouter
 from sqlalchemy import select, func, desc, case
 
-from database.db import database, warehouse_balances, warehouses, warehouse_register_movement, nomenclature, OperationType, organizations
+from database.db import database, warehouse_balances, warehouses, warehouse_register_movement, nomenclature, OperationType, organizations, categories
 from . import schemas
+from datetime import datetime
 
 from functions.helpers import datetime_to_timestamp, check_entity_exists
 from functions.helpers import get_user_by_token
@@ -59,18 +60,31 @@ async def get_warehouse_balances(
     return paginate(warehouse_balances_db)
 
 
-@router.get("/alt_warehouse_balances/", response_model=Page[schemas.ViewAlt])
+@router.get("/alt_warehouse_balances/", response_model=schemas.ViewRes)
 async def alt_get_warehouse_balances(
     token: str,
     warehouse_id: int,
     nomenclature_id: Optional[int] = None,
     organization_id: Optional[int] = None,
+    date_from: Optional[int] = None,
+    date_to: Optional[int] = None,
     limit: int = 100,
     offset: int = 0,
 ):
     """Получение списка остатков склада"""
 
-    selection_conditions = [warehouse_register_movement.c.warehouse_id == warehouse_id]
+    dates_arr = []
+
+    if date_to and not date_from:
+        dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+    if date_to and date_from:
+        dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+        dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+    if not date_to and date_from:
+        dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+
+
+    selection_conditions = [warehouse_register_movement.c.warehouse_id == warehouse_id, *dates_arr]
     if nomenclature_id is not None:
         selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
     if organization_id is not None:
@@ -90,6 +104,7 @@ async def alt_get_warehouse_balances(
         select(
             nomenclature.c.id,
             nomenclature.c.name,
+            nomenclature.c.category,
             warehouse_register_movement.c.organization_id,
             warehouse_register_movement.c.warehouse_id,
             func.sum(q).label("current_amount"))
@@ -110,15 +125,68 @@ async def alt_get_warehouse_balances(
     warehouse_balances_db = await database.fetch_all(query)
     # warehouse_balances_db = [*map(datetime_to_timestamp, warehouse_balances_db)]
     res = []
+
+    categories_db = await database.fetch_all(categories.select())
+
+    res_with_cats = []
+
     for warehouse_balance in warehouse_balances_db:
         balance_dict = dict(warehouse_balance)
+
         organization_db = await database.fetch_one(organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
         warehouse_db = await database.fetch_one(warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id))
+
+        plus_amount = 0
+        minus_amount = 0
+
+        register_q = warehouse_register_movement.select().where(
+            warehouse_register_movement.c.warehouse_id == warehouse_id, 
+            warehouse_register_movement.c.nomenclature_id == warehouse_balance.id,
+            *dates_arr
+        )\
+        .order_by(warehouse_register_movement.c.id)
+
+
+        register_events = await database.fetch_all(register_q)
+
+        for reg_event in register_events:
+            if reg_event.type_amount == "plus":
+                plus_amount += reg_event.amount
+            else:
+                minus_amount += reg_event.amount
+        
+
+
+        balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
+        balance_dict['plus_amount'] = plus_amount
+        balance_dict['minus_amount'] = minus_amount
         balance_dict['organization_name'] = organization_db.short_name
         balance_dict['warehouse_name'] = warehouse_db.name
 
         res.append(balance_dict)
 
-    return paginate(res)
+    for category in categories_db:
+        cat_childrens = [item for item in res if item['category'] == category.id]
+
+        if len(cat_childrens) > 0:
+            res_with_cats.append(
+                {
+                    "name": category.name,
+                    "key": category.id,
+                    "children": cat_childrens
+                }
+            )
+        
+    none_childrens = [item for item in res if item['category'] == None]
+    res_with_cats.append(
+                {
+                    "name": "Без категории",
+                    "key": 0,
+                    "children": none_childrens
+                }
+            )
+
+
+    return {"result": res_with_cats}
 
 add_pagination(router)

@@ -17,11 +17,25 @@ class View(BaseModel):
 class ViewAlt(BaseModel):
     id: int
     name: str
+    category: Optional[int]
     organization_id: Optional[int]
     organization_name: Optional[str]
     warehouse_id: Optional[int]
     warehouse_name: Optional[str]
     current_amount: float
+    plus_amount: float
+    minus_amount: float
+    start_ost: float
+
+
+class ViewAltList(BaseModel):
+    name: str
+    key: int
+    children: List[ViewAlt]
+
+
+class ViewRes(BaseModel):
+    result: List[ViewAltList]
 
 
 class ListView(BaseModel):

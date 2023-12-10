@@ -1,7 +1,9 @@
 import React, { Component } from "react";
-import { Table } from "antd";
+import { Table, DatePicker, Button } from "antd";
 import DebounceSelect from "./DebFetch";
 import axios from "axios";
+
+const { RangePicker } = DatePicker;
 
 class WarehousesBalances extends Component {
     constructor(props) {
@@ -24,6 +26,21 @@ class WarehousesBalances extends Component {
                 key: 'warehouse_name',
             },
             {
+                title: 'Начальный остаток',
+                dataIndex: 'start_ost',
+                key: 'start_ost',
+            },
+            {
+                title: 'Поступление',
+                dataIndex: 'plus_amount',
+                key: 'plus_amount',
+            },
+            {
+                title: 'Расход',
+                dataIndex: 'minus_amount',
+                key: 'minus_amount',
+            },
+            {
                 title: 'Остаток',
                 dataIndex: 'current_amount',
                 key: 'current_amount',
@@ -31,7 +48,9 @@ class WarehousesBalances extends Component {
         ];
 
         this.state = {
-            dataSource: null
+            dataSource: null,
+            currWarehouse: null,
+            datesArr: null
         }
     }
 
@@ -76,12 +95,12 @@ class WarehousesBalances extends Component {
         }
     }
 
-    onWarehouseSelect = (warehouse) => {
+    onWarehouseSelect = (params) => {
         axios
             .get(
                 `https://${process.env.REACT_APP_APP_URL}/api/v1/alt_warehouse_balances/`,
                 {
-                    params: { token: this.props.token, warehouse_id: warehouse },
+                    params: params,
                 }
             )
             .then((res) => {
@@ -93,18 +112,36 @@ class WarehousesBalances extends Component {
             });
     }
 
+    getBalance = () => {
+        const { currWarehouse, datesArr } = this.state
+
+        let params = { token: this.props.token, warehouse_id: currWarehouse }
+
+        if (datesArr) {
+            params.date_from = datesArr[0].unix()
+            params.date_to = datesArr[1].unix()
+        }
+
+        this.onWarehouseSelect(params)
+
+    }
+
+
+
     render() {
         return (
             <>
                 <DebounceSelect
                     // mode="multiple"
-                    style={{ width: "100%", marginBottom: 10 }}
+                    style={{ marginBottom: 10 }}
                     placeholder="Введите имя склада"
                     fetchOptions={this.fetchWarehouse}
                     removeIcon={null}
-                    onSelect={(user) => this.onWarehouseSelect(user)}
+                    onSelect={(user) => this.setState({ currWarehouse: user })}
 
                 />
+                <RangePicker style={{ marginLeft: 10 }} onChange={(dates) => this.setState({ datesArr: dates })} />
+                <Button onClick={this.getBalance} style={{ marginLeft: 10 }}>Найти</Button>
                 <Table dataSource={this.state.dataSource} columns={this.columns} />
             </>
         );
