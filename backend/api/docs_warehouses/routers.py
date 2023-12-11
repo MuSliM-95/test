@@ -197,6 +197,11 @@ async def create(token: str, docs_warehouse_data: schemas.CreateMass):
                     except HTTPException as e:
                         exceptions.append(str(item) + " " + e.detail)
                         continue
+            else:
+                q = nomenclature.select().where(nomenclature.c.id == item['nomenclature'])
+                nom_db = await database.fetch_one(q)
+                item['unit'] = nom_db.unit
+
             query = docs_warehouse_goods.insert().values(item)
             await database.execute(query)
             items_sum += item["price"] * item["quantity"]
@@ -310,6 +315,11 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
                         except HTTPException as e:
                             exceptions.append(str(item) + " " + e.detail)
                             continue
+                else:
+                    q = nomenclature.select().where(nomenclature.c.id == item['nomenclature'])
+                    nom_db = await database.fetch_one(q)
+                    item['unit'] = nom_db.unit
+
                 query = docs_warehouse_goods.insert().values(item)
                 await database.execute(query)
                 items_sum += item["price"] * item["quantity"]
