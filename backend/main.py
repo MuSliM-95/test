@@ -144,7 +144,7 @@ async def write_event_middleware(request: Request, call_next):
     body = await get_body(request)
 
     try:
-        if "docs" not in request.url.path and "openapi.json" not in request.url.path:
+        if "openapi.json" not in request.url.path:
             token = request.query_params.get("token")
             token = token if token else request.path_params.get("token")
 
