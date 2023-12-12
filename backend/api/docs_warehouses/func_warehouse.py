@@ -211,6 +211,10 @@ async def insert_goods(entity, doc_id, type_operation, not_create_goods: bool = 
         for item in entity.get('goods'):
             if not not_create_goods:
                 item["docs_warehouse_id"] = doc_id
+                if not item.get("unit"):
+                    q = nomenclature.select().where(nomenclature.c.id == item['nomenclature'])
+                    nom_db = await database.fetch_one(q)
+                    item['unit'] = nom_db.unit
                 query = docs_warehouse_goods.insert().values(item)
                 await database.execute(query)
                 items_sum += item["price"] * item["quantity"]
