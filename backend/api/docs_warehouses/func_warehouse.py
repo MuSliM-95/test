@@ -101,7 +101,7 @@ async def update_docs_warehouse(entity):
 
 @database.transaction()
 async def update_goods_warehouse(entity, doc_id, type_operation):
-    try:
+    
         items_sum = 0
 
         goods_db = [dict(item) for item in await database.fetch_all(
@@ -167,8 +167,6 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
             .values({"sum": items_sum})
         )
         await database.execute(query)
-    except Exception as err:
-        raise Exception(f"error update record in docs_warehouse: {str(err)}")
 
 
 async def check_exist_amount(goods, warehouse):
