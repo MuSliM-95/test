@@ -121,6 +121,10 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                 for item in entity.get('goods'):
                     item = dict(item)
                     item['docs_warehouse_id'] = doc_id
+                    if not item['unit']:
+                        q = nomenclature.select().where(nomenclature.c.id == item['nomenclature'])
+                        nom_db = await database.fetch_one(q)
+                        item['unit'] = nom_db.unit
                     query = docs_warehouse_goods.insert().values(item)
                     await database.execute(query)
             except Exception as err:
@@ -135,6 +139,10 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
             for item in entity.get('goods'):
                 item = dict(item)
                 item['docs_warehouse_id'] = doc_id
+                if not item['unit']:
+                    q = nomenclature.select().where(nomenclature.c.id == item['nomenclature'])
+                    nom_db = await database.fetch_one(q)
+                    item['unit'] = nom_db.unit
                 query = docs_warehouse_goods.insert().values(item)
                 await database.execute(query)
                 try:
