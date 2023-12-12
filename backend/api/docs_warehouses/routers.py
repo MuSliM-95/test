@@ -298,7 +298,7 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
             items_sum = 0
             for item in goods:
                 item["docs_warehouse_id"] = instance_id
-
+                print(item)
                 if item.get("price_type") is not None:
                     if item["price_type"] not in price_types_cache:
                         try:
