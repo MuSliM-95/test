@@ -101,6 +101,7 @@ async def update_docs_warehouse(entity):
 
 @database.transaction()
 async def update_goods_warehouse(entity, doc_id, type_operation):
+    try:
     
         items_sum = 0
 
@@ -121,7 +122,7 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
                 for item in entity.get('goods'):
                     item = dict(item)
                     item['docs_warehouse_id'] = doc_id
-                    if not item['unit']:
+                    if not item.get("unit"):
                         q = nomenclature.select().where(nomenclature.c.id == item['nomenclature'])
                         nom_db = await database.fetch_one(q)
                         item['unit'] = nom_db.unit
@@ -139,7 +140,7 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
             for item in entity.get('goods'):
                 item = dict(item)
                 item['docs_warehouse_id'] = doc_id
-                if not item['unit']:
+                if not item.get("unit"):
                     q = nomenclature.select().where(nomenclature.c.id == item['nomenclature'])
                     nom_db = await database.fetch_one(q)
                     item['unit'] = nom_db.unit
@@ -167,6 +168,8 @@ async def update_goods_warehouse(entity, doc_id, type_operation):
             .values({"sum": items_sum})
         )
         await database.execute(query)
+    except Exception as err:
+        raise HTTPException(f"error {err}")
 
 
 async def check_exist_amount(goods, warehouse):
