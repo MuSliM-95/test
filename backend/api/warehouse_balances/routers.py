@@ -234,6 +234,6 @@ async def alt_get_warehouse_balances(
             )
 
 
-    return {"result": res_with_cats}
+    return {"result": paginate(res_with_cats)}
 
 add_pagination(router)
