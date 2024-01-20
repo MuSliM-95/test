@@ -33,7 +33,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, limit: int = 
     user = await get_user_by_token(token)
 
     filters = [
-        nomenclature.c.owner == user.id,
+        nomenclature.c.cashbox == user.cashbox_id,
         nomenclature.c.is_deleted.is_not(True),
     ]
 
@@ -99,7 +99,7 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
         nomenclature_id = await database.execute(query)
         inserted_ids.add(nomenclature_id)
 
-    query = nomenclature.select().where(nomenclature.c.owner == user.id, nomenclature.c.id.in_(inserted_ids))
+    query = nomenclature.select().where(nomenclature.c.cashbox == user.cashbox_id, nomenclature.c.id.in_(inserted_ids))
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
@@ -139,7 +139,7 @@ async def edit_nomenclature(
 
         query = (
             nomenclature.update()
-            .where(nomenclature.c.id == idx, nomenclature.c.owner == user.id)
+            .where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
             .values(nomenclature_values)
         )
         await database.execute(query)
@@ -180,7 +180,7 @@ async def edit_nomenclature_mass(
 
             query = (
                 nomenclature.update()
-                .where(nomenclature.c.id == idx, nomenclature.c.owner == user.id)
+                .where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
                 .values(nomenclature_values)
             )
             await database.execute(query)
@@ -207,12 +207,12 @@ async def delete_nomenclature(token: str, idx: int):
 
     query = (
         nomenclature.update()
-        .where(nomenclature.c.id == idx, nomenclature.c.owner == user.id)
+        .where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
         .values({"is_deleted": True})
     )
     await database.execute(query)
 
-    query = nomenclature.select().where(nomenclature.c.id == idx, nomenclature.c.owner == user.id)
+    query = nomenclature.select().where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
     nomenclature_db = await database.fetch_one(query)
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
@@ -240,12 +240,12 @@ async def delete_nomenclature_mass(token: str, nomenclature_data: List[int]):
 
         query = (
             nomenclature.update()
-            .where(nomenclature.c.id == idx, nomenclature.c.owner == user.id)
+            .where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
             .values({"is_deleted": True})
         )
         await database.execute(query)
 
-        query = nomenclature.select().where(nomenclature.c.id == idx, nomenclature.c.owner == user.id)
+        query = nomenclature.select().where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
         nomenclature_db = await database.fetch_one(query)
         nomenclature_db = datetime_to_timestamp(nomenclature_db)
 

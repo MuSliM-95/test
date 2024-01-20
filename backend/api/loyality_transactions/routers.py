@@ -68,7 +68,7 @@ async def get_transactions(token: str, limit: int = 100, offset: int = 0, filter
         query = (
             loyality_transactions.select()
             .where(
-                loyality_transactions.c.created_by_id == user.id,
+                loyality_transactions.c.cashbox == user.cashbox_id,
                 loyality_transactions.c.is_deleted.is_not(True)
                 
             )
@@ -81,7 +81,7 @@ async def get_transactions(token: str, limit: int = 100, offset: int = 0, filter
         query = (
             loyality_transactions.select()
             .where(
-                loyality_transactions.c.created_by_id == user.id,
+                loyality_transactions.c.cashbox == user.cashbox_id,
                 loyality_transactions.c.is_deleted.is_not(True)
                 
             )
@@ -212,7 +212,7 @@ async def edit_loyality_transaction(
 
         query = (
             loyality_transactions.update()
-            .where(loyality_transactions.c.id == idx, loyality_transactions.c.created_by_id == user.id)
+            .where(loyality_transactions.c.id == idx, loyality_transactions.c.cashbox == user.cashbox_id)
             .values(loyality_transaction_values)
         )
         await database.execute(query)
@@ -239,13 +239,13 @@ async def delete_loyality_transaction(token: str, idx: int):
 
     query = (
         loyality_transactions.update()
-        .where(loyality_transactions.c.id == idx, loyality_transactions.c.created_by_id == user.id)
+        .where(loyality_transactions.c.id == idx, loyality_transactions.c.cashbox == user.cashbox_id)
         .values({"is_deleted": True})
     )
     await database.execute(query)
 
     query = loyality_transactions.select().where(
-        loyality_transactions.c.id == idx, loyality_transactions.c.created_by_id == user.id
+        loyality_transactions.c.id == idx, loyality_transactions.c.cashbox == user.cashbox_id
     )
     loyality_transaction_db = await database.fetch_one(query)
     loyality_transaction_db = datetime_to_timestamp(loyality_transaction_db)

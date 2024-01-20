@@ -30,7 +30,7 @@ async def get_contracts(token: str, name: Optional[str] = None, limit: int = 100
     """Получение списка контрактов"""
     user = await get_user_by_token(token)
     filters = [
-        contracts.c.owner == user.id,
+        contracts.c.cashbox == user.cashbox_id,
         contracts.c.is_deleted.is_not(True),
     ]
 
@@ -84,7 +84,7 @@ async def new_contract(token: str, contracts_data: schemas.ContractCreateMass):
         contract_id = await database.execute(query)
         inserted_ids.add(contract_id)
 
-    query = contracts.select().where(contracts.c.owner == user.id, contracts.c.id.in_(inserted_ids))
+    query = contracts.select().where(contracts.c.cashbox == user.cashbox_id, contracts.c.id.in_(inserted_ids))
     contracts_db = await database.fetch_all(query)
     contracts_db = [*map(datetime_to_timestamp, contracts_db)]
 
@@ -121,7 +121,7 @@ async def edit_contract(
         if contract_values.get("organization") is not None:
             await check_entity_exists(organizations, contract_values["organization"], user.id)
 
-        query = contracts.update().where(contracts.c.id == idx, contracts.c.owner == user.id).values(contract_values)
+        query = contracts.update().where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id).values(contract_values)
         await database.execute(query)
         contract_db = await get_entity_by_id(contracts, idx, user.id)
 
@@ -142,10 +142,10 @@ async def delete_contract(token: str, idx: int):
 
     await get_entity_by_id(contracts, idx, user.id)
 
-    query = contracts.update().where(contracts.c.id == idx, contracts.c.owner == user.id).values({"is_deleted": True})
+    query = contracts.update().where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id).values({"is_deleted": True})
     await database.execute(query)
 
-    query = contracts.select().where(contracts.c.id == idx, contracts.c.owner == user.id)
+    query = contracts.select().where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id)
     contract_db = await database.fetch_one(query)
     contract_db = datetime_to_timestamp(contract_db)
 

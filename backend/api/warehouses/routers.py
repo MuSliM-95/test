@@ -24,7 +24,7 @@ async def get_warehouses(token: str, name: Optional[str] = None, limit: int = 10
     """Получение списка складов"""
     user = await get_user_by_token(token)
     filters = [
-        warehouses.c.owner == user.id,
+        warehouses.c.cashbox == user.cashbox_id,
         warehouses.c.is_deleted.is_not(True),
     ]
 
@@ -70,7 +70,7 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
         warehouse_id = await database.execute(query)
         inserted_ids.add(warehouse_id)
 
-    query = warehouses.select().where(warehouses.c.owner == user.id, warehouses.c.id.in_(inserted_ids))
+    query = warehouses.select().where(warehouses.c.cashbox == user.cashbox_id, warehouses.c.id.in_(inserted_ids))
     warehouses_db = await database.fetch_all(query)
     warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
 
@@ -105,7 +105,7 @@ async def edit_warehouse(
             await check_entity_exists(warehouses, warehouse_values["parent"], user.id)
 
         query = (
-            warehouses.update().where(warehouses.c.id == idx, warehouses.c.owner == user.id).values(warehouse_values)
+            warehouses.update().where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id).values(warehouse_values)
         )
         await database.execute(query)
         warehouse_db = await get_entity_by_id(warehouses, idx, user.id)
@@ -128,11 +128,11 @@ async def delete_warehouse(token: str, idx: int):
     await get_entity_by_id(warehouses, idx, user.id)
 
     query = (
-        warehouses.update().where(warehouses.c.id == idx, warehouses.c.owner == user.id).values({"is_deleted": True})
+        warehouses.update().where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id).values({"is_deleted": True})
     )
     await database.execute(query)
 
-    query = warehouses.select().where(warehouses.c.id == idx, warehouses.c.owner == user.id)
+    query = warehouses.select().where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id)
     warehouse_db = await database.fetch_one(query)
     warehouse_db = datetime_to_timestamp(warehouse_db)
 
