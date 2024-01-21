@@ -156,6 +156,7 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
         del loyality_transactions_values['percentamount']
 
     loyality_transactions_values["created_by_id"] = user.id
+    loyality_transactions_values['cashbox'] = user.cashbox_id
     loyality_transactions_values["loyality_card_id"] = card.id
     # loyality_transactions_values["dead_at"] = datetime.fromtimestamp(loyality_transactions_values["dead_at"])
 
