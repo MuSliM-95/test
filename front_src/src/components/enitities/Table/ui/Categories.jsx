@@ -1,4 +1,3 @@
-//таблица на странице "Категории"
 import React, { useMemo } from "react";
 import { Table, Button, Popconfirm, Switch } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";

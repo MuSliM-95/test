@@ -1,4 +1,3 @@
-//страница "Номенклатура"
 import React from "react";
 import { TableNomenclature } from "../../../features/Table";
 import { NomenclatureContext } from "../../../shared/lib/hooks/context/getNomenclatureContext";
