@@ -1,16 +1,13 @@
+// страница "Аналитика"
 import React, { useEffect, useState } from 'react'
 import "./style.css"
-import { Calendar } from 'antd';
-
+import { Calendar, Menu, Modal } from 'antd';
 import { CalendarOutlined, CheckCircleOutlined, StopOutlined, InfoCircleOutlined } from '@ant-design/icons';
-
+import locale from 'antd/es/date-picker/locale/ru_RU';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'
 import axios from 'axios';
-
-import locale from 'antd/es/date-picker/locale/ru_RU';
-import { Menu, Modal} from 'antd';
-import Filter from '../filter';
+import Filter from '../../filter';
 
 dayjs.extend(utc)
 
