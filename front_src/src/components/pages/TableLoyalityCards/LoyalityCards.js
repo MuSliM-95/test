@@ -24,7 +24,7 @@ import utc from 'dayjs/plugin/utc';
 import _ from "lodash";
 import axios from 'axios';
 import { CreateLoyalityCard } from 'src/components/features/Modal';
-import DebounceSelectFil from '../../features/DebFetchFilters';
+import DebounceSelectFil from "src/components/features/DebFetchFilters"
 
 const { RangePicker } = DatePicker;
 const { Panel } = Collapse;
