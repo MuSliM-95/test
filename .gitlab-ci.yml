@@ -72,9 +72,11 @@ front-build-job:
     - cd ./front_src
     - echo -e "REACT_APP_APP_URL=$APP_URL\nREACT_APP_FRONT_URL=$FRONT_URL" > .env
     - cp .env ../landing_src/.env
+    - yarn cache clean
     - yarn install
     - yarn build:stage
     - cd ../landing_src
+    - yarn cache clean
     - yarn install
     - yarn build:stage
     - git submodule sync --recursive
