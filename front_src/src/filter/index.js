@@ -1,6 +1,6 @@
 //фильтр на странице "Аналитика"
 import React, { useState } from 'react'
-import DebounceSelectFil from '../features/DebFetchFilters';
+import DebounceSelectFil from "src/components/features/DebFetchFilters"
 import { SearchOutlined } from '@ant-design/icons';
 import {
 	Button,
