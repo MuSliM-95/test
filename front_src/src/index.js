@@ -2,9 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import axios from "axios";
-import { QueryClient, QueryClientProvider } from "react-query";
-import { Select, Result, Layout, Menu, Button } from "antd";
 
+import { QueryClient, QueryClientProvider } from "react-query";
+
+import { Select, Result, Layout, Menu, Button } from "antd";
 import {
   BankOutlined,
   AlertOutlined,
@@ -25,6 +26,22 @@ import {
   ShoppingCartOutlined,
   TableOutlined,
 } from "@ant-design/icons";
+
+import PaymentsTable from "./Payments";
+import CBSelect from "./CBSelect";
+import AuthError from "./AuthError";
+import LoadingState from "./Loading";
+import PayboxTable from "./Payboxes";
+import ProjectsTable from "./Projects";
+import UsersTable from "./Users";
+import CATable from "./Contragents";
+import Integrations from "./Integrations";
+import Events from "./Events";
+import Analytics from "./components/analytics";
+import LoyalityCards from "./LoyalityCards";
+import LoyalityTransactions from "./LoyalityTransactions";
+import DocsSales from "./DocsSales";
+import WarehousesBalances from "./WarehousesBalances";
 import {
   TableCategoriesPage,
   TableNomenclature,
@@ -36,25 +53,10 @@ import {
   TablePricesHandsontable,
   TableLoyalitySettings,
   TableLoyalityReport,
-  TablePayments,
-  TableLoyalityCards,
-  TableContragents,
-  TableProjects,
-  TablePurchases,
-  TableDocsWarehouse,
-  TablePayboxes,
-  TableUsers,
-  TableEvents,
-  TableIntegrations,
-  TableDocsSales,
-  // TableWarehousesBalance, //LOOK!
-  TableLoyalityTransactions
 } from "./components/pages/";
 import { currentMonthRange } from "./components/shared";
-import CBSelect from "./components/shared";
-import AuthError from "./components/shared";
-import { LoadingState } from "./components/shared"
-import Analytics from "./components/analytics";
+import DocsWarehouse from "./DocsWarehouse";
+import DocsPurchases from "./DocsPurchases";
 
 const { Option } = Select;
 const { Header, Content, Footer, Sider } = Layout;
@@ -819,7 +821,7 @@ class LogIn extends React.Component {
                   trigger={null}
                   collapsible
                   collapsed={this.state.collapsed}
-                  style={{ background: "white", height: '100vh', position: 'sticky', left: 0, top: 0, bottom: 0 }}
+                  style={{ background: "white" }}
                 >
                   <Menu
                     theme="light"
@@ -834,9 +836,6 @@ class LogIn extends React.Component {
                       padding: 0,
                       marginTop: -5,
                       background: "white",
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 100,
                     }}
                   >
                     <Button
@@ -858,7 +857,6 @@ class LogIn extends React.Component {
                       }}
                     />
                     <div style={{ float: "right" }}>
-                      {/* balance info */}
                       {this.state.CBInfoText}
                     </div>
                   </Header>
@@ -877,7 +875,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/"
                             element={
-                              <TablePayments
+                              <PaymentsTable
                                 PBData={this.state.payboxesSelect}
                                 PRData={this.state.ProjectSelect}
                                 payboxesMeta={this.state.payboxesMeta}
@@ -894,7 +892,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/payboxes"
                             element={
-                              <TablePayboxes
+                              <PayboxTable
                                 query={params}
                                 payboxesData={{
                                   c: this.state.payboxesCount,
@@ -907,7 +905,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/loyality_cards"
                             element={
-                              <TableLoyalityCards
+                              <LoyalityCards
                                 query={params}
                                 orgsData={this.state.OrgsDS}
                                 loyalityCardsData={{
@@ -921,7 +919,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/loyality_transactions"
                             element={
-                              <TableLoyalityTransactions
+                              <LoyalityTransactions
                                 query={params}
                                 loyalityCardsData={this.state.LoyalityDS}
                                 loyalityTransactionsData={{
@@ -946,7 +944,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/projects"
                             element={
-                              <TableProjects
+                              <ProjectsTable
                                 c={this.state.ProjectsCount}
                                 ds={this.state.ProjectsDS}
                                 query={params}
@@ -957,7 +955,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/integrations"
                             element={
-                              <TableIntegrations
+                              <Integrations
                                 query={params}
                                 websocket={this.state.ws}
                               />
@@ -966,7 +964,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/events"
                             element={
-                              <TableEvents
+                              <Events
                                 token={params.token}
                                 websocket={this.state.ws}
                               />
@@ -975,7 +973,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/users"
                             element={
-                              <TableUsers
+                              <UsersTable
                                 c={this.state.UsersCount}
                                 ds={this.state.UsersDS}
                                 query={params}
@@ -987,7 +985,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/contragents"
                             element={
-                              <TableContragents
+                              <CATable
                                 query={params}
                                 c={this.state.CACount}
                                 ds={this.state.CADS}
@@ -1057,7 +1055,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/warehouses_balances"
                             element={
-                              <TableWarehouses
+                              <WarehousesBalances
                                 token={params.token}
                                 websocket={this.state.ws}
                                 initialData={this.state.warehousesData}
@@ -1067,7 +1065,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/docs_warehouse"
                             element={
-                              <TableDocsWarehouse
+                              <DocsWarehouse
                                 token={params.token}
                                 query={params}
                                 websocket={this.state.ws}
@@ -1123,7 +1121,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/docs_sales"
                             element={
-                              <TableDocsSales
+                              <DocsSales
                                 query={params}
                                 websocket={this.state.ws}
                               />
@@ -1132,7 +1130,7 @@ class LogIn extends React.Component {
                           <Route
                             path="/docs_purchases"
                             element={
-                              <TablePurchases
+                              <DocsPurchases
                                 contractsData={this.state.contractsData}
                                 warehousesDS={this.state.warehousesData}
                                 contragentsInfo={this.state.CADS}
