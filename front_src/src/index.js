@@ -46,7 +46,7 @@ import {
   TableEvents,
   TableIntegrations,
   TableDocsSales,
-  TableWarehousesBalance, //LOOK!
+  // TableWarehousesBalance, //LOOK!
   TableLoyalityTransactions
 } from "./components/pages/";
 import { currentMonthRange } from "./components/shared";
