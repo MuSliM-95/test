@@ -2,7 +2,7 @@
 import { BankOutlined, WalletOutlined } from '@ant-design/icons';
 import { Menu } from 'antd';
 
-function CBSelect(props) {
+export function CBSelect(props) {
     const index = props.CBData.findIndex((item) => props.token === item.token)
     const CurrentCB = props.CBData[index]
 
@@ -15,5 +15,3 @@ function CBSelect(props) {
         </>
     );
 }
-
-export default CBSelect;
