@@ -1,7 +1,7 @@
 //страница "Балансы складов"
 import React, { Component } from "react";
 import { Table, DatePicker, Button } from "antd";
-import DebounceSelect from "../../DebFetch";
+import { DebounceSelect } from "src/components/shared"
 import axios from "axios";
 
 const { RangePicker } = DatePicker;
