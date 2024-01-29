@@ -1,3 +1,4 @@
+// страница "Категории"
 import React from "react";
 import AddRowButton from "../../../widgets/Button/ui/AddRowButton";
 import TableCategories from "../../../features/Table/ui/TableCategories";
