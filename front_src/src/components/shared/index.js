@@ -1,3 +1,4 @@
+
 // ui
 export { EditableCell } from "./ui/Tables/EditableCell";
 export { EditableRow } from "./ui/Tables/EditableRow";
@@ -5,6 +6,7 @@ export { FilterCalendar } from "./ui/Tables/FilterCalendar";
 export { FilterRangePicker } from "./ui/Tables/FilterRangePicker";
 export { PreviewImage } from "./ui/Image/PreviewImage";
 export { default as LoadingState } from "./ui/Loading"
+export { CBSelect } from "./ui/Blocks/CBSelect";
 
 // lib
 export { default as saveRow } from "./lib/saveRow";
