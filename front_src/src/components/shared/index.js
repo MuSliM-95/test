@@ -4,7 +4,6 @@ export { EditableRow } from "./ui/Tables/EditableRow";
 export { FilterCalendar } from "./ui/Tables/FilterCalendar";
 export { FilterRangePicker } from "./ui/Tables/FilterRangePicker";
 export { PreviewImage } from "./ui/Image/PreviewImage";
-export { default as AuthError } from "./ui/Alert/AuthError"
 export { default as LoadingState } from "./ui/Loading"
 
 // lib
