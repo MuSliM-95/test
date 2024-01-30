@@ -17,7 +17,7 @@ from ws_manager import manager
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
+@router.get("/webapp/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, limit: int = 1000, offset: int = 0):
     """Получение фотографий, цен, остатков, категорий"""
     user = await get_user_by_token(token)
