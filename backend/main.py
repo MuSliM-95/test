@@ -46,7 +46,6 @@ from api.distribution_docs.routers import router as distribution_docs_router
 from api.fifo_settings.routers import router as fifo_settings_router
 from api.warehouse_balances.routers import router as warehouse_balances_router
 from api.gross_profit_docs.routers import router as gross_profit_docs_router
-from api.webapp.routers import router as webapp_router
 
 from api.loyality_cards.routers import router as loyality_cards
 from api.loyality_transactions.routers import router as loyality_transactions
@@ -117,7 +116,6 @@ app.include_router(distribution_docs_router)
 app.include_router(fifo_settings_router)
 app.include_router(warehouse_balances_router)
 app.include_router(gross_profit_docs_router)
-app.include_router(webapp_router)
 app.include_router(loyality_cards)
 app.include_router(loyality_transactions)
 app.include_router(loyality_settings)
