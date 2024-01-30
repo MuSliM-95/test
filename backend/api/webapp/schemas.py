@@ -11,7 +11,7 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
-    pictures: Optional[List[Item]]
+    # pictures: Optional[List[Item]]
 
     class Config:
         orm_mode = True
