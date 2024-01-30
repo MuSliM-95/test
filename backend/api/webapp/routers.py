@@ -277,7 +277,7 @@ async def get_nomenclature(
         res.append(balance_dict)
     
     for nomenclature in nomenclature_db:
-        query = pictured_db.select().where(pictured_db.c.id == nomenclature['id'])
+        query = pictures_db.select().where(pictures.c.id == nomenclature['id'])
         pictures_db = await database.fetch_all(query)
         nomenclature['pictures'] = pictures_db
 
