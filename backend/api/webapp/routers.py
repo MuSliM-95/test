@@ -1,4 +1,3 @@
-from database.db import database, pictures
 from functions.filter_schemas import PicturesFiltersQuery
 from database.db import categories, database, manufacturers, nomenclature, price_types, prices, units
 from functions.filter_schemas import PricesFiltersQuery
@@ -275,10 +274,10 @@ async def get_nomenclature(
         balance_dict['warehouse_name'] = warehouse_db.name
 
         res.append(balance_dict)
-    
+
     # for nomenclature in nomenclature_db:
     #     query = pictures.select().where(pictures.c.id == nomenclature['id'])
-        # pictures_db = await database.fetch_all(query)
-        # nomenclature['pictures'] = pictures_db
+    # pictures_db = await database.fetch_all(query)
+    # nomenclature['pictures'] = pictures_db
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1, "signalturaw": pictures.c.id}
