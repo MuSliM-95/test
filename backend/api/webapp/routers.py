@@ -7,7 +7,7 @@ from database.db import database, warehouse_balances, warehouses, warehouse_regi
     OperationType, organizations
 from typing import Optional
 import api.nomenclature.schemas as schemas
-from database.db import categories, database, manufacturers, nomenclature
+from database.db import categories, database, manufacturers, nomenclature, pictures
 from fastapi import APIRouter, Depends
 from functions.helpers import (
     check_entity_exists,
@@ -276,9 +276,9 @@ async def get_nomenclature(
 
         res.append(balance_dict)
     
-    # for nomenclature in nomenclature_db:
-    #     query = pictured_db.select().where(pictured_db.c.id == nomenclature['id'])
-    #     pictures_db = await database.fetch_all(query)
-    #     nomenclature['pictures'] = pictures_db
+    for nomenclature in nomenclature_db:
+        query = pictured_db.select().where(pictured_db.c.id == nomenclature['id'])
+        pictures_db = await database.fetch_all(query)
+        nomenclature['pictures'] = pictures_db
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
