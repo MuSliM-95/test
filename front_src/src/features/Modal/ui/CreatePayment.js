@@ -13,6 +13,7 @@ import {
     Alert,
     Select,
 } from 'antd';
+import { ExclamationCircleFilled } from '@ant-design/icons'
 import { PlusOutlined } from '@ant-design/icons';
 import React from "react";
 // import moment from "moment";
@@ -111,6 +112,7 @@ class CreatePayment extends React.Component {
         let now = new Date();
         return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     }
+
 
     handleOk = async (values) => {
         const {
@@ -281,6 +283,18 @@ class CreatePayment extends React.Component {
             isNewArticle: false,
             newArticleName: null,
             isArticleCleared: true,
+        });
+    };
+
+
+    confirm = Modal;
+    showConfirm = () => {
+        console.log("confirm")
+        confirm({
+            title: 'Вы точно хотите выйти?',
+            icon: <ExclamationCircleFilled />,
+            content: 'Все изменения будут утеряны',
+            onOk: () => this.handleCancel()
         });
     };
 
@@ -622,7 +636,7 @@ class CreatePayment extends React.Component {
                     width={550}
                     title="Создание нового платежа"
                     destroyOnClose={true}
-                    onCancel={this.handleCancel}
+                    onCancel={this.showConfirm}
                     footer={null}
                 >
 
