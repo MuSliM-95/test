@@ -15,7 +15,7 @@ class Item(BaseModel):
 
 
 class NomenclatureCreate(BaseModel):
-    name: str
+    # name: str
     type: Optional[str]
     description_short: Optional[str]
     description_long: Optional[str]
