@@ -16,17 +16,6 @@ class NomenclatureCreate(BaseModel):
     class Config:
         orm_mode = True
 
-
-class NomenclatureGet(NomenclatureCreate):
-    id: int
-    unit_name: Optional[str]
-    updated_at: int
-    created_at: int
-
-    class Config:
-        orm_mode = True
-
-
 class NomenclatureListGetRes(BaseModel):
-    result: Optional[List[NomenclatureGet]]
+    result: Optional[List[NomenclatureCreate]]
     count: int
