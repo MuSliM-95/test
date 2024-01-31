@@ -24,7 +24,7 @@ router = APIRouter(tags=["webapp"])
 @router.get("/webapp/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(
         token: str,
-        warehouse_id: int,
+        warehouse_id: Optional[int] = None,
         nomenclature_id: Optional[int] = None,
         organization_id: Optional[int] = None,
         name: Optional[str] = None,
@@ -276,8 +276,8 @@ async def get_nomenclature(
         res.append(balance_dict)
 
     for nomenclature in nomenclature_db:
-        query = pictures.select().where(pictures.c.id == nomenclature.category.id)
-        pictures_db = await database.fetch_all(query)
-    nomenclature['pictures'] = pictures_db
-    nomenclature['id']
+        print(nomenclature.id)
+        # query = pictures.select().where(pictures.c.entity_id == nomenclature.category.id)
+        # pictures_db = await database.fetch_all(query)
+        # nomenclature['pictures'] = pictures_db
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
