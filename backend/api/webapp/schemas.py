@@ -29,4 +29,3 @@ class NomenclatureCreate(BaseModel):
 class NomenclatureListGetRes(BaseModel):
     result: Optional[List[NomenclatureCreate]]
     count: int
-    massive_for_ides: Optional[List[str]]
