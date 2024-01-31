@@ -281,5 +281,6 @@ async def get_nomenclature(
         pictures_db = await database.fetch_all(query)
         itemitem['pictures'] = pictures_db
 
+    #  abc
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
