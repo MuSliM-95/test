@@ -27,5 +27,5 @@ class NomenclatureCreate(BaseModel):
 
 
 class NomenclatureListGetRes(BaseModel):
-    result: Optional[NomenclatureCreate]
+    result: Optional[List[NomenclatureCreate]]
     count: int
