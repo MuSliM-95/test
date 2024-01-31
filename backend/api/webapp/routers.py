@@ -280,4 +280,4 @@ async def get_nomenclature(
     #     pictures_db = await database.fetch_all(query)
     # nomenclature['pictures'] = pictures_db
     # nomenclature['id']
-    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}, nomenclature['id']
+    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}, nomenclature.c.id
