@@ -1,6 +1,5 @@
 import React from "react";
 import { Modal, message } from "antd";
-import { ExclamationCircleFilled } from '@ant-design/icons';
 
 export default function ModalForm({
   formContext,
@@ -13,17 +12,6 @@ export default function ModalForm({
   submitIsDisabled,
 }) {
 
-  const { confirm } = Modal;
-  const showConfirm = () => {
-    confirm({
-      title: 'Вы точно хотите выйти?',
-      icon: <ExclamationCircleFilled />,
-      content: 'Все изменения будут утеряны',
-      onOk() {
-        () => setOpen(false)
-      },
-    });
-  };
 
   const handleOk = () => {
     formContext
@@ -66,7 +54,7 @@ export default function ModalForm({
       okButtonProps={{
         disabled: submitIsDisabled,
       }}
-      onCancel={showConfirm}
+      onCancel={() => setOpen(false)}
     >
       {children}
     </Modal>
