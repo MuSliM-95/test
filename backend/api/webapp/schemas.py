@@ -1,6 +1,18 @@
 from pydantic import BaseModel
 from typing import Optional, List
 
+class Item(BaseModel):
+    id: int
+    entity: str
+    entity_id: int
+    is_main: Optional[bool]
+    url: str
+    size: Optional[int]
+    updated_at: int
+    created_at: int
+
+
+
 
 class NomenclatureCreate(BaseModel):
     name: str
@@ -17,3 +29,4 @@ class NomenclatureCreate(BaseModel):
 class NomenclatureListGetRes(BaseModel):
     result: Optional[List[NomenclatureCreate]]
     count: int
+    id_massive Optional[List[str]]
