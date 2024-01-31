@@ -276,10 +276,10 @@ async def get_nomenclature(
         res.append(balance_dict)
 
 
-    # for nomenclature in nomenclature_db:
-    #     query = pictures.select().where(pictures.c.entity_id == nomenclature['id'])
-    #     pictures_db = await database.fetch_all(query)
-    #     nomenclature['pictures'] = pictures_db
+    for itemitem in nomenclature_db:
+        query = pictures.select().where(pictures.c.entity_id == itemitem['id'])
+        pictures_db = await database.fetch_all(query)
+        itemitem['pictures'] = pictures_db
 
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
