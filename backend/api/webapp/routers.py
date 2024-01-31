@@ -288,4 +288,4 @@ async def get_nomenclature(
             id_massive.append(str(nomenclature['id']))
 
 
-    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1, id_massive}
+    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1, "massive_for_ides": id_massive}
