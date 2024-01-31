@@ -11,6 +11,19 @@ export default function ModalForm({
   handleSubmit,
   submitIsDisabled,
 }) {
+
+  const { confirm } = Modal;
+  const showConfirm = () => {
+    confirm({
+      title: 'Вы точно хотите выйти?',
+      icon: <ExclamationCircleFilled />,
+      content: 'Все изменения будут утеряны',
+      onOk() {
+        () => setOpen(false)
+      },
+    });
+  };
+
   const handleOk = () => {
     formContext
       .validateFields()
@@ -47,11 +60,12 @@ export default function ModalForm({
       forceRender
       width={width || 800}
       title={title}
+      maskClosable={false}
       onOk={() => handleOk()}
       okButtonProps={{
         disabled: submitIsDisabled,
       }}
-      onCancel={() => setOpen(false)}
+      onCancel={showConfirm}
     >
       {children}
     </Modal>
