@@ -835,11 +835,10 @@ class LogIn extends React.Component {
                   <Header
                     style={{
                       padding: 0,
-                      marginTop: -5,
                       background: "white",
                       position: 'sticky',
                       top: 0,
-                      zIndex: 100,
+                      zIndex: 1000,
                     }}
                   >
                     <Button
