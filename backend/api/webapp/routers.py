@@ -286,6 +286,8 @@ async def get_nomenclature(
     for nomenclature in nomenclature_db:
         try:
             id_massive.append(str(nomenclature['id']))
+        except:
+            pass
 
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1, "massive_for_ides": id_massive}
