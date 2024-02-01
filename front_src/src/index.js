@@ -822,7 +822,15 @@ class LogIn extends React.Component {
                   trigger={null}
                   collapsible
                   collapsed={this.state.collapsed}
-                  style={{ background: "white", height: '100vh', position: 'sticky', left: 0, top: 0, bottom: 0 }}
+                  style={{
+                    background: "white",
+                    height: '100vh',
+                    overflow: 'auto',
+                    position: 'sticky',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                  }}
                 >
                   <Menu
                     theme="light"

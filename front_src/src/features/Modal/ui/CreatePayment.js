@@ -621,11 +621,11 @@ class CreatePayment extends React.Component {
                     open={visible}
                     width={550}
                     title="Создание нового платежа"
+                    maskClosable={false}
                     destroyOnClose={true}
                     onCancel={this.handleCancel}
                     footer={null}
                 >
-
                     <Form {...layout}
                         ref={this.formRef}
                         style={{ marginTop: 20 }}

@@ -45,8 +45,8 @@ export default function ModalForm({
   return (
     <Modal
       open={isOpen}
-      centered={true}
-      forceRender
+      // centered={true}
+      // forceRender
       width={width || 800}
       title={title}
       maskClosable={false}
