@@ -11,6 +11,8 @@ class Item(BaseModel):
     updated_at: int
     created_at: int
 
+    class Config:
+        orm_mode = True
 
 
 
