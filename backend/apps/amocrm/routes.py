@@ -64,9 +64,12 @@ async def refresh_token(referer):
 
 @router.get("/amo_connect/")
 async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widget: str):
+
+    print(from_widget)
+
     user = True
     if user:
-        
+
         query = amo_install.select().where(amo_install.c.referrer == referer)
         install = await database.fetch_one(query)
 

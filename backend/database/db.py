@@ -1067,6 +1067,18 @@ type_template = sqlalchemy.Table(
     sqlalchemy.Column("name", String, nullable=False),
 )
 
+settings = sqlalchemy.Table(
+    "settings",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("scope", String),
+    sqlalchemy.Column("redirect_uri", String),
+    sqlalchemy.Column("client_secret", String),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    extend_existing=True
+)
+
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"
 database = databases.Database(SQLALCHEMY_DATABASE_URL)
 engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
