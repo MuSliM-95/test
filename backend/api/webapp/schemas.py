@@ -24,8 +24,16 @@ class NomenclatureCreate(BaseModel):
     category: Optional[int]
     manufacturer: Optional[int]
     pictures: Optional[List[Item]]
+    
+    class Config:
+        orm_mode = True
+
 
 
 class NomenclatureListGetRes(BaseModel):
     result: Optional[List[NomenclatureCreate]]
     count: int
+
+    class Config:
+        orm_mode = True
+
