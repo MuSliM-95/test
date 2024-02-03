@@ -4,14 +4,14 @@ from datetime import datetime
 import aiohttp
 
 from apps.amocrm.tasks.contacts import compare_contacts
-from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, amo_settings, load_types
+from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, amo_settings, amo_settings_load_types
 from functions.helpers import gen_token
 from jobs import scheduler
 from ws_manager import manager
 
 
 async def add_job_compare(ref: str, amo_install_id: int, load_type_id):
-    query = load_types.select().where(load_types.c.id == load_type_id)
+    query = amo_settings_load_types.select().where(amo_settings_load_types.c.id == load_type_id)
     load_type_setting = await database.fetch_one(query)
 
     if load_type_setting.contacts:
