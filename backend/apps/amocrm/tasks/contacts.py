@@ -1,15 +1,134 @@
 import asyncio
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import aiohttp
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, or_
 
 from apps.amocrm.tasks.function import phone_normalizer
-from database.db import amo_install, database, amo_contacts
+from database.db import amo_install, database, amo_contacts, amo_install_table_cashboxes, amo_table_contacts, \
+    contragents
 
 
 async def compare_contacts(amo_install_id: int):
     await load_amo_contacts(amo_install_id)
+    await compare_amo_to_table(amo_install_id)
+
+
+async def compare_amo_to_table(amo_install_id: int):
+    query = (
+        select([amo_install.c.access_token, amo_install.c.referrer])
+        .where(amo_install.c.id == amo_install_id)
+    )
+    amo_install_info = await database.fetch_one(query)
+
+    if not amo_install_info:
+        return {
+            "status": "error",
+            "detail": "amo install not found"
+        }
+
+    query = (
+        select([amo_install_table_cashboxes.c.cashbox_id])
+        .where(amo_install_table_cashboxes.c.amo_integration_id == amo_install_id)
+        .where(amo_install_table_cashboxes.c.status == True)
+    )
+    amo_table_link = await database.fetch_one(query)
+
+    if not amo_table_link:
+        return {
+            "status": "error",
+            "detail": "amo dont connect to table"
+        }
+
+    query = (
+        amo_contacts.select()
+        .where(amo_contacts.c.amo_install_id == amo_install_id)
+        .where(amo_contacts.c.is_active == True)
+    )
+    contacts = await database.fetch_all(query)
+
+    contacts_phone_new = []
+
+    for contact_info in contacts:
+        if contact_info.formatted_phone in contacts_phone_new:
+            query = (
+                amo_contacts.update()
+                .where(amo_contacts.c.id == contact_info.id)
+                .values({
+                    "is_active": False
+                })
+            )
+            await database.execute(query)
+            continue
+
+        query = (
+            amo_table_contacts.select()
+            .where(amo_table_contacts.c.amo_id == contact_info.id)
+            .where(amo_table_contacts.c.amo_install_id == amo_install_id)
+            .where(amo_table_contacts.c.cashbox_id == amo_table_link.cashbox_id)
+        )
+        table_contact_exist = await database.fetch_one(query)
+
+        if table_contact_exist:
+            query = (
+                contragents.select()
+                .where(contragents.c.id == amo_table_contacts.table_id)
+            )
+            contragent_info = await database.fetch_one(query)
+
+            body = {}
+            if contragent_info.name != contact_info.name:
+                body["name"] = contact_info.name
+            if body:
+                query = (
+                    contragents.update()
+                    .where(contragents.c.id == amo_table_contacts.table_id)
+                    .values(body)
+                )
+                await database.execute(query)
+
+        else:
+            contacts_phone_new.append(contact_info.formatted_phone)
+
+            query = (
+                contragents.select()
+                .where(contragents.c.cashbox == amo_table_link.cashbox_id)
+                .where(or_(contragents.c.phone == contact_info.formatted_phone,
+                           contragents.c.phone == contact_info.phone))
+            )
+            contragent_info = database.fetch_one(query)
+
+            if contragent_info:
+                query = amo_table_contacts.insert().values({
+                    "amo_id": contact_info.id,
+                    "table_id": contragent_info.id,
+                    "cashbox_id": amo_table_link.cashbox_id,
+                    "amo_install_id": amo_install_id
+                })
+                await database.execute(query)
+            else:
+                query = (
+                    contragents.insert()
+                    .values({
+                        "name": contact_info.name,
+                        "phone": contact_info.formatted_phone,
+                        "cashbox": amo_table_link.cashbox_id,
+                        "is_deleted": False,
+                        "created_at": int(datetime.utcnow().timestamp()),
+                        "updated_at": int(datetime.utcnow().timestamp()),
+                    }).returning(contragents.c.id)
+                )
+                contragents_record = await database.fetch_one(query)
+
+                query = amo_table_contacts.insert().values({
+                    "amo_id": contact_info.id,
+                    "table_id": contragents_record.id,
+                    "cashbox_id": amo_table_link.cashbox_id,
+                    "amo_install_id": amo_install_id
+                })
+                await database.execute(query)
+
+
 
 
 async def load_amo_contacts(amo_install_id: int):

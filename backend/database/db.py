@@ -1099,8 +1099,22 @@ amo_contacts = sqlalchemy.Table(
     sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
     sqlalchemy.Column("formatted_phone", String),
     sqlalchemy.Column("ext_id", Integer),
+    sqlalchemy.Column("is_active", Boolean, server_default="true"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    extend_existing=True
+)
+
+amo_table_contacts = sqlalchemy.Table(
+    "klientix_amo_contacts",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("amo_id", ForeignKey("amo_contacts.id")),
+    sqlalchemy.Column("table_id", ForeignKey("contragents.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
     extend_existing=True
 )
 
