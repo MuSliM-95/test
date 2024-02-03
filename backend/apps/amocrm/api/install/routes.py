@@ -48,8 +48,6 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                                       args=[referer], max_instances=1)
 
                 await add_job_compare(referer, install_add_info["amo_install_id"], setting_info)
-
-                return {"result": "amo token connected succesfully"}
             else:
                 if not install["active"]:
                     amo_db_data = await update_amo_install(amo_post_json, referer, install, code)
@@ -60,21 +58,13 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                                           args=[referer])
 
                     await add_job_compare(referer, install.id, setting_info)
-
-                return {"status": "amo token already connected!"}
         else:
-
             install_add_info = await add_amo_install(amo_post_json, referer, platform, setting_info.id)
-
             scheduler.add_job(refresh_token, trigger="interval", seconds=install_add_info["expires_in"], id=referer,
                               args=[referer])
-
             await add_job_compare(referer, install_add_info["amo_install_id"], setting_info)
 
-            return {"result": "amo token connected succesfully"}
 
-    else:
-        return {"status": "incorrect token!"}
 
 
 @router.get("/amo_disconnect/")
