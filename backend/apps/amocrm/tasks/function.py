@@ -1,7 +1,7 @@
 import re
 
 
-def phone_normalizer(phone):
+async def phone_normalizer(phone):
     normalized_phone = ""
     if phone:
         reg_phone = re.findall(r"^(\+7|7|8).*?(\d{3}).*?(\d{3}).*?(\d{2}).*?(\d{2,})$", phone)

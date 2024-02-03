@@ -43,7 +43,7 @@ async def load_amo_contacts(amo_install_id: int):
         while True:
             amo_contacts_list = []
             try:
-                url = f"https://{amo_install_info.referrer}/api/v4/contacts?page={page}&limit=250&order[id]=asc"
+                url = f"https://{amo_install_info.referrer}/api/v4/contacts?page={page}&limit=250&order[updated_at]=asc"
                 if last_date_timestamp:
                     url += f"&filter[updated_at][from]={last_date_timestamp}"
                 print(f"Fetching amo_install {amo_install_id} contacts page {page}\n    url: {url}")
@@ -72,14 +72,14 @@ async def load_amo_contacts(amo_install_id: int):
                                         {
                                             "name": contact["name"],
                                             "phone": phone,
-                                            "formatted_phone": phone_normalizer(phone),
+                                            "formatted_phone": await phone_normalizer(phone),
                                             "amo_install_id": amo_install_id,
                                             "ext_id": contact["id"],
                                         }
                                     )
                         await save_amo_contacts(amo_contacts_list)
                 page += 1
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.4)
             except aiohttp.client_exceptions.ServerDisconnectedError:
                 continue
 

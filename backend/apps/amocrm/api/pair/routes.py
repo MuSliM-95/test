@@ -12,7 +12,7 @@ from database.db import database, amo_install, amo_install_table_cashboxes, user
 router = APIRouter(tags=["amocrm"])
 
 
-@router.get("/integration_pair")
+@router.get("/integration_pair/")
 async def sc_l(token: str, amo_token: str):
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query=query)
@@ -64,7 +64,7 @@ async def sc_l(token: str, amo_token: str):
         )
 
 
-@router.get("/get_my_token")
+@router.get("/get_my_token/")
 async def sc_l(referer: str):
     query = amo_install.select().where(amo_install.c.referrer == referer)
     user = await database.fetch_one(query)
@@ -74,7 +74,7 @@ async def sc_l(referer: str):
         return {"status": "incorrect token!"}
 
 
-@router.get("/refresh_my_token")
+@router.get("/refresh_my_token/")
 async def sc_l(referer: str):
     query = amo_install.select().where(amo_install.c.referrer == referer)
     user = await database.fetch_one(query)
@@ -104,7 +104,7 @@ async def sc_l(referer: str):
         return {"status": "incorrect token!"}
 
 
-@router.get("/check_pair")
+@router.get("/check_pair/")
 async def sc_l(token: str):
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query=query)
@@ -127,7 +127,7 @@ async def sc_l(token: str):
         return {"status": "incorrect token!"}
 
 
-@router.get("/integration_unpair")
+@router.get("/integration_unpair/")
 async def sc_l(token: str):
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
@@ -164,7 +164,7 @@ async def sc_l(token: str):
         return {"status": "incorrect token!"}
 
 
-@router.get("/integration_on")
+@router.get("/integration_on/")
 async def sc_l(token: str):
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query=query)
@@ -200,6 +200,6 @@ async def sc_l(token: str):
         return {"status": "incorrect token!"}
 
 
-@router.post("/test")
+@router.post("/test/")
 async def test_endpoint():
     pass
