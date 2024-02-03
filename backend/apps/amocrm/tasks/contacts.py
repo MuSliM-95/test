@@ -96,7 +96,7 @@ async def compare_amo_to_table(amo_install_id: int):
                 .where(or_(contragents.c.phone == contact_info.formatted_phone,
                            contragents.c.phone == contact_info.phone))
             )
-            contragent_info = database.fetch_one(query)
+            contragent_info = await database.fetch_one(query)
 
             if contragent_info:
                 query = amo_table_contacts.insert().values({
