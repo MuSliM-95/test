@@ -1106,7 +1106,7 @@ amo_contacts = sqlalchemy.Table(
 )
 
 amo_table_contacts = sqlalchemy.Table(
-    "klientix_amo_contacts",
+    "amo_table_contacts",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("amo_id", ForeignKey("amo_contacts.id")),
