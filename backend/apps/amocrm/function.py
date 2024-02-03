@@ -4,14 +4,14 @@ from datetime import datetime
 import aiohttp
 
 from apps.amocrm.tasks.contacts import compare_contacts
-from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, settings, load_types
+from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, amo_settings, load_types
 from functions.helpers import gen_token
 from jobs import scheduler
 from ws_manager import manager
 
 
-async def add_job_compare(ref: str, amo_install_id: int, setting):
-    query = load_types.select().where(load_types.c.id == setting.load_type)
+async def add_job_compare(ref: str, amo_install_id: int, load_type_id):
+    query = load_types.select().where(load_types.c.id == load_type_id)
     load_type_setting = await database.fetch_one(query)
 
     if load_type_setting.contacts:
@@ -68,22 +68,15 @@ async def update_amo_install(amo_post_json, ref, install, code):
 async def add_amo_install(amo_post_json, ref, platform, setting_info_id):
     async with aiohttp.ClientSession() as session:
         async with session.post(f'https://{ref}/oauth2/access_token', json=amo_post_json) as resp:
-            print(resp.status)
-            print(await resp.text())
             amo_resp_json1 = await resp.json()
 
     amo_token = amo_resp_json1.get("access_token")
-    print(amo_token)
 
     if amo_token:
         headers = {'Authorization': f'Bearer {amo_token}'}
-        async with aiohttp.ClientSession(headers=headers) as session2:
-            async with session2.get(f'https://{ref}/api/v4/account') as resp:
-                print("22")
-                print(await resp.text())
-                print(resp.status)
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(f'https://{ref}/api/v4/account') as resp:
                 amo_resp_json2 = await resp.json()
-            await session2.close()
 
     amo_data = amo_post_json
     time = int(datetime.utcnow().timestamp())
@@ -102,12 +95,12 @@ async def add_amo_install(amo_post_json, ref, platform, setting_info_id):
     amo_data["access_token"] = amo_token
 
     query = amo_install.insert().values(amo_data).returning(amo_install.c.id)
-    amo_install_id = await database.fetch_one(query)
+    amo_install_record = await database.fetch_one(query)
 
-    print(f"Successful install amo №{amo_install_id}")
+    print(f"Successful install amo №{amo_install_record.id}")
 
     return {
-        "amo_install_id": amo_install_id,
+        "amo_install_id": amo_install_record.id,
         "expires_in": amo_data["expires_in"],
     }
 
@@ -118,7 +111,7 @@ async def refresh_token(referer):
 
     for amo_db_referer in amo_db_referers:
         if amo_db_referer.active:
-            query = settings.select().where(settings.c.id == amo_db_referer.from_widget)
+            query = amo_settings.select().where(amo_settings.c.id == amo_db_referer.from_widget)
             setting_info = await database.fetch_one(query)
 
             amo_post_json = {
@@ -154,7 +147,6 @@ async def refresh_token(referer):
                     # await database.execute(
                     #     events.insert().values(event_body)
                     # )
-                await session1.close()
             amo_db_referer_dict = dict(amo_db_referer)
             amo_db_referer_dict["access_token"] = amo_resp_json['access_token']
             amo_db_referer_dict["refresh_token"] = amo_resp_json['refresh_token']

@@ -6,7 +6,7 @@ from starlette import status
 
 from apps.amocrm.function import refresh_token, add_amo_install, update_amo_install, add_job_compare
 from apps.amocrm.tasks.contacts import compare_contacts
-from database.db import amo_install, database, settings, amo_install_table_cashboxes, cboxes, users_cboxes_relation
+from database.db import amo_install, database, amo_settings, amo_install_table_cashboxes, cboxes, users_cboxes_relation
 from functions.helpers import gen_token
 from jobs import scheduler
 from ws_manager import manager
@@ -22,7 +22,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
         query = amo_install.select().where(amo_install.c.referrer == referer)
         install = await database.fetch_one(query)
 
-        query = settings.select().where(settings.c.integration_id == client_id)
+        query = amo_settings.select().where(amo_settings.c.integration_id == client_id)
         setting_info = await database.fetch_one(query)
 
         if not setting_info:
@@ -47,7 +47,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                     scheduler.add_job(refresh_token, trigger="interval", seconds=install_add_info["expires_in"], id=referer,
                                       args=[referer], max_instances=1)
 
-                await add_job_compare(referer, install_add_info["amo_install_id"], setting_info)
+                await add_job_compare(referer, install_add_info["amo_install_id"], setting_info.load_type_id)
             else:
                 if not install["active"]:
                     amo_db_data = await update_amo_install(amo_post_json, referer, install, code)
@@ -57,12 +57,12 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                                           id=referer,
                                           args=[referer])
 
-                    await add_job_compare(referer, install.id, setting_info)
+                    await add_job_compare(referer, install.id, setting_info.load_type_id)
         else:
             install_add_info = await add_amo_install(amo_post_json, referer, platform, setting_info.id)
             scheduler.add_job(refresh_token, trigger="interval", seconds=install_add_info["expires_in"], id=referer,
                               args=[referer])
-            await add_job_compare(referer, install_add_info["amo_install_id"], setting_info)
+            await add_job_compare(referer, install_add_info["amo_install_id"], setting_info.load_type_id)
 
 
 

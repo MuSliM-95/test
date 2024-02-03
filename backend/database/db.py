@@ -589,7 +589,7 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("amo_account_id", Integer),
     sqlalchemy.Column("client_id", String),
     sqlalchemy.Column("client_secret", String),
-    sqlalchemy.Column("from_widget", Integer, ForeignKey("settings.id")),
+    sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
     sqlalchemy.Column("refresh_token", String),
     sqlalchemy.Column("access_token", String),
     sqlalchemy.Column("pair_token", String),
@@ -1067,22 +1067,22 @@ type_template = sqlalchemy.Table(
     sqlalchemy.Column("name", String, nullable=False),
 )
 
-settings = sqlalchemy.Table(
-    "settings",
+amo_settings = sqlalchemy.Table(
+    "amo_settings",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("scope", String),
     sqlalchemy.Column("redirect_uri", String),
     sqlalchemy.Column("client_secret", String),
     sqlalchemy.Column("integration_id", String),
-    sqlalchemy.Column("load_type", Integer, ForeignKey("load_types.id")),
+    sqlalchemy.Column("load_type_id", Integer, ForeignKey("amo_settings_load_types.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     extend_existing=True
 )
 
-load_types = sqlalchemy.Table(
-    "load_types",
+amo_settings_load_types = sqlalchemy.Table(
+    "amo_settings_load_types",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("contacts", Boolean, server_default="false"),
