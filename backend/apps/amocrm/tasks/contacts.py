@@ -72,7 +72,7 @@ async def compare_amo_to_table(amo_install_id: int):
         if table_contact_exist:
             query = (
                 contragents.select()
-                .where(contragents.c.id == amo_table_contacts.table_id)
+                .where(contragents.c.id == table_contact_exist.table_id)
             )
             contragent_info = await database.fetch_one(query)
 
@@ -88,15 +88,17 @@ async def compare_amo_to_table(amo_install_id: int):
                 await database.execute(query)
 
         else:
-            contacts_phone_new.append(contact_info.formatted_phone)
+            contragent_info = None
+            if contact_info.formatted_phone:
+                contacts_phone_new.append(contact_info.formatted_phone)
 
-            query = (
-                contragents.select()
-                .where(contragents.c.cashbox == amo_table_link.cashbox_id)
-                .where(or_(contragents.c.phone == contact_info.formatted_phone,
-                           contragents.c.phone == contact_info.phone))
-            )
-            contragent_info = await database.fetch_one(query)
+                query = (
+                    contragents.select()
+                    .where(contragents.c.cashbox == amo_table_link.cashbox_id)
+                    .where(or_(contragents.c.phone == contact_info.formatted_phone,
+                               contragents.c.phone == contact_info.phone))
+                )
+                contragent_info = await database.fetch_one(query)
 
             if contragent_info:
                 query = amo_table_contacts.insert().values({
@@ -127,8 +129,6 @@ async def compare_amo_to_table(amo_install_id: int):
                     "amo_install_id": amo_install_id
                 })
                 await database.execute(query)
-
-
 
 
 async def load_amo_contacts(amo_install_id: int):
