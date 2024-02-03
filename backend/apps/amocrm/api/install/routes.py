@@ -14,7 +14,7 @@ from ws_manager import manager
 router = APIRouter(tags=["amocrm"])
 
 
-@router.get("/amo_connect/")
+@router.get("/amo_connect")
 async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widget: str):
     user = True
     if user:
@@ -67,7 +67,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
 
 
 
-@router.get("/amo_disconnect/")
+@router.get("/amo_disconnect")
 async def sc_l(account_id: int, client_uuid: str):
     user = True
     if user:

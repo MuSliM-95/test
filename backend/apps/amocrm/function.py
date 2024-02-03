@@ -68,13 +68,20 @@ async def update_amo_install(amo_post_json, ref, install, code):
 async def add_amo_install(amo_post_json, ref, platform, setting_info_id):
     async with aiohttp.ClientSession() as session:
         async with session.post(f'https://{ref}/oauth2/access_token', json=amo_post_json) as resp:
+            print(resp.status)
+            print(await resp.text())
             amo_resp_json1 = await resp.json()
 
     amo_token = amo_resp_json1.get("access_token")
+    print(amo_token)
+
     if amo_token:
         headers = {'Authorization': f'Bearer {amo_token}'}
         async with aiohttp.ClientSession(headers=headers) as session2:
             async with session2.get(f'https://{ref}/api/v4/account') as resp:
+                print("22")
+                print(await resp.text())
+                print(resp.status)
                 amo_resp_json2 = await resp.json()
             await session2.close()
 
