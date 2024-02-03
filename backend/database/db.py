@@ -589,7 +589,7 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("amo_account_id", Integer),
     sqlalchemy.Column("client_id", String),
     sqlalchemy.Column("client_secret", String),
-    sqlalchemy.Column("from_widget", Integer),
+    sqlalchemy.Column("from_widget", Integer, ForeignKey("settings.id")),
     sqlalchemy.Column("refresh_token", String),
     sqlalchemy.Column("access_token", String),
     sqlalchemy.Column("pair_token", String),
@@ -1074,6 +1074,31 @@ settings = sqlalchemy.Table(
     sqlalchemy.Column("scope", String),
     sqlalchemy.Column("redirect_uri", String),
     sqlalchemy.Column("client_secret", String),
+    sqlalchemy.Column("integration_id", String),
+    sqlalchemy.Column("load_type", Integer, ForeignKey("load_types.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    extend_existing=True
+)
+
+load_types = sqlalchemy.Table(
+    "load_types",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("contacts", Boolean, server_default="false"),
+    sqlalchemy.Column("leads", Boolean, server_default="false"),
+    extend_existing=True
+)
+
+amo_contacts = sqlalchemy.Table(
+    "amo_contacts",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("phone", String),
+    sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
+    sqlalchemy.Column("formatted_phone", String),
+    sqlalchemy.Column("ext_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     extend_existing=True

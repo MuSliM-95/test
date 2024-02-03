@@ -51,7 +51,8 @@ from api.loyality_cards.routers import router as loyality_cards
 from api.loyality_transactions.routers import router as loyality_transactions
 from api.loyality_settings.routers import router as loyality_settings
 
-from apps.amocrm.routes import router as amo_router
+from apps.amocrm.api.pair.routes import router as amo_pair_router
+from apps.amocrm.api.install.routes import router as amo_install_router
 
 from api.integrations.routers import router as int_router
 from api.oauth.routes import router as oauth_router
@@ -97,7 +98,8 @@ app.include_router(installs_router)
 app.include_router(balances_router)
 app.include_router(cheques_router)
 app.include_router(events_router)
-app.include_router(amo_router)
+app.include_router(amo_pair_router)
+app.include_router(amo_install_router)
 app.include_router(organizations_router)
 app.include_router(contracts_router)
 app.include_router(categories_router)
