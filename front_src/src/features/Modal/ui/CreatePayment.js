@@ -276,18 +276,6 @@ class CreatePayment extends React.Component {
     this.handleCancel();
   };
 
-  handleCancel = () => {
-    Modal.confirm({
-      title: "Confirm",
-      content: "Are you sure you want to cancel?",
-      okText: "Yes",
-      cancelText: "No",
-      onOk() {
-        handleState();
-      },
-    });
-  };
-
   handleState = () => {
     this.setState({
       p_status: true,
@@ -304,6 +292,18 @@ class CreatePayment extends React.Component {
       isNewArticle: false,
       newArticleName: null,
       isArticleCleared: true,
+    });
+  };
+
+  handleCancel = () => {
+    Modal.confirm({
+      title: "Confirm",
+      content: "Are you sure you want to cancel?",
+      okText: "Yes",
+      cancelText: "No",
+      onOk() {
+        handleState();
+      },
     });
   };
 
