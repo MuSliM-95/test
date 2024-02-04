@@ -21,8 +21,8 @@ variables:
 
 stages:
   - test
-  - front_build
   - build_up_docker
+  - front_build
 
 test:
   stage: test
