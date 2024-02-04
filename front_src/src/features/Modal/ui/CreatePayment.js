@@ -283,23 +283,27 @@ class CreatePayment extends React.Component {
       okText: "Yes",
       cancelText: "No",
       onOk() {
-        this.setState({
-          p_status: true,
-          paymentType: "incoming",
-          visible: false,
-          repeat_freq: undefined,
-          repeat_freq_int: 1,
-          selected: [],
-          tax: "0",
-          tax_type: "internal",
-          amount: 1.0,
-          ca_alert_name: null,
-          current_article: null,
-          isNewArticle: false,
-          newArticleName: null,
-          isArticleCleared: true,
-        });
+        handleState();
       },
+    });
+  };
+
+  handleState = () => {
+    this.setState({
+      p_status: true,
+      paymentType: "incoming",
+      visible: false,
+      repeat_freq: undefined,
+      repeat_freq_int: 1,
+      selected: [],
+      tax: "0",
+      tax_type: "internal",
+      amount: 1.0,
+      ca_alert_name: null,
+      current_article: null,
+      isNewArticle: false,
+      newArticleName: null,
+      isArticleCleared: true,
     });
   };
 
