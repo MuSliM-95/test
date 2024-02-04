@@ -597,6 +597,7 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("active", Boolean),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("field_id", Integer),
 )
 
 amo_integrations = sqlalchemy.Table(
