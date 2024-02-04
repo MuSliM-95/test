@@ -133,7 +133,7 @@ async def compare_table_to_amo(amo_install_id: int):
                                         .values(
                                             {
                                                 "amo_id": created_id.id,
-                                                "klientix_id": table_id,
+                                                "table_id": table_id,
                                                 "cashbox_id": amo_table_link.cashbox_id,
                                                 "amo_install_id": amo_install_id
                                             }
