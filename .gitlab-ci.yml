@@ -99,7 +99,7 @@ build-up-docker-job:
     - master
   tags:
     - master_runner
-  dependencies: 
+  dependencies:
     - front-build-job
   environment: production
   script:
