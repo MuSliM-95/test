@@ -31,7 +31,14 @@ async def update_amo_install(amo_post_json, ref, install, code):
     async with aiohttp.ClientSession() as session1:
         async with session1.post(f'https://{ref}/oauth2/access_token', json=amo_post_json) as resp:
             amo_resp_json1 = await resp.json()
-        await session1.close()
+        if not install.field_id:
+            field_id = None
+            async with session1.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp:
+                amo_resp_json3 = await resp.json()
+                for custom_field in amo_resp_json3["_embedded"]["custom_fields"]:
+                    if custom_field["name"] == "Телефон":
+                        field_id = int(custom_field["id"])
+            amo_db_data["field_id"] = field_id
 
     timestamp = int(datetime.utcnow().timestamp())
 
@@ -72,11 +79,18 @@ async def add_amo_install(amo_post_json, ref, platform, setting_info_id):
 
     amo_token = amo_resp_json1.get("access_token")
 
+    field_id = None
+
     if amo_token:
         headers = {'Authorization': f'Bearer {amo_token}'}
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(f'https://{ref}/api/v4/account') as resp:
                 amo_resp_json2 = await resp.json()
+            async with session.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp:
+                amo_resp_json3 = await resp.json()
+                for custom_field in amo_resp_json3["_embedded"]["custom_fields"]:
+                    if custom_field["name"] == "Телефон":
+                        field_id = int(custom_field["id"])
 
     amo_data = amo_post_json
     time = int(datetime.utcnow().timestamp())
@@ -93,6 +107,7 @@ async def add_amo_install(amo_post_json, ref, platform, setting_info_id):
     amo_data["expires_in"] = int(amo_resp_json1["expires_in"])
     amo_data["refresh_token"] = amo_resp_json1["refresh_token"]
     amo_data["access_token"] = amo_token
+    amo_data["field_id"] = field_id
 
     query = amo_install.insert().values(amo_data).returning(amo_install.c.id)
     amo_install_record = await database.fetch_one(query)

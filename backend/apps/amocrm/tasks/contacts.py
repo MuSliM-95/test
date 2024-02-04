@@ -12,6 +12,137 @@ from database.db import amo_install, database, amo_contacts, amo_install_table_c
 async def compare_contacts(amo_install_id: int):
     await load_amo_contacts(amo_install_id)
     await compare_amo_to_table(amo_install_id)
+    await compare_table_to_amo(amo_install_id)
+
+
+async def compare_table_to_amo(amo_install_id: int):
+    query = (
+        select([amo_install.c.access_token, amo_install.c.referrer])
+        .where(amo_install.c.id == amo_install_id)
+    )
+    amo_install_info = await database.fetch_one(query)
+
+    query = (
+        select([amo_install_table_cashboxes.c.cashbox_id])
+        .where(amo_install_table_cashboxes.c.amo_integration_id == amo_install_id)
+        .where(amo_install_table_cashboxes.c.status == True)
+    )
+    amo_table_link = await database.fetch_one(query)
+
+    query = (
+        contragents.select()
+        .where(contragents.c.cashbox == amo_table_link.cashbox_id)
+    )
+    contragents_list = await database.fetch_all(query)
+
+    patch_body = []
+    post_body = []
+    post_add_body = []
+    counter = 0
+
+    for contragent_info in contragents_list:
+        query = (
+            amo_table_contacts.select()
+            .where(amo_table_contacts.c.table_id == contragent_info.id)
+            .where(amo_table_contacts.c.cashbox_id == amo_table_link.cashbox_id)
+            .where(amo_table_contacts.c.amo_install_id == amo_install_id)
+        )
+        amo_table_contact_link = await database.fetch_one(query)
+
+        if amo_table_contact_link:
+            query = (
+                amo_contacts.select()
+                .where(amo_contacts.c.id == amo_table_contact_link.amo_id)
+            )
+            amo_contact = await database.fetch_one(query)
+
+            if amo_contact:
+                if amo_contact.name != contragent_info.name:
+                    patch_body.append(
+                        {
+                            "id": amo_contact.ext_id,
+                            "name": contragent_info.name
+                        }
+                    )
+        else:
+            post_dict = {"name": "Без имени" if not contragent_info.name else contragent_info.name}
+            if contragent_info.phone:
+                if amo_install_info.field_id:
+                    post_dict["custom_fields_values"] = [
+                        {
+                            "field_code": 'PHONE',
+                            "field_id": amo_install_info.field_id,
+                            "values": [
+                                {
+                                    "value": contragent_info.phone
+                                }
+                            ]
+                        }
+                    ]
+            post_dict["request_id"] = str(counter)
+            post_body.append(post_dict)
+            post_add_body.append(
+                {
+                    "table_id": contragent_info.id,
+                    "name": contragent_info.name,
+                    "phone": contragent_info.phone,
+                }
+            )
+            counter += 1
+
+        headers = {"Content-type": "application/json", "Authorization": f"Bearer {amo_install_info.access_token}"}
+        url = f"https://{amo_install_info.referrer}/api/v4/contacts"
+
+        async with aiohttp.ClientSession(headers=headers) as http_session:
+            if patch_body:
+                for i in range(0, len(patch_body), 250):
+                    try:
+                        async with http_session.patch(url, json=patch_body[i:i + 250]) as patch_resp:
+                            patch_resp.raise_for_status()
+                    except aiohttp.ClientResponseError as e:
+                        print(f"{e.status} - {e.message}")
+            if post_body:
+                for i in range(0, len(post_body), 250):
+                    try:
+                        async with http_session.post(url, json=post_body[i:i + 250]) as post_resp:
+                            post_resp.raise_for_status()
+                            if post_resp.status == 200:
+                                post_resp_json = await post_resp.json()
+                                for contact in post_resp_json['_embedded']['contacts']:
+                                    request_id = contact["request_id"]
+
+                                    amo_add_info = post_add_body[int(request_id)]
+
+                                    table_id = amo_add_info['table_id']
+
+                                    create_body = {
+                                        "name": amo_add_info["name"],
+                                        "phone": amo_add_info["phone"],
+                                        "formatted_phone": amo_add_info["phone"],
+                                        "ext_id": contact['id'],
+                                        "amo_install_id": amo_install_id
+                                    }
+
+                                    query = (
+                                        amo_contacts.insert().values(create_body).returning(amo_contacts.c.id)
+                                    )
+                                    created_id = await database.fetch_one(query)
+
+                                    query = (
+                                        amo_table_contacts.insert()
+                                        .values(
+                                            {
+                                                "amo_id": created_id.id,
+                                                "klientix_id": table_id,
+                                                "cashbox_id": amo_table_link.cashbox_id,
+                                                "amo_install_id": amo_install_id
+                                            }
+                                        )
+                                    )
+                                    await database.execute(query)
+
+                    except aiohttp.ClientResponseError as e:
+                        print(f"{e.status} - {e.message}")
 
 
 async def compare_amo_to_table(amo_install_id: int):
@@ -78,7 +209,8 @@ async def compare_amo_to_table(amo_install_id: int):
 
             body = {}
             if contragent_info.name != contact_info.name:
-                body["name"] = contact_info.name
+                if int(contact_info.updated_at.timestamp()) >= contragent_info.updated_at:
+                    body["name"] = contact_info.name
             if body:
                 query = (
                     contragents.update()
