@@ -297,10 +297,10 @@ class CreatePayment extends React.Component {
 
   handleCancel = () => {
     Modal.confirm({
-      title: "Confirm",
-      content: "Are you sure you want to cancel?",
-      okText: "Yes",
-      cancelText: "No",
+      title: "Подтвердите действие",
+      content: "Вы дейтвительно хотите закрыть окно?",
+      okText: "Да",
+      cancelText: "Нет",
       onOk: () => {
         this.handleState();
       },
