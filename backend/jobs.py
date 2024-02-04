@@ -23,7 +23,14 @@ except DatabaseError:
     pass
 scheduler.add_jobstore(jobstore)
 
+
+def add_job_to_sched(func, **kwargs):
+    scheduler.add_job(func, **kwargs)
+
+
 accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
+
+
 # accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 # amo_interval = int(os.getenv("AMO_CONTACTS_IMPORT_FREQUENCY_SECONDS", default=120))
 
@@ -37,7 +44,7 @@ async def check_account():
         if balance.tariff_type == DEMO:
             now = datetime.utcnow()
             if now >= datetime.fromtimestamp(balance.created_at) + timedelta(
-                days=tariff.demo_days
+                    days=tariff.demo_days
             ):
                 await make_account(balance)
         elif balance.tariff_type == PAID:

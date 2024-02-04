@@ -6,7 +6,7 @@ import aiohttp
 from apps.amocrm.tasks.contacts import compare_contacts
 from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, amo_settings, amo_settings_load_types
 from functions.helpers import gen_token
-from jobs import scheduler
+from jobs import scheduler, add_job_to_sched
 from ws_manager import manager
 
 
@@ -16,7 +16,7 @@ async def add_job_compare(ref: str, amo_install_id: int, load_type_id):
 
     if load_type_setting.contacts:
         if not scheduler.get_job(f"compare_contacts_{ref}"):
-            scheduler.add_job(
+            add_job_to_sched(
                 compare_contacts,
                 trigger="interval",
                 seconds=120,

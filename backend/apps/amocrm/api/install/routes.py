@@ -44,7 +44,8 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                 install_add_info = await add_amo_install(amo_post_json, referer, platform, setting_info.id)
 
                 if not scheduler.get_job(referer):
-                    scheduler.add_job(refresh_token, trigger="interval", seconds=install_add_info["expires_in"], id=referer,
+                    scheduler.add_job(refresh_token, trigger="interval", seconds=install_add_info["expires_in"],
+                                      id=referer,
                                       args=[referer], max_instances=1)
 
                 await add_job_compare(referer, install_add_info["amo_install_id"], setting_info.load_type_id)
@@ -63,8 +64,6 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
             scheduler.add_job(refresh_token, trigger="interval", seconds=install_add_info["expires_in"], id=referer,
                               args=[referer])
             await add_job_compare(referer, install_add_info["amo_install_id"], setting_info.load_type_id)
-
-
 
 
 @router.get("/amo_disconnect")
@@ -96,12 +95,14 @@ async def sc_l(account_id: int, client_uuid: str):
             relship = await database.fetch_one(query)
 
             if relship:
-                query = users_cboxes_relation.select().where(users_cboxes_relation.c.cashbox_id == relship["cashbox_id"])
+                query = users_cboxes_relation.select().where(
+                    users_cboxes_relation.c.cashbox_id == relship["cashbox_id"])
                 cashboxes = await database.fetch_all(query)
 
                 for cashbox in cashboxes:
                     await manager.send_message(cashbox.token,
-                                               {"action": "paired", "target": "integrations", "integration_status": False})
+                                               {"action": "paired", "target": "integrations",
+                                                "integration_status": False})
 
             if scheduler.get_job(db_dict["referrer"]):
                 scheduler.remove_job(db_dict["referrer"])
