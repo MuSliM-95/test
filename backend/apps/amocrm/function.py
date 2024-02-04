@@ -33,8 +33,9 @@ async def update_amo_install(amo_post_json, ref, install, code):
             amo_resp_json1 = await resp.json()
         if not install.field_id:
             field_id = None
-            async with session1.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp:
-                amo_resp_json3 = await resp.json()
+            async with session1.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp3:
+                amo_resp_json3 = await resp3.json()
+                print(amo_resp_json3)
                 if amo_resp_json3.get("_embedded"):
                     _emb = amo_resp_json3.get("_embedded")
                     if _emb.get("custom_fields"):
@@ -89,8 +90,9 @@ async def add_amo_install(amo_post_json, ref, platform, setting_info_id):
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(f'https://{ref}/api/v4/account') as resp:
                 amo_resp_json2 = await resp.json()
-            async with session.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp:
-                amo_resp_json3 = await resp.json()
+            async with session.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp3:
+                amo_resp_json3 = await resp3.json()
+                print(amo_resp_json3)
                 if amo_resp_json3.get("_embedded"):
                     _emb = amo_resp_json3.get("_embedded")
                     if _emb.get("custom_fields"):
