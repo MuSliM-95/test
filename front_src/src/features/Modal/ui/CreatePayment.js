@@ -302,7 +302,7 @@ class CreatePayment extends React.Component {
       okText: "Yes",
       cancelText: "No",
       onOk() {
-        handleState();
+        () => this.handleState();
       },
     });
   };
