@@ -301,7 +301,7 @@ class CreatePayment extends React.Component {
       content: "Are you sure you want to cancel?",
       okText: "Yes",
       cancelText: "No",
-      onOk() {
+      onOk: () => {
         this.handleState();
       },
     });
