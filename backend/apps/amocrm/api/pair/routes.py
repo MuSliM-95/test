@@ -187,6 +187,7 @@ async def sc_l(token: str):
         db_dict = dict(a_t)
         db_dict["active"] = True
 
+
         query = amo_install.update().where(amo_install.c.id == pair["amo_integration_id"]).values(db_dict)
         await database.execute(query)
 
