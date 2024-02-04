@@ -31,20 +31,24 @@ async def update_amo_install(amo_post_json, ref, install, code):
     async with aiohttp.ClientSession() as session1:
         async with session1.post(f'https://{ref}/oauth2/access_token', json=amo_post_json) as resp:
             amo_resp_json1 = await resp.json()
-    if not install.field_id:
-        headers = {'Authorization': f'Bearer {install.access_token}'}
-        async with aiohttp.ClientSession(headers=headers) as session:
-            field_id = None
-            async with session.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp3:
-                amo_resp_json3 = await resp3.json()
-                print(amo_resp_json3)
-                if amo_resp_json3.get("_embedded"):
-                    _emb = amo_resp_json3.get("_embedded")
-                    if _emb.get("custom_fields"):
-                        for custom_field in amo_resp_json3["_embedded"]["custom_fields"]:
-                            if custom_field["name"] == "Телефон":
-                                field_id = int(custom_field["id"])
-            amo_db_data["field_id"] = field_id
+
+    amo_token = amo_resp_json1.get("access_token")
+
+    if amo_token:
+        if not install.field_id:
+            headers = {'Authorization': f'Bearer {amo_token}'}
+            async with aiohttp.ClientSession(headers=headers) as session:
+                field_id = None
+                async with session.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp3:
+                    amo_resp_json3 = await resp3.json()
+                    print(amo_resp_json3)
+                    if amo_resp_json3.get("_embedded"):
+                        _emb = amo_resp_json3.get("_embedded")
+                        if _emb.get("custom_fields"):
+                            for custom_field in amo_resp_json3["_embedded"]["custom_fields"]:
+                                if custom_field["name"] == "Телефон":
+                                    field_id = int(custom_field["id"])
+                amo_db_data["field_id"] = field_id
 
     timestamp = int(datetime.utcnow().timestamp())
 
