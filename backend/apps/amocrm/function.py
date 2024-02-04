@@ -31,9 +31,11 @@ async def update_amo_install(amo_post_json, ref, install, code):
     async with aiohttp.ClientSession() as session1:
         async with session1.post(f'https://{ref}/oauth2/access_token', json=amo_post_json) as resp:
             amo_resp_json1 = await resp.json()
-        if not install.field_id:
+    if not install.field_id:
+        headers = {'Authorization': f'Bearer {install.access_token}'}
+        async with aiohttp.ClientSession(headers=headers) as session:
             field_id = None
-            async with session1.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp3:
+            async with session.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp3:
                 amo_resp_json3 = await resp3.json()
                 print(amo_resp_json3)
                 if amo_resp_json3.get("_embedded"):
