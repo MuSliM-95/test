@@ -88,6 +88,7 @@ async def add_amo_install(amo_post_json, ref, platform, setting_info_id):
                 amo_resp_json2 = await resp.json()
             async with session.get(f'https://{ref}/api/v4/contacts/custom_fields') as resp:
                 amo_resp_json3 = await resp.json()
+                print(amo_resp_json3)
                 for custom_field in amo_resp_json3["_embedded"]["custom_fields"]:
                     if custom_field["name"] == "Телефон":
                         field_id = int(custom_field["id"])
