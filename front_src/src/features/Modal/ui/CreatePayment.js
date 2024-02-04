@@ -687,7 +687,6 @@ class CreatePayment extends React.Component {
           open={visible}
           width={550}
           title="Создание нового платежа"
-          maskClosable={false}
           destroyOnClose={true}
           onCancel={this.handleCancel}
           footer={null}
