@@ -283,4 +283,4 @@ async def get_nomenclature(
         item['pictures'] = pictures_db
 
 
-    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
+    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}, pictures_db
