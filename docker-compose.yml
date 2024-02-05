@@ -64,7 +64,7 @@ services:
       - /certbot/www:/var/www/certbot/:ro
       - /etc/letsencrypt/:/etc/nginx/ssl/:ro
       - /var/log:/var/log
-      - /var/www/app:/var/www/tablecrm-app
+      - /var/www/tablecrm-app:/var/www/app
       # - ./htpasswd:/etc/nginx/.htpasswd
       - /photos:/nginx/photos
     networks:
