@@ -65,6 +65,7 @@ services:
       - /etc/letsencrypt/:/etc/nginx/ssl/:ro
       - /var/log:/var/log
       - /var/www/tablecrm-app:/var/www/app
+      - /var/www/tablecrm-landing:/var/www/landing
       # - ./htpasswd:/etc/nginx/.htpasswd
       - /photos:/nginx/photos
     networks:

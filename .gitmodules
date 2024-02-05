@@ -1,6 +1,0 @@
-[submodule "submodule-docurus"]
-	path = submodule-docurus
-	url = ../../natfullin.ru/submodule-docurus.git
-[submodule "front-tablecrm-v2"]
-	path = front-tablecrm-v2
-	url = ../../tablecrm/front-tablecrm-v2
