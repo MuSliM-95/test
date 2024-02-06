@@ -1,6 +1,7 @@
 from typing import Optional
 import api.webapp.schemas as schemas
 from database.db import database, pictures, price_types, warehouse_balances, prices
+from api.nomenclature.routers import get_nomenclature
 from fastapi import APIRouter
 
 router = APIRouter(tags=["webapp"])
@@ -15,10 +16,8 @@ async def get_nomenclature(
 ):
     """Получение фотографий, цен и их видов, остатков и названия категорий"""
 
-    from api.nomenclature.routers import get_nomenclature
     response = await get_nomenclature(token, name, limit, offset)
     nomenclature_db = response['result']
-
 
     for item in nomenclature_db:
         query = pictures.select().where(pictures.c.entity_id == item['id'])
