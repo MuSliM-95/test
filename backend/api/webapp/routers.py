@@ -382,14 +382,14 @@ async def get_nomenclature(
         price_types_db = await database.fetch_all(query)
         item['price_types'] = price_types_db
 
-        query = prices.select().where(prices.c.nomenclature_id == item['id'])
-        prices_db = await database.fetch_all(query)
-        item['prices'] = prices_db
+        # query = prices.select().where(prices.c.nomenclature_id == item['id'])
+        # prices_db = await database.fetch_all(query)
+        # item['prices'] = prices_db
 
         query = warehouse_balances.select().where(warehouse_balances.c.nomenclature_id == item['id'])
         alt_warehouse_balances_db = await database.fetch_all(query)
         item['alt_warehouse_balances'] = alt_warehouse_balances_db
-        
+
 
 
 
