@@ -1,16 +1,9 @@
 from pydantic import BaseModel
 from typing import Optional, List
-
-
-class Item(BaseModel):
-    id: int
-    entity: str
-    entity_id: int
-    is_main: Optional[bool]
-    url: str
-    size: Optional[int]
-    updated_at: int
-    created_at: int
+from api.pictures.schemas import Picture
+from api.price_types.schemas import PriceType
+from api.prices.schemas import PriceInList
+from api.warehouse_balances.schemas import ViewAltList
 
 
 class NomenclatureCreate(BaseModel):
@@ -22,8 +15,21 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
-    pictures: Optional[List[Item]]
-    
+    pictures: Optional[List[Picture]]
+    price_types: Optional[List[PriceType]]
+    prices: Optional[List[PriceInList]]
+    alt_warehouse_balances: Optional[List[ViewAltList]]
+
+
+class NomenclatureGet(NomenclatureCreate):
+    id: int
+    unit_name: Optional[str]
+    updated_at: int
+    created_at: int
+
+    class Config:
+        orm_mode = True
+
 
 class NomenclatureListGetRes(BaseModel):
     result: Optional[List[NomenclatureCreate]]
