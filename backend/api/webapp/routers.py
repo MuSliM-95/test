@@ -271,7 +271,7 @@ async def get_nomenclature(
         pictures_db = await database.fetch_all(query)
         item['pictures'] = pictures_db
 
-        query = price_types.select().where(pictures.c.id == item['id'])
+        query = price_types.select().where(price_types.c.id == item['id'])
         price_types_db = await database.fetch_all(query)
         item['price_types'] = price_types_db
 
