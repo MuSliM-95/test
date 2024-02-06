@@ -6,14 +6,14 @@ from fastapi import APIRouter
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(
         token: str,
         name: Optional[str] = None,
         limit: int = 100,
         offset: int = 0
 ):
-    """А ну вот"""
+    """Получение фотографий, цен и их видов, остатков и названия категорий"""
 
     from api.nomenclature.routers import get_nomenclature
     response = await get_nomenclature(token, name, limit, offset)
