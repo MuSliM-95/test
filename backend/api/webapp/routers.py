@@ -31,27 +31,28 @@ async def get_nomenclature(
 ):
     """Получение фотографий, цен и их видов, остатков и названия категорий"""
 
-    # response = await get_nomenclature(token, name, limit, offset)
-    # nomenclature_db = response['result']
-    user = await get_user_by_token(token)
+    response = await get_nomenclature(token, name, limit, offset)
+    nomenclature_db = response['result']
 
-    filters = [
-        nomenclature.c.cashbox == user.cashbox_id,
-        nomenclature.c.is_deleted.is_not(True),
-    ]
-
-    if name:
-        filters.append(nomenclature.c.name.ilike(f"%{name}%"))
-
-    query = nomenclature.select().where(*filters).limit(limit).offset(offset)
-
-    nomenclature_db = await database.fetch_all(query)
-    nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
-    nomenclature_db = [*map(nomenclature_unit_id_to_name, nomenclature_db)]
-    nomenclature_db = [await inst for inst in nomenclature_db]
-
-    query = select(func.count(nomenclature.c.id)).where(*filters)
-    nomenclature_db_c = await database.fetch_one(query)
+    # user = await get_user_by_token(token)
+    #
+    # filters = [
+    #     nomenclature.c.cashbox == user.cashbox_id,
+    #     nomenclature.c.is_deleted.is_not(True),
+    # ]
+    #
+    # if name:
+    #     filters.append(nomenclature.c.name.ilike(f"%{name}%"))
+    #
+    # query = nomenclature.select().where(*filters).limit(limit).offset(offset)
+    #
+    # nomenclature_db = await database.fetch_all(query)
+    # nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+    # nomenclature_db = [*map(nomenclature_unit_id_to_name, nomenclature_db)]
+    # nomenclature_db = [await inst for inst in nomenclature_db]
+    #
+    # query = select(func.count(nomenclature.c.id)).where(*filters)
+    # nomenclature_db_c = await database.fetch_one(query)
 
     for item in nomenclature_db:
         query = pictures.select().where(pictures.c.entity_id == item['id'])
