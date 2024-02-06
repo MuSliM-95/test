@@ -25,11 +25,11 @@ class NomenclatureCreate(BaseModel):
     manufacturer: Optional[int]
     pictures: Optional[List[Item]]
     
-    
+
 
 
 
 class NomenclatureListGetRes(BaseModel):
-    result: str
-    # count: int
+    result: Optional[List[NomenclatureCreate]]
+    count: int
 
