@@ -278,9 +278,9 @@ async def get_nomenclature(
 
     for item in nomenclature_db:
         query = pictures.select().where(pictures.c.entity_id == item['id'])
-        print(item['id'])
+        # print(item['id'])
         pictures_db = await database.fetch_all(query)
         item['pictures'] = pictures_db
 
 
-    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
+    return {"result": "Привет"}

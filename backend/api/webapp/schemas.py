@@ -30,6 +30,6 @@ class NomenclatureCreate(BaseModel):
 
 
 class NomenclatureListGetRes(BaseModel):
-    result: Optional[List[NomenclatureCreate]]
-    count: int
+    result: str
+    # count: int
 
