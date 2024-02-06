@@ -3,7 +3,7 @@ from database.db import categories, database, manufacturers, nomenclature, price
 from functions.filter_schemas import PricesFiltersQuery
 from sqlalchemy import desc, case
 from database.db import database, warehouse_balances, warehouses, warehouse_register_movement, nomenclature, \
-    OperationType, organizations
+    OperationType, organizations, price_types
 from typing import Optional
 import api.nomenclature.schemas as schemas
 from database.db import categories, database, manufacturers, nomenclature, pictures
@@ -209,8 +209,7 @@ async def get_nomenclature(
         response_body = datetime_to_timestamp(response_body)
         response_body_list.append(response_body)
 
-    q = select(func.count(prices.c.id)).where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
-    prices_db_count = await database.fetch_one(q)
+
 
     #  remains(ost) xd
 
@@ -271,7 +270,12 @@ async def get_nomenclature(
         # print(item['id'])
         pictures_db = await database.fetch_all(query)
         item['pictures'] = pictures_db
+
+        query = price_types.select().where(pictures.c.id == item['id'])
+        price_types_db = await database.fetch_all(query)
         item['price_types'] = price_types_db
+
+        # item['prices'] = prices_db
 
 
 
