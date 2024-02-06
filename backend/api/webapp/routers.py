@@ -1,23 +1,12 @@
+from database.db import pictures, price_types, warehouse_balances, prices, nomenclature, database
 from typing import Optional
-from database.db import database, pictures, price_types, warehouse_balances, prices
-from api.nomenclature.routers import get_nomenclature
 from fastapi import APIRouter
-
-from typing import List, Optional
-
-import api.nomenclature.schemas as schemas
-from database.db import categories, database, manufacturers, nomenclature
-from fastapi import APIRouter, HTTPException
 from functions.helpers import (
-    check_entity_exists,
-    check_unit_exists,
     datetime_to_timestamp,
-    get_entity_by_id,
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
 from sqlalchemy import func, select
-from ws_manager import manager
 
 router = APIRouter(tags=["webapp"])
 
