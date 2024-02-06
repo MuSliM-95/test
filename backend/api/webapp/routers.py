@@ -104,16 +104,6 @@ async def get_nomenclature(
     price_types_db = await database.fetch_all(query)
     price_types_db = [*map(datetime_to_timestamp, price_types_db)]
 
-    query = (
-        select(func.count(price_types.c.id))
-        .where(
-            price_types.c.owner == user.id,
-            price_types.c.is_deleted.is_not(True),
-        )
-    )
-
-    price_types_db_count = await database.fetch_one(query)
-
     #  prices
 
     filters_nom = []
@@ -281,6 +271,8 @@ async def get_nomenclature(
         # print(item['id'])
         pictures_db = await database.fetch_all(query)
         item['pictures'] = pictures_db
+        item['price_types'] = price_types_db
+
 
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
