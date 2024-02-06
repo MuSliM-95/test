@@ -7,7 +7,7 @@ from fastapi import APIRouter
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=schemas.NomenclatureListGetRes)
+@router.get("/webapp/")
 async def get_nomenclature(
         token: str,
         name: Optional[str] = None,
