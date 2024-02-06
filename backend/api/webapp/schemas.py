@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 
+
 class Item(BaseModel):
     id: int
     entity: str
@@ -10,8 +11,6 @@ class Item(BaseModel):
     size: Optional[int]
     updated_at: int
     created_at: int
-
-
 
 
 class NomenclatureCreate(BaseModel):
@@ -25,9 +24,6 @@ class NomenclatureCreate(BaseModel):
     manufacturer: Optional[int]
     pictures: Optional[List[Item]]
     
-
-
-
 
 class NomenclatureListGetRes(BaseModel):
     result: Optional[List[NomenclatureCreate]]

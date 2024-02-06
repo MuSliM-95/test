@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=schemas.NomenclatureListGetRes)
+@router.get("/webapp/")
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -283,4 +283,4 @@ async def get_nomenclature(
         item['pictures'] = pictures_db
 
 
-    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
+    return pictures_db
