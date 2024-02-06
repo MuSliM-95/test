@@ -24,196 +24,34 @@ router = APIRouter(tags=["webapp"])
 @router.get("/webapp/")
 async def get_nomenclature(
         token: str,
-        warehouse_id: Optional[int] = None,
-        nomenclature_id: Optional[int] = None,
-        organization_id: Optional[int] = None,
-        date_from: Optional[int] = None,
-        date_to: Optional[int] = None,
         name: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0,
-        filter_pictures: PicturesFiltersQuery = Depends(),
-        filter_prices: PricesFiltersQuery = Depends(),
+        offset: int = 0
 ):
     """Получение категорий, фотографий, цен, остатков"""
-    user = await get_user_by_token(token)
+    # user = await get_user_by_token(token)
+    #
+    # filters = [
+    #     nomenclature.c.owner == user.id,
+    #     nomenclature.c.is_deleted.is_not(True),
+    # ]
+    #
+    # if name:
+    #     filters.append(nomenclature.c.name.ilike(f"%{name}%"))
+    #
+    # query = nomenclature.select().where(*filters).limit(limit).offset(offset)
+    #
+    # nomenclature_db = await database.fetch_all(query)
+    # nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+    # nomenclature_db = [*map(nomenclature_unit_id_to_name, nomenclature_db)]
+    # nomenclature_db = [await inst for inst in nomenclature_db]
+    #
+    # query = select(func.count(nomenclature.c.id)).where(*filters)
+    # nomenclature_db_c = await database.fetch_one(query)
 
-    #  category names
-
-    filters = [
-        nomenclature.c.owner == user.id,
-        nomenclature.c.is_deleted.is_not(True),
-    ]
-
-    if name:
-        filters.append(nomenclature.c.name.ilike(f"%{name}%"))
-
-    query = nomenclature.select().where(*filters).limit(limit).offset(offset)
-
-    nomenclature_db = await database.fetch_all(query)
-    nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
-    nomenclature_db = [*map(nomenclature_unit_id_to_name, nomenclature_db)]
-    nomenclature_db = [await inst for inst in nomenclature_db]
-
-    query = select(func.count(nomenclature.c.id)).where(*filters)
-    nomenclature_db_c = await database.fetch_one(query)
-
-    #  pictures
-
-    filters_list = []
-    if filter_pictures.entity:
-        filters_list.append(pictures.c.entity == filter_pictures.entity)
-    if filter_pictures.entity_id:
-        filters_list.append(pictures.c.entity_id == filter_pictures.entity_id)
-
-    query = (
-        pictures.select()
-        .where(
-            pictures.c.owner == user.id,
-            pictures.c.is_deleted.is_not(True),
-            *filters_list,
-        )
-        .limit(limit)
-        .offset(offset)
-    )
-
-    pictures_db = await database.fetch_all(query)
-    pictures_db = [*map(datetime_to_timestamp, pictures_db)]
-
-    query = (
-        select(func.count(pictures.c.id))
-        .where(
-            pictures.c.owner == user.id,
-            pictures.c.is_deleted.is_not(True),
-            *filters_list,
-        )
-    )
-
-    pictures_db_c = await database.fetch_one(query)
-
-    #  price_types
-
-    query = (
-        price_types.select()
-        .where(
-            price_types.c.owner == user.id,
-            price_types.c.is_deleted.is_not(True),
-        )
-        .limit(limit)
-        .offset(offset)
-    )
-
-    price_types_db = await database.fetch_all(query)
-    price_types_db = [*map(datetime_to_timestamp, price_types_db)]
-
-    #  prices
-
-    filters_nom = []
-    filters_price = []
-    if filter_prices.name:
-        filters_nom.append(nomenclature.c.name.ilike(f"%{filters.name}%"))
-    if filter_prices.type:
-        filters_nom.append(nomenclature.c.type == filter_prices.type)
-    if filter_prices.description_short:
-        filters_nom.append(nomenclature.c.description_short.ilike(f"%{filters.description_short}%"))
-    if filter_prices.description_long:
-        filters_nom.append(nomenclature.c.description_long.ilike(f"%{filters.description_long}%"))
-    if filter_prices.code:
-        filters_nom.append(nomenclature.c.code == filter_prices.code)
-    if filter_prices.unit:
-        filters_nom.append(nomenclature.c.unit == filters.unit)
-    if filter_prices.category:
-        filters_nom.append(nomenclature.c.category.in_(filter_prices.category.split(",")))
-    if filter_prices.manufacturer:
-        filters_nom.append(nomenclature.c.manufacturer == filter_prices.manufacturer)
-    if filter_prices.price_type_id:
-        filters_price.append(prices.c.price_type == filter_prices.price_type_id)
-    if filter_prices.date_from:
-        filters_price.append(prices.c.price_type >= filter_prices.date_from)
-    if filter_prices.date_to:
-        filters_price.append(prices.c.date_to <= filter_prices.date_to)
-
-    if limit == -1:
-        q = (
-            prices.select()
-            .where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
-            .order_by(desc(prices.c.id))
-        )
-        prices_db = await database.fetch_all(q)
-    else:
-        q = (
-            prices.select()
-            .where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
-            .order_by(desc(prices.c.id))
-            .limit(limit)
-            .offset(offset)
-        )
-        prices_db = await database.fetch_all(q)
-
-    response_body_list = []
-
-    for price_db in prices_db:
-        response_body = {**dict(price_db)}
-
-        response_body["id"] = price_db.id
-        response_body["price"] = price_db.price
-        response_body["date_to"] = price_db.date_to
-        response_body["date_from"] = price_db.date_from
-        response_body["updated_at"] = price_db.updated_at
-        response_body["created_at"] = price_db.created_at
-
-        q = nomenclature.select().where(
-            nomenclature.c.id == price_db.nomenclature,
-            nomenclature.c.owner == user.id,
-            nomenclature.c.is_deleted == False,
-            *filters_nom,
-        )
-        nom_db = await database.fetch_one(q)
-
-        if price_db.price_type:
-            q = price_types.select().where(price_types.c.id == price_db.price_type)
-            price_type = await database.fetch_one(q)
-
-            if price_type:
-                response_body["price_type"] = price_type.name
-
-        if nom_db:
-            response_body["nomenclature_id"] = nom_db.id
-            response_body["nomenclature_name"] = nom_db.name
-
-            if nom_db.unit:
-                q = units.select().where(units.c.id == nom_db.unit)
-                unit = await database.fetch_one(q)
-
-                if unit:
-                    response_body["unit"] = unit.id
-                    response_body["unit_name"] = unit.name
-
-                if nom_db.category:
-                    q = categories.select().where(categories.c.id == nom_db.category)
-                    category = await database.fetch_one(q)
-
-                    if category:
-                        response_body["category"] = category.id
-                        response_body["category_name"] = category.name
-
-                if nom_db.manufacturer:
-                    q = manufacturers.select().where(manufacturers.c.id == nom_db.manufacturer)
-                    manufacturer = await database.fetch_one(q)
-
-                    if manufacturer:
-                        response_body["manufacturer"] = manufacturer.id
-                        response_body["manufacturer_name"] = manufacturer.name
-
-        else:
-            continue
-
-        response_body = datetime_to_timestamp(response_body)
-        response_body_list.append(response_body)
-
-
-
-    #  remains(ost) xd
+    from api.nomenclature.routers import get_nomenclature
+    response = await get_nomenclature(token, name, limit, offset)
+    nomenclature_db = response['result']
 
 
     for item in nomenclature_db:
@@ -234,5 +72,4 @@ async def get_nomenclature(
         alt_warehouse_balances_db = await database.fetch_all(query)
         item['alt_warehouse_balances'] = alt_warehouse_balances_db
 
-
-    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
+    return {"result": nomenclature_db, "count": response['count']}
