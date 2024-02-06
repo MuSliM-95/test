@@ -1,5 +1,4 @@
 from typing import Optional
-import api.webapp.schemas as schemas
 from database.db import database, pictures, price_types, warehouse_balances, prices
 from api.nomenclature.routers import get_nomenclature
 from fastapi import APIRouter
