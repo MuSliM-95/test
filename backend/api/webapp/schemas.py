@@ -6,7 +6,8 @@ from api.prices.schemas import PriceInList
 from api.warehouse_balances.schemas import ViewAltList
 
 
-class NomenclatureCreate(BaseModel):
+class WebappItem(BaseModel):
+    id: int
     name: str
     type: Optional[str]
     description_short: Optional[str]
@@ -15,23 +16,16 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
+    updated_at: int
+    created_at: int
+    unit_name: Optional[str]
     pictures: Optional[List[Picture]]
     price_types: Optional[List[PriceType]]
     prices: Optional[List[PriceInList]]
     alt_warehouse_balances: Optional[List[ViewAltList]]
 
 
-class NomenclatureGet(NomenclatureCreate):
-    id: int
-    unit_name: Optional[str]
-    updated_at: int
-    created_at: int
-
-    class Config:
-        orm_mode = True
-
-
-class NomenclatureListGetRes(BaseModel):
-    result: Optional[List[NomenclatureCreate]]
+class WebappResponse(BaseModel):
+    result: Optional[List[WebappItem]]
     count: int
 

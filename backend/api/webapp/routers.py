@@ -7,11 +7,12 @@ from functions.helpers import (
     nomenclature_unit_id_to_name,
 )
 from sqlalchemy import func, select
+from api.webapp.schemas import WebappItem
 
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=WebappItem)
 async def get_nomenclature(
         token: str,
         name: Optional[str] = None,
