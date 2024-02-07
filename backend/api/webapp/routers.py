@@ -1,4 +1,4 @@
-from database.db import pictures, price_types, warehouse_balances, prices, nomenclature, database
+from database.db import (pictures, price_types, warehouse_balances, prices, nomenclature, database, warehouses)
 from typing import Optional
 from fastapi import APIRouter
 from functions.helpers import (
@@ -58,5 +58,9 @@ async def get_nomenclature(
         query = warehouse_balances.select().where(warehouse_balances.c.nomenclature_id == item['id'])
         alt_warehouse_balances_db = await database.fetch_all(query)
         item['alt_warehouse_balances'] = alt_warehouse_balances_db
+
+        query = warehouses.name.select().where(warehouses.c.id == item['id'])
+        warehouses_db = await database.fetch_all(query)
+        item['warehouse_name'] = warehouses_db
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
