@@ -12,7 +12,7 @@ from api.webapp.schemas import WebappItem
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=WebappItem)
+@router.get("/webapp/")
 async def get_nomenclature(
         token: str,
         name: Optional[str] = None,
