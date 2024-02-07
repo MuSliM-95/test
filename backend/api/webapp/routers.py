@@ -59,8 +59,8 @@ async def get_nomenclature(
         alt_warehouse_balances_db = await database.fetch_all(query)
         item['alt_warehouse_balances'] = alt_warehouse_balances_db
 
-        query = warehouses.name.select().where(warehouses.c.id == item['id'])
+        query = warehouses.select().where(warehouses.c.id == item['id'])
         warehouses_db = await database.fetch_all(query)
-        item['warehouse_name'] = warehouses_db
+        item['warehouses'] = warehouses_db
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
