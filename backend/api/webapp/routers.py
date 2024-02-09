@@ -19,7 +19,8 @@ async def get_nomenclature(
         name: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
-        filters_pictures: PicturesFiltersQuery = Depends(),
+        filter_pictures: PicturesFiltersQuery = Depends(),
+        filter_prices: PricesFiltersQuery = Depends(),
 ):
     """Получение фотографий, цен и их видов, остатков и названия категорий"""
 
@@ -44,14 +45,14 @@ async def get_nomenclature(
     nomenclature_db_c = await database.fetch_one(query)
 
     for item in nomenclature_db:
-        filters_pictures_list = []
-        if filters_pictures.entity:
-            filters_pictures_list.append(pictures.c.entity == filters_pictures.entity)
-        if filters_pictures.entity_id:
-            filters_pictures_list.append(pictures.c.entity_id == filters_pictures.entity_id)
+        filter_pictures_list = []
+        if filter_pictures.entity:
+            filter_pictures_list.append(pictures.c.entity == filter_pictures.entity)
+        if filter_pictures.entity_id:
+            filter_pictures_list.append(pictures.c.entity_id == filter_pictures.entity_id)
 
         query = pictures.select().where(pictures.c.entity_id == item['id'],
-                                        *filters_pictures_list)
+                                        *filter_pictures_list)
         pictures_db = await database.fetch_all(query)
         item['pictures'] = pictures_db
 
@@ -59,7 +60,32 @@ async def get_nomenclature(
         price_types_db = await database.fetch_all(query)
         item['price_types'] = price_types_db
 
-        query = prices.select().where(prices.c.nomenclature == item['id'])
+        filter_prices_nom = []
+        filter_prices_price = []
+        if filter_prices.name:
+            filter_prices_nom.append(nomenclature.c.name.ilike(f"%{filter_prices.name}%"))
+        if filter_prices.type:
+            filter_prices_nom.append(nomenclature.c.type == filter_prices.type)
+        if filter_prices.description_short:
+            filter_prices_nom.append(nomenclature.c.description_short.ilike(f"%{filter_prices.description_short}%"))
+        if filter_prices.description_long:
+            filter_prices_nom.append(nomenclature.c.description_long.ilike(f"%{filter_prices.description_long}%"))
+        if filter_prices.code:
+            filter_prices_nom.append(nomenclature.c.code == filter_prices.code)
+        if filter_prices.unit:
+            filter_prices_nom.append(nomenclature.c.unit == filter_prices.unit)
+        if filter_prices.category:
+            filter_prices_nom.append(nomenclature.c.category.in_(filter_prices.category.split(",")))
+        if filter_prices.manufacturer:
+            filter_prices_nom.append(nomenclature.c.manufacturer == filter_prices.manufacturer)
+        if filter_prices.price_type_id:
+            filter_prices_price.append(prices.c.price_type == filter_prices.price_type_id)
+        if filter_prices.date_from:
+            filter_prices_price.append(prices.c.price_type >= filter_prices.date_from)
+        if filter_prices.date_to:
+            filter_prices_price.append(prices.c.date_to <= filter_prices.date_to)
+        query = prices.select().where(prices.c.nomenclature == item['id'],
+                                      *filter_prices_price)
         prices_db = await database.fetch_all(query)
         item['prices'] = prices_db
 
