@@ -1,5 +1,7 @@
-from database.db import pictures, price_types, warehouse_balances, prices, nomenclature, database, warehouses
+from database.db import (pictures, price_types, warehouse_balances,
+                         prices, nomenclature, database, warehouses, warehouse_register_movement)
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends
 from functions.helpers import (
     datetime_to_timestamp,
@@ -16,7 +18,12 @@ router = APIRouter(tags=["webapp"])
 @router.get("/webapp/")
 async def get_nomenclature(
         token: str,
+        warehouse_id: Optional[int],
+        nomenclature_id: Optional[int] = None,
+        organization_id: Optional[int] = None,
         name: Optional[str] = None,
+        date_from: Optional[int] = None,
+        date_to: Optional[int] = None,
         limit: int = 100,
         offset: int = 0,
         filter_pictures: PicturesFiltersQuery = Depends(),
@@ -89,7 +96,22 @@ async def get_nomenclature(
         prices_db = await database.fetch_all(query)
         item['prices'] = prices_db
 
-        query = warehouse_balances.select().where(warehouse_balances.c.nomenclature_id == item['id'])
+        dates_arr = []
+        if date_to and not date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+        if date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+        if not date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+
+        selection_conditions = [warehouse_register_movement.c.warehouse_id == warehouse_id, *dates_arr]
+        if nomenclature_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
+        if organization_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
+        query = warehouse_balances.select().where(warehouse_balances.c.nomenclature_id == item['id'],
+                                                  *selection_conditions)
         alt_warehouse_balances_db = await database.fetch_all(query)
         item['alt_warehouse_balances'] = alt_warehouse_balances_db
 
