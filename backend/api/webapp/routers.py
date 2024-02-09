@@ -18,7 +18,7 @@ router = APIRouter(tags=["webapp"])
 @router.get("/webapp/")
 async def get_nomenclature(
         token: str,
-        warehouse_id: Optional[int],
+        warehouse_id: Optional[int] = None,
         nomenclature_id: Optional[int] = None,
         organization_id: Optional[int] = None,
         name: Optional[str] = None,
