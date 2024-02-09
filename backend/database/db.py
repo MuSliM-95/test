@@ -1153,6 +1153,7 @@ amo_lead_statuses = sqlalchemy.Table(
 
 amo_install_settings = sqlalchemy.Table(
     "amo_install_settings",
+    metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
     sqlalchemy.Column("contacts", Boolean, server_default="false"),
