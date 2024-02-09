@@ -1,4 +1,4 @@
-from database.db import (pictures, price_types, warehouse_balances, prices, nomenclature, database, warehouses)
+from database.db import pictures, price_types, warehouse_balances, prices, nomenclature, database, warehouses
 from typing import Optional
 from fastapi import APIRouter, Depends
 from functions.helpers import (
@@ -93,7 +93,16 @@ async def get_nomenclature(
         alt_warehouse_balances_db = await database.fetch_all(query)
         item['alt_warehouse_balances'] = alt_warehouse_balances_db
 
-        query = warehouses.select().where(warehouses.c.id == item['id'])
+        filter_warehouses = [
+            warehouses.c.cashbox == user.cashbox_id,
+            warehouses.c.is_deleted.is_not(True),
+        ]
+        if name:
+            filter_warehouses.append(
+                warehouses.c.name.ilike(f"%{name}%"),
+            )
+        query = warehouses.select().where(warehouses.c.id == item['id'],
+                                          *filter_warehouses)
         warehouses_db = await database.fetch_all(query)
         item['warehouses'] = warehouses_db
 
