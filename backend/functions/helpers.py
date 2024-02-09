@@ -377,7 +377,7 @@ async def add_nomenclature_count(instance: Optional[Record]) -> Optional[dict]:
 
         if goods:
             instance["nomenclature_count"] = len(goods)
-            instance["doc_discount"] = round(sum([good.sum_discounted for good in goods]), 2)
+            instance["doc_discount"] = round(sum([(0 if not good.sum_discounted else good.sum_discounted) for good in goods]), 2)
         else:
             instance["nomenclature_count"] = 0
             instance["doc_discount"] = 0

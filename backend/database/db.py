@@ -583,20 +583,18 @@ amo_install = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("code", String),
-    sqlalchemy.Column("last_code", Integer),
     sqlalchemy.Column("referrer", String),
     sqlalchemy.Column("platform", Integer),
     sqlalchemy.Column("amo_account_id", Integer),
     sqlalchemy.Column("client_id", String),
     sqlalchemy.Column("client_secret", String),
-    sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
     sqlalchemy.Column("refresh_token", String),
     sqlalchemy.Column("access_token", String),
     sqlalchemy.Column("pair_token", String),
     sqlalchemy.Column("expires_in", Integer),
     sqlalchemy.Column("active", Boolean),
-    sqlalchemy.Column("created_at", Integer),
-    sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("field_id", Integer),
 )
 
@@ -1117,6 +1115,49 @@ amo_table_contacts = sqlalchemy.Table(
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
     extend_existing=True
+)
+
+amo_lead_pipelines = sqlalchemy.Table(
+    "amo_lead_pipelines",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
+    sqlalchemy.Column("amo_id", Integer),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("sort", Integer),
+    sqlalchemy.Column("is_main", Boolean),
+    sqlalchemy.Column("is_unsorted_on", Boolean),
+    sqlalchemy.Column("is_archive", Boolean),
+    sqlalchemy.Column("account_id", Integer),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    extend_existing=True
+)
+
+amo_lead_statuses = sqlalchemy.Table(
+    "amo_lead_statuses",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("sort", Integer),
+    sqlalchemy.Column("is_editable", Boolean),
+    sqlalchemy.Column("pipeline_id", Integer, ForeignKey("amo_lead_pipelines.id")),
+    sqlalchemy.Column("amo_id", Integer),
+    sqlalchemy.Column("color", String),
+    sqlalchemy.Column("type", Integer),
+    sqlalchemy.Column("account_id", Integer),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    extend_existing=True
+)
+
+amo_install_settings = sqlalchemy.Table(
+    "amo_install_settings",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
+    sqlalchemy.Column("contacts", Boolean, server_default="false"),
+    sqlalchemy.Column("leads", Boolean, server_default="false"),
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"
