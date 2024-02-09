@@ -1,12 +1,13 @@
 from database.db import (pictures, price_types, warehouse_balances, prices, nomenclature, database, warehouses)
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from functions.helpers import (
     datetime_to_timestamp,
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
 from sqlalchemy import func, select
+from functions.filter_schemas import *
 from api.webapp.schemas import WebappItem
 
 router = APIRouter(tags=["webapp"])
@@ -17,7 +18,8 @@ async def get_nomenclature(
         token: str,
         name: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        filters_pictures: PicturesFiltersQuery = Depends(),
 ):
     """Получение фотографий, цен и их видов, остатков и названия категорий"""
 
@@ -42,8 +44,14 @@ async def get_nomenclature(
     nomenclature_db_c = await database.fetch_one(query)
 
     for item in nomenclature_db:
-        query = pictures.select().where(pictures.c.entity_id == item['id'])
-        # print(item['id'])
+        filters_pictures_list = []
+        if filters_pictures.entity:
+            filters_pictures_list.append(pictures.c.entity == filters_pictures.entity)
+        if filters_pictures.entity_id:
+            filters_pictures_list.append(pictures.c.entity_id == filters_pictures.entity_id)
+
+        query = pictures.select().where(pictures.c.entity_id == item['id'],
+                                        *filters_pictures_list)
         pictures_db = await database.fetch_all(query)
         item['pictures'] = pictures_db
 
