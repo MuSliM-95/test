@@ -14,6 +14,7 @@ class AmoCRMAuthenticationResult:
         headers = {'Authorization': f'Bearer {self.access_token}'}
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(custom_fields_url) as response:
+                print(await response.text())
                 data = await response.json()
                 if data.get("_embedded"):
                     _emb = data.get("_embedded")
