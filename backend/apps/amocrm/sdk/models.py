@@ -9,6 +9,7 @@ class AmoCRMAuthenticationResult:
         self.refresh_token = refresh_token
 
     async def get_custom_contact_phone_field(self) -> int:
+
         field_id = None
         custom_fields_url = f'https://{self.amo_domain}/api/v4/contacts/custom_fields'
         headers = {'Authorization': f'Bearer {self.access_token}'}
