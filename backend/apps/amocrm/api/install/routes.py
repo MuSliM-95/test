@@ -34,7 +34,8 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                                               setting_info.redirect_uri, referer)
             amo_crm_install = await amocrm_auth.authenticate(code)
 
-            field_id, account_id = await amo_crm_install.get_custom_contact_phone_field()
+            field_id = await amo_crm_install.get_custom_contact_phone_field()
+            account_info = await amo_crm_install.get_account_info()
             if install and not install_active:
                 query = amo_install.update().where(amo_install.c.referrer == referer)
             else:
@@ -43,7 +44,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                 code=code,
                 referrer=referer,
                 platform=platform,
-                amo_account_id=account_id,
+                amo_account_id=account_info["id"],
                 client_id=client_id,
                 client_secret=setting_info.client_secret,
                 refresh_token=amo_crm_install.refresh_token,
