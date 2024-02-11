@@ -4,6 +4,7 @@ from api.pictures.schemas import Picture
 from api.price_types.schemas import PriceType
 from api.prices.schemas import PriceInList
 from api.warehouse_balances.schemas import ViewAltList
+from api.warehouses.schemas import Warehouse
 
 
 class WebappItem(BaseModel):
@@ -23,6 +24,7 @@ class WebappItem(BaseModel):
     price_types: Optional[List[PriceType]]
     prices: Optional[List[PriceInList]]
     alt_warehouse_balances: Optional[List[ViewAltList]]
+    warehouses: Optional[List[Warehouse]]
 
 
 class WebappResponse(BaseModel):
