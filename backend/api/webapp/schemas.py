@@ -1,9 +1,23 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from api.pictures.schemas import Picture
-from api.price_types.schemas import PriceType
-from api.prices.schemas import PriceInList
-from api.warehouse_balances.schemas import ViewAltList
+# from api.pictures.schemas import Picture
+# from api.price_types.schemas import PriceType
+# from api.prices.schemas import PriceInList
+# from api.warehouse_balances.schemas import ViewAltList
+
+
+class Picture(BaseModel):
+    id: int
+    entity: str
+    entity_id: int
+    is_main: Optional[bool]
+    url: str
+    size: Optional[int]
+    updated_at: int
+    created_at: int
+
+    class Config:
+        orm_mode = True
 
 
 class WebappItem(BaseModel):
@@ -20,9 +34,9 @@ class WebappItem(BaseModel):
     created_at: int
     unit_name: Optional[str]
     pictures: Optional[List[Picture]]
-    price_types: Optional[List[PriceType]]
-    prices: Optional[List[PriceInList]]
-    alt_warehouse_balances: Optional[List[ViewAltList]]
+    # price_types: Optional[List[PriceType]]
+    # prices: Optional[List[PriceInList]]
+    # alt_warehouse_balances: Optional[List[ViewAltList]]
 
 
 class WebappResponse(BaseModel):
