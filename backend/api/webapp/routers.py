@@ -66,10 +66,13 @@ async def get_nomenclature(
         pictures_db = [*map(datetime_to_timestamp, pictures_db)]
         item['pictures'] = pictures_db
 
-        # query = price_types.select().where(price_types.c.id == item['id'])
-        # price_types_db = await database.fetch_all(query)
-        # item['price_types'] = price_types_db
-        #
+        query = price_types.select().where(price_types.c.id == item['id'],
+                                           price_types.c.owner == user.id,
+                                           price_types.c.is_deleted.is_not(True))
+        price_types_db = await database.fetch_all(query)
+        price_types_db = [*map(datetime_to_timestamp, price_types_db)]
+        item['price_types'] = price_types_db
+
         # filter_prices_nom = []
         # filter_prices_price = []
         # if filter_prices.name:
@@ -118,17 +121,18 @@ async def get_nomenclature(
         # alt_warehouse_balances_db = await database.fetch_all(query)
         # item['alt_warehouse_balances'] = alt_warehouse_balances_db
         #
-        # filter_warehouses = [
-        #     warehouses.c.cashbox == user.cashbox_id,
-        #     warehouses.c.is_deleted.is_not(True),
-        # ]
-        # if name:
-        #     filter_warehouses.append(
-        #         warehouses.c.name.ilike(f"%{name}%"),
-        #     )
-        # query = warehouses.select().where(warehouses.c.id == item['id'],
-        #                                   *filter_warehouses)
-        # warehouses_db = await database.fetch_all(query)
-        # item['warehouses'] = warehouses_db
+        filter_warehouses = [
+            warehouses.c.cashbox == user.cashbox_id,
+            warehouses.c.is_deleted.is_not(True),
+        ]
+        if name:
+            filter_warehouses.append(
+                warehouses.c.name.ilike(f"%{name}%"),
+            )
+        query = warehouses.select().where(warehouses.c.id == item['id'],
+                                          *filter_warehouses)
+        warehouses_db = await database.fetch_all(query)
+        warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
+        item['warehouses'] = warehouses_db
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
