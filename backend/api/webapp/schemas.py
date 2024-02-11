@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from api.pictures.schemas import *
-from api.price_types.schemas import *
-from api.prices.schemas import *
-from api.warehouse_balances.schemas import *
+from api.pictures.schemas import Picture
+from api.price_types.schemas import PriceType
+from api.prices.schemas import PriceInList
+from api.warehouse_balances.schemas import ViewAltList
 
 
 class WebappItem(BaseModel):
