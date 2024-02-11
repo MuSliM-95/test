@@ -10,12 +10,12 @@ from functions.helpers import (
 )
 from sqlalchemy import func, select
 from functions.filter_schemas import *
-from api.webapp.schemas import WebappItem
+from api.webapp.schemas import WebappResponse
 
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=List[WebappItem])
+@router.get("/webapp/", response_model=WebappResponse)
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
