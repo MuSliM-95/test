@@ -192,14 +192,14 @@ async def get_prices(
     if limit == -1:
         q = (
             prices.select()
-            .where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
+            .where(prices.c.owner == user.id, prices.c.is_deleted is False, *filters_price)
             .order_by(desc(prices.c.id))
         )
         prices_db = await database.fetch_all(q)
     else:
         q = (
             prices.select()
-            .where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
+            .where(prices.c.owner == user.id, prices.c.is_deleted is False, *filters_price)
             .order_by(desc(prices.c.id))
             .limit(limit)
             .offset(offset)
@@ -221,7 +221,7 @@ async def get_prices(
         q = nomenclature.select().where(
             nomenclature.c.id == price_db.nomenclature,
             nomenclature.c.owner == user.id,
-            nomenclature.c.is_deleted == False,
+            nomenclature.c.is_deleted is False,
             *filters_nom,
         )
         nom_db = await database.fetch_one(q)
@@ -267,7 +267,7 @@ async def get_prices(
         response_body = datetime_to_timestamp(response_body)
         response_body_list.append(response_body)
 
-    q = select(func.count(prices.c.id)).where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
+    q = select(func.count(prices.c.id)).where(prices.c.owner == user.id, prices.c.is_deleted is False, *filters_price)
     prices_db_count = await database.fetch_one(q)
 
     return {"result": response_body_list, "count": prices_db_count.count_1}
