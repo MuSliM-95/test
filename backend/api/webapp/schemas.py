@@ -19,10 +19,10 @@ class WebappItem(BaseModel):
     updated_at: int
     created_at: int
     unit_name: Optional[str]
-    pictures: Optional[List[Picture]]
-    price_types: Optional[List[PriceType]]
-    prices: Optional[List[PriceInList]]
-    alt_warehouse_balances: Optional[List[ViewAltList]]
+    # pictures: Optional[List[Picture]]
+    # price_types: Optional[List[PriceType]]
+    # prices: Optional[List[PriceInList]]
+    # alt_warehouse_balances: Optional[List[ViewAltList]]
 
 
 class WebappResponse(BaseModel):
