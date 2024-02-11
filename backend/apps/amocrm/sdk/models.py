@@ -8,9 +8,9 @@ class AmoCRMAuthenticationResult:
         self.amo_domain = amo_domain
         self.refresh_token = refresh_token
 
-    async def get_custom_contact_phone_field(self) -> dict:
+    async def get_custom_contact_phone_field(self) -> int:
         field_id = None
-        custom_fields_url = f'https://{self.amo_domain}.amocrm.ru/v4/contacts/custom_fields'
+        custom_fields_url = f'https://{self.amo_domain}/api/v4/contacts/custom_fields'
         headers = {'Authorization': f'Bearer {self.access_token}'}
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(custom_fields_url) as response:
@@ -24,7 +24,7 @@ class AmoCRMAuthenticationResult:
                 return field_id
 
     async def get_account_info(self) -> dict:
-        account_info_url = f'https://{self.amo_domain}/api/v4/contacts/custom_fields'
+        account_info_url = f'https://{self.amo_domain}/api/v4/account'
         headers = {'Authorization': f'Bearer {self.access_token}'}
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(account_info_url) as response:

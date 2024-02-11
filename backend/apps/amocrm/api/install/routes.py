@@ -92,7 +92,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
         query = query.values(amo_install_settings_dict_values)
         await database.execute(query)
 
-        await add_job_compare(referer, install.id, setting_info.load_type_id)
+        await add_job_compare(referer, install_id, setting_info.load_type_id)
 
 
 @router.get("/amo_disconnect")

@@ -28,7 +28,7 @@ class AmoCRMRefreshToken(AmoCRMAuthenticationService):
             'redirect_uri': self.redirect_uri,
         }
 
-        async with self.http_client.post(f'https://{self.amo_domain}.amocrm.ru/oauth2/access_token',
+        async with self.http_client.post(f'https://{self.amo_domain}/oauth2/access_token',
                                          json=params) as response:
             data = await response.json()
             if 'access_token' in data:
@@ -55,7 +55,8 @@ class AmoCRMAuthenticator(AmoCRMAuthenticationService):
             'redirect_uri': self.redirect_uri,
         }
 
-        async with self.http_client.post(f'https://{self.amo_domain}.amocrm.ru/oauth2/access_token',
+        print(f'https://{self.amo_domain}/oauth2/access_token')
+        async with self.http_client.post(f'https://{self.amo_domain}/oauth2/access_token',
                                          json=params) as response:
             data = await response.json()
             if 'access_token' in data:
