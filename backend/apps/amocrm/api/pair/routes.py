@@ -7,6 +7,7 @@ from datetime import datetime
 from jobs import scheduler
 from functions.helpers import gen_token
 
+
 from database.db import database, amo_install, amo_install_table_cashboxes, users_cboxes_relation
 
 router = APIRouter(tags=["amocrm"])

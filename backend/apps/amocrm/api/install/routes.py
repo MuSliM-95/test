@@ -4,6 +4,7 @@ import aiohttp
 from fastapi import HTTPException, APIRouter
 from starlette import status
 
+
 from apps.amocrm.function import refresh_token, add_job_compare
 from apps.amocrm.sdk.oauth import AmoCRMAuthenticator
 from database.db import amo_install, database, amo_settings, amo_install_table_cashboxes, users_cboxes_relation, \
