@@ -28,7 +28,6 @@ class AmoCRMRefreshToken(AmoCRMAuthenticationService):
             'redirect_uri': self.redirect_uri,
         }
 
-
         async with self.http_client.post(f'https://{self.amo_domain}/oauth2/access_token',
                                          json=params) as response:
             data = await response.json()
