@@ -1,6 +1,6 @@
 from database.db import (pictures, price_types, warehouse_balances, categories,
                          prices, nomenclature, database, warehouses, manufacturers,
-                         warehouse_register_movement, units,)
+                         warehouse_register_movement, units, organizations)
 from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends
@@ -9,7 +9,7 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select, desc
+from sqlalchemy import func, select, desc, case
 from functions.filter_schemas import *
 import api.webapp.schemas as schemas
 
@@ -98,10 +98,9 @@ async def get_nomenclature(
             filter_prices_price.append(prices.c.price_type >= filter_prices.date_from)
         if filter_prices.date_to:
             filter_prices_price.append(prices.c.date_to <= filter_prices.date_to)
-        query = prices.select().where(prices.c.nomenclature == item['id'],
-                                      *filter_prices_price)
         q = (prices.select()
-             .where(prices.c.owner == user.id, prices.c.is_deleted is False, *filter_prices_price)
+             .where(prices.c.nomenclature == item['id'],
+                    prices.c.owner == user.id, prices.c.is_deleted is False, *filter_prices_price)
              .order_by(desc(prices.c.id))
              )
         prices_db = await database.fetch_all(q)
@@ -167,25 +166,159 @@ async def get_nomenclature(
             response_body_list.append(response_body)
         item['prices'] = response_body_list
 
+        dates_arr = []
+        if date_to and not date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+        if date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+        if not date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
 
-        # dates_arr = []
-        # if date_to and not date_from:
-        #     dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
-        # if date_to and date_from:
-        #     dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
-        #     dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
-        # if not date_to and date_from:
-        #     dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
-        #
-        # selection_conditions = [warehouse_register_movement.c.warehouse_id == warehouse_id, *dates_arr]
-        # if nomenclature_id is not None:
-        #     selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
-        # if organization_id is not None:
-        #     selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
-        # query = warehouse_balances.select().where(warehouse_balances.c.nomenclature_id == item['id'],
-        #                                           *selection_conditions)
-        # alt_warehouse_balances_db = await database.fetch_all(query)
-        # item['alt_warehouse_balances'] = alt_warehouse_balances_db
+        selection_conditions = [warehouse_register_movement.c.warehouse_id == warehouse_id, *dates_arr]
+        if nomenclature_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
+        if organization_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
+        q = case(
+            [
+                (
+                    warehouse_register_movement.c.type_amount == 'minus',
+                    warehouse_register_movement.c.amount * (-1)
+                )
+            ],
+            else_=warehouse_register_movement.c.amount
+
+        )
+        query = (
+            select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.category,
+                warehouse_register_movement.c.organization_id,
+                warehouse_register_movement.c.warehouse_id,
+                func.sum(q).label("current_amount"))
+            .where(*selection_conditions)
+            .limit(limit)
+            .offset(offset)
+        ).group_by(
+            nomenclature.c.name,
+            nomenclature.c.id,
+            warehouse_register_movement.c.organization_id,
+            warehouse_register_movement.c.warehouse_id
+        ) \
+            .select_from(warehouse_register_movement
+                         .join(nomenclature,
+                               warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                               ))
+
+        warehouse_balances_db = await database.fetch_all(query)
+
+        selection_conditions = [warehouse_register_movement.c.warehouse_id == warehouse_id]
+        if nomenclature_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
+        if organization_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
+        q = case(
+            [
+                (
+                    warehouse_register_movement.c.type_amount == 'minus',
+                    warehouse_register_movement.c.amount * (-1)
+                )
+            ],
+            else_=warehouse_register_movement.c.amount
+
+        )
+        query = (
+            select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.category,
+                warehouse_register_movement.c.organization_id,
+                warehouse_register_movement.c.warehouse_id,
+                func.sum(q).label("current_amount"))
+            .where(*selection_conditions)
+            .limit(limit)
+            .offset(offset)
+        ).group_by(
+            nomenclature.c.name,
+            nomenclature.c.id,
+            warehouse_register_movement.c.organization_id,
+            warehouse_register_movement.c.warehouse_id
+        ) \
+            .select_from(warehouse_register_movement
+                         .join(nomenclature,
+                               warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                               ))
+
+        warehouse_balances_db_curr = await database.fetch_all(query)
+
+        # warehouse_balances_db = [*map(datetime_to_timestamp, warehouse_balances_db)]
+        res = []
+
+        categories_db = await database.fetch_all(categories.select())
+
+        res_with_cats = []
+
+        for warehouse_balance in warehouse_balances_db:
+
+            current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
+
+            balance_dict = dict(warehouse_balance)
+
+            organization_db = await database.fetch_one(
+                organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
+            warehouse_db = await database.fetch_one(
+                warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id))
+
+            plus_amount = 0
+            minus_amount = 0
+
+            register_q = warehouse_register_movement.select().where(
+                warehouse_register_movement.c.warehouse_id == warehouse_id,
+                warehouse_register_movement.c.nomenclature_id == warehouse_balance.id,
+                *dates_arr
+            ) \
+                .order_by(warehouse_register_movement.c.id)
+
+            register_events = await database.fetch_all(register_q)
+
+            for reg_event in register_events:
+                if reg_event.type_amount == "plus":
+                    plus_amount += reg_event.amount
+                else:
+                    minus_amount += reg_event.amount
+
+            balance_dict['now_ost'] = current[0].current_amount
+            balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
+            balance_dict['plus_amount'] = plus_amount
+            balance_dict['minus_amount'] = minus_amount
+            balance_dict['organization_name'] = organization_db.short_name
+            balance_dict['warehouse_name'] = warehouse_db.name
+
+            res.append(balance_dict)
+
+        for category in categories_db:
+            cat_childrens = [item for item in res if item['category'] == category.id]
+
+            if len(cat_childrens) > 0:
+                res_with_cats.append(
+                    {
+                        "name": category.name,
+                        "key": category.id,
+                        "children": cat_childrens
+                    }
+                )
+
+        none_childrens = [item for item in res if item['category'] == None]
+        res_with_cats.append(
+            {
+                "name": "Без категории",
+                "key": 0,
+                "children": none_childrens
+            }
+        )
+        item['alt_warehouse_balances'] = res_with_cats
 
         filter_warehouses = [
             warehouses.c.cashbox == user.cashbox_id,
