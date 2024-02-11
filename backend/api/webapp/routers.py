@@ -15,7 +15,7 @@ from api.webapp.schemas import WebappItem
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=List[WebappItem])
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
