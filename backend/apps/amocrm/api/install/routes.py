@@ -180,5 +180,3 @@ async def sc_l(account_id: int, client_uuid: str):
         await database.execute(query)
 
         await add_job_compare(a_t.referrer, a_t.id, setting_info.load_type_id)
-
-
