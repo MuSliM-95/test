@@ -29,8 +29,19 @@ async def sync_contacts(amo_install_id: int):
                                                         amo_install_info["referrer"],
                                                         timestamp_last_contact,
                                                         page)
+            print("------")
+            print(amo_contacts_list)
+            print("------")
             amo_contacts_list_prepared = await prepare_contacts_list(amo_contacts_list, amo_install_id)
+            print("------")
+            print(amo_contacts_list_prepared)
+            print("------")
             exist_contacts, new_contacts = await split_contacts(amo_contacts_list_prepared)
+            print("СУЩЕСТВУЮЩИЕ")
+            print(exist_contacts)
+            print("НОВЫЕ")
+            print(new_contacts)
+            print("СОХРАНЕНИЕ")
             await save_exist_contacts(exist_contacts)
             await save_new_contacts(new_contacts)
             page += 1

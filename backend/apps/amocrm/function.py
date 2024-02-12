@@ -21,8 +21,6 @@ async def add_job_compare(amo_install_id: int, referrer: str):
         amo_install_setting_dict.pop("id")
         amo_install_setting_dict.pop("amo_install_id")
 
-        print(amo_install_setting_dict)
-
         for key in amo_install_setting_dict:
             if amo_install_setting_dict.get(key):
                 if key == "contacts":
@@ -38,9 +36,7 @@ async def add_job_compare(amo_install_id: int, referrer: str):
                 elif key == "leads":
                     pass
             else:
-                print(key)
                 if scheduler.get_job(f"sync_{key}_{referrer}"):
-                    print("FALSE")
                     scheduler.remove_job(f"sync_{key}_{referrer}")
 
 
