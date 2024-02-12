@@ -105,8 +105,8 @@ async def get_nomenclature(
 
         response_body_list = []
         for price_db in prices_db:
-            if price_db.nomenclature != item['id']:
-                continue
+            # if price_db.nomenclature != item['id']:
+            #     continue
             response_body = {**dict(price_db)}
 
             response_body["id"] = price_db.id
