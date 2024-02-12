@@ -143,25 +143,24 @@ async def sc_l(account_id: int, client_uuid: str):
 
     if flag:
 
-        db_dict = {"active": False, "updated_at": int(datetime.utcnow().timestamp())}
+        db_dict = {"active": False}
 
-        query = amo_install.update().where(
-            amo_install.c.amo_account_id == account_id and amo_install.c.client_id == client_uuid).values(db_dict)
+        query = amo_install.update().where(amo_install.c.id == a_t.id).values(db_dict)
         await database.execute(query)
 
         integration_dict = {"status": False, "updated_at": int(datetime.utcnow().timestamp())}
 
         query = amo_install_table_cashboxes.update().where(
-            amo_install_table_cashboxes.c.amo_integration_id == a_t["id"]).values(integration_dict)
+            amo_install_table_cashboxes.c.amo_integration_id == a_t.id).values(integration_dict)
         await database.execute(query)
 
         query = amo_install_table_cashboxes.select().where(
-            amo_install_table_cashboxes.c.amo_integration_id == a_t["id"])
+            amo_install_table_cashboxes.c.amo_integration_id == a_t.id)
         relship = await database.fetch_one(query)
 
         if relship:
             query = users_cboxes_relation.select().where(
-                users_cboxes_relation.c.cashbox_id == relship["cashbox_id"])
+                users_cboxes_relation.c.cashbox_id == relship.cashbox_id)
             cashboxes = await database.fetch_all(query)
 
             for cashbox in cashboxes:
@@ -169,8 +168,8 @@ async def sc_l(account_id: int, client_uuid: str):
                                            {"action": "paired", "target": "integrations",
                                             "integration_status": False})
 
-        if scheduler.get_job(db_dict["referrer"]):
-            scheduler.remove_job(db_dict["referrer"])
+        if scheduler.get_job(a_t.referrer):
+            scheduler.remove_job(a_t.referrer)
 
         return {"status": "amo token disconnected succesfully!"}
 
