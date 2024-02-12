@@ -105,7 +105,27 @@ async def sc_l(account_id: int, client_uuid: str):
     if not a_t:
         return {"result": "amo token does not connected!"}
 
-    query = amo_install_settings.select().where(amo_install_settings.c.amo_install_id == a_t.id)
+    query = amo_settings.select().where(amo_settings.c.integration_id == client_uuid)
+    setting_info = await database.fetch_one(query)
+
+    query = amo_settings_load_types.select().where(amo_settings_load_types.c.id == setting_info.load_type_id)
+    amo_setting_load_type = await database.fetch_one(query)
+
+    amo_setting_load_type_dict = dict(amo_setting_load_type)
+    amo_setting_load_type_dict.pop("id")
+
+    amo_install_settings_dict_values = {}
+
+    for key in amo_setting_load_type_dict:
+        if amo_setting_load_type_dict.get(key):
+            amo_install_settings_dict_values[key] = not amo_setting_load_type_dict.get(key)
+
+    query = (
+        amo_install_settings.update()
+        .where(amo_install_settings.c.amo_install_id == a_t.id)
+        .values(amo_install_settings_dict_values)
+        .returning(amo_install_settings)
+    )
     amo_install_setting = await database.fetch_one(query)
 
     if not amo_install_setting:
@@ -152,32 +172,6 @@ async def sc_l(account_id: int, client_uuid: str):
         if scheduler.get_job(db_dict["referrer"]):
             scheduler.remove_job(db_dict["referrer"])
 
-        if scheduler.get_job(f"compare_contacts_{db_dict['referrer']}"):
-            scheduler.remove_job(f"compare_contacts_{db_dict['referrer']}")
-
         return {"status": "amo token disconnected succesfully!"}
 
-    else:
-
-        query = amo_settings.select().where(amo_settings.c.integration_id == client_uuid)
-        setting_info = await database.fetch_one(query)
-
-        query = amo_settings_load_types.select().where(amo_settings_load_types.c.id == setting_info.load_type_id)
-        amo_setting_load_type = await database.fetch_one(query)
-
-        amo_setting_load_type_dict = dict(amo_setting_load_type)
-        amo_setting_load_type_dict.pop("id")
-
-        amo_install_settings_dict_values = {}
-
-        for key in amo_setting_load_type_dict:
-            if amo_setting_load_type_dict.get(key):
-                amo_install_settings_dict_values[key] = not amo_setting_load_type_dict.get(key)
-
-        query = (
-            amo_install_settings.update()
-            .where(amo_install_settings.c.amo_install_id == a_t.id)
-            .values(amo_install_settings_dict_values))
-        await database.execute(query)
-
-        await add_job_compare(a_t.referrer, a_t.id, setting_info.load_type_id)
+    await add_job_compare(a_t.id, a_t.referrer)
