@@ -89,6 +89,7 @@ async def alt_get_warehouse_balances(
         selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
     if organization_id is not None:
         selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
+    await get_user_by_token(token)
     q = case(
         [
             (
@@ -130,6 +131,7 @@ async def alt_get_warehouse_balances(
         selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
     if organization_id is not None:
         selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
+    await get_user_by_token(token)
     q = case(
         [
             (

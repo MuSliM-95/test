@@ -98,10 +98,9 @@ async def get_nomenclature(
             filter_prices_price.append(prices.c.price_type >= filter_prices.date_from)
         if filter_prices.date_to:
             filter_prices_price.append(prices.c.date_to <= filter_prices.date_to)
-        q = (prices.select()
-             .where(prices.c.nomenclature == item['id'],
-                    prices.c.owner == user.id, prices.c.is_deleted is False, *filter_prices_price)
-             .order_by(desc(prices.c.id))
+        q = (prices.select().where(prices.c.nomenclature == item['id'],
+                                   prices.c.owner == user.id, prices.c.is_deleted is False, *filter_prices_price)
+                   .order_by(desc(prices.c.id))
              )
         prices_db = await database.fetch_all(q)
 
