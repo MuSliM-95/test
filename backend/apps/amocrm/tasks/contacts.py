@@ -207,11 +207,11 @@ async def load_amo_contacts(access_token: str, referrer: str, last_date_timestam
                         return resp_json["_embedded"]["contacts"]
                     else:
                         print(f"Failed to fetch contacts referrer: {referrer}, empty response")
-                elif "next" not in resp_json.get("_links", []):
-                    raise AmoApiPageIsEmpty
                 else:
                     print(f"Failed to fetch contacts referrer: {referrer}, empty response")
                     return []
+            elif contact_resp.status == 204:
+                raise AmoApiPageIsEmpty
 
 
 async def prepare_contacts_list(contacts_list, amo_install_id):
