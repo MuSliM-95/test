@@ -67,7 +67,9 @@ async def get_nomenclature(
         pictures_db = [*map(datetime_to_timestamp, pictures_db)]
         item['pictures'] = pictures_db
 
-        query = price_types.select().where(price_types.c.id == item['id'],
+        query = prices.select().where(prices.c.nomenclature_id == item['id'])
+        price_db = await database.fetch_one(query)
+        query = price_types.select().where(price_types.c.name == price_db.price_type,
                                            price_types.c.owner == user.id,
                                            price_types.c.is_deleted.is_not(True))
         price_types_db = await database.fetch_all(query)
