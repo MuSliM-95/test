@@ -24,14 +24,17 @@ async def sync_contacts(amo_install_id: int):
     page = 1
     while True:
         try:
-
-            timestamp_last_contact = await get_timestamp_last_contact(amo_install_id)
             print("----")
+            print(f"GET PAGE {page}")
+            timestamp_last_contact = await get_timestamp_last_contact(amo_install_id)
+
             print(timestamp_last_contact)
             amo_contacts_list = await load_amo_contacts(amo_install_info["access_token"],
                                                         amo_install_info["referrer"],
                                                         timestamp_last_contact,
                                                         page)
+            print("-----")
+            print(amo_contacts_list)
             amo_contacts_list_prepared = await prepare_contacts_list(amo_contacts_list, amo_install_id)
             exist_contacts, new_contacts = await split_contacts(amo_contacts_list_prepared)
             await save_exist_contacts(exist_contacts)
@@ -188,7 +191,7 @@ async def load_amo_contacts(access_token: str, referrer: str, last_date_timestam
         url = f"https://{referrer}/api/v4/contacts?page={page}&limit=250&order[updated_at]=asc"
         if last_date_timestamp:
             url += f"&filter[updated_at][from]={last_date_timestamp}"
-
+        print("GET: " + url)
         async with http_session.get(url) as contact_resp:
             print(await contact_resp.text())
             contact_resp.raise_for_status()
