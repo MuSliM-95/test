@@ -98,7 +98,7 @@ async def get_nomenclature(
             filter_prices_price.append(prices.c.price_type >= filter_prices.date_from)
         if filter_prices.date_to:
             filter_prices_price.append(prices.c.date_to <= filter_prices.date_to)
-        q = (prices.select().where(prices.c.nomenclature_id == item['id'],
+        q = (prices.select().where(prices.c.nomenclature == item['id'],
                                    prices.c.owner == user.id, prices.c.is_deleted is False, *filter_prices_price)
                    .order_by(desc(prices.c.id))
              )
@@ -106,6 +106,8 @@ async def get_nomenclature(
 
         response_body_list = []
         for price_db in prices_db:
+            if price_db.nomenclature != item['id']:
+                continue
             response_body = {**dict(price_db)}
 
             response_body["id"] = price_db.id
@@ -116,6 +118,7 @@ async def get_nomenclature(
             response_body["created_at"] = price_db.created_at
 
             q = nomenclature.select().where(
+
                 nomenclature.c.id == price_db.nomenclature,
                 nomenclature.c.owner == user.id,
                 nomenclature.c.is_deleted is False,
