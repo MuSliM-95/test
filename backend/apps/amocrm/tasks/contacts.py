@@ -26,6 +26,8 @@ async def sync_contacts(amo_install_id: int):
         try:
 
             timestamp_last_contact = await get_timestamp_last_contact(amo_install_id)
+            print("----")
+            print(timestamp_last_contact)
             amo_contacts_list = await load_amo_contacts(amo_install_info["access_token"],
                                                         amo_install_info["referrer"],
                                                         timestamp_last_contact,
@@ -34,7 +36,7 @@ async def sync_contacts(amo_install_id: int):
             exist_contacts, new_contacts = await split_contacts(amo_contacts_list_prepared)
             await save_exist_contacts(exist_contacts)
             await save_new_contacts(new_contacts)
-
+            page += 1
         except AmoApiPageIsEmpty:
             break
         except ClientResponseError as e:
@@ -188,6 +190,7 @@ async def load_amo_contacts(access_token: str, referrer: str, last_date_timestam
             url += f"&filter[updated_at][from]={last_date_timestamp}"
 
         async with http_session.get(url) as contact_resp:
+            print(await contact_resp.text())
             contact_resp.raise_for_status()
             if contact_resp.status == 200:
                 resp_json = await contact_resp.json()
