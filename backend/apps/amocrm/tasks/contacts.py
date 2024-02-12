@@ -22,6 +22,7 @@ async def sync_contacts(amo_install_id: int):
     except AmoLinkTableNotFound:
         return
     timestamp_last_contact = await get_timestamp_last_contact(amo_install_id)
+    print(f"СТАРТ LOAD КОНТАКТОВ С {timestamp_last_contact}")
     page = 1
     while True:
         try:
@@ -46,6 +47,7 @@ async def sync_contacts(amo_install_id: int):
             await save_new_contacts(new_contacts)
             page += 1
         except AmoApiPageIsEmpty:
+            print("СТРАНИЦА ПУСТАЯ")
             break
         except ClientResponseError as e:
             print(f"Request to AMO INSTALL №{amo_install_id} failed with status {e.status} with {e.message}")
