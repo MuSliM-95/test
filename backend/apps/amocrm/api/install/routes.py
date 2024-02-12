@@ -171,6 +171,6 @@ async def sc_l(account_id: int, client_uuid: str):
         if scheduler.get_job(a_t.referrer):
             scheduler.remove_job(a_t.referrer)
 
-        return {"status": "amo token disconnected succesfully!"}
-
     await add_job_compare(a_t.id, a_t.referrer)
+
+    return {"status": "amo token disconnected succesfully!"}
