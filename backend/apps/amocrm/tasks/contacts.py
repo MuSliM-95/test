@@ -22,7 +22,6 @@ async def sync_contacts(amo_install_id: int):
     except AmoLinkTableNotFound:
         return
     timestamp_last_contact = await get_timestamp_last_contact(amo_install_id)
-    print(f"СТАРТ LOAD КОНТАКТОВ С {timestamp_last_contact}")
     page = 1
     while True:
         try:
@@ -30,19 +29,8 @@ async def sync_contacts(amo_install_id: int):
                                                         amo_install_info["referrer"],
                                                         timestamp_last_contact,
                                                         page)
-            print("------")
-            print(amo_contacts_list)
-            print("------")
             amo_contacts_list_prepared = await prepare_contacts_list(amo_contacts_list, amo_install_id)
-            print("------")
-            print(amo_contacts_list_prepared)
-            print("------")
             exist_contacts, new_contacts = await split_contacts(amo_contacts_list_prepared)
-            print("СУЩЕСТВУЮЩИЕ")
-            print(exist_contacts)
-            print("НОВЫЕ")
-            print(new_contacts)
-            print("СОХРАНЕНИЕ")
             await save_exist_contacts(exist_contacts)
             await save_new_contacts(new_contacts)
             page += 1
@@ -213,13 +201,14 @@ async def load_amo_contacts(access_token: str, referrer: str, last_date_timestam
             contact_resp.raise_for_status()
             if contact_resp.status == 200:
                 resp_json = await contact_resp.json()
-                if "next" not in resp_json.get("_links", []):
-                    raise AmoApiPageIsEmpty
-                if "_embedded" in resp_json:
+
+                if resp_json.get("_embedded", None):
                     if "contacts" in resp_json["_embedded"]:
                         return resp_json["_embedded"]["contacts"]
                     else:
                         print(f"Failed to fetch contacts referrer: {referrer}, empty response")
+                elif "next" not in resp_json.get("_links", []):
+                    raise AmoApiPageIsEmpty
                 else:
                     print(f"Failed to fetch contacts referrer: {referrer}, empty response")
                     return []
