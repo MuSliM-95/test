@@ -51,12 +51,14 @@ async def save_new_contacts(new_contacts):
     new_contacts_insert = []
 
     for new_contact in new_contacts:
-        query = (
-            amo_contacts.select()
-            .where(amo_contacts.c.formatted_phone == new_contact["formatted_phone"])
-            .where(amo_contacts.c.amo_install_id == new_contact["amo_install_id"])
-        )
-        exist_phone_contact = await database.fetch_one(query)
+        exist_phone_contact = None
+        if new_contact["formatted_phone"]:
+            query = (
+                amo_contacts.select()
+                .where(amo_contacts.c.formatted_phone == new_contact["formatted_phone"])
+                .where(amo_contacts.c.amo_install_id == new_contact["amo_install_id"])
+            )
+            exist_phone_contact = await database.fetch_one(query)
         if exist_phone_contact:
             exist_phone_contact_list.append({
                 "orig_id": exist_phone_contact.id,
@@ -382,11 +384,11 @@ async def compare_amo_to_table(amo_install_id: int, cashbox_id: int):
 
             body = {}
             if contragent_info.name != contact_info.name:
-                if int(contact_info.updated_at.timestamp()) >= contragent_info.updated_at:
+                if contact_info.updated_at >= contragent_info.updated_at:
                     body["name"] = contact_info.name
 
             if contragent_info.phone != contact_info.phone:
-                if int(contact_info.updated_at.timestamp()) >= contragent_info.updated_at:
+                if contact_info.updated_at >= contragent_info.updated_at:
                     body["phone"] = await phone_normalizer(contact_info.phone)
 
             if body:
