@@ -79,7 +79,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
         amo_setting_load_type_dict = dict(amo_setting_load_type)
         amo_setting_load_type_dict.pop("id")
 
-        amo_install_settings_dict_values = {}
+        amo_install_settings_dict_values = {"amo_install_id": install_id}
 
         for key in amo_setting_load_type_dict:
             if amo_setting_load_type_dict.get(key):
