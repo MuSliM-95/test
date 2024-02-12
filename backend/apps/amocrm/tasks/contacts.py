@@ -21,20 +21,14 @@ async def sync_contacts(amo_install_id: int):
         return
     except AmoLinkTableNotFound:
         return
+    timestamp_last_contact = await get_timestamp_last_contact(amo_install_id)
     page = 1
     while True:
         try:
-            print("----")
-            print(f"GET PAGE {page}")
-            timestamp_last_contact = await get_timestamp_last_contact(amo_install_id)
-
-            print(timestamp_last_contact)
             amo_contacts_list = await load_amo_contacts(amo_install_info["access_token"],
                                                         amo_install_info["referrer"],
                                                         timestamp_last_contact,
                                                         page)
-            print("-----")
-            print(amo_contacts_list)
             amo_contacts_list_prepared = await prepare_contacts_list(amo_contacts_list, amo_install_id)
             exist_contacts, new_contacts = await split_contacts(amo_contacts_list_prepared)
             await save_exist_contacts(exist_contacts)
@@ -93,6 +87,7 @@ async def save_exist_contacts(exist_contacts):
                 body["phone"] = coming_contact["phone"]
                 body["formatted_phone"] = coming_contact["formatted_phone"]
         if body:
+            body["updated_at"] = coming_contact["updated_at"]
             query = (
                 amo_contacts.update()
                 .where(amo_contacts.c.id == exist_contact["id"])
@@ -114,7 +109,7 @@ async def get_timestamp_last_contact(amo_install_id: int):
 
     last_date_timestamp = None
     if last_contact:
-        last_date_timestamp = (last_contact.updated_at - timedelta(seconds=15)).timestamp()
+        last_date_timestamp = last_contact.updated_at - 30
 
     return last_date_timestamp
 
@@ -175,7 +170,15 @@ async def split_contacts(contacts_list):
         if exist:
             exist_contacts.append((contact, dict(exist)))
         else:
-            new_contacts.append(contact)
+            query_q_2 = (
+                amo_contacts_double.select()
+                .where(amo_contacts.c.ext_id == contact["ext_id"])
+                .where(amo_contacts.c.amo_install_id == contact["amo_install_id"])
+            )
+            exist_2 = await database.fetch_one(query_q_2)
+
+            if not exist_2:
+                new_contacts.append(contact)
 
     return exist_contacts, new_contacts
 
@@ -191,9 +194,7 @@ async def load_amo_contacts(access_token: str, referrer: str, last_date_timestam
         url = f"https://{referrer}/api/v4/contacts?page={page}&limit=250&order[updated_at]=asc"
         if last_date_timestamp:
             url += f"&filter[updated_at][from]={last_date_timestamp}"
-        print("GET: " + url)
         async with http_session.get(url) as contact_resp:
-            print(await contact_resp.text())
             contact_resp.raise_for_status()
             if contact_resp.status == 200:
                 resp_json = await contact_resp.json()
@@ -231,6 +232,8 @@ async def prepare_contacts_list(contacts_list, amo_install_id):
                 "formatted_phone": await phone_normalizer(phone),
                 "amo_install_id": amo_install_id,
                 "ext_id": contact["id"],
+                "created_at": contact["created_at"],
+                "updated_at": contact["updated_at"],
             }
         )
     return amo_contacts_list

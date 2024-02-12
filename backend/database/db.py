@@ -1098,8 +1098,8 @@ amo_contacts = sqlalchemy.Table(
     sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
     sqlalchemy.Column("formatted_phone", String),
     sqlalchemy.Column("ext_id", Integer),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("created_at", BigInteger),
+    sqlalchemy.Column("updated_at", BigInteger),
     extend_existing=True
 )
 
@@ -1113,8 +1113,8 @@ amo_contacts_double = sqlalchemy.Table(
     sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
     sqlalchemy.Column("formatted_phone", String),
     sqlalchemy.Column("ext_id", Integer),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("created_at", BigInteger),
+    sqlalchemy.Column("updated_at", BigInteger),
     extend_existing=True
 )
 

@@ -67,6 +67,13 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                 scheduler.add_job(refresh_token, trigger="interval", seconds=int(amo_crm_install.expires_in),
                                   id=referer,
                                   args=[referer], max_instances=1)
+
+            query = (
+                amo_install_table_cashboxes.update()
+                .where(amo_install_table_cashboxes.c.amo_integration_id == install_id)
+                .values({"status": True})
+            )
+            await database.execute(query)
         else:
             install_id = install.id
 
