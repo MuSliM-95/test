@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=schemas.WebappResponse)
+@router.get("/webapp/")
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -69,8 +69,7 @@ async def get_nomenclature(
 
         query = prices.select().where(prices.c.nomenclature == item['id'])
         price_db = await database.fetch_one(query)
-        # print(price_db.price_type)  ошибку дропает то есть ошибка в том что выдает None
-        #  price db не выдает нон и нормально выдает значение
+
         if price_db is not None:
             query = price_types.select().where(price_types.c.id == price_db.price_type,
                                                price_types.c.owner == user.id,
@@ -172,6 +171,14 @@ async def get_nomenclature(
 
             response_body = datetime_to_timestamp(response_body)
             response_body_list.append(response_body)
+        for price in response_body_list:
+            query = price_types.select().where(price_types.c.name == price['price_type'],
+                                               price_types.c.owner == user.id,
+                                               price_types.c.is_deleted.is_not(True))
+            price_types_db = await database.fetch_all(query)
+            price_types_db = [*map(datetime_to_timestamp, price_types_db)]
+
+            price['price_types'] = price_types_db
         item['prices'] = response_body_list
 
         dates_arr = []
