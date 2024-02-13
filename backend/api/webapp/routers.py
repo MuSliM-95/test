@@ -181,6 +181,14 @@ async def get_nomenclature(
             price['price_types'] = price_types_db
         item['prices'] = response_body_list
 
+        filter_warehouses = [
+            warehouses.c.cashbox == user.cashbox_id,
+            warehouses.c.is_deleted.is_not(True),
+        ]
+        if name:
+            filter_warehouses.append(
+                warehouses.c.name.ilike(f"%{name}%"),
+            )
         dates_arr = []
         if date_to and not date_from:
             dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
@@ -287,8 +295,9 @@ async def get_nomenclature(
 
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
-            warehouse_db = await database.fetch_one(
-                warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id))
+            warehouses_db = await database.fetch_all(
+                warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id, *filter_warehouses))
+            warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
 
             plus_amount = 0
             minus_amount = 0
@@ -309,32 +318,21 @@ async def get_nomenclature(
                     minus_amount += reg_event.amount
 
             balance_dict['organization_name'] = organization_db.short_name
-            balance_dict['warehouse_name'] = warehouse_db.name
+            balance_dict['warehouse_name'] = warehouses_db[0].name
             balance_dict['plus_amount'] = plus_amount
             balance_dict['minus_amount'] = minus_amount
             balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
             balance_dict['now_ost'] = current[0].current_amount
-            balance_dict['warehouses'] = [warehouse_db]
+            balance_dict['warehouses'] = warehouses_db
 
 
             res.append(balance_dict)
-        filter_warehouses = [
-            warehouses.c.cashbox == user.cashbox_id,
-            warehouses.c.is_deleted.is_not(True),
-        ]
-        if name:
-            filter_warehouses.append(
-                warehouses.c.name.ilike(f"%{name}%"),
-            )
         for category in categories_db:
             cat_childrens = []
             for item_cat in res:
                 if item_cat['category'] == category.id:
                     cat_childrens.append(item_cat)
 
-            # warehouses_db = await database.fetch_all(query)
-            # warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
-            # cat_childrens.append()
             if len(cat_childrens) > 0:
                 res_with_cats.append(
                     {
