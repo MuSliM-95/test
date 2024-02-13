@@ -318,7 +318,10 @@ async def get_nomenclature(
             res.append(balance_dict)
 
         for category in categories_db:
-            cat_childrens = [item for item in res if item['category'] == category.id]
+            cat_childrens = []
+            for item_cat in res:
+                if item['category'] == category.id:
+                    cat_childrens.append(item_cat)
 
             if len(cat_childrens) > 0:
                 res_with_cats.append(
