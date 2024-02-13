@@ -69,8 +69,8 @@ async def get_nomenclature(
 
         query = prices.select().where(prices.c.nomenclature == item['id'])
         price_db = await database.fetch_one(query)
-        # print(price_db.price_type)  ошибку дропает то есть скорее всего
-        print(price_db)
+        # print(price_db.price_type)  ошибку дропает то есть ошибка в том что выдает None
+        print(price_db.id)
         query = price_types.select().where(price_types.c.name == 'abc123',
                                            price_types.c.owner == user.id,
                                            price_types.c.is_deleted.is_not(True))
