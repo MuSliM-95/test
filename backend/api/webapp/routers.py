@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=schemas.WebappResponse)
+@router.get("/webapp/")
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -316,13 +316,23 @@ async def get_nomenclature(
             balance_dict['warehouse_name'] = warehouse_db.name
 
             res.append(balance_dict)
-
+        filter_warehouses = [
+            warehouses.c.cashbox == user.cashbox_id,
+            warehouses.c.is_deleted.is_not(True),
+        ]
+        if name:
+            filter_warehouses.append(
+                warehouses.c.name.ilike(f"%{name}%"),
+            )
         for category in categories_db:
             cat_childrens = []
             for item_cat in res:
-                if item['category'] == category.id:
+                if item_cat['category'] == category.id:
                     cat_childrens.append(item_cat)
 
+            # warehouses_db = await database.fetch_all(query)
+            # warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
+            # cat_childrens.append()
             if len(cat_childrens) > 0:
                 res_with_cats.append(
                     {
@@ -331,6 +341,7 @@ async def get_nomenclature(
                         "children": cat_childrens
                     }
                 )
+            return cat_childrens
 
         none_childrens = [item for item in res if item['category'] == None]
         res_with_cats.append(
@@ -340,6 +351,9 @@ async def get_nomenclature(
                 "children": none_childrens
             }
         )
+        item['alt_warehouse_balances'] = res_with_cats
+
+        # warehouses.c.id == res_with_cats.children.warehouse_id
         filter_warehouses = [
             warehouses.c.cashbox == user.cashbox_id,
             warehouses.c.is_deleted.is_not(True),
@@ -348,15 +362,6 @@ async def get_nomenclature(
             filter_warehouses.append(
                 warehouses.c.name.ilike(f"%{name}%"),
             )
-        # for warehouse in res_with_cats:
-        #     query = warehouses.select().where(warehouses.c.id == warehouse.children.warehouse_id,
-        #                                       *filter_warehouses)
-        #     warehouses_db = await database.fetch_all(query)
-        #     warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
-        #
-        #     price['price_types'] = price_types_db
-        item['alt_warehouse_balances'] = res_with_cats
-        # warehouses.c.id == res_with_cats.children.warehouse_id
         query = warehouses.select().where(warehouses.c.id == item['id'],
                                           *filter_warehouses)
         warehouses_db = await database.fetch_all(query)
