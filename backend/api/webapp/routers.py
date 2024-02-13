@@ -190,7 +190,7 @@ async def get_nomenclature(
         if not date_to and date_from:
             dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
 
-        selection_conditions = [*dates_arr]
+        selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id'], *dates_arr]
         if nomenclature_id is not None:
             selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
         if organization_id is not None:
@@ -229,7 +229,7 @@ async def get_nomenclature(
 
         warehouse_balances_db = await database.fetch_all(query)
 
-        selection_conditions = []
+        selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id']]
         if nomenclature_id is not None:
             selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
         if organization_id is not None:
