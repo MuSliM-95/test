@@ -287,7 +287,7 @@ async def get_nomenclature(
 
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
-            warehouses_db = await database.fetch_one(
+            warehouse_db = await database.fetch_one(
                 warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id))
 
             plus_amount = 0
@@ -309,12 +309,12 @@ async def get_nomenclature(
                     minus_amount += reg_event.amount
 
             balance_dict['organization_name'] = organization_db.short_name
-            balance_dict['warehouse_name'] = warehouses_db[0].name
+            balance_dict['warehouse_name'] = warehouse_db.name
             balance_dict['plus_amount'] = plus_amount
             balance_dict['minus_amount'] = minus_amount
             balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
             balance_dict['now_ost'] = current[0].current_amount
-            balance_dict['warehouses'] = warehouses_db
+            balance_dict['warehouses'] = [warehouse_db]
 
 
             res.append(balance_dict)
