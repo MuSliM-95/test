@@ -181,14 +181,6 @@ async def get_nomenclature(
             price['price_types'] = price_types_db
         item['prices'] = response_body_list
 
-        filter_warehouses = [
-            warehouses.c.cashbox == user.cashbox_id,
-            warehouses.c.is_deleted.is_not(True),
-        ]
-        if name:
-            filter_warehouses.append(
-                warehouses.c.name.ilike(f"%{name}%"),
-            )
         dates_arr = []
         if date_to and not date_from:
             dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
@@ -295,9 +287,8 @@ async def get_nomenclature(
 
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
-            warehouses_db = await database.fetch_all(
-                warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id, *filter_warehouses))
-            warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
+            warehouses_db = await database.fetch_one(
+                warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id))
 
             plus_amount = 0
             minus_amount = 0
@@ -327,6 +318,14 @@ async def get_nomenclature(
 
 
             res.append(balance_dict)
+        filter_warehouses = [
+            warehouses.c.cashbox == user.cashbox_id,
+            warehouses.c.is_deleted.is_not(True),
+        ]
+        if name:
+            filter_warehouses.append(
+                warehouses.c.name.ilike(f"%{name}%"),
+            )
         for category in categories_db:
             cat_childrens = []
             for item_cat in res:
