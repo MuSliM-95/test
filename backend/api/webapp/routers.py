@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=schemas.WebappResponse)
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -67,18 +67,18 @@ async def get_nomenclature(
         pictures_db = [*map(datetime_to_timestamp, pictures_db)]
         item['pictures'] = pictures_db
 
-        query = prices.select().where(prices.c.nomenclature == item['id'])
-        price_db = await database.fetch_one(query)
-
-        if price_db is not None:
-            query = price_types.select().where(price_types.c.id == price_db.price_type,
-                                               price_types.c.owner == user.id,
-                                               price_types.c.is_deleted.is_not(True))
-            price_types_db = await database.fetch_all(query)
-            price_types_db = [*map(datetime_to_timestamp, price_types_db)]
-        else:
-            price_types_db = []
-        item['price_types'] = price_types_db
+        # query = prices.select().where(prices.c.nomenclature == item['id'])
+        # price_db = await database.fetch_one(query)
+        #
+        # if price_db is not None:
+        #     query = price_types.select().where(price_types.c.id == price_db.price_type,
+        #                                        price_types.c.owner == user.id,
+        #                                        price_types.c.is_deleted.is_not(True))
+        #     price_types_db = await database.fetch_all(query)
+        #     price_types_db = [*map(datetime_to_timestamp, price_types_db)]
+        # else:
+        #     price_types_db = []
+        # item['price_types'] = price_types_db
 
         filter_prices_nom = []
         filter_prices_price = []
