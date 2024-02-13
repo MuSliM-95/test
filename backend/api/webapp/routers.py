@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=schemas.WebappResponse)
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -341,7 +341,6 @@ async def get_nomenclature(
                         "children": cat_childrens
                     }
                 )
-            return cat_childrens
 
         none_childrens = [item for item in res if item['category'] == None]
         res_with_cats.append(
