@@ -314,23 +314,22 @@ async def get_nomenclature(
             balance_dict['minus_amount'] = minus_amount
             balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
             balance_dict['now_ost'] = current[0].current_amount
-            filters = [
+            filter_warehouses = [
                 warehouses.c.cashbox == user.cashbox_id,
                 warehouses.c.is_deleted.is_not(True),
             ]
 
             if name:
-                filters.append(
+                filter_warehouses.append(
                     warehouses.c.name.ilike(f"%{name}%"),
                 )
 
             query = warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id,
-                                              *filters)
+                                              )
 
             warehouses_db = await database.fetch_all(query)
             warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
             balance_dict['warehouses'] = warehouses_db
-
 
             res.append(balance_dict)
         for category in categories_db:
