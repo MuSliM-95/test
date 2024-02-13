@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=schemas.WebappResponse)
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -345,16 +345,15 @@ async def get_nomenclature(
             filter_warehouses.append(
                 warehouses.c.name.ilike(f"%{name}%"),
             )
-        for warehouse in res_with_cats:
-            # query = warehouses.select().where(warehouses.c.id == warehouse,
-            #                                   *filter_warehouses)
-            return warehouse
-            warehouses_db = await database.fetch_all(query)
-            warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
-
-            price['price_types'] = price_types_db
+        # for warehouse in res_with_cats:
+        #     query = warehouses.select().where(warehouses.c.id == warehouse.children.warehouse_id,
+        #                                       *filter_warehouses)
+        #     warehouses_db = await database.fetch_all(query)
+        #     warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
+        #
+        #     price['price_types'] = price_types_db
         item['alt_warehouse_balances'] = res_with_cats
-
+        # warehouses.c.id == res_with_cats.children.warehouse_id
         query = warehouses.select().where(warehouses.c.id == item['id'],
                                           *filter_warehouses)
         warehouses_db = await database.fetch_all(query)
