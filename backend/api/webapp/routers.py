@@ -191,6 +191,8 @@ async def get_nomenclature(
             dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
 
         selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id'], *dates_arr]
+        if warehouse_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.warehouse_id == warehouse_id)
         if nomenclature_id is not None:
             selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
         if organization_id is not None:
@@ -230,6 +232,8 @@ async def get_nomenclature(
         warehouse_balances_db = await database.fetch_all(query)
 
         selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id']]
+        if warehouse_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.warehouse_id == warehouse_id)
         if nomenclature_id is not None:
             selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
         if organization_id is not None:
@@ -333,8 +337,6 @@ async def get_nomenclature(
                 "children": none_childrens
             }
         )
-        item['alt_warehouse_balances'] = res_with_cats
-
         filter_warehouses = [
             warehouses.c.cashbox == user.cashbox_id,
             warehouses.c.is_deleted.is_not(True),
@@ -343,6 +345,16 @@ async def get_nomenclature(
             filter_warehouses.append(
                 warehouses.c.name.ilike(f"%{name}%"),
             )
+        for warehouse in res_with_cats:
+            # query = warehouses.select().where(warehouses.c.id == warehouse,
+            #                                   *filter_warehouses)
+            return warehouse
+            warehouses_db = await database.fetch_all(query)
+            warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
+
+            price['price_types'] = price_types_db
+        item['alt_warehouse_balances'] = res_with_cats
+
         query = warehouses.select().where(warehouses.c.id == item['id'],
                                           *filter_warehouses)
         warehouses_db = await database.fetch_all(query)
