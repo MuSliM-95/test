@@ -314,7 +314,7 @@ async def get_nomenclature(
             balance_dict['minus_amount'] = minus_amount
             balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
             balance_dict['now_ost'] = current[0].current_amount
-            balance_dict['warehouses'] = warehouse_db
+            balance_dict['warehouses'] = [warehouse_db]
 
 
             res.append(balance_dict)
@@ -353,20 +353,5 @@ async def get_nomenclature(
             }
         )
         item['alt_warehouse_balances'] = res_with_cats
-
-        # warehouses.c.id == res_with_cats.children.warehouse_id
-        filter_warehouses = [
-            warehouses.c.cashbox == user.cashbox_id,
-            warehouses.c.is_deleted.is_not(True),
-        ]
-        if name:
-            filter_warehouses.append(
-                warehouses.c.name.ilike(f"%{name}%"),
-            )
-        query = warehouses.select().where(warehouses.c.id == item['id'],
-                                          *filter_warehouses)
-        warehouses_db = await database.fetch_all(query)
-        warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
-        item['warehouses'] = warehouses_db
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
