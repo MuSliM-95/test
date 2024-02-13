@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=schemas.WebappResponse)
+@router.get("/webapp/")
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
