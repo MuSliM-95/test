@@ -314,7 +314,7 @@ async def get_nomenclature(
             balance_dict['minus_amount'] = minus_amount
             balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
             balance_dict['now_ost'] = current[0].current_amount
-            balance_dict['warehouses'] = [warehouse_db]
+            balance_dict['warehouses'] = warehouse_db
 
 
             res.append(balance_dict)
