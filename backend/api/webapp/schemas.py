@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from typing import Optional, List
 from api.pictures.schemas import Picture
 from api.price_types.schemas import PriceType
-from api.warehouse_balances.schemas import ViewAltList
 from api.warehouses.schemas import Warehouse
 
 
@@ -29,6 +28,28 @@ class PriceInList(BaseModel):
     class Config:
         orm_mode = True
 
+class ViewAlt(BaseModel):
+    id: int
+    name: str
+    category: Optional[int]
+    organization_id: Optional[int]
+    organization_name: Optional[str]
+    warehouse_id: Optional[int]
+    warehouse_name: Optional[str]
+    current_amount: float
+    plus_amount: float
+    minus_amount: float
+    start_ost: float
+    now_ost: float
+    warehouses: Optional[List[Warehouse]]
+
+
+class ViewAltList(BaseModel):
+    name: str
+    key: int
+    children: List[ViewAlt]
+
+
 class WebappItem(BaseModel):
     id: int
     name: str
@@ -45,7 +66,6 @@ class WebappItem(BaseModel):
     pictures: Optional[List[Picture]]
     prices: Optional[List[PriceInList]]
     alt_warehouse_balances: Optional[List[ViewAltList]]
-    warehouses: Optional[List[Warehouse]]
 
 
 class WebappResponse(BaseModel):
