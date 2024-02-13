@@ -319,13 +319,8 @@ async def get_nomenclature(
                 warehouses.c.is_deleted.is_not(True),
             ]
 
-            if name:
-                filter_warehouses.append(
-                    warehouses.c.name.ilike(f"%{name}%"),
-                )
-
             query = warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id,
-                                              )
+                                              *filter_warehouses)
 
             warehouses_db = await database.fetch_all(query)
             warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
