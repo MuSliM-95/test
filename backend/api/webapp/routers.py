@@ -75,13 +75,11 @@ async def get_nomenclature(
             query = price_types.select().where(price_types.c.id == price_db.price_type,
                                                price_types.c.owner == user.id,
                                                price_types.c.is_deleted.is_not(True))
+            price_types_db = await database.fetch_all(query)
+            price_types_db = [*map(datetime_to_timestamp, price_types_db)]
+            item['price_types'] = price_types_db
         else:
-            query = price_types.select().where(
-                                               price_types.c.owner == user.id,
-                                               price_types.c.is_deleted.is_not(True))
-        price_types_db = await database.fetch_all(query)
-        price_types_db = [*map(datetime_to_timestamp, price_types_db)]
-        item['price_types'] = price_types_db
+            item['price_types'] = []
 
         filter_prices_nom = []
         filter_prices_price = []
