@@ -71,9 +71,14 @@ async def get_nomenclature(
         price_db = await database.fetch_one(query)
         # print(price_db.price_type)  ошибку дропает то есть ошибка в том что выдает None
         #  price db не выдает нон и нормально выдает значение
-        query = price_types.select().where(price_types.c.id == price_db.price_type,
-                                           price_types.c.owner == user.id,
-                                           price_types.c.is_deleted.is_not(True))
+        if price_db:
+            query = price_types.select().where(price_types.c.id == price_db.price_type,
+                                               price_types.c.owner == user.id,
+                                               price_types.c.is_deleted.is_not(True))
+        else:
+            query = price_types.select().where(
+                                               price_types.c.owner == user.id,
+                                               price_types.c.is_deleted.is_not(True))
         price_types_db = await database.fetch_all(query)
         price_types_db = [*map(datetime_to_timestamp, price_types_db)]
         item['price_types'] = price_types_db
