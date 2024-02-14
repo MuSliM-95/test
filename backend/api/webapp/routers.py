@@ -67,18 +67,6 @@ async def get_nomenclature(
         pictures_db = [*map(datetime_to_timestamp, pictures_db)]
         item['pictures'] = pictures_db
 
-        # query = prices.select().where(prices.c.nomenclature == item['id'])
-        # price_db = await database.fetch_one(query)
-        #
-        # if price_db is not None:
-        #     query = price_types.select().where(price_types.c.id == price_db.price_type,
-        #                                        price_types.c.owner == user.id,
-        #                                        price_types.c.is_deleted.is_not(True))
-        #     price_types_db = await database.fetch_all(query)
-        #     price_types_db = [*map(datetime_to_timestamp, price_types_db)]
-        # else:
-        #     price_types_db = []
-        # item['price_types'] = price_types_db
 
         filter_prices_nom = []
         filter_prices_price = []
@@ -267,7 +255,6 @@ async def get_nomenclature(
 
         warehouse_balances_db_curr = await database.fetch_all(query)
 
-        # warehouse_balances_db = [*map(datetime_to_timestamp, warehouse_balances_db)]
         res = []
 
         categories_db = await database.fetch_all(categories.select())
@@ -279,7 +266,7 @@ async def get_nomenclature(
             current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
 
             balance_dict = dict(warehouse_balance)
-            
+
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
 
@@ -323,8 +310,9 @@ async def get_nomenclature(
             cat_childrens = []
             for item_cat in res:
                 if item_cat['category'] == category.id:
+                    item_cat.pop("id", None)
                     cat_childrens.append(item_cat)
-
+                    
             if len(cat_childrens) > 0:
                 res_with_cats.append(
                     {
