@@ -199,8 +199,8 @@ async def get_nomenclature(
 
         )
         query = (
-            select(
-                warehouse_register_movement.c.organization_id).where(*selection_conditions).limit(limit).offset(offset)
+            select(warehouse_register_movement.c.organization_id,
+                   func.sum(q).label("current_amount")).where(*selection_conditions).limit(limit).offset(offset)
         )
 
         warehouse_balances_db = await database.fetch_all(query)
