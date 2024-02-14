@@ -139,15 +139,12 @@ async def get_nomenclature(
                     response_body["price_type"] = price_type.name
 
             if nom_db:
-                response_body["nomenclature_id"] = nom_db.id
-                response_body["nomenclature_name"] = nom_db.name
 
                 if nom_db.unit:
                     q = units.select().where(units.c.id == nom_db.unit)
                     unit = await database.fetch_one(q)
 
                     if unit:
-                        response_body["unit"] = unit.id
                         response_body["unit_name"] = unit.name
 
                     if nom_db.category:
@@ -155,7 +152,6 @@ async def get_nomenclature(
                         category = await database.fetch_one(q)
 
                         if category:
-                            response_body["category"] = category.id
                             response_body["category_name"] = category.name
 
                     if nom_db.manufacturer:
