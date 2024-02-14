@@ -7,8 +7,6 @@ from api.warehouses.schemas import Warehouse
 
 class PriceInList(BaseModel):
     id: int
-    nomenclature_id: int
-    nomenclature_name: str
     type: Optional[str]
     description_short: Optional[str]
     description_long: Optional[str]
@@ -66,6 +64,7 @@ class WebappItem(BaseModel):
     pictures: Optional[List[Picture]]
     prices: Optional[List[PriceInList]]
     alt_warehouse_balances: Optional[List[ViewAltList]]
+
 
 
 class WebappResponse(BaseModel):
