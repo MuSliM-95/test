@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=schemas.WebappResponse)
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -186,6 +186,10 @@ async def get_nomenclature(
             dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
 
         selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id'], *dates_arr]
+        if warehouse_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.warehouse_id == warehouse_id)
+        if nomenclature_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
         if organization_id is not None:
             selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
         q = case(
@@ -223,6 +227,10 @@ async def get_nomenclature(
         warehouse_balances_db = await database.fetch_all(query)
 
         selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id']]
+        if warehouse_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.warehouse_id == warehouse_id)
+        if nomenclature_id is not None:
+            selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
         if organization_id is not None:
             selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
         q = case(
@@ -270,10 +278,8 @@ async def get_nomenclature(
 
             current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
 
-            balance_dict = {"category": warehouse_balance.category,
-                            "organization_id": warehouse_balance.organization_id,
-                            "current_amount": warehouse_balance.current_amount}
-            return balance_dict
+            balance_dict = dict(warehouse_balance)
+            
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
 
@@ -317,8 +323,8 @@ async def get_nomenclature(
             cat_childrens = []
             for item_cat in res:
                 if item_cat['category'] == category.id:
-                    del item_cat['category']
                     cat_childrens.append(item_cat)
+
             if len(cat_childrens) > 0:
                 res_with_cats.append(
                     {
