@@ -174,7 +174,7 @@ async def get_nomenclature(
                                                price_types.c.is_deleted.is_not(True))
             price_types_db = await database.fetch_all(query)
             price_types_db = [*map(datetime_to_timestamp, price_types_db)]
-
+            del price['price_type']
             price['price_types'] = price_types_db
         item['prices'] = response_body_list
 

@@ -8,8 +8,6 @@ from api.warehouses.schemas import Warehouse
 class PriceInList(BaseModel):
     id: int
     type: Optional[str]
-    description_short: Optional[str]
-    description_long: Optional[str]
     code: Optional[int]
     unit: Optional[int]
     unit_name: Optional[str]
@@ -18,7 +16,6 @@ class PriceInList(BaseModel):
     manufacturer: Optional[int]
     manufacturer_name: Optional[str]
     price: float
-    price_type: Optional[str]
     date_from: Optional[int]
     date_to: Optional[int]
     price_types: Optional[List[PriceType]]
