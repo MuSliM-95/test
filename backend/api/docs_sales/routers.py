@@ -17,7 +17,7 @@ from database.db import (
     users_cboxes_relation,
     price_types, warehouse_balances,
     nomenclature,
-    docs_warehouse,
+    docs_warehouse, docs_sales_tags, amo_leads, amo_install_table_cashboxes, amo_leads_docs_sales_mapping,
 
 )
 import datetime
@@ -261,8 +261,54 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             del instance_values["goods"]
         except KeyError:
             pass
+
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
+
+        # Процесс разделения тегов(в другую таблицу), а также связывание лида с документом продажи при наличии нужного тега
+
+        tags = instance_values.get("tags")
+        if tags:
+            tags_insert_list = []
+            tags_split = tags.split(",")
+            for tag_name in tags_split:
+                tags_insert_list.append({
+                    "docs_sales_id": instance_id,
+                    "name": tag_name,
+                })
+                if tag_name.startswith("ID_"):
+                    lead_id = tag_name.split("_")[1]
+
+                    query = amo_install_table_cashboxes.select().where(and_(
+                        amo_install_table_cashboxes.c.cashbox_id == user.cashbox_id,
+                        amo_install_table_cashboxes.c.status == True
+                    ))
+                    amo_install_cahsbox = await database.fetch_one(query)
+                    if amo_install_cahsbox:
+                        query = amo_leads.select().where(and_(
+                            amo_leads.c.amo_install_id == amo_install_cahsbox.amo_integration_id,
+                            amo_leads.c.amo_id == int(lead_id)
+                        ))
+                        lead_info = await database.fetch_one(query)
+                        if lead_info:
+                            query = amo_leads_docs_sales_mapping.select().where(
+                                amo_leads_docs_sales_mapping.c.docs_sales_id == instance_id
+                            )
+                            amo_lead_docs = await database.fetch_one(query)
+                            if not amo_lead_docs:
+                                query = amo_leads_docs_sales_mapping.insert().values({
+                                    "docs_sales_id": instance_id,
+                                    "lead_id": int(lead_id)
+                                })
+                                await database.execute(query)
+            if tags_insert_list:
+                await database.execute(docs_sales_tags.insert(tags_insert_list))
+
+        try:
+            del instance_values["tags"]
+        except KeyError:
+            pass
+
         inserted_ids.add(instance_id)
         items_sum = 0
         for item in goods:
