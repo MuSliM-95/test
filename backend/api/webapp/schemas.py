@@ -20,12 +20,8 @@ class PriceInList(BaseModel):
 
 
 class ViewAlt(BaseModel):
-    id: Optional[int]
-    name: Optional[str]
-    category: Optional[int]
     organization_id: Optional[int]
     organization_name: Optional[str]
-    warehouse_id: Optional[int]
     current_amount: float
     plus_amount: float
     minus_amount: float
