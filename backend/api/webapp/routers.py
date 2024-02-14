@@ -312,7 +312,7 @@ async def get_nomenclature(
                 if item_cat['category'] == category.id:
                     item_cat.pop("id", None)
                     item_cat.pop("name", None)
-                    item_cat.pop("category", None)
+                    # item_cat.pop("category", None)
                     item_cat.pop("warehouse_id", None)
                     cat_childrens.append(item_cat)
 
