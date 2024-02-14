@@ -8,8 +8,6 @@ from api.warehouses.schemas import Warehouse
 class PriceInList(BaseModel):
     id: int
     type: Optional[str]
-    code: Optional[int]
-    unit: Optional[int]
     unit_name: Optional[str]
     category: Optional[int]
     category_name: Optional[str]

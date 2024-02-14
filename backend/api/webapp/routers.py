@@ -152,7 +152,6 @@ async def get_nomenclature(
                         category = await database.fetch_one(q)
 
                         if category:
-                            response_body["category"] = category.id
                             response_body["category_name"] = category.name
 
                     if nom_db.manufacturer:
@@ -160,7 +159,6 @@ async def get_nomenclature(
                         manufacturer = await database.fetch_one(q)
 
                         if manufacturer:
-                            response_body["manufacturer"] = manufacturer.id
                             response_body["manufacturer_name"] = manufacturer.name
 
             else:
