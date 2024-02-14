@@ -279,7 +279,7 @@ async def get_nomenclature(
             current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
 
             balance_dict = dict(warehouse_balance)
-            return(balance_dict)
+            return balance_dict
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
 
