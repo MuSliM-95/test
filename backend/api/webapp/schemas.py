@@ -7,11 +7,8 @@ from api.warehouses.schemas import Warehouse
 
 class PriceInList(BaseModel):
     id: int
-    type: Optional[str]
     unit_name: Optional[str]
-    category: Optional[int]
     category_name: Optional[str]
-    manufacturer: Optional[int]
     manufacturer_name: Optional[str]
     price: float
     date_from: Optional[int]
@@ -20,6 +17,7 @@ class PriceInList(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 class ViewAlt(BaseModel):
     id: int
@@ -59,7 +57,6 @@ class WebappItem(BaseModel):
     pictures: Optional[List[Picture]]
     prices: Optional[List[PriceInList]]
     alt_warehouse_balances: Optional[List[ViewAltList]]
-
 
 
 class WebappResponse(BaseModel):
