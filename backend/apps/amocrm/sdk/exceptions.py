@@ -20,3 +20,9 @@ class AmoLinkTableNotFound(BaseModuleException):
     """
     Raised when amo link amo with table not found
     """
+
+
+class AmoUnAuthorized(BaseModuleException):
+    """
+    Raised when user is not authorized
+    """

@@ -4,6 +4,7 @@ from datetime import datetime
 import aiohttp
 
 from apps.amocrm.tasks.contacts import sync_contacts
+from apps.amocrm.tasks.leads import sync_leads
 from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, amo_settings, \
     amo_settings_load_types, amo_install_settings
 from functions.helpers import gen_token
@@ -34,7 +35,15 @@ async def add_job_compare(amo_install_id: int, referrer: str):
                             max_instances=1
                         )
                 elif key == "leads":
-                    pass
+                    if not scheduler.get_job(f"sync_{key}_{referrer}"):
+                        add_job_to_sched(
+                            sync_leads,
+                            trigger="interval",
+                            seconds=120,
+                            id=f"sync_{key}_{referrer}",
+                            args=[amo_install_id],
+                            max_instances=1
+                        )
             else:
                 if scheduler.get_job(f"sync_{key}_{referrer}"):
                     scheduler.remove_job(f"sync_{key}_{referrer}")

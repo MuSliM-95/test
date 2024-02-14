@@ -38,7 +38,7 @@ async def sync_contacts(amo_install_id: int):
             print("СТРАНИЦА ПУСТАЯ")
             break
         except ClientResponseError as e:
-            print(f"Request to AMO INSTALL №{amo_install_id} failed with status {e.status} with {e.message}")
+            print(f"Request to load contact AMO INSTALL №{amo_install_id} failed with status {e.status} with {e.message}")
             break
 
     await compare_amo_to_table(amo_install_id, cashbox_id)
