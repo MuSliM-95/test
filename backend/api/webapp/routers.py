@@ -199,17 +199,30 @@ async def get_nomenclature(
 
         )
         query = (
-            select(warehouse_register_movement.c.organization_id,
-                   func.sum(q).label("current_amount")).where(*selection_conditions).limit(limit).offset(offset)
-        )
+            select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.category,
+                warehouse_register_movement.c.organization_id,
+                warehouse_register_movement.c.warehouse_id,
+                func.sum(q).label("current_amount"))
+            .where(*selection_conditions)
+            .limit(limit)
+            .offset(offset)
+        ).group_by(
+            nomenclature.c.name,
+            nomenclature.c.id,
+            warehouse_register_movement.c.organization_id,
+            warehouse_register_movement.c.warehouse_id
+        ) \
+            .select_from(warehouse_register_movement
+                         .join(nomenclature,
+                               warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                               ))
 
         warehouse_balances_db = await database.fetch_all(query)
-        return warehouse_balances_db
+
         selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id']]
-        if warehouse_id is not None:
-            selection_conditions.append(warehouse_register_movement.c.warehouse_id == warehouse_id)
-        if nomenclature_id is not None:
-            selection_conditions.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
         if organization_id is not None:
             selection_conditions.append(warehouse_register_movement.c.organization_id == organization_id)
         q = case(
@@ -258,7 +271,7 @@ async def get_nomenclature(
             current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
 
             balance_dict = dict(warehouse_balance)
-
+            return balance_dict
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
 
