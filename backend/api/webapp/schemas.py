@@ -7,8 +7,6 @@ from api.warehouses.schemas import Warehouse
 
 class PriceInList(BaseModel):
     id: int
-    nomenclature_id: int
-    nomenclature_name: str
     type: Optional[str]
     description_short: Optional[str]
     description_long: Optional[str]
@@ -20,7 +18,6 @@ class PriceInList(BaseModel):
     manufacturer: Optional[int]
     manufacturer_name: Optional[str]
     price: float
-    price_type: Optional[str]
     date_from: Optional[int]
     date_to: Optional[int]
     price_types: Optional[List[PriceType]]

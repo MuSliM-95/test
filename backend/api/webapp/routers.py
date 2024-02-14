@@ -131,12 +131,6 @@ async def get_nomenclature(
             )
             nom_db = await database.fetch_one(q)
 
-            if price_db.price_type:
-                q = price_types.select().where(price_types.c.id == price_db.price_type)
-                price_type = await database.fetch_one(q)
-
-                if price_type:
-                    response_body["price_type"] = price_type.name
 
             if nom_db:
 
