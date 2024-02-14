@@ -311,8 +311,11 @@ async def get_nomenclature(
             for item_cat in res:
                 if item_cat['category'] == category.id:
                     item_cat.pop("id", None)
+                    item_cat.pop("name", None)
+                    item_cat.pop("category", None)
+                    item_cat.pop("warehouse_id", None)
                     cat_childrens.append(item_cat)
-                    
+
             if len(cat_childrens) > 0:
                 res_with_cats.append(
                     {
