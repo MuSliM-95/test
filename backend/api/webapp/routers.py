@@ -270,8 +270,10 @@ async def get_nomenclature(
 
             current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
 
-            balance_dict = dict(warehouse_balance)
-            return balance_dict
+            balance_dict = {"category": warehouse_balance.category,
+                            "organization_id": warehouse_balance.organization_id,
+                            "current_amount": warehouse_balance.current_amount}
+
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
 
@@ -315,8 +317,8 @@ async def get_nomenclature(
             cat_childrens = []
             for item_cat in res:
                 if item_cat['category'] == category.id:
+                    del item_cat['category']
                     cat_childrens.append(item_cat)
-
             if len(cat_childrens) > 0:
                 res_with_cats.append(
                     {
