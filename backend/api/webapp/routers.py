@@ -208,7 +208,7 @@ async def get_nomenclature(
         )
 
         warehouse_balances_db = await database.fetch_all(query)
-
+        return warehouse_balances_db
         selection_conditions = [warehouse_register_movement.c.nomenclature_id == item['id']]
         if warehouse_id is not None:
             selection_conditions.append(warehouse_register_movement.c.warehouse_id == warehouse_id)
