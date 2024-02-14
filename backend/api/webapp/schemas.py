@@ -21,7 +21,7 @@ class PriceInList(BaseModel):
 
 class ViewAlt(BaseModel):
     id: Optional[int]
-    name: str
+    name: Optional[str]
     category: Optional[int]
     organization_id: Optional[int]
     organization_name: Optional[str]
