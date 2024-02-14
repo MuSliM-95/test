@@ -679,6 +679,14 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
+docs_sales_tags = sqlalchemy.Table(
+    "docs_sales_tags",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column("name", String),
+)
+
 docs_sales_goods = sqlalchemy.Table(
     "docs_sales_goods",
     metadata,
@@ -1193,6 +1201,15 @@ amo_leads = sqlalchemy.Table(
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
     extend_existing=True
+)
+
+amo_leads_docs_sales_mapping = sqlalchemy.Table(
+    "amo_leads_docs_sales_mapping",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column("lead_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    extend_existing=True,
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"
