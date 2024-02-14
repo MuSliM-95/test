@@ -26,7 +26,6 @@ class ViewAlt(BaseModel):
     organization_id: Optional[int]
     organization_name: Optional[str]
     warehouse_id: Optional[int]
-    warehouse_name: Optional[str]
     current_amount: float
     plus_amount: float
     minus_amount: float
