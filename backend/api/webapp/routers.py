@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/", response_model=schemas.WebappResponse)
+@router.get("/webapp/")
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -279,11 +279,9 @@ async def get_nomenclature(
             current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
 
             balance_dict = dict(warehouse_balance)
-
+            return(balance_dict)
             organization_db = await database.fetch_one(
                 organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
-            warehouse_db = await database.fetch_one(
-                warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id))
 
             plus_amount = 0
             minus_amount = 0
