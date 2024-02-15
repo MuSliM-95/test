@@ -333,6 +333,9 @@ async def get_nomenclature(
                     "children": []
                 }
             )
+        else:
+            for cat in res_with_cats:
+                cat['children'].pop('category', None)
         item['alt_warehouse_balances'] = res_with_cats
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
