@@ -16,7 +16,7 @@ import api.webapp.schemas as schemas
 router = APIRouter(tags=["webapp"])
 
 
-@router.get("/webapp/")
+@router.get("/webapp/", response_model=schemas.WebappResponse)
 async def get_nomenclature(
         token: str,
         warehouse_id: Optional[int] = None,
@@ -334,8 +334,9 @@ async def get_nomenclature(
                 }
             )
         else:
-            for catsas in res_with_cats:
-                return catsas
+            for cat in res_with_cats:
+                for catinclusive in cat['children']:
+                    catinclusive.pop('category', None)
         item['alt_warehouse_balances'] = res_with_cats
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
