@@ -325,14 +325,14 @@ async def get_nomenclature(
                     }
                 )
 
-        none_childrens = [item for item in res if item['category'] == None]
-        res_with_cats.append(
-            {
-                "name": "Без категории",
-                "key": 0,
-                "children": none_childrens
-            }
-        )
+        if len(res_with_cats) == 0:
+            res_with_cats.append(
+                {
+                    "name": "Без категории",
+                    "key": 0,
+                    "children": []
+                }
+            )
         item['alt_warehouse_balances'] = res_with_cats
 
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
