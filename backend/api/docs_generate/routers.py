@@ -120,7 +120,6 @@ async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, 
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
-        return filter_tags
         query = doc_generated.select().where(or_(*filter_tags)).order_by(desc(doc_generated.c.created_at)).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
