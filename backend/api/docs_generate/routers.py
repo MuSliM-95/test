@@ -77,7 +77,7 @@ async def doc_generate(token: str,
         file_dict = {
                 'doc_link': file_link,
                 'created_at': datetime.datetime.now(),
-                'tags': tags,
+                'tags': tags.lower(),
                 'template_id': template_id,
                 'entity': entity,
                 'entity_id': entity_id,
