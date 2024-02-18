@@ -59,13 +59,11 @@ async def doc_generate(token: str,
                        variable: Dict,
                        entity: str,
                        entity_id: int,
-                       user_id: int,
                        tags: str = None,
                        ):
     '''Генерирование документа с загрузкой в S3 и фиксацией записи генерации'''
     try:
         user = await get_user_by_token(token)
-        return user
         query = doc_templates.select().where(doc_templates.c.id == template_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
@@ -83,7 +81,7 @@ async def doc_generate(token: str,
                 'template_id': template_id,
                 'entity': entity,
                 'entity_id': entity_id,
-                'user_id': user_id}
+                'user_id': user.id}
         query = doc_generated.insert().values(file_dict)
         result_file_dict_id = await database.execute(query)
         query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id)
