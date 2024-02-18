@@ -65,6 +65,7 @@ async def doc_generate(token: str,
     '''Генерирование документа с загрузкой в S3 и фиксацией записи генерации'''
     try:
         user = await get_user_by_token(token)
+        return user
         query = doc_templates.select().where(doc_templates.c.id == template_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
