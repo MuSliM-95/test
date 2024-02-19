@@ -77,7 +77,7 @@ async def doc_generate(token: str,
         file_dict = {
                 'doc_link': file_link,
                 'created_at': datetime.datetime.now(),
-                'tags': tags.lower(),
+                'tags': tags,
                 'template_id': template_id,
                 'entity': entity,
                 'entity_id': entity_id,
@@ -116,7 +116,7 @@ async def get_generate_docs_by_filename(filename: str):
 @router.get('/docgenerated/', status_code=status.HTTP_200_OK)
 async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, offset: int = 0):
     """Получение списка генераций"""
-    user = await get_user_by_token(token)
+    # user = await get_user_by_token(token)
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
