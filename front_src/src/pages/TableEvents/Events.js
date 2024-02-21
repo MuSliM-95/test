@@ -48,6 +48,11 @@ class Events extends React.Component {
                 key: 'ip',
             },
             {
+                title: 'Время выполнения(ms)',
+                dataIndex: 'request_time',
+                key: 'request_time',
+            },
+            {
                 title: 'Дата события',
                 dataIndex: 'created_at',
                 key: 'created_at',

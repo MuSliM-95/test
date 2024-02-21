@@ -384,6 +384,7 @@ events = sqlalchemy.Table(
     sqlalchemy.Column("user_id", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("token", String),
     sqlalchemy.Column("ip", String),
+    sqlalchemy.Column("request_time", Integer, nullable=True, default=0),
     sqlalchemy.Column("promoimage", String),
     sqlalchemy.Column("promodata", JSON),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
