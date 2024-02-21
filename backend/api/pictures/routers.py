@@ -61,10 +61,6 @@ async def get_picture_by_id(filename: str):
             raise HTTPException(status_code=404, detail="Такой картинки не существует")
 
 
-    
-
-
-
 @router.get("/pictures/", response_model=schemas.PictureListGet)
 async def get_pictures(
     token: str,
