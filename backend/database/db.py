@@ -447,7 +447,7 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("inn", String, nullable=True),
     sqlalchemy.Column("description", Text),
     sqlalchemy.Column("contragent_type", Enum(Contragent_types)),
-    sqlalchemy.Column("birth_date", Date,
+    sqlalchemy.Column("birth_date", Date,)
     sqlalchemy.Column("data", JSON),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
