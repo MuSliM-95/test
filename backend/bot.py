@@ -243,12 +243,12 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                         body=answer
                     )
                     return
-        except Exception as exc:
-            logging.info(exc)
+    except Exception as exc:
+        logging.info(exc)
 
     
 
-    if not phone:
+    if "referral" in str(invite_token):
         ref_id = invite_token.split("referral_")[-1]
 
         if int(ref_id) != int(message.from_user.id):
