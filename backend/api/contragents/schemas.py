@@ -16,7 +16,7 @@ class Contragent(BaseModel):
     inn: Optional[str]
     description: Optional[str]
 
-    contragent_type: Contragent_types
+    contragent_type: Optional[Contragent_types]
     birth_date: datetime.datetime
     data: Optional[dict]
 
@@ -28,7 +28,7 @@ class ContragentEdit(BaseModel):
     inn: Optional[str]
     description: Optional[str]
 
-    contragent_type: Contragent_types
+    contragent_type: Optional[Contragent_types]
     birth_date: datetime.datetime
     data: Optional[dict]
 
@@ -40,6 +40,6 @@ class ContragentCreate(BaseModel):
     inn: Optional[str]
     description: Optional[str]
 
-    contragent_type: Contragent_types
+    contragent_type: Optional[Contragent_types]
     birth_date: datetime.datetime
     data: Optional[dict]
