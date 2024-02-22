@@ -17,7 +17,7 @@ class Contragent(BaseModel):
     description: Optional[str]
 
     contragent_type: Optional[Contragent_types]
-    birth_date: date = None
+    birth_date: date
     data: Optional[dict]
 
 
@@ -25,11 +25,11 @@ class ContragentEdit(BaseModel):
     name: Optional[str]
     external_id: Optional[str]
     phone: Optional[str]
-    inn: date
+    inn: Optional[str]
     description: Optional[str]
 
     contragent_type: Optional[Contragent_types]
-    birth_date: date = None
+    birth_date: date
     data: Optional[dict]
 
 
@@ -41,5 +41,5 @@ class ContragentCreate(BaseModel):
     description: Optional[str]
 
     contragent_type: Optional[Contragent_types]
-    birth_date: date = None
+    birth_date: date
     data: Optional[dict]
