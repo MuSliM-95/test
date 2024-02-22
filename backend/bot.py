@@ -225,11 +225,17 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 
     if "referral" in str(invite_token):
         ref_id = invite_token.split("referral_")[-1]
-        answer = f'''
+
+        if int(ref_id) != int(message.from_user.id):
+            answer = f'''
 У Вас новая регистрация:
 
 @{message.from_user.username}
-'''
+'''     
+        else:
+            answer = f'''
+Вы не можете регистировать самого себя!
+'''     
         await bot.send_message(chat_id=int(ref_id), text=answer)
         await store_bot_message(
             tg_message_id=message.message_id + 1,
