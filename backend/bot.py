@@ -225,14 +225,15 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             phone = user.phone_number
         if phone:
                 answer = f"У вас уже есть регистрация в tablecrm.com!"   
-                await bot.send_message(chat_id=message.from_user.id, text=answer)
+                await message.answer(text=answer)
                 await store_bot_message(
                     tg_message_id=message.message_id + 1,
                     tg_user_or_chat=str(message.from_user.id),
                     from_or_to=str(bot.id),
                     body=answer
                 )
-                return
+                if "referral" in str(invite_token):
+                    return
     except Exception as exc:
         logging.info(exc)
 
