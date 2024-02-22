@@ -225,13 +225,25 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 
     if "referral" in str(invite_token):
         ref_id = invite_token.split("referral_")[-1]
+        if user:
+            phone = user.phone_number
+        if phone:
+            answer = f"У вас уже есть регистрация в tablecrm.com!"   
+            await bot.send_message(chat_id=int(message.from_user.id), text=answer)
+            await store_bot_message(
+                tg_message_id=message.message_id + 1,
+                tg_user_or_chat=str(message.from_user.id),
+                from_or_to=str(bot.id),
+                body=answer
+            )
+            return
 
-        if int(ref_id) != int(message.from_user.id):
+        elif int(ref_id) != int(message.from_user.id):
             answer = f'''
 У Вас новая регистрация:
-
 @{message.from_user.username}
 '''     
+
         else:
             answer = f'''
 Вы не можете регистировать самого себя!
