@@ -220,24 +220,33 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             users.c.owner_id == str(message.from_user.id)
         )
     )
-    try:
-        if user:
-            phone = user.phone_number
-        if phone:
-                answer = f"У вас уже есть регистрация в tablecrm.com!"   
-                await message.answer(text=answer)
-                await store_bot_message(
-                    tg_message_id=message.message_id + 1,
-                    tg_user_or_chat=str(message.from_user.id),
-                    from_or_to=str(bot.id),
-                    body=answer
-                )
-                if "referral" in str(invite_token):
+
+    if not user:
+        # В случае если юзера не приглашали и он ещё не был зарегистрирован - приглашаем и выходим
+        await welcome_and_share_number(message)
+        await state.set_state(Form.start)
+        return
+        
+    invite_token = command.args
+
+    if "referral" in str(invite_token):
+        try:
+            if user:
+                phone = user.phone_number
+            if phone:
+                    answer = f"У вас уже есть регистрация в tablecrm.com!"   
+                    await message.answer(text=answer)
+                    await store_bot_message(
+                        tg_message_id=message.message_id + 1,
+                        tg_user_or_chat=str(message.from_user.id),
+                        from_or_to=str(bot.id),
+                        body=answer
+                    )
                     return
     except Exception as exc:
         logging.info(exc)
 
-    invite_token = command.args
+    
 
     if "referral" in str(invite_token):
         ref_id = invite_token.split("referral_")[-1]
@@ -300,11 +309,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             await state.update_data(cbox=dict(cbox_by_invite))
         return
 
-    if not user:
-        # В случае если юзера не приглашали и он ещё не был зарегистрирован - приглашаем и выходим
-        await welcome_and_share_number(message)
-        await state.set_state(Form.start)
-        return
+    
 
     users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
 
