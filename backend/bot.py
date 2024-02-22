@@ -243,8 +243,8 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                         body=answer
                     )
                     return
-    except Exception as exc:
-        logging.info(exc)
+        except Exception as exc:
+            logging.info(exc)
 
     
 
