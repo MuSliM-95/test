@@ -79,8 +79,7 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
             q = contragents.insert().values(ca_list).returning(
                 contragents.c.id, contragents.c.name,
                 contragents.c.inn, contragents.c.phone,
-                contragents.c.description, contragents.c.contragent_type,
-                contragents.c.birth_date, contragents.c.data
+                contragents.c.description
             )
             new_ca = await database.fetch_all(q)
 
