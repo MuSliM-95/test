@@ -41,6 +41,9 @@ class Trial(ENUM):
     secon = "secon"
     link: str
 
+class Contragent_types(str, ENUM):
+    Supplier = "Поставщик"
+    Buyer = "Покупатель"
 
 metadata = sqlalchemy.MetaData()
 
