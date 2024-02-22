@@ -41,9 +41,6 @@ class Trial(ENUM):
     secon = "secon"
     link: str
 
-class Contragent_types(str, ENUM):
-    Supplier = "Поставщик"
-    Buyer = "Покупатель"
 
 metadata = sqlalchemy.MetaData()
 
@@ -446,9 +443,6 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("phone", String, nullable=True),
     sqlalchemy.Column("inn", String, nullable=True),
     sqlalchemy.Column("description", Text),
-    sqlalchemy.Column("contragent_type", Enum(Contragent_types)),
-    sqlalchemy.Column("birth_date", Date,)
-    sqlalchemy.Column("data", JSON),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", Integer),
