@@ -1,7 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
-import datetime
+from enum import Enum
+
+
+class Contragent_types(str, Enum):
+    Supplier = "Поставщик"
+    Buyer = "Покупатель"
 
 
 class Contragent(BaseModel):
@@ -9,6 +14,10 @@ class Contragent(BaseModel):
     phone: Optional[str]
     inn: Optional[str]
     description: Optional[str]
+
+    contragent_type: Optional[Contragent_types]
+    birth_date: Optional[int]
+    data: Optional[dict]
 
 
 class ContragentEdit(BaseModel):
@@ -18,6 +27,10 @@ class ContragentEdit(BaseModel):
     inn: Optional[str]
     description: Optional[str]
 
+    contragent_type: Optional[Contragent_types]
+    birth_date: Optional[int]
+    data: Optional[dict]
+
 
 class ContragentCreate(BaseModel):
     name: str
@@ -25,3 +38,7 @@ class ContragentCreate(BaseModel):
     phone: Optional[str]
     inn: Optional[str]
     description: Optional[str]
+
+    contragent_type: Optional[Contragent_types]
+    birth_date: Optional[int]
+    data: Optional[dict]
