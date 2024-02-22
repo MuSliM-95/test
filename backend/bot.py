@@ -228,7 +228,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         answer = f'''
 У Вас новая регистрация:
 
-{message.from_user.id}
+@{message.from_user.username}
 '''
         await bot.send_message(chat_id=int(ref_id), text=answer)
         await store_bot_message(
