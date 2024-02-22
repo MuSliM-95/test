@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from enum import Enum
+from datetime import date
 
 
 class Contragent_types(str, Enum):
@@ -16,7 +17,7 @@ class Contragent(BaseModel):
     description: Optional[str]
 
     contragent_type: Optional[Contragent_types]
-    birth_date: Optional[int]
+    birth_date: date
     data: Optional[dict]
 
 
@@ -24,7 +25,7 @@ class ContragentEdit(BaseModel):
     name: Optional[str]
     external_id: Optional[str]
     phone: Optional[str]
-    inn: Optional[str]
+    inn: date
     description: Optional[str]
 
     contragent_type: Optional[Contragent_types]
@@ -40,5 +41,5 @@ class ContragentCreate(BaseModel):
     description: Optional[str]
 
     contragent_type: Optional[Contragent_types]
-    birth_date: Optional[int]
+    birth_date: date
     data: Optional[dict]
