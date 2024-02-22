@@ -176,6 +176,39 @@ async def generate_new_user_access_token_for_cashbox(user_id: int, cashbox_id: i
     return token
 
 
+@router_comm.message(commands="referral")
+async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
+    """
+    /referral command handler for all chats
+    """
+    await store_user_message(message)
+
+    user = await database.fetch_one(
+        users.select().where(
+            users.c.chat_id == str(message.chat.id),
+            users.c.owner_id == str(message.from_user.id)
+        )
+    )
+    ref_url = f"https://t.me/tablecrmbot?start=referral_{message.chat.id}"
+
+    answer = f'''
+Ваша ссылка для приглашения:
+
+{ref_url}
+'''
+    await message.answer(text=answer)
+    await store_bot_message(
+        tg_message_id=message.message_id + 1,
+        tg_user_or_chat=str(message.chat.id),
+        from_or_to=str(bot.id),
+        body=answer
+    )
+    return
+
+
+
+
+
 @router_comm.message(F.chat.type == "private", commands="start")
 async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
     """
@@ -191,7 +224,32 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         )
     )
 
-    invite_token = command.args
+    try:
+        ref_link = message.text.split("referral_")[-1]
+        ref_user = await database.fetch_one(
+            users.select().where(
+                users.c.chat_id == str(ref_link)
+            )
+        )
+        ref_id = ref_user.chat_id
+    except Exception as exc:
+        pass
+    
+    if ref_id:
+        answer = f'''
+У Вас новая регистрация!
+@{user.username}
+'''
+        await bot.send_message(chat_id=ref_id, text=answer)
+        await store_bot_message(
+            tg_message_id=message.message_id + 1,
+            tg_user_or_chat=str(ref_id),
+            from_or_to=str(bot.id),
+            body=answer
+        )
+        return
+    else:
+        invite_token = command.args
 
     if invite_token:
         # Если пользователь пришел по пригласительной ссылке -
