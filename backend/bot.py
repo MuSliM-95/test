@@ -206,9 +206,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
     return
 
 
-
-
-
 @router_comm.message(F.chat.type == "private", commands="start")
 async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
     """
@@ -224,31 +221,23 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         )
     )
 
-    try:
-        ref_link = message.text.split("referral_")[-1]
-        ref_user = await database.fetch_one(
-            users.select().where(
-                users.c.chat_id == str(ref_link)
-            )
-        )
-    except Exception as exc:
-        pass
-    
-    if ref_link:
+    invite_token = command.args
+
+    if "referral" in str(invite_token):
+        ref_id = invite_token.split("referral_")[-1]
         answer = f'''
-У Вас новая регистрация!
-@{user.username}
+У Вас новая регистрация:
+
+{message.from_user.id}
 '''
-        await bot.send_message(chat_id=ref_link, text=answer)
+        await bot.send_message(chat_id=int(ref_id), text=answer)
         await store_bot_message(
             tg_message_id=message.message_id + 1,
-            tg_user_or_chat=str(ref_link),
+            tg_user_or_chat=str(ref_id),
             from_or_to=str(bot.id),
             body=answer
         )
         return
-    else:
-        invite_token = command.args
 
     if invite_token:
         # Если пользователь пришел по пригласительной ссылке -
