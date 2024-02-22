@@ -231,19 +231,18 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 users.c.chat_id == str(ref_link)
             )
         )
-        ref_id = ref_user.chat_id
     except Exception as exc:
         pass
     
-    if ref_id:
+    if ref_link:
         answer = f'''
 У Вас новая регистрация!
 @{user.username}
 '''
-        await bot.send_message(chat_id=ref_id, text=answer)
+        await bot.send_message(chat_id=ref_link, text=answer)
         await store_bot_message(
             tg_message_id=message.message_id + 1,
-            tg_user_or_chat=str(ref_id),
+            tg_user_or_chat=str(ref_link),
             from_or_to=str(bot.id),
             body=answer
         )
