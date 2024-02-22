@@ -220,6 +220,15 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             users.c.owner_id == str(message.from_user.id)
         )
     )
+
+    if not user:
+        # В случае если юзера не приглашали и он ещё не был зарегистрирован - приглашаем и выходим
+        await welcome_and_share_number(message)
+        await state.set_state(Form.start)
+        return
+        
+    invite_token = command.args
+
     if "referral" in str(invite_token):
         try:
             if user:
@@ -237,7 +246,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         except Exception as exc:
             logging.info(exc)
 
-    invite_token = command.args
+    
 
     if not phone:
         ref_id = invite_token.split("referral_")[-1]
@@ -300,11 +309,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             await state.update_data(cbox=dict(cbox_by_invite))
         return
 
-    if not user:
-        # В случае если юзера не приглашали и он ещё не был зарегистрирован - приглашаем и выходим
-        await welcome_and_share_number(message)
-        await state.set_state(Form.start)
-        return
+    
 
     users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
 
