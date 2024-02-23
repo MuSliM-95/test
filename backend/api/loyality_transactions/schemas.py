@@ -22,7 +22,7 @@ class LoyalityTranstactionFilters(BaseModel):
 class LoyalityTranstactionType(str, Enum):
     accrual = "accrual"
     withdraw = "withdraw"
-    autoburned = "autoburned"
+    # autoburned = "autoburned"
 
 
 class LoyalityTransactionCreate(BaseModel):
@@ -41,7 +41,7 @@ class LoyalityTransactionCreate(BaseModel):
     dead_at: Optional[int]
     is_deleted: bool = False
 
-    autoburned: bool = False
+    # autoburned: bool = False
 
     class Config:
         orm_mode = True
@@ -50,6 +50,9 @@ class LoyalityTransactionCreate(BaseModel):
 class LoyalityTransactionGet(LoyalityTransactionCreate):
     id: int
     loyality_card_id: int
+
+    # autoburned: bool
+
     created_at: int
     updated_at: int
 
@@ -57,6 +60,9 @@ class LoyalityTransactionGet(LoyalityTransactionCreate):
 class LoyalityTransaction(LoyalityTransactionCreate):
     id: int
     loyality_card_id: int
+
+    # autoburned: bool
+
     created_at: int
     updated_at: int
     data: dict
@@ -78,7 +84,7 @@ class LoyalityTransactionEdit(BaseModel):
     dead_at: Optional[int]
     is_deleted: Optional[bool]
 
-    autoburned: Optional[bool]
+    # autoburned: Optional[bool]
 
 
 class LoyalityTransactionCreateMass(BaseModel):
