@@ -54,7 +54,7 @@ def generate_doc(template, *kwargs) -> Any:
 
 
 @router.post('/docgenerated/')
-async def doc_generate(token: str,
+async def doc_generate(cashbox_id: int,
                        template_id: int,
                        variable: Dict,
                        entity: str,
@@ -63,7 +63,7 @@ async def doc_generate(token: str,
                        ):
     '''Генерирование документа с загрузкой в S3 и фиксацией записи генерации'''
     try:
-        user = await get_user_by_token(token)
+        # user = await get_user_by_token(token)
         query = doc_templates.select().where(doc_templates.c.id == template_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
@@ -75,13 +75,13 @@ async def doc_generate(token: str,
             await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
 
         file_dict = {
+                'cashbox_id': cashbox_id,
                 'doc_link': file_link,
                 'created_at': datetime.datetime.now(),
                 'tags': tags,
                 'template_id': template_id,
                 'entity': entity,
-                'entity_id': entity_id,
-                'user_id': user.id}
+                'entity_id': entity_id}
         query = doc_generated.insert().values(file_dict)
         result_file_dict_id = await database.execute(query)
         query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id)
