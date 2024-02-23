@@ -74,7 +74,7 @@ async def autoburn():
                 query = loyality_cards.update().where(loyality_cards.id == card_id).values({"balance": new_balance})
                 await database.execute(query)
 
-            cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id = card.cashbox_id))
+            cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
             admin = cashbox.admin
             
 
