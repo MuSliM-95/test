@@ -61,10 +61,11 @@ async def autoburn():
         balance = card.balance
         lifetime = card.lifetime
         if lifetime:
-            cashbox = await database.fetch_one(cboxes.select().where(cboxes.id = card.cashbox_id))
-            admin = cashbox.admin
-
             
+
+            q = loyality_transactions.select().where(loyality_transactions.loyality_card_id == card_id)
+            all_transactions = await database.fetch_all(q)
+            total_accrual = 0
             
 
 
