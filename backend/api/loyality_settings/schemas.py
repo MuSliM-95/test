@@ -13,7 +13,7 @@ class CreateSetting(BaseModel):
     end_period: Optional[int] = 0
     max_withdraw_percentage: Optional[int] = 0
     max_percentage: Optional[int] = 0
-    # lifetime: Optional[int] = 0 # lifetime in seconds
+    lifetime: Optional[int] = 0 # lifetime in seconds
 
 class EditSetting(BaseModel):
     organization: Optional[int]
@@ -24,4 +24,4 @@ class EditSetting(BaseModel):
     end_period: Optional[int] = 0
     max_withdraw_percentage: Optional[int] = 0
     max_percentage: Optional[int] = 0
-    # lifetime: Optional[int] = 0 # lifetime in seconds
+    lifetime: Optional[int] = 0 # lifetime in seconds
