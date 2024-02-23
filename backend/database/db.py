@@ -41,6 +41,9 @@ class Trial(ENUM):
     secon = "secon"
     link: str
 
+class Contragent_types(str, ENUM):
+    Supplier = "Поставщик"
+    Buyer = "Покупатель"
 
 metadata = sqlalchemy.MetaData()
 
@@ -384,6 +387,7 @@ events = sqlalchemy.Table(
     sqlalchemy.Column("user_id", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("token", String),
     sqlalchemy.Column("ip", String),
+    sqlalchemy.Column("request_time", Float, nullable=True, default=0),
     sqlalchemy.Column("promoimage", String),
     sqlalchemy.Column("promodata", JSON),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -442,6 +446,9 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("phone", String, nullable=True),
     sqlalchemy.Column("inn", String, nullable=True),
     sqlalchemy.Column("description", Text),
+    sqlalchemy.Column("contragent_type", Enum(Contragent_types)),
+    sqlalchemy.Column("birth_date", Date),
+    sqlalchemy.Column("data", JSON),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", Integer),
@@ -987,6 +994,7 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("created_by_id", ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("status_card", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("lifetime", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -1010,6 +1018,7 @@ loyality_transactions = sqlalchemy.Table(
     sqlalchemy.Column("external_id", String),
     sqlalchemy.Column("cashier_name", String),
     sqlalchemy.Column("dead_at", DateTime),
+    sqlalchemy.Column("autoberned", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -1028,6 +1037,7 @@ loyality_settings = sqlalchemy.Table(
     sqlalchemy.Column("end_period", DateTime),
     sqlalchemy.Column("max_withdraw_percentage", Integer),
     sqlalchemy.Column("max_percentage", Integer),
+    sqlalchemy.Column("lifetime", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )

@@ -15,6 +15,7 @@ class Event(BaseModel):
     user_id: Optional[int]
     token: Optional[str]
     ip: Optional[str]
+    request_time: Optional[float]
     promoimage: Optional[str]
     promodata: Optional[dict]
 

@@ -1,5 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional,  List
+from typing import Optional, List
+
+from datetime import date
 
 class LoyalityCardFilters(BaseModel):
     card_number: Optional[int]
@@ -25,6 +27,8 @@ class LoyalityCardFilters(BaseModel):
     phone_number: Optional[int]
     organization_name: Optional[str]
 
+    lifetime: Optional[int] # lifetime in seconds
+
     status_card: Optional[bool]
 
 
@@ -45,6 +49,10 @@ class LoyalityCardCreate(BaseModel):
     # start_period: Optional[int]
     # end_period: Optional[int]
     # max_percentage: Optional[int]
+
+    lifetime: Optional[int] # lifetime in seconds
+    # closest_burnout: Optional[dict[Optional[date], Optional[int]]]
+
     status_card: bool = True
     is_deleted: bool = False
 
@@ -68,6 +76,9 @@ class LoyalityCardEdit(BaseModel):
     end_period: Optional[int]
     max_percentage: Optional[int]
     max_withdraw_percentage: Optional[int]
+
+    lifetime: Optional[int] # lifetime in seconds
+
     status_card: Optional[bool]
     is_deleted: Optional[bool]
 
@@ -89,6 +100,10 @@ class LoyalityCardGet(BaseModel):
     start_period: int
     end_period: int
     max_percentage: int
+
+    lifetime: int # lifetime in seconds
+    closest_burnout: dict[Optional[date], Optional[int]]
+
     status_card: bool
     is_deleted: bool
     created_at: int

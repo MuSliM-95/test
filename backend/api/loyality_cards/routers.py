@@ -241,6 +241,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
             loyality_cards_values['minimal_checque_amount'] = setting.minimal_checque_amount
             loyality_cards_values['max_percentage'] = setting.max_percentage
             loyality_cards_values['max_withdraw_percentage'] = setting.max_withdraw_percentage
+            loyality_cards_values['lifetime'] = setting.lifetime
             loyality_cards_values['start_period'] = setting.start_period
             loyality_cards_values['end_period'] = setting.end_period
 
@@ -248,7 +249,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                 if setting.tags:
                     loyality_cards_values['tags'] = setting.tags
         else:
-            for field in ['cashback_percent', 'minimal_checque_amount', 'max_percentage', 'max_withdraw_percentage']:
+            for field in ['cashback_percent', 'minimal_checque_amount', 'max_percentage', 'max_withdraw_percentage', 'lifetime']:
                 if not loyality_cards_values.get(field):
                     loyality_cards_values[field] = 0
 

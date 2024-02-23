@@ -176,6 +176,36 @@ async def generate_new_user_access_token_for_cashbox(user_id: int, cashbox_id: i
     return token
 
 
+@router_comm.message(commands="referral")
+async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
+    """
+    /referral command handler for all chats
+    """
+    await store_user_message(message)
+
+    user = await database.fetch_one(
+        users.select().where(
+            users.c.chat_id == str(message.chat.id),
+            users.c.owner_id == str(message.from_user.id)
+        )
+    )
+    ref_url = f"https://t.me/tablecrmbot?start=referral_{message.chat.id}"
+
+    answer = f'''
+Ваша ссылка для приглашения:
+
+{ref_url}
+'''
+    await message.answer(text=answer)
+    await store_bot_message(
+        tg_message_id=message.message_id + 1,
+        tg_user_or_chat=str(message.chat.id),
+        from_or_to=str(bot.id),
+        body=answer
+    )
+    return
+
+
 @router_comm.message(F.chat.type == "private", commands="start")
 async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
     """
@@ -191,7 +221,54 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         )
     )
 
+    if not user:
+        # В случае если юзера не приглашали и он ещё не был зарегистрирован - приглашаем и выходим
+        await welcome_and_share_number(message)
+        await state.set_state(Form.start)
+        return
+        
     invite_token = command.args
+
+    if "referral" in str(invite_token):
+        try:
+            if user:
+                phone = user.phone_number
+            if phone:
+                    answer = f"У вас уже есть регистрация в tablecrm.com!"   
+                    await message.answer(text=answer)
+                    await store_bot_message(
+                        tg_message_id=message.message_id + 1,
+                        tg_user_or_chat=str(message.from_user.id),
+                        from_or_to=str(bot.id),
+                        body=answer
+                    )
+                    return
+        except Exception as exc:
+            logging.info(exc)
+
+    
+
+    if "referral" in str(invite_token):
+        ref_id = invite_token.split("referral_")[-1]
+
+        if int(ref_id) != int(message.from_user.id):
+            answer = f'''
+У Вас новая регистрация:
+@{message.from_user.username}
+'''     
+
+        else:
+            answer = f'''
+Вы не можете регистировать самого себя!
+'''     
+        await bot.send_message(chat_id=int(ref_id), text=answer)
+        await store_bot_message(
+            tg_message_id=message.message_id + 1,
+            tg_user_or_chat=str(ref_id),
+            from_or_to=str(bot.id),
+            body=answer
+        )
+        return
 
     if invite_token:
         # Если пользователь пришел по пригласительной ссылке -
@@ -232,11 +309,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             await state.update_data(cbox=dict(cbox_by_invite))
         return
 
-    if not user:
-        # В случае если юзера не приглашали и он ещё не был зарегистрирован - приглашаем и выходим
-        await welcome_and_share_number(message)
-        await state.set_state(Form.start)
-        return
+    
 
     users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
 

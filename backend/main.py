@@ -1,4 +1,5 @@
 import json
+import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -144,8 +145,10 @@ async def write_event_middleware(request: Request, call_next):
         await set_body(request, body)
         return body
 
+    time_start = time.time()
     await set_body(request, await request.body())
     body = await get_body(request)
+    response = await call_next(request)
 
     try:
         if "openapi.json" not in request.url.path:
@@ -166,12 +169,11 @@ async def write_event_middleware(request: Request, call_next):
                 cashbox_id=cashbox_id,
                 user_id=user_id,
                 token=token,
-                ip=request.headers.get("x-forwarded-for")
+                ip=request.headers.get("x-forwarded-for"),
+                request_time=time.time()-time_start
             )
     except:
         pass
-
-    response = await call_next(request)
 
     return response
 
