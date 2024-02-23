@@ -51,7 +51,7 @@ async def check_account():
             await make_account(balance)
 
 
-@scheduler.scheduled_job("interval", seconds=5)
+@scheduler.scheduled_job("interval", seconds=60)
 async def autoburn():
     await database.connect()
 
