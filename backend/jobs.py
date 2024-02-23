@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 from const import PAID, DEMO, RepeatPeriod
-from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards
+from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, cboxes
 from functions.account import make_account
 from functions.goods_distribution import process_distribution
 from functions.gross_profit import process_gross_profit_report
