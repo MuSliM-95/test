@@ -25,7 +25,7 @@ class LoyalityCardFilters(BaseModel):
     phone_number: Optional[int]
     organization_name: Optional[str]
 
-    lifetime: Optional[int]
+    lifetime: Optional[int] # lifetime in seconds
 
     status_card: Optional[bool]
 
@@ -48,7 +48,7 @@ class LoyalityCardCreate(BaseModel):
     # end_period: Optional[int]
     # max_percentage: Optional[int]
 
-    lifetime: Optional[int]
+    lifetime: Optional[int] # lifetime in seconds
 
     status_card: bool = True
     is_deleted: bool = False
@@ -74,7 +74,7 @@ class LoyalityCardEdit(BaseModel):
     max_percentage: Optional[int]
     max_withdraw_percentage: Optional[int]
 
-    lifetime: Optional[int]
+    lifetime: Optional[int] # lifetime in seconds
 
     status_card: Optional[bool]
     is_deleted: Optional[bool]
@@ -98,7 +98,7 @@ class LoyalityCardGet(BaseModel):
     end_period: int
     max_percentage: int
 
-    lifetime: int
+    lifetime: int # lifetime in seconds
 
     status_card: bool
     is_deleted: bool
