@@ -116,11 +116,11 @@ async def get_generate_docs_by_filename(filename: str):
 @router.get('/docgenerated/', status_code=status.HTTP_200_OK)
 async def get_doc_generate_list(cashbox: int, tags: str = None, limit: int = 100, offset: int = 0):
     """Получение списка генераций"""
-    # doc_generated.select().where(doc_generated.c.cashbox_id == cashbox).limit(limit).offset()
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
-        query = doc_generated.select().where(or_(*filter_tags)).order_by(desc(doc_generated.c.created_at)).limit(limit).offset(offset)
+        query = doc_generated.select().where(doc_generated.c.cashbox_id == cashbox,
+                                             *filter_tags).order_by(desc(doc_generated.c.created_at)).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
     else:
