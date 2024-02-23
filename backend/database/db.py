@@ -960,7 +960,6 @@ warehouse_balances = sqlalchemy.Table(
 
 
 
-
 messages = sqlalchemy.Table(
     "messages",
     metadata,
@@ -995,7 +994,6 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("status_card", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("lifetime", Integer),
-    sqlalchemy.Column("closest_burnout", JSON),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )

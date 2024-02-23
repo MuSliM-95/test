@@ -127,10 +127,10 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
                         card_dict["balance"] = round(
                             float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
                         )
-                    elif loyality_transaction_data.type == "autoburned":
-                        card_dict["balance"] = round(
-                            float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
-                        )
+                    # elif loyality_transaction_data.type == "autoburned":
+                    #     card_dict["balance"] = round(
+                    #         float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
+                    #     )
 
                     if card.status_card:
                         q = loyality_cards.update().where(loyality_cards.c.id == card.id).values(card_dict)

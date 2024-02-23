@@ -27,7 +27,7 @@ class LoyalityCardFilters(BaseModel):
     phone_number: Optional[int]
     organization_name: Optional[str]
 
-    lifetime: Optional[int] # lifetime in seconds
+    # lifetime: Optional[int] # lifetime in seconds
 
     status_card: Optional[bool]
 
@@ -51,7 +51,6 @@ class LoyalityCardCreate(BaseModel):
     # max_percentage: Optional[int]
 
     lifetime: Optional[int] # lifetime in seconds
-    # closest_burnout: Optional[dict[Optional[date], Optional[int]]]
 
     status_card: bool = True
     is_deleted: bool = False
@@ -101,8 +100,7 @@ class LoyalityCardGet(BaseModel):
     end_period: int
     max_percentage: int
 
-    lifetime: int # lifetime in seconds
-    closest_burnout: dict[Optional[date], Optional[int]]
+    lifetime: Optional[int] # lifetime in seconds
 
     status_card: bool
     is_deleted: bool
