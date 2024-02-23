@@ -994,6 +994,7 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("created_by_id", ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("status_card", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("lifetime", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -1017,6 +1018,7 @@ loyality_transactions = sqlalchemy.Table(
     sqlalchemy.Column("external_id", String),
     sqlalchemy.Column("cashier_name", String),
     sqlalchemy.Column("dead_at", DateTime),
+    sqlalchemy.Column("autoberned", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -1035,6 +1037,7 @@ loyality_settings = sqlalchemy.Table(
     sqlalchemy.Column("end_period", DateTime),
     sqlalchemy.Column("max_withdraw_percentage", Integer),
     sqlalchemy.Column("max_percentage", Integer),
+    sqlalchemy.Column("lifetime", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
