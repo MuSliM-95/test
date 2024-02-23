@@ -61,11 +61,20 @@ async def autoburn():
         balance = card.balance
         lifetime = card.lifetime
         if lifetime:
-            
-
             q = loyality_transactions.select().where(loyality_transactions.loyality_card_id == card_id)
             all_transactions = await database.fetch_all(q)
             total_accrual = 0
+            for transaction in all_transactions:
+                if transaction.created_at.timestamp() + lifetime < datetime.now().timestamp():
+                    if transaction.type == "accrual":
+                        total_accrual += transaction.amount
+            burn_amount = balance - total_accrual
+            if burn_amount > 0:
+                new_balance = balance - burn_amount
+                query = loyality_cards.update().where(loyality_cards.id == card_id).values({"balance": new_balance})
+                await database.execute(query)
+
+            
             
 
 
