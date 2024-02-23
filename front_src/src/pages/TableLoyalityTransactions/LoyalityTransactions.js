@@ -189,7 +189,7 @@ class LoyalityTransactions extends React.Component {
 						return <font color="green">+{text}</font>
 					} 
 					else if (row.type === "autoburned") {
-						return <font color="purple">-{text}</font>
+						return <font color="blue">-{text}</font>
 					} else {
 						return <font color="red">-{text}</font>
 					}
@@ -234,7 +234,7 @@ class LoyalityTransactions extends React.Component {
 						return <font color="red">Вывод</font>
 					}
 					if (paymentType === "autoburned") {
-						return <font color="purple">Автосписание</font>
+						return <font color="blue">Автосписание</font>
 					}
 				}
 			},
