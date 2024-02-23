@@ -17,7 +17,7 @@ class LoyalityTranstactionFilters(BaseModel):
 
     status: Optional[bool]
 
-    autoberned: Optional[bool] = False
+    autoberned: Optional[bool]
 
 class LoyalityTranstactionType(str, Enum):
     accrual = "accrual"
