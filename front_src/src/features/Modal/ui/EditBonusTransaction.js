@@ -384,6 +384,7 @@ class EditBonusTransaction extends React.Component {
                                 <Radio.Group>
                                     <Radio.Button value="accrual">Начисление</Radio.Button>
                                     <Radio.Button value="withdraw">Вывод</Radio.Button>
+                                    <Radio.Button value="autoburned">Автосписание</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
 
