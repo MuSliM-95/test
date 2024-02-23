@@ -1018,7 +1018,7 @@ loyality_transactions = sqlalchemy.Table(
     sqlalchemy.Column("external_id", String),
     sqlalchemy.Column("cashier_name", String),
     sqlalchemy.Column("dead_at", DateTime),
-    sqlalchemy.Column("autoberned", Boolean),
+    sqlalchemy.Column("autoburned", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
