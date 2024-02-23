@@ -51,7 +51,7 @@ async def check_account():
             await make_account(balance)
 
 
-@scheduler.scheduled_job("interval", seconds=60)
+@scheduler.scheduled_job("interval", seconds=5)
 async def autoburn():
     await database.connect()
 
@@ -77,22 +77,30 @@ async def autoburn():
             cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
             admin = cashbox.admin
 
+            
             rubles_body = {
-                "loyality_card_id": card_id,
-                "loyality_card_number": card.card_number,
                 "type": "autoburned",
-                "name": f"Автосписание",
-                "amount": burn_amount,
-                "created_by_id": admin,
-                "tags": "",
                 "dated": datetime.now(),
-                "cashbox": cashbox.id,
-                "is_deleted": False,
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
+                "amount": burn_amount,
+                "loyality_card_id": card_id,
+                "loyality_card_number": card_number,
+                "created_by_id": admin,
+                "cashbox": cashbox_id['cashbox_id'],
+                "tags": "",
+                "name": "Автосписание",
+                "description": None,
                 "status": True,
+                "external_id": None,
+                "cashier_name": None,
+                "percentamount": None,
+                "preamount": None,
+                "dead_at": None,
+                "is_deleted": False,
                 "autoburned": True,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now()
             }
+
             await database.execute(loyality_transactions.insert().values(rubles_body))
             
 
