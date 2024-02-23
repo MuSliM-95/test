@@ -22,6 +22,7 @@ class LoyalityTranstactionFilters(BaseModel):
 class LoyalityTranstactionType(str, Enum):
     accrual = "accrual"
     withdraw = "withdraw"
+    autoberned = "autoberned"
 
 
 class LoyalityTransactionCreate(BaseModel):
