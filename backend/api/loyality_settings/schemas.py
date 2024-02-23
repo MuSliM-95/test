@@ -1,7 +1,7 @@
 from enum import Enum
 
 from pydantic import BaseModel
-from typing import Optional,  List
+from typing import Optional, List
 
 
 class CreateSetting(BaseModel):
@@ -13,6 +13,7 @@ class CreateSetting(BaseModel):
     end_period: Optional[int] = 0
     max_withdraw_percentage: Optional[int] = 0
     max_percentage: Optional[int] = 0
+    lifetime: Optional[int] = 0 # lifetime in seconds
 
 class EditSetting(BaseModel):
     organization: Optional[int]
@@ -23,3 +24,4 @@ class EditSetting(BaseModel):
     end_period: Optional[int] = 0
     max_withdraw_percentage: Optional[int] = 0
     max_percentage: Optional[int] = 0
+    lifetime: Optional[int] = 0 # lifetime in seconds
