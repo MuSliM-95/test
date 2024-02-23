@@ -114,9 +114,9 @@ async def get_generate_docs_by_filename(filename: str):
 
 
 @router.get('/docgenerated/', status_code=status.HTTP_200_OK)
-async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, offset: int = 0):
+async def get_doc_generate_list(cashbox: int, tags: str = None, limit: int = 100, offset: int = 0):
     """Получение списка генераций"""
-    # user = await get_user_by_token(token)
+    # doc_generated.select().where(doc_generated.c.cashbox_id == cashbox).limit(limit).offset()
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
@@ -124,6 +124,6 @@ async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, 
         result = await database.fetch_all(query)
         return {'results': result}
     else:
-        query = doc_generated.select().limit(limit).offset(offset)
+        query = doc_generated.select().where(doc_generated.c.cashbox_id == cashbox).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
