@@ -960,7 +960,6 @@ warehouse_balances = sqlalchemy.Table(
 
 
 
-
 messages = sqlalchemy.Table(
     "messages",
     metadata,
