@@ -41,7 +41,7 @@ class LoyalityTransactionCreate(BaseModel):
     dead_at: Optional[int]
     is_deleted: bool = False
 
-    autoburned: bool = False
+    autoburned: Optional[bool] = False
 
     class Config:
         orm_mode = True
