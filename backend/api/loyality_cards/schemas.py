@@ -51,7 +51,7 @@ class LoyalityCardCreate(BaseModel):
     # max_percentage: Optional[int]
 
     lifetime: Optional[int] # lifetime in seconds
-    # closest_burnout: Optional[dict[Optional[date], Optional[int]]]
+    closest_burnout: Optional[dict[Optional[date], Optional[int]]]
 
     status_card: bool = True
     is_deleted: bool = False
