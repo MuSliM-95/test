@@ -17,6 +17,8 @@ class LoyalityTranstactionFilters(BaseModel):
 
     status: Optional[bool]
 
+    autoberned: Optional[bool] = False
+
 class LoyalityTranstactionType(str, Enum):
     accrual = "accrual"
     withdraw = "withdraw"
@@ -38,6 +40,8 @@ class LoyalityTransactionCreate(BaseModel):
     dead_at: Optional[int]
     is_deleted: bool = False
 
+    autoberned: bool = False
+
     class Config:
         orm_mode = True
 
@@ -45,6 +49,9 @@ class LoyalityTransactionCreate(BaseModel):
 class LoyalityTransactionGet(LoyalityTransactionCreate):
     id: int
     loyality_card_id: int
+
+    autoberned: bool
+
     created_at: int
     updated_at: int
 
@@ -52,6 +59,9 @@ class LoyalityTransactionGet(LoyalityTransactionCreate):
 class LoyalityTransaction(LoyalityTransactionCreate):
     id: int
     loyality_card_id: int
+
+    autoberned: bool
+
     created_at: int
     updated_at: int
     data: dict
@@ -72,6 +82,8 @@ class LoyalityTransactionEdit(BaseModel):
     cashier_name: Optional[str]
     dead_at: Optional[int]
     is_deleted: Optional[bool]
+
+    autoberned: Optional[bool]
 
 
 class LoyalityTransactionCreateMass(BaseModel):
