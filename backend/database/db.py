@@ -1047,7 +1047,6 @@ doc_generated = sqlalchemy.Table(
     "doc_generated",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("user_id", ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("tags", String),
     sqlalchemy.Column("template_id", ForeignKey("doc_template.id")),
