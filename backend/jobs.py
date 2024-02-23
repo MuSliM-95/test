@@ -76,6 +76,24 @@ async def autoburn():
 
             cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
             admin = cashbox.admin
+
+            rubles_body = {
+                "loyality_card_id": card_id,
+                "loyality_card_number": card.card_number,
+                "type": "autoburned",
+                "name": f"Автосписание",
+                "amount": burn_amount,
+                "created_by_id": admin,
+                "tags": "",
+                "dated": datetime.now(),
+                "cashbox": cashbox.id,
+                "is_deleted": False,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
+                "status": True,
+                "autoburned": True,
+            }
+            await database.execute(loyality_transactions.insert().values(rubles_body))
             
 
 
