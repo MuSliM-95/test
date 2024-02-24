@@ -55,13 +55,13 @@ async def check_account():
 async def autoburn():
     await database.connect()
 
-    all_cards = await database.fetch_all(loyality_cards.select().where(loyality_cards.balance > 0))
+    all_cards = await database.fetch_all(loyality_cards.select().where(loyality_cards.c.balance > 0))
     for card in all_cards:
         card_id = card.id
         balance = card.balance
         lifetime = card.lifetime
         if lifetime:
-            q = loyality_transactions.select().where(loyality_transactions.loyality_card_id == card_id)
+            q = loyality_transactions.select().where(loyality_transactions.c.loyality_card_id == card_id)
             all_transactions = await database.fetch_all(q)
             total_accrual = 0
             for transaction in all_transactions:
@@ -71,7 +71,7 @@ async def autoburn():
             burn_amount = balance - total_accrual
             if burn_amount > 0:
                 new_balance = balance - burn_amount
-                query = loyality_cards.update().where(loyality_cards.id == card_id).values({"balance": new_balance})
+                query = loyality_cards.update().where(loyality_cards.c.id == card_id).values({"balance": new_balance})
                 await database.execute(query)
 
             cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
