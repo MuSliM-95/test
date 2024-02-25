@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta
 
+from apscheduler.jobstores.base import JobLookupError
 from sqlalchemy import desc
 from sqlalchemy.exc import DatabaseError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -18,9 +19,29 @@ scheduler = AsyncIOScheduler(
 )
 jobstore = SQLAlchemyJobStore(engine=engine)
 try:
-    jobstore.remove_all_jobs()
+    try:
+        jobstore.remove_job("check_account")
+    except JobLookupError:
+        pass
+    try:
+        jobstore.remove_job("autoburn")
+    except JobLookupError:
+        pass
+    try:
+        jobstore.remove_job("repeat_payments")
+    except JobLookupError:
+        pass
+    try:
+        jobstore.remove_job("distribution")
+    except JobLookupError:
+        pass
+    # try:
+        # jobstore.remove_job("amo_import")
+    # except JobLookupError:
+    #     pass
 except DatabaseError:
     pass
+
 scheduler.add_jobstore(jobstore)
 
 
@@ -35,7 +56,7 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 # amo_interval = int(os.getenv("AMO_CONTACTS_IMPORT_FREQUENCY_SECONDS", default=120))
 
 
-@scheduler.scheduled_job("interval", seconds=accountant_interval)
+@scheduler.scheduled_job("interval", seconds=accountant_interval, id="check_account")
 async def check_account():
     await database.connect()
     balances = await database.fetch_all(accounts_balances.select())
@@ -51,7 +72,7 @@ async def check_account():
             await make_account(balance)
 
 
-@scheduler.scheduled_job("interval", seconds=5)
+@scheduler.scheduled_job("interval", seconds=5, id="autoburn")
 async def autoburn():
     await database.connect()
 
@@ -105,7 +126,7 @@ async def autoburn():
             
 
 
-# @scheduler.scheduled_job("interval", seconds=amo_interval)
+# @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
 # async def amo_import():
 #     await database.connect()
 #     balances = await database.fetch_all(accounts_balances.select())
@@ -121,7 +142,7 @@ async def autoburn():
 #             await make_account(balance)
 
 
-@scheduler.scheduled_job("interval", seconds=5)
+@scheduler.scheduled_job("interval", seconds=5, id="repeat_payments")
 async def repeat_payments():
     await database.connect()
     query = payments.select().filter(payments.c.repeat_period != None)
@@ -190,7 +211,7 @@ async def repeat_payments():
             await clear_repeats(payment.id)
 
 
-@scheduler.scheduled_job("interval", seconds=5)
+@scheduler.scheduled_job("interval", seconds=5, id="distribution")
 async def distribution():
     await process_distribution()
     await process_gross_profit_report()
