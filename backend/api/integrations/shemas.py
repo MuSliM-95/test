@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Union
 from pydantic import BaseModel, Field, HttpUrl
 
 # class Status(Enum):
@@ -54,8 +54,9 @@ class Integration(BaseModel):
 
 class CreateApp(Integration):
     scopes: str
-    url: HttpUrl
-    redirect_uri: Optional[HttpUrl] = None
+    client_app_id: Optional[str] = None
+    url: Union[HttpUrl, str]
+    redirect_uri: Union[HttpUrl, str] = None
 
 class UpdateIntegration(BaseModel):
     status : Optional[bool] =  None

@@ -47,6 +47,16 @@ class Contragent_types(str, ENUM):
 
 metadata = sqlalchemy.MetaData()
 
+
+tochka_bank_credentials = sqlalchemy.Table(
+    "tochka_bank_credentials",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id")),
+    sqlalchemy.Column('access_token', String),
+    sqlalchemy.Column('refresh_token', String)
+)
+
 entity_type = sqlalchemy.Table(
     "entity_type",
     metadata,
@@ -123,6 +133,7 @@ integrations = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("is_payed", Boolean),
     sqlalchemy.Column("trial", String),
+    sqlalchemy.Column('client_app_id', String),
     sqlalchemy.Column("client_secret", String),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("scopes", Text),
