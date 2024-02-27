@@ -1,7 +1,8 @@
 import aiohttp
 from jobs import scheduler, jobstore
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import RedirectResponse
+from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database, tochka_bank_credentials
 from datetime import datetime
 from sqlalchemy import or_, and_, select
 
@@ -11,23 +12,55 @@ from functions.helpers import get_user_by_token
 router = APIRouter(tags=["Tochka bank"])
 
 
+async def integration_info(cashbox_id, id_integration):
+    query = select(integrations_to_cashbox.c.installed_by,
+                   users_cboxes_relation.c.token,
+                   integrations_to_cashbox.c.id,
+                   *integrations.columns) \
+        .where(users_cboxes_relation.c.cashbox_id == cashbox_id) \
+        .select_from(users_cboxes_relation) \
+        .join(integrations_to_cashbox, users_cboxes_relation.c.id == integrations_to_cashbox.c.installed_by) \
+        .select_from(integrations_to_cashbox) \
+        .join(integrations, integrations.c.id == integrations_to_cashbox.c.installed_by).where(
+        integrations.c.id == id_integration)
+    return await database.fetch_one(query)
+
+
 def create_job(link):
     print(f'finish link: {link}')
 
 
-@router.post("/get_oauth_link/")
+@router.get("/bank/tochkaoauth")
+async def tochkaoauth(code: str, state: int):
+    user_integration = await integration_info(state, 1)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f'https://enter.tochka.com/connect/token', data = {
+            'client_id': user_integration.get('client_app_id'),
+            'client_secret': user_integration.get('client_secret'),
+            'grant_type': 'authorization_code',
+            'code': code,
+            'scope': user_integration.get('scopes'),
+        }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
+            token_json = await resp.json()
+        await session.close()
+    try:
+        await database.execute(tochka_bank_credentials.insert().values({
+            'access_token': token_json.get('access_token'),
+            'refresh_token': token_json.get('refresh_token'),
+            'integration_cashboxes': user_integration.get('id')}))
+    except Exception as error:
+        raise HTTPException(status_code=433, detail=str(error))
+    return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}', status_code=302)
+
+
+@router.post("/bank/get_oauth_link/")
 async def get_token_for_scope(token: str, id_integration: int):
 
     """Получение токена для работы с разрешениями"""
 
     user = await get_user_by_token(token)
-    query = select(integrations_to_cashbox.c.installed_by, *integrations.columns) \
-        .where(users_cboxes_relation.c.cashbox_id == user.cashbox_id)\
-        .select_from(users_cboxes_relation)\
-        .join(integrations_to_cashbox, users_cboxes_relation.c.id == integrations_to_cashbox.c.installed_by)\
-        .select_from(integrations_to_cashbox)\
-        .join(integrations, integrations.c.id == integrations_to_cashbox.c.installed_by).where(integrations.c.id == id_integration)
-    user_integration = await database.fetch_one(query)
+    user_integration = await integration_info(user.get('cashbox_id'), id_integration)
 
     async with aiohttp.ClientSession() as session:
         async with session.post(f'https://enter.tochka.com/connect/token', data = {
@@ -38,7 +71,7 @@ async def get_token_for_scope(token: str, id_integration: int):
         }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
             token_scope_json = await resp.json()
         await session.close()
-    print(token_scope_json.get("access_token"))
+
     async with aiohttp.ClientSession() as session:
         async with session.post(f'https://enter.tochka.com/uapi/v1.0/consents', json = {
             "Data": {
@@ -59,15 +92,16 @@ async def get_token_for_scope(token: str, id_integration: int):
                 ]
             }
         }, headers = {'Authorization': f'Bearer {token_scope_json.get("access_token")}', 'Content-Type': 'application/json'}) as resp:
-            print(resp.request_info)
             api_resp_json = await resp.json()
         await session.close()
+
         link = f'{user_integration.get( "url" )}authorize?' \
                f'client_id={api_resp_json.get("Data").get("clientId")}&' \
                f'response_type=code&' \
                f'redirect_uri={user_integration.get("redirect_uri")}&' \
                f'consent_id={api_resp_json.get("Data").get("consentId")}&' \
-               f'scope={user_integration.get("scopes")}'
+               f'scope={user_integration.get("scopes")}&' \
+               f'state={user.get("cashbox_id")}'
         # scheduler.add_job(create_job, 'interval', seconds = 20, kwargs = {'link': link}, name = 'update token', id = api_resp_json.get("Data").get("clientId"))
     return {'result': link}
 

@@ -54,7 +54,9 @@ tochka_bank_credentials = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id")),
     sqlalchemy.Column('access_token', String),
-    sqlalchemy.Column('refresh_token', String)
+    sqlalchemy.Column('refresh_token', String),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 entity_type = sqlalchemy.Table(
