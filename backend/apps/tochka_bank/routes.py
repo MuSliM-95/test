@@ -21,7 +21,7 @@ async def integration_info(cashbox_id, id_integration):
         .select_from(users_cboxes_relation) \
         .join(integrations_to_cashbox, users_cboxes_relation.c.id == integrations_to_cashbox.c.installed_by) \
         .select_from(integrations_to_cashbox) \
-        .join(integrations, integrations.c.id == integrations_to_cashbox.c.installed_by).where(
+        .join(integrations, integrations.c.id == integrations_to_cashbox.c.integration_id).where(
         integrations.c.id == id_integration)
     return await database.fetch_one(query)
 
