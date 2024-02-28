@@ -129,7 +129,7 @@ async def check(token: str, id_integration: int):
         isAuth = await database.fetch_one(
             tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == check.get("id"))
         )
-        if isAuth is not None:
+        if isAuth:
             message.update({'integration_isAuth': True})
     await manager.send_message(user.token, message)
     return {"result": 'ok'}
