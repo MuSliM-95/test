@@ -106,7 +106,7 @@ async def get_token_for_scope(token: str, id_integration: int):
                f'scope={user_integration.get("scopes")}&' \
                f'state={user.get("cashbox_id")}'
         # scheduler.add_job(create_job, 'interval', seconds = 20, kwargs = {'link': link}, name = 'update token', id = api_resp_json.get("Data").get("clientId"))
-    return RedirectResponse(f'{link}', status_code=302)
+    return {'link': link}
 
 
 @router.get("/bank/check")
