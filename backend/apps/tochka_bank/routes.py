@@ -176,7 +176,6 @@ async def integration_off(token: str, id_integration: int):
     """Удаление связи аккаунта пользователя и интеграции"""
 
     user = await get_user_by_token(token)
-
     try:
         await database.execute(integrations_to_cashbox.update().where(and_(
             integrations_to_cashbox.c.integration_id == id_integration,
@@ -184,11 +183,17 @@ async def integration_off(token: str, id_integration: int):
         )).values({
             'status': False
         }))
+        integration_cashbox = await database.fetch_one(integrations_to_cashbox.
+                                                       select().
+                                                       where(integrations_to_cashbox.c.installed_by == user.get("id")))
+        await database.execute(tochka_bank_credentials.
+                               delete().
+                               where(tochka_bank_credentials.c.integration_cashboxes == integration_cashbox.get("id")))
         await manager.send_message(user.token,
                                     {"action": "off", "target": "IntegrationTochkaBank", "integration_status": False})
-        return {'result': 'ok'}
+        return {'isAuth': False}
     except:
-        raise HTTPException(status_code = 422, detail = "ошибка удаления связи аккаунта пользователя и интеграции")
+        raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")
 
 
 
