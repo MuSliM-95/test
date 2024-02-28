@@ -120,8 +120,18 @@ async def check(token: str, id_integration: int):
         integrations_to_cashbox.c.integration_id == id_integration,
         integrations_to_cashbox.c.installed_by == user.id
     )))
-    await manager.send_message(user.token,
-                                {"action": "check", "target":"IntegrationTochkaBank", "integration_status": check.get('status')})
+    message = {
+        "action": "check",
+        "target": "IntegrationTochkaBank",
+        "integration_status": check.get('status'),
+    }
+    if check:
+        isAuth = await database.fetch_one(
+            tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == check.get("id"))
+        )
+        if isAuth is not None:
+            message.update({'integration_isAuth': True})
+    await manager.send_message(user.token, message)
     return {"result": 'ok'}
 
 
