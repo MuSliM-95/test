@@ -109,6 +109,22 @@ async def get_token_for_scope(token: str, id_integration: int):
     return {'result': link}
 
 
+@router.get("/bank/check")
+async def check(token: str, id_integration: int):
+
+    """Проверка установлена или нет интеграция у клиента"""
+
+    user = await get_user_by_token(token)
+
+    check = await database.fetch_one(integrations_to_cashbox.select().where(and_(
+        integrations_to_cashbox.c.integration_id == id_integration,
+        integrations_to_cashbox.c.installed_by == user.id
+    )))
+    await manager.send_message(user.token,
+                                {"action": "check", "target":"IntegrationTochkaBank", "integration_status": check.get('status')})
+    return {"result": 'ok'}
+
+
 @router.get("/bank/integration_on")
 async def integration_on(token: str, id_integration: int):
 
