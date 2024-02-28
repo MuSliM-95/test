@@ -125,7 +125,7 @@ async def check(token: str, id_integration: int):
         "target": "IntegrationTochkaBank",
         "integration_status": check.get('status'),
     }
-    if check:
+    if check.get('status'):
         isAuth = await database.fetch_one(
             tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == check.get("id"))
         )
