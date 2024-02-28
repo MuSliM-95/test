@@ -196,4 +196,31 @@ async def integration_off(token: str, id_integration: int):
         raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")
 
 
+@router.get("/bank/accounts/")
+async def accounts(token: str, id_integration: int):
+
+    """Получение списка счетов аккаунта банка"""
+
+    user = await get_user_by_token(token)
+
+    query = ((select(integrations_to_cashbox.c.id, integrations_to_cashbox.c.status, tochka_bank_credentials.c.access_token).
+             where(and_(
+                integrations_to_cashbox.c.installed_by == user.id,
+                integrations_to_cashbox.c.integration_id == id_integration
+                ))
+             ).select_from(integrations_to_cashbox).
+             join(tochka_bank_credentials, integrations_to_cashbox.c.id == tochka_bank_credentials.c.integration_cashboxes)
+             )
+    credential = await database.fetch_one(query)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts',
+                               headers={
+                                   'Authorization': f'Bearer {credential.get("access_token")}',
+                                   'Content-type': 'application/json'
+                               }) as resp:
+            accounts_json = await resp.json()
+        await session.close()
+
+    return {'result': accounts_json}
 
