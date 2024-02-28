@@ -129,10 +129,13 @@ async def check(token: str, id_integration: int):
         isAuth = await database.fetch_one(
             tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == check.get("id"))
         )
+
         if isAuth:
             message.update({'integration_isAuth': True})
+        else:
+            message.update({'integration_isAuth': False})
     await manager.send_message(user.token, message)
-    return {"result": 'ok'}
+    return {"isAuth": message.get('integration_isAuth')}
 
 
 @router.get("/bank/integration_on")
