@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import or_, and_, select
 
 from functions.helpers import get_user_by_token
-
+from ws_manager import manager
 
 router = APIRouter(tags=["Tochka bank"])
 
@@ -133,6 +133,9 @@ async def integration_on(token: str, id_integration: int):
                 'deactivated_by': user.get('id'),
                 'status': True,
             }))
+
+        await manager.send_message(user.token,
+                                    {"action": "on", "target": "IntegrationTochkaBank", "integration_status": True})
         return {'result': 'ok'}
     except:
         raise HTTPException(status_code = 422, detail = "ошибка установки связи аккаунта пользователя и интеграции")
@@ -152,7 +155,8 @@ async def integration_off(token: str, id_integration: int):
         )).values({
             'status': False
         }))
-
+        await manager.send_message(user.token,
+                                    {"action": "off", "target": "IntegrationTochkaBank", "integration_status": False})
         return {'result': 'ok'}
     except:
         raise HTTPException(status_code = 422, detail = "ошибка удаления связи аккаунта пользователя и интеграции")
