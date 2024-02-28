@@ -32,6 +32,9 @@ def create_job(link):
 
 @router.get("/bank/tochkaoauth")
 async def tochkaoauth(code: str, state: int):
+
+    """Hook для oauth банка"""
+
     user_integration = await integration_info(state, 1)
 
     async with aiohttp.ClientSession() as session:
@@ -104,6 +107,55 @@ async def get_token_for_scope(token: str, id_integration: int):
                f'state={user.get("cashbox_id")}'
         # scheduler.add_job(create_job, 'interval', seconds = 20, kwargs = {'link': link}, name = 'update token', id = api_resp_json.get("Data").get("clientId"))
     return {'result': link}
+
+
+@router.get("/bank/integration_on")
+async def integration_on(token: str, id_integration: int):
+
+    """Установка связи аккаунта пользователя и интеграции"""
+
+    user = await get_user_by_token(token)
+
+    try:
+        check = await database.fetch_one(integrations_to_cashbox.select().where(and_(
+            integrations_to_cashbox.c.integration_id == id_integration,
+            integrations_to_cashbox.c.installed_by == user.id
+        )))
+        if check:
+            await database.execute(integrations_to_cashbox.update().where(and_(
+                integrations_to_cashbox.c.integration_id == id_integration,
+                integrations_to_cashbox.c.installed_by == user.id
+            )).values({'status': True}))
+        else:
+            await database.execute(integrations_to_cashbox.insert().values({
+                'integration_id': id_integration,
+                'installed_by': user.get('id'),
+                'deactivated_by': user.get('id'),
+                'status': True,
+            }))
+        return {'result': 'ok'}
+    except:
+        raise HTTPException(status_code = 422, detail = "ошибка установки связи аккаунта пользователя и интеграции")
+
+
+@router.get("/bank/integration_off")
+async def integration_off(token: str, id_integration: int):
+
+    """Удаление связи аккаунта пользователя и интеграции"""
+
+    user = await get_user_by_token(token)
+
+    try:
+        await database.execute(integrations_to_cashbox.update().where(and_(
+            integrations_to_cashbox.c.integration_id == id_integration,
+            integrations_to_cashbox.c.installed_by == user.id
+        )).values({
+            'status': False
+        }))
+
+        return {'result': 'ok'}
+    except:
+        raise HTTPException(status_code = 422, detail = "ошибка удаления связи аккаунта пользователя и интеграции")
 
 
 
