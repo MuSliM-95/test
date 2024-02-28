@@ -57,7 +57,7 @@ async def tochkaoauth(code: str, state: int):
     return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}', status_code=302)
 
 
-@router.post("/bank/get_oauth_link/")
+@router.get("/bank/get_oauth_link/")
 async def get_token_for_scope(token: str, id_integration: int):
 
     """Получение токена для работы с разрешениями"""
@@ -106,7 +106,7 @@ async def get_token_for_scope(token: str, id_integration: int):
                f'scope={user_integration.get("scopes")}&' \
                f'state={user.get("cashbox_id")}'
         # scheduler.add_job(create_job, 'interval', seconds = 20, kwargs = {'link': link}, name = 'update token', id = api_resp_json.get("Data").get("clientId"))
-    return {'result': link}
+    return RedirectResponse(f'{link}', status_code=302)
 
 
 @router.get("/bank/check")
