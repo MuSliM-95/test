@@ -289,9 +289,11 @@ async def accounts(token: str, id_integration: int):
 
     user = await get_user_by_token(token)
 
-    query = select().where(tochka_bank_accounts.c.payboxes_id.in_(
-        select(pboxes.c.cashbox))
-    )
+    query = (select(pboxes.c.name, tochka_bank_accounts.c.currency, tochka_bank_accounts.c.is_active).
+             where(pboxes.c.cashbox == user.id).
+             select_from(pboxes).
+             join(tochka_bank_accounts, tochka_bank_accounts.c.payboxes_id == pboxes.c.id)
+             )
 
     accounts = await database.fetch_all(query)
 
