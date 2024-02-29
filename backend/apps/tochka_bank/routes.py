@@ -79,19 +79,6 @@ async def tochkaoauth(code: str, state: int):
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
 
-
-    query = ((select(integrations_to_cashbox.c.id, integrations_to_cashbox.c.status,
-                         tochka_bank_credentials.c.access_token).
-        where(and_(
-            integrations_to_cashbox.c.installed_by == user_integration.get('installed_by'),
-            integrations_to_cashbox.c.integration_id == user_integration.get('id')
-        ))
-                 ).select_from(integrations_to_cashbox).
-                 join(tochka_bank_credentials,
-                      integrations_to_cashbox.c.id == tochka_bank_credentials.c.integration_cashboxes)
-                 )
-    credential = await database.fetch_one(query)
-
     async with aiohttp.ClientSession() as session:
         async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts',
                                    headers={
@@ -113,7 +100,9 @@ async def tochkaoauth(code: str, state: int):
                     await session.close()
                     data = {
                     'name':f"Счет банк Точка №{account.get('accountId').split('/')[0]}",
-                    'start_balance':balance_json.get("Data").get("Balance")[0].get("Amount").get("amount")
+                    'start_balance':balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
+                    'cashbox': state
+
                     }
                     id_paybox = await database.execute(pboxes.insert().values(data))
                     bank_account = await database.execute(tochka_bank_accounts.insert().values(
@@ -294,6 +283,10 @@ async def accounts(token: str, id_integration: int):
 
     user = await get_user_by_token(token)
 
-    accounts = await database.fetch_all(tochka_bank_accounts.select().where())
+    query = select().where(tochka_bank_accounts.c.payboxes_id.in_(
+        pboxes.select())
+    )
 
-    return {'result': [{}]}
+    accounts = await database.fetch_all(query)
+
+    return {'result': accounts}
