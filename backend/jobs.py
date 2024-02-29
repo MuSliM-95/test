@@ -98,7 +98,7 @@ async def autoburn():
 
             cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
             admin = cashbox.admin
-            print(cashbox, admin)
+            print(dict(cashbox), admin)
 
             rubles_body = {
                 "type": "autoburned",
