@@ -113,7 +113,7 @@ async def tochkaoauth(code: str, state: int):
                     await session.close()
                     data = {
                     'name':f"Счет банк Точка №{account.get('accountId').split('/')[0]}",
-                    'start_balance':balance_json.get("Data").get("Balance").get("Amount").get("amount")
+                    'start_balance':balance_json.get("Data").get("Balance")[0].get("Amount").get("amount")
                     }
                     id_paybox = await database.execute(pboxes.insert().values(data))
                     bank_account = await database.execute(tochka_bank_accounts.insert().values(
