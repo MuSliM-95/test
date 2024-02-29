@@ -223,6 +223,14 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
+nomenclature_barcodes = sqlalchemy.Table(
+    "nomenclature_barcodes",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
+    sqlalchemy.Column("code", String),
+)
+
 categories = sqlalchemy.Table(
     "categories",
     metadata,
@@ -1235,5 +1243,7 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"
+SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_job_store"
 database = databases.Database(SQLALCHEMY_DATABASE_URL)
 engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
+engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)

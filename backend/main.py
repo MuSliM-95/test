@@ -190,7 +190,14 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
-    scheduler.remove_all_jobs()
+    if scheduler.get_job("check_account"):
+        scheduler.remove_job("check_account")
+    if scheduler.get_job("autoburn"):
+        scheduler.remove_job("autoburn")
+    if scheduler.get_job("repeat_payments"):
+        scheduler.remove_job("repeat_payments")
+    if scheduler.get_job("distribution"):
+        scheduler.remove_job("distribution")
 
 
 scheduler.start()

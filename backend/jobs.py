@@ -8,7 +8,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 from const import PAID, DEMO, RepeatPeriod
-from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, cboxes
+from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
+    cboxes, engine_job_store
 from functions.account import make_account
 from functions.goods_distribution import process_distribution
 from functions.gross_profit import process_gross_profit_report
@@ -17,7 +18,7 @@ from functions.payments import clear_repeats, repeat_payment
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
 )
-jobstore = SQLAlchemyJobStore(engine=engine)
+jobstore = SQLAlchemyJobStore(engine=engine_job_store)
 try:
     try:
         jobstore.remove_job("check_account")
@@ -98,7 +99,7 @@ async def autoburn():
             cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
             admin = cashbox.admin
 
-            
+
             rubles_body = {
                 "type": "autoburned",
                 "dated": datetime.now(),
@@ -123,7 +124,7 @@ async def autoburn():
             }
 
             await database.execute(loyality_transactions.insert().values(rubles_body))
-            
+
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
