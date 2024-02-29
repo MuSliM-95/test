@@ -54,7 +54,7 @@ async def tochkaoauth(code: str, state: int):
             'integration_cashboxes': user_integration.get('id')}))
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
-    if not scheduler.get_job(job_id = user_integration.get('installed_by')):
+    if not scheduler.get_job(job_id = str(user_integration.get('installed_by'))):
         scheduler.add_job(refresh_token, 'interval', seconds = token_json.get('expires_in'), kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
     else:
         scheduler.get_job(job_id = user_integration.get('installed_by')).reschedule('interval', seconds = token_json.get('expires_in'))
