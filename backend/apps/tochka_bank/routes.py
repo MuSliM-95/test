@@ -95,7 +95,7 @@ async def tochkaoauth(code: str, state: int):
     async with aiohttp.ClientSession() as session:
         async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts',
                                    headers={
-                                       'Authorization': f'Bearer {credential.get("access_token")}',
+                                       'Authorization': f'Bearer {token_json.get("access_token")}',
                                        'Content-type': 'application/json'
                                 }) as resp:
                 accounts_json = await resp.json()
