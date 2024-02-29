@@ -380,7 +380,7 @@ async def compare_amo_to_table(amo_install_id: int, cashbox_id: int):
         if table_contact_exist:
             query = (
                 contragents.select()
-                .where(contragents.c.id == table_contact_exist.table_id)
+                .where(contragents.c.id == table_contact_exist.get('table_id'))
             )
             contragent_info = await database.fetch_one(query)
 
@@ -396,7 +396,7 @@ async def compare_amo_to_table(amo_install_id: int, cashbox_id: int):
             if body:
                 query = (
                     contragents.update()
-                    .where(contragents.c.id == amo_table_contacts.table_id)
+                    .where(contragents.c.id == amo_table_contacts.get('table_id'))
                     .values(body)
                 )
                 await database.execute(query)
