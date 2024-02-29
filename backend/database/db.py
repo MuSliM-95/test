@@ -41,12 +41,13 @@ class Trial(ENUM):
     secon = "secon"
     link: str
 
+
 class Contragent_types(str, ENUM):
     Supplier = "Поставщик"
     Buyer = "Покупатель"
 
-metadata = sqlalchemy.MetaData()
 
+metadata = sqlalchemy.MetaData()
 
 tochka_bank_credentials = sqlalchemy.Table(
     "tochka_bank_credentials",
@@ -58,6 +59,28 @@ tochka_bank_credentials = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
+
+
+tochka_bank_accounts = sqlalchemy.Table(
+    "tochka_bank_accounts",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("pboxes_id", ForeignKey("pboxes.id"), index=True),
+    sqlalchemy.Column("tochka_bank_credential_id", ForeignKey("tochka_bank_credentials.id"), index=True),
+    sqlalchemy.Column("customerCode", String),
+    sqlalchemy.Column("accountId", String, nullable=False),
+    sqlalchemy.Column("transitAccount", String),
+    sqlalchemy.Column("status", String),
+    sqlalchemy.Column("statusUpdateDateTime", String),
+    sqlalchemy.Column("currency", String),
+    sqlalchemy.Column("accountType", String),
+    sqlalchemy.Column("accountSubType", String),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("is_active", Boolean, server_default=False),
+)
+
 
 entity_type = sqlalchemy.Table(
     "entity_type",
