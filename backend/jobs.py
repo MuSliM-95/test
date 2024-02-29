@@ -98,7 +98,6 @@ async def autoburn():
 
             cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
             admin = cashbox.admin
-            print(dict(cashbox), admin)
 
             rubles_body = {
                 "type": "autoburned",
@@ -114,8 +113,8 @@ async def autoburn():
                 "status": True,
                 "external_id": None,
                 "cashier_name": None,
-                # "percentamount": None,
-                # "preamount": None,
+                # "percentamount": None, что это?
+                # "preamount": None, что это?
                 "dead_at": None,
                 "is_deleted": False,
                 "autoburned": True,
