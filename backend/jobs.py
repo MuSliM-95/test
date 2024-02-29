@@ -100,7 +100,6 @@ async def autoburn():
             admin = cashbox.admin
             print(cashbox, admin)
 
-
             rubles_body = {
                 "type": "autoburned",
                 "dated": datetime.now(),
