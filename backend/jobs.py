@@ -107,7 +107,7 @@ async def autoburn():
                 "loyality_card_id": card_id,
                 "loyality_card_number": card.card_number,
                 "created_by_id": admin,
-                "cashbox": cashbox_id['cashbox_id'],
+                "cashbox": cashbox['cashbox_id'],
                 "tags": "",
                 "name": "Автосписание",
                 "description": None,
