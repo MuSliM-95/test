@@ -26,8 +26,8 @@ async def integration_info(cashbox_id, id_integration):
     return await database.fetch_one(query)
 
 
-def create_job(link):
-    print(f'finish link: {link}')
+def refresh_token(integration_cashboxes):
+    print(f'refresh token: {integration_cashboxes}')
 
 
 @router.get("/bank/tochkaoauth")
@@ -54,6 +54,10 @@ async def tochkaoauth(code: str, state: int):
             'integration_cashboxes': user_integration.get('id')}))
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
+    if not scheduler.get_job(job_id = user_integration.get('installed_by')):
+        scheduler.add_job(refresh_token, 'interval', seconds = token_json.get('expires_in'), kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
+    else:
+        scheduler.get_job(job_id = user_integration.get('installed_by')).reschedule('interval', seconds = token_json.get('expires_in'))
     return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}', status_code=302)
 
 
@@ -105,7 +109,7 @@ async def get_token_for_scope(token: str, id_integration: int):
                f'consent_id={api_resp_json.get("Data").get("consentId")}&' \
                f'scope={user_integration.get("scopes")}&' \
                f'state={user.get("cashbox_id")}'
-        # scheduler.add_job(create_job, 'interval', seconds = 20, kwargs = {'link': link}, name = 'update token', id = api_resp_json.get("Data").get("clientId"))
+
     return {'link': link}
 
 
