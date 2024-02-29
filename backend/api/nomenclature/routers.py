@@ -1,7 +1,10 @@
 from typing import List, Optional
 
+from h11._abnf import status_code
+from starlette import status
+
 import api.nomenclature.schemas as schemas
-from database.db import categories, database, manufacturers, nomenclature
+from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes
 from fastapi import APIRouter, HTTPException
 from functions.helpers import (
     check_entity_exists,
@@ -11,10 +14,58 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select
+from sqlalchemy import func, select, and_
 from ws_manager import manager
 
 router = APIRouter(tags=["nomenclature"])
+
+
+@router.get("/nomenclature/{idx}/barcode")
+async def get_nomenclature_barcodes(token: str, idx: int):
+    """Получение штрихкодов категории по ID"""
+    user = await get_user_by_token(token)
+
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+
+    query = nomenclature_barcodes.select().where(nomenclature_barcodes.c.nomenclature_id == idx)
+    barcodes_list = await database.fetch_all(query)
+
+    return [barcode_info.code for barcode_info in barcodes_list]
+
+
+@router.post("/nomenclature/{idx}/barcode")
+async def add_barcode_to_nomenclature(token: str, idx: int, barcode: schemas.NomenclatureBarcodeCreate):
+    """Добавление штрихкода к категории по ID"""
+    user = await get_user_by_token(token)
+
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+    query = nomenclature_barcodes.select().where(and_(
+        nomenclature_barcodes.c.nomenclature_id == idx,
+        nomenclature_barcodes.c.code == barcode.barcode
+    ))
+    barcode_ex = await database.fetch_one(query)
+
+    if barcode_ex:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Данный штрихкод уже привязан к этому товару")
+
+    query = nomenclature_barcodes.insert().values({
+        "nomenclature_id": idx,
+        "barcode": barcode.barcode
+    })
+    await database.execute(query)
+
+
+@router.delete("/nomenclature/{idx}/barcode")
+async def delete_barcode_to_nomenclature(token: str, idx: int, barcode: schemas.NomenclatureBarcodeCreate):
+    """Добавление штрихкода к категории по ID"""
+    user = await get_user_by_token(token)
+
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+    query = nomenclature_barcodes.delete().where(and_(
+        nomenclature_barcodes.c.nomenclature_id == idx,
+        nomenclature_barcodes.c.code == barcode.barcode
+    ))
+    await database.execute(query)
 
 
 @router.get("/nomenclature/{idx}/", response_model=schemas.NomenclatureGet)
@@ -28,9 +79,16 @@ async def get_nomenclature_by_id(token: str, idx: int):
 
 
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
-async def get_nomenclature(token: str, name: Optional[str] = None, limit: int = 100, offset: int = 0):
+async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, limit: int = 100,
+                           offset: int = 0):
     """Получение списка категорий"""
     user = await get_user_by_token(token)
+
+    if name and barcode:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Укажите только один из параметров: 'name' или 'barcode'")
+
+    query = nomenclature.select()
 
     filters = [
         nomenclature.c.cashbox == user.cashbox_id,
@@ -39,8 +97,11 @@ async def get_nomenclature(token: str, name: Optional[str] = None, limit: int = 
 
     if name:
         filters.append(nomenclature.c.name.ilike(f"%{name}%"))
+    if barcode:
+        query = query.join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
+        filters.append(nomenclature_barcodes.c.code == barcode)
 
-    query = nomenclature.select().where(*filters).limit(limit).offset(offset)
+    query = query.where(*filters).limit(limit).offset(offset)
 
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
@@ -120,9 +181,9 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
 
 @router.patch("/nomenclature/{idx}/", response_model=schemas.Nomenclature)
 async def edit_nomenclature(
-    token: str,
-    idx: int,
-    nomenclature_data: schemas.NomenclatureEdit,
+        token: str,
+        idx: int,
+        nomenclature_data: schemas.NomenclatureEdit,
 ):
     """Редактирование категории"""
     user = await get_user_by_token(token)
@@ -157,8 +218,8 @@ async def edit_nomenclature(
 
 @router.patch("/nomenclature/", response_model=List[schemas.Nomenclature])
 async def edit_nomenclature_mass(
-    token: str,
-    nomenclature_data: List[schemas.NomenclatureEditMass],
+        token: str,
+        nomenclature_data: List[schemas.NomenclatureEditMass],
 ):
     """Редактирование номенклатуры пачкой"""
     user = await get_user_by_token(token)

@@ -2,6 +2,10 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 
+class NomenclatureBarcodeCreate(BaseModel):
+    barcode: str
+
+
 class NomenclatureCreate(BaseModel):
     name: str
     type: Optional[str]
@@ -25,6 +29,7 @@ class NomenclatureCreateMass(BaseModel):
 
 class NomenclatureEdit(NomenclatureCreate):
     name: Optional[str]
+
 
 class NomenclatureEditMass(NomenclatureEdit):
     id: int
@@ -55,11 +60,13 @@ class NomenclatureList(BaseModel):
     class Config:
         orm_mode = True
 
+
 class NomenclatureListGet(BaseModel):
     __root__: Optional[List[NomenclatureGet]]
 
     class Config:
         orm_mode = True
+
 
 class NomenclatureListGetRes(BaseModel):
     result: Optional[List[NomenclatureGet]]
