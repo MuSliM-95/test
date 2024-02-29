@@ -5,8 +5,6 @@ from fastapi.responses import RedirectResponse
 from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database, tochka_bank_credentials, pboxes, tochka_bank_accounts
 from datetime import datetime
 from sqlalchemy import or_, and_, select
-from api.pboxes.schemas import PayboxesCreate
-from api.pboxes.routers import create_paybox, read_payboxes_meta
 from functions.helpers import get_user_by_token
 from ws_manager import manager
 
@@ -98,11 +96,19 @@ async def tochkaoauth(code: str, state: int):
                             }) as resp:
                         balance_json = await resp.json()
                     await session.close()
+                    created_date = datetime.utcnow().date()
+                    created_date_ts = int(datetime.timestamp(
+                        datetime.combine(created_date, datetime.min.time())))
                     data = {
-                    'name':f"Счет банк Точка №{account.get('accountId').split('/')[0]}",
-                    'start_balance':balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
-                    'cashbox': state
-
+                        'name': f"Счет банк Точка №{account.get('accountId').split('/')[0]}",
+                        'start_balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
+                        'cashbox': state,
+                        'balance': 0,
+                        'update_start_balance': int(datetime.utcnow().timestamp()),
+                        'update_start_balance_date': int(datetime.utcnow().timestamp()),
+                        'created_at': int(datetime.utcnow().timestamp()),
+                        'updated_at': int(datetime.utcnow().timestamp()),
+                        'balance_date':created_date_ts
                     }
                     id_paybox = await database.execute(pboxes.insert().values(data))
                     bank_account = await database.execute(tochka_bank_accounts.insert().values(
