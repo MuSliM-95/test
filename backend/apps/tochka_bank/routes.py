@@ -26,8 +26,32 @@ async def integration_info(cashbox_id, id_integration):
     return await database.fetch_one(query)
 
 
-def refresh_token(integration_cashboxes):
-    print(f'refresh token: {integration_cashboxes}')
+@router.post("/bank/refresh_token")
+async def refresh_token(integration_cashboxes: int):
+    integration_cbox = await database.fetch_one(
+        integrations_to_cashbox.select().where(integrations_to_cashbox.c.id == integration_cashboxes))
+    integration = await database.fetch_one(
+        integrations.select().where(integrations.c.id == integration_cbox.get('integration_id')))
+    credentials = await database.fetch_one(
+        tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == integration_cashboxes))
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f'https://enter.tochka.com/connect/token', data = {
+            'client_id': integration.get('client_app_id'),
+            'client_secret': integration.get('client_secret'),
+            'grant_type': 'refresh_token',
+            'refresh_token': credentials.get('refresh_token'),
+        }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
+            token_json = await resp.json()
+        await session.close()
+        print(token_json)
+    try:
+        await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.integration_cashboxes == integration_cashboxes).values({
+            'access_token': token_json.get('access_token'),
+            'refresh_token': token_json.get('refresh_token'),
+        }))
+        return {'result': token_json}
+    except:
+        raise HTTPException(status_code = 422, detail = "ошибка обновления токена")
 
 
 @router.get("/bank/tochkaoauth")
@@ -58,7 +82,7 @@ async def tochkaoauth(code: str, state: int):
     if not scheduler.get_job(job_id = str(user_integration.get('installed_by'))):
         scheduler.add_job(refresh_token, 'interval', seconds = int(token_json.get('expires_in')), kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
     else:
-        scheduler.get_job(job_id = user_integration.get('installed_by')).reschedule('interval', seconds = int(token_json.get('expires_in')))
+        scheduler.get_job(job_id = str(user_integration.get('installed_by'))).reschedule('interval', seconds = int(token_json.get('expires_in')))
     return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}', status_code=302)
 
 
@@ -196,6 +220,9 @@ async def integration_off(token: str, id_integration: int):
                                where(tochka_bank_credentials.c.integration_cashboxes == integration_cashbox.get("id")))
         await manager.send_message(user.token,
                                     {"action": "off", "target": "IntegrationTochkaBank", "integration_status": False})
+
+        if scheduler.get_job(job_id = str(user.get("id"))):
+            scheduler.remove_job(job_id = str(user.get("id")))
         return {'isAuth': False}
     except:
         raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")
