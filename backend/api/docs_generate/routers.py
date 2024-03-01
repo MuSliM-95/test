@@ -83,14 +83,7 @@ async def doc_generate(token: str,
             file_link += ".pdf"
 
         async with s3_session.client(**s3_data) as s3:
-            await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
-
-            if type_doc is TypeDoc.pdf:
-                await s3.put_object_acl(
-                    Bucket=bucket_name,
-                    Key=file_link,
-                    ACL='public-read'
-                )
+            await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link, ACL="public-read")
 
         file_dict = {
             'cashbox_id': user.cashbox_id,
@@ -140,7 +133,6 @@ async def get_generate_docs_by_filename(filename: str, type_doc: TypeDoc):
                     },
                     ExpiresIn=None
                 )
-                print(url)
                 return {
                     "data": {
                         "url": url
