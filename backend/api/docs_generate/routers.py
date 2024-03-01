@@ -132,9 +132,18 @@ async def get_generate_docs_by_filename(filename: str, type_doc: TypeDoc):
                 return Response(content=body, media_type="text/html",
                                 headers={'Response-content-disposition': 'attachment'})
             if type_doc is TypeDoc.pdf:
+                url = await s3.generate_presigned_url(
+                    'get_object',
+                    Params={
+                        'Bucket': bucket_name,
+                        'Key': file_key
+                    },
+                    ExpiresIn=None
+                )
+                print(url)
                 return {
                     "data": {
-                        "url": s3_data["endpoint_url"] + "/" + file_key
+                        "url": url
                     }
                 }
         except Exception as err:
