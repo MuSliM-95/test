@@ -318,7 +318,8 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
             tochka_bank_accounts.update().
             where(tochka_bank_accounts.c.id == idx).
             values(updated_account))
-        return {'result': account}
+        account_result = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
+        return {'result': account_result}
     except Exception as error:
         raise HTTPException(status_code=432, detail=str(error))
 
