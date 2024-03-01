@@ -368,6 +368,10 @@ def raise_wrong_token():
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
+def raise_bad_request(message: str):
+    raise HTTPException(status_code=400, detail=message)
+
+
 async def add_nomenclature_count(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
         instance = dict(instance)

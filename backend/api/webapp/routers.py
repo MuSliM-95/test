@@ -6,7 +6,7 @@ from typing import Optional
 import api.webapp.schemas as schemas
 from database.db import (pictures, price_types, categories, prices, nomenclature, database,
                          warehouses, manufacturers, warehouse_register_movement, units, organizations)
-from functions.helpers import datetime_to_timestamp, get_user_by_token, nomenclature_unit_id_to_name
+from functions.helpers import datetime_to_timestamp, get_user_by_token, raise_bad_request, nomenclature_unit_id_to_name
 
 
 router = APIRouter(tags=["webapp"])
@@ -26,7 +26,8 @@ async def get_nomenclature(
         description_long: Optional[str] = Query(None, description="Подробное описание или его часть."),
         code: Optional[int] = None,
         unit: Optional[int] = None,
-        category: Optional[str] = Query(None, description="Несколько категорий указываются через запятую."),
+        category_ids: Optional[str] = Query(None, description="Целочисленные идентификаторы категорий. "
+                                                              "Несколько категорий указываются через запятую."),
         manufacturer: Optional[str] = Query(None, description="Название производителя или его часть."),
         date_from: Optional[int] = Query(None, description="Начальная дата для фильтрации по дате создания."),
         date_to: Optional[int] = Query(None, description="Конечная дата для фильтрации по дате создания."),
@@ -62,8 +63,12 @@ async def get_nomenclature(
         filter_general.append(nomenclature.c.code == code)
     if unit:
         filter_general.append(nomenclature.c.unit == unit)
-    if category:
-        filter_general.append(nomenclature.c.category.in_(category.split(",")))
+    if category_ids:
+        try:
+            category_ids = [int(ix) for ix in category_ids.split(",")]
+        except ValueError:
+            raise_bad_request("Category IDs must contain only numbers")
+        filter_general.append(nomenclature.c.category.in_(category_ids))
     if manufacturer:
         filter_general.append(nomenclature.c.manufacturer.ilike(f"%{manufacturer}%"))
 
