@@ -50,6 +50,7 @@ async def get_picture_by_id(filename: str):
     """Получение картинки по ID"""
     async with s3_session.client(**s3_data) as s3:
         try:
+
             file_key = f"photos/{filename}"
             s3_ob = await s3.get_object(Bucket=bucket_name, Key=file_key)
             body = await s3_ob['Body'].read()

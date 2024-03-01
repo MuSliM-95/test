@@ -1096,6 +1096,7 @@ doc_generated = sqlalchemy.Table(
     sqlalchemy.Column("doc_link", String),
     sqlalchemy.Column("entity", String),
     sqlalchemy.Column("entity_id", Integer),
+    sqlalchemy.Column("type_doc", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
 
