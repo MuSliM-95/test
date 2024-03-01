@@ -328,7 +328,7 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
 async def init_statement(statement_data: StatementData, access_token: str):
     statement_data = statement_data.dict()
     async with aiohttp.ClientSession() as session:
-        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', data = {
+        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
             'Data': {
                 'Statement': {
                     'accountId': statement_data.get('accountId'),
@@ -341,3 +341,12 @@ async def init_statement(statement_data: StatementData, access_token: str):
         await session.close()
     return init_statement_json
 
+
+@router.get("/bank/statement/{statementId}")
+async def get_statement(statement_id: str, account_id: str, access_token: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
+                               headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            init_statement_json = await resp.json()
+        await session.close()
+    return init_statement_json
