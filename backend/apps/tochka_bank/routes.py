@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from ws_manager import manager
-from apps.tochka_bank.schemas import Account, AccountUpdate
+from apps.tochka_bank.schemas import Account, AccountUpdate, StatementData
 
 router = APIRouter(tags=["Tochka bank"])
 
@@ -322,4 +322,22 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
         return {'result': account_result}
     except Exception as error:
         raise HTTPException(status_code=432, detail=str(error))
+
+
+@router.post("/bank/statement/init/")
+async def init_statement(statement_data: StatementData, access_token: str):
+    statement_data = statement_data.dict()
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', data = {
+            'Data': {
+                'Statement': {
+                    'accountId': statement_data.get('accountId'),
+                    'startDateTime': statement_data.get('startDateTime'),
+                    'endDateTime': statement_data.get('endDateTime'),
+                }
+            }
+        }, headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            init_statement_json = await resp.json()
+        await session.close()
+    return init_statement_json
 
