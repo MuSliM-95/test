@@ -308,18 +308,18 @@ async def accounts(token: str, id_integration: int):
 async def update_account(token: str, idx: int, account: AccountUpdate):
 
     """Обновление счета аккаунта банка"""
-    # try:
-    account_data = account.dict(exclude_unset=True)
-    await get_user_by_token(token)
-    account_db = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
-    account_model = AccountUpdate(**account_db)
-    updated_account = account_model.copy(update=account_data)
-    await database.execute(
-            tochka_bank_accounts.update().
-            where(tochka_bank_accounts.c.id == idx).
-            values(updated_account))
-    account_result = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
-    return {'result': account_result}
-    # except Exception as error:
-    #     raise HTTPException(status_code=432, detail=str(error))
+    try:
+        account_data = account.dict(exclude_unset=True)
+        await get_user_by_token(token)
+        account_db = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
+        account_model = AccountUpdate(**account_db)
+        updated_account = account_model.copy(update=account_data)
+        await database.execute(
+                    tochka_bank_accounts.update().
+                    where(tochka_bank_accounts.c.id == idx).
+                    values(updated_account.dict()))
+        account_result = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
+        return {'result': account_result}
+    except Exception as error:
+        raise HTTPException(status_code=432, detail=str(error))
 
