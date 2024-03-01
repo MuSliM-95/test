@@ -50,7 +50,7 @@ async def add_barcode_to_nomenclature(token: str, idx: int, barcode: schemas.Nom
 
     query = nomenclature_barcodes.insert().values({
         "nomenclature_id": idx,
-        "barcode": barcode.barcode
+        "code": barcode.barcode
     })
     await database.execute(query)
 
