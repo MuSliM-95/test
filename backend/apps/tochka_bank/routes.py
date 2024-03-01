@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from ws_manager import manager
-from apps.tochka_bank.schemas import Account, AccountUpdate
+from apps.tochka_bank.schemas import Account, AccountUpdate, StatementData
 
 router = APIRouter(tags=["Tochka bank"])
 
@@ -71,10 +71,17 @@ async def tochkaoauth(code: str, state: int):
             token_json = await resp.json()
         await session.close()
     try:
-        credentials_id = await database.execute(tochka_bank_credentials.insert().values({
-            'access_token': token_json.get('access_token'),
-            'refresh_token': token_json.get('refresh_token'),
-            'integration_cashboxes': user_integration.get('id')}))
+        credential = await database.fetch_one(tochka_bank_credentials.select(tochka_bank_credentials.c.integration_cashboxes == user_integration.get('id')))
+        if not credential:
+            credentials_id = await database.execute(tochka_bank_credentials.insert().values({
+                'access_token': token_json.get('access_token'),
+                'refresh_token': token_json.get('refresh_token'),
+                'integration_cashboxes': user_integration.get('id')}))
+        else:
+            await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.integration_cashboxes == user_integration.get('id')).values({
+                'access_token': token_json.get('access_token'),
+                'refresh_token': token_json.get('refresh_token')}))
+            credentials_id = credential.get('id')
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
 
@@ -124,6 +131,7 @@ async def tochkaoauth(code: str, state: int):
                             'currency': account.get('currency'),
                             'accountType': account.get('accountType'),
                             'accountSubType': account.get('accountSubType'),
+                            'registrationDate': account.get('registrationDate'),
                             'is_deleted': False,
                             'is_active': False
                         }
@@ -267,12 +275,7 @@ async def integration_off(token: str, id_integration: int):
         )).values({
             'status': False
         }))
-        integration_cashbox = await database.fetch_one(integrations_to_cashbox.
-                                                       select().
-                                                       where(integrations_to_cashbox.c.installed_by == user.get("id")))
-        await database.execute(tochka_bank_credentials.
-                               delete().
-                               where(tochka_bank_credentials.c.integration_cashboxes == integration_cashbox.get("id")))
+
         await manager.send_message(user.token,
                                     {"action": "off", "target": "IntegrationTochkaBank", "integration_status": False})
 
@@ -323,3 +326,30 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
     except Exception as error:
         raise HTTPException(status_code=432, detail=str(error))
 
+
+@router.post("/bank/statement/init/")
+async def init_statement(statement_data: StatementData, access_token: str):
+    statement_data = statement_data.dict()
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
+            'Data': {
+                'Statement': {
+                    'accountId': statement_data.get('accountId'),
+                    'startDateTime': statement_data.get('startDateTime'),
+                    'endDateTime': statement_data.get('endDateTime'),
+                }
+            }
+        }, headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            init_statement_json = await resp.json()
+        await session.close()
+    return init_statement_json
+
+
+@router.get("/bank/statement/{statementId}")
+async def get_statement(statement_id: str, account_id: str, access_token: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
+                               headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            init_statement_json = await resp.json()
+        await session.close()
+    return init_statement_json

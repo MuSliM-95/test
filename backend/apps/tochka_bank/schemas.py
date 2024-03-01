@@ -22,3 +22,12 @@ class AccountUpdate(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class StatementData(BaseModel):
+    accountId: str
+    startDateTime: str
+    endDateTime: str
+    class Config:
+        orm_mode = True
+
