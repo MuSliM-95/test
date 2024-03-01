@@ -124,6 +124,7 @@ async def tochkaoauth(code: str, state: int):
                             'currency': account.get('currency'),
                             'accountType': account.get('accountType'),
                             'accountSubType': account.get('accountSubType'),
+                            'registrationDate': account.get('registrationDate'),
                             'is_deleted': False,
                             'is_active': False
                         }
