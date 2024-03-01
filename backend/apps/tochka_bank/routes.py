@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from ws_manager import manager
-from apps.tochka_bank.schemas import Account
+from apps.tochka_bank.schemas import Account, AccountUpdate
 
 router = APIRouter(tags=["Tochka bank"])
 
@@ -305,15 +305,20 @@ async def accounts(token: str, id_integration: int):
 
 
 @router.patch("/bank/accounts/update/{idx}/")
-async def update_account(token: str, idx: int, account: Account):
+async def update_account(token: str, idx: int, account: AccountUpdate):
 
     """Обновление счета аккаунта банка"""
+    try:
+        account_data = account.dict(exclude_unset=True)
+        await get_user_by_token(token)
+        account_db = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
+        account_model = AccountUpdate(**account_db)
+        updated_account = account_model.copy(update=account_data)
+        await database.execute(
+            tochka_bank_accounts.update().
+            where(tochka_bank_accounts.c.id == idx).
+            values(updated_account))
+        return {'result': account}
+    except Exception as error:
+        raise HTTPException(status_code=432, detail=str(error))
 
-    await get_user_by_token(token)
-    await database.execute(
-        tochka_bank_accounts.update().
-        where(tochka_bank_accounts.c.id == idx).
-        values(account.dict()))
-    account = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
-
-    return {'result': account}

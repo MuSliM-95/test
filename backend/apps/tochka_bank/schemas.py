@@ -12,3 +12,7 @@ class Account(BaseModel):
     is_deleted: Optional[bool] = None
     is_active: Optional[bool] = None
 
+
+class AccountUpdate(BaseModel):
+    is_deleted: Optional[bool] = None
+    is_active: Optional[bool] = None
