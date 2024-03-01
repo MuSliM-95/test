@@ -53,35 +53,38 @@ def generate_doc(template, *kwargs) -> Any:
         return error
 
 
+def convert_html_to_pdf(doc_render):
+    pass
+
+
 @router.post('/docgenerated/')
-async def doc_generate(cashbox_id: int,
+async def doc_generate(token: str,
                        template_id: int,
                        variable: Dict,
                        entity: str,
                        entity_id: int,
-                       tags: str = None,
-                       ):
+                       tags: str = None):
     '''Генерирование документа с загрузкой в S3 и фиксацией записи генерации'''
     try:
-        # user = await get_user_by_token(token)
+        user = await get_user_by_token(token)
         query = doc_templates.select().where(doc_templates.c.id == template_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
         file_link = (
-                f"docsgenerate/{entity}_{entity_id}_{uuid4().hex[:8]}.html"
-            )
+            f"docsgenerate/{entity}_{entity_id}_{uuid4().hex[:8]}.html"
+        )
 
         async with s3_session.client(**s3_data) as s3:
             await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
 
         file_dict = {
-                'cashbox_id': cashbox_id,
-                'doc_link': file_link,
-                'created_at': datetime.datetime.now(),
-                'tags': tags,
-                'template_id': template_id,
-                'entity': entity,
-                'entity_id': entity_id}
+            'cashbox_id': user.cashbox_id,
+            'doc_link': file_link,
+            'created_at': datetime.datetime.now(),
+            'tags': tags.lower(),
+            'template_id': template_id,
+            'entity': entity,
+            'entity_id': entity_id}
         query = doc_generated.insert().values(file_dict)
         result_file_dict_id = await database.execute(query)
         query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id)
@@ -101,14 +104,15 @@ async def get_doc_generate_by_idx(token: str, idx: int):
 
 
 @router.get("/docgenerated/file/{filename}/")
-async def get_generate_docs_by_filename(filename: str):
+async def get_generate_docs_by_filename(filename: str, is_pdf: bool):
     """Получение документа по имени файла"""
     async with s3_session.client(**s3_data) as s3:
         try:
             file_key = f"docsgenerate/{filename}"
             s3_ob = await s3.get_object(Bucket=bucket_name, Key=file_key)
             body = await s3_ob['Body'].read()
-            return Response(content=body, media_type="text/html", headers={'Response-content-disposition': 'attachment'})
+            return Response(content=body, media_type="text/html",
+                            headers={'Response-content-disposition': 'attachment'})
         except Exception as err:
             return HTTPException(status_code=404, detail="Такого документа не существует")
 
@@ -120,7 +124,8 @@ async def get_doc_generate_list(cashbox: int, tags: str = None, limit: int = 100
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
         query = doc_generated.select().where(doc_generated.c.cashbox_id == cashbox,
-                                             *filter_tags).order_by(desc(doc_generated.c.created_at)).limit(limit).offset(offset)
+                                             *filter_tags).order_by(desc(doc_generated.c.created_at)).limit(
+            limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
     else:
