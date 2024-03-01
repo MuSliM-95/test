@@ -155,9 +155,9 @@ async def get_nomenclature(
 
             if item["category"]:
                 q = categories.select().where(categories.c.id == item["category"])
-                category_ids = await database.fetch_one(q)
-                if category_ids:
-                    price_in_list["category_name"] = category_ids.name
+                category = await database.fetch_one(q)
+                if category:
+                    price_in_list["category_name"] = category.name
 
             if item["manufacturer"]:
                 q = manufacturers.select().where(manufacturers.c.id == item["manufacturer"])
@@ -303,10 +303,10 @@ async def get_nomenclature(
             balance_dict['warehouses'] = warehouses_db
 
             res.append(balance_dict)
-        for category_ids in categories_db:
+        for category in categories_db:
             cat_children = []
             for item_cat in res:
-                if item_cat['category'] == category_ids.id:
+                if item_cat['category'] == category.id:
                     item_cat.pop("id", None)
                     item_cat.pop("name", None)
 
@@ -316,8 +316,8 @@ async def get_nomenclature(
             if len(cat_children) > 0:
                 res_with_cats.append(
                     {
-                        "name": category_ids.name,
-                        "key": category_ids.id,
+                        "name": category.name,
+                        "key": category.id,
                         "children": cat_children
                     }
                 )
