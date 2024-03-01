@@ -71,10 +71,17 @@ async def tochkaoauth(code: str, state: int):
             token_json = await resp.json()
         await session.close()
     try:
-        credentials_id = await database.execute(tochka_bank_credentials.insert().values({
-            'access_token': token_json.get('access_token'),
-            'refresh_token': token_json.get('refresh_token'),
-            'integration_cashboxes': user_integration.get('id')}))
+        credential = await database.fetch_one(tochka_bank_credentials.select(tochka_bank_credentials.c.integration_cashboxes == user_integration.get('id')))
+        if not credential:
+            credentials_id = await database.execute(tochka_bank_credentials.insert().values({
+                'access_token': token_json.get('access_token'),
+                'refresh_token': token_json.get('refresh_token'),
+                'integration_cashboxes': user_integration.get('id')}))
+        else:
+            await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.integration_cashboxes == user_integration.get('id')).values({
+                'access_token': token_json.get('access_token'),
+                'refresh_token': token_json.get('refresh_token')}))
+            credentials_id = credential.get('id')
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
 
@@ -268,12 +275,7 @@ async def integration_off(token: str, id_integration: int):
         )).values({
             'status': False
         }))
-        integration_cashbox = await database.fetch_one(integrations_to_cashbox.
-                                                       select().
-                                                       where(integrations_to_cashbox.c.installed_by == user.get("id")))
-        await database.execute(tochka_bank_credentials.
-                               delete().
-                               where(tochka_bank_credentials.c.integration_cashboxes == integration_cashbox.get("id")))
+
         await manager.send_message(user.token,
                                     {"action": "off", "target": "IntegrationTochkaBank", "integration_status": False})
 
