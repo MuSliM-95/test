@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from ws_manager import manager
+from apps.tochka_bank.schemas import Account
 
 router = APIRouter(tags=["Tochka bank"])
 
@@ -290,6 +291,7 @@ async def accounts(token: str, id_integration: int):
     user = await get_user_by_token(token)
 
     query = (select(
+        tochka_bank_accounts.c.id,
         pboxes.c.name,
         tochka_bank_accounts.c.currency,
         tochka_bank_accounts.c.accountType,
@@ -300,3 +302,18 @@ async def accounts(token: str, id_integration: int):
              )
     accounts = await database.fetch_all(query)
     return {'result': accounts}
+
+
+@router.patch("/bank/accounts/update/{idx}/")
+async def update_account(token: str, idx: int, account: Account):
+
+    """Обновление счета аккаунта банка"""
+
+    await get_user_by_token(token)
+    await database.execute(
+        tochka_bank_accounts.update().
+        where(tochka_bank_accounts.c.id == idx).
+        values(account.dict()))
+    account = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
+
+    return {'result': account}
