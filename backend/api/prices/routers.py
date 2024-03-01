@@ -7,6 +7,7 @@ from functions.filter_schemas import PricesFiltersQuery
 from functions.helpers import (
     check_entity_exists,
     datetime_to_timestamp,
+    raise_bad_request,
     get_entity_by_id,
     get_user_by_token,
     rem_owner_is_deleted,
@@ -178,8 +179,13 @@ async def get_prices(
         filters_nom.append(nomenclature.c.code == filters.code)
     if filters.unit:
         filters_nom.append(nomenclature.c.unit == filters.unit)
-    if filters.category:
-        filters_nom.append(nomenclature.c.category.in_(filters.category.split(",")))
+    if filters.category_ids:
+        category_ids = []
+        try:
+            category_ids = [int(ix) for ix in filters.category_ids.split(",")]
+        except ValueError:
+            raise_bad_request("Category IDs must contain only numbers")
+        filters_nom.append(nomenclature.c.category.in_(category_ids))
     if filters.manufacturer:
         filters_nom.append(nomenclature.c.manufacturer == filters.manufacturer)
     if filters.price_type_id:
