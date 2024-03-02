@@ -90,7 +90,7 @@ async def tochkaoauth(code: str, state: int):
                                        'Authorization': f'Bearer {token_json.get("access_token")}',
                                        'Content-type': 'application/json'
                                 }) as resp:
-                accounts_json = await resp.json()
+            accounts_json = await resp.json()
         await session.close()
     if len(accounts_json.get("Data").get("Account")) > 0:
         for account in accounts_json.get("Data").get("Account"):
