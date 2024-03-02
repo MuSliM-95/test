@@ -184,6 +184,7 @@ async def get_token_for_scope(token: str, id_integration: int):
             token_scope_json = await resp.json()
         await session.close()
 
+
     async with aiohttp.ClientSession() as session:
         async with session.post(f'https://enter.tochka.com/uapi/v1.0/consents', json = {
             "Data": {
