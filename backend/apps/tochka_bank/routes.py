@@ -34,7 +34,7 @@ async def refresh_token(integration_cashboxes: int):
         integrations.select().where(integrations.c.id == integration_cbox.get('integration_id')))
     credentials = await database.fetch_one(
         tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == integration_cashboxes))
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.post(f'https://enter.tochka.com/connect/token', data = {
             'client_id': integration.get('client_app_id'),
             'client_secret': integration.get('client_secret'),
@@ -59,7 +59,7 @@ async def tochkaoauth(code: str, state: int):
 
     user_integration = await integration_info(state, 1)
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.post(f'https://enter.tochka.com/connect/token', data = {
             'client_id': user_integration.get('client_app_id'),
             'client_secret': user_integration.get('client_secret'),
@@ -84,9 +84,9 @@ async def tochkaoauth(code: str, state: int):
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts',
-                                   headers={
+                               headers={
                                        'Authorization': f'Bearer {token_json.get("access_token")}',
                                        'Content-type': 'application/json'
                                 }) as resp:
@@ -94,7 +94,7 @@ async def tochkaoauth(code: str, state: int):
         await session.close()
     if len(accounts_json.get("Data").get("Account")) > 0:
         for account in accounts_json.get("Data").get("Account"):
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(trust_env = True) as session:
                 async with session.get(
                             f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account.get("accountId")}/balances',
                             headers={
@@ -102,7 +102,7 @@ async def tochkaoauth(code: str, state: int):
                                 'Content-type': 'application/json'
                             }) as resp:
                     balance_json = await resp.json()
-            await session.close()
+                await session.close()
             created_date = datetime.utcnow().date()
             created_date_ts = int(datetime.timestamp(
                         datetime.combine(created_date, datetime.min.time())))
@@ -174,7 +174,7 @@ async def get_token_for_scope(token: str, id_integration: int):
     user = await get_user_by_token(token)
     user_integration = await integration_info(user.get('cashbox_id'), id_integration)
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.post(f'https://enter.tochka.com/connect/token', data = {
             'client_id': user_integration.get('client_app_id'),
             'client_secret': user_integration.get('client_secret'),
@@ -184,8 +184,7 @@ async def get_token_for_scope(token: str, id_integration: int):
             token_scope_json = await resp.json()
         await session.close()
 
-
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.post(f'https://enter.tochka.com/uapi/v1.0/consents', json = {
             "Data": {
                 "permissions": [
@@ -348,7 +347,7 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
 @router.post("/bank/statement/init/")
 async def init_statement(statement_data: StatementData, access_token: str):
     statement_data = statement_data.dict()
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
             'Data': {
                 'Statement': {
@@ -365,7 +364,7 @@ async def init_statement(statement_data: StatementData, access_token: str):
 
 @router.get("/bank/statement/{statementId}")
 async def get_statement(statement_id: str, account_id: str, access_token: str):
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
                                headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
             init_statement_json = await resp.json()
