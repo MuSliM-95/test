@@ -102,11 +102,11 @@ async def tochkaoauth(code: str, state: int):
                                 'Content-type': 'application/json'
                             }) as resp:
                     balance_json = await resp.json()
-                await session.close()
-                created_date = datetime.utcnow().date()
-                created_date_ts = int(datetime.timestamp(
+            await session.close()
+            created_date = datetime.utcnow().date()
+            created_date_ts = int(datetime.timestamp(
                         datetime.combine(created_date, datetime.min.time())))
-                data = {
+            data = {
                         'name': f"Счет банк Точка №{account.get('accountId').split('/')[0]}",
                         'start_balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
                         'cashbox': state,
@@ -117,11 +117,11 @@ async def tochkaoauth(code: str, state: int):
                         'updated_at': int(datetime.utcnow().timestamp()),
                         'balance_date':created_date_ts
                     }
-                account_db = await database.fetch_one(
+            account_db = await database.fetch_one(
                     tochka_bank_accounts.select().where(tochka_bank_accounts.c.accountId == account.get('accountId')))
-                if not account_db:
-                    id_paybox = await database.execute(pboxes.insert().values(data))
-                    await database.execute(tochka_bank_accounts.insert().values(
+            if not account_db:
+                id_paybox = await database.execute(pboxes.insert().values(data))
+                await database.execute(tochka_bank_accounts.insert().values(
                             {
                                 'payboxes_id': id_paybox,
                                 'tochka_bank_credential_id': credentials_id,
@@ -138,10 +138,10 @@ async def tochkaoauth(code: str, state: int):
                                 'is_active': False
                             }
                         ))
-                else:
-                    del data['created_at']
-                    id_paybox = await database.execute(pboxes.update().where(pboxes.c.id == account_db.get('payboxes_id')).values(data))
-                    await database.execute(tochka_bank_accounts.update().where(tochka_bank_accounts.c.id == account_db.get('id')).values(
+            else:
+                del data['created_at']
+                id_paybox = await database.execute(pboxes.update().where(pboxes.c.id == account_db.get('payboxes_id')).values(data))
+                await database.execute(tochka_bank_accounts.update().where(tochka_bank_accounts.c.id == account_db.get('id')).values(
                             {
                                 'payboxes_id': id_paybox,
                                 'tochka_bank_credential_id': credentials_id,
