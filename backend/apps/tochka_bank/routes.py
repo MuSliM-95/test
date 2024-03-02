@@ -160,9 +160,9 @@ async def tochkaoauth(code: str, state: int):
                         ))
 
     if not scheduler.get_job(job_id = str(user_integration.get('installed_by'))):
-        scheduler.add_job(refresh_token, 'interval', seconds = 20, kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
+        scheduler.add_job(refresh_token, 'interval', seconds = int(token_json.get('expires_in')), kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
     else:
-        scheduler.get_job(job_id = str(user_integration.get('installed_by'))).reschedule('interval', seconds = 30)
+        scheduler.get_job(job_id = str(user_integration.get('installed_by'))).reschedule('interval', seconds = int(token_json.get('expires_in')))
     return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}')
 
 
