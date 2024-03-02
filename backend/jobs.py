@@ -238,4 +238,4 @@ async def tochka_update_transaction():
     )
     if active_accounts_with_credentials:
         for account in active_accounts_with_credentials:
-            print(dict(account))
+            print(account.get('accountId'))
