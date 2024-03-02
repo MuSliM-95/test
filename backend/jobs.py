@@ -2,14 +2,16 @@ import os
 from datetime import datetime, timedelta
 
 from apscheduler.jobstores.base import JobLookupError
-from sqlalchemy import desc
+from sqlalchemy import desc, select, or_, and_, alias
 from sqlalchemy.exc import DatabaseError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
+from sqlalchemy.orm import aliased
+
 from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
-    cboxes, engine_job_store
+    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes
 from functions.account import make_account
 from functions.goods_distribution import process_distribution
 from functions.gross_profit import process_gross_profit_report
@@ -215,3 +217,25 @@ async def repeat_payments():
 async def distribution():
     await process_distribution()
     await process_gross_profit_report()
+
+
+@scheduler.scheduled_job('interval', seconds=10, id="tochka_update_transaction")
+async def tochka_update_transaction():
+    active_accounts_with_credentials = await database.fetch_all(
+        select(tochka_bank_accounts.c.accountId,
+               tochka_bank_credentials.c.access_token,
+               pboxes.c.id.label("pbox_id"),
+               ).
+        where(
+            and_(
+                tochka_bank_accounts.c.is_active == True,
+                tochka_bank_accounts.c.is_deleted == False
+            )
+        ).
+        select_from(tochka_bank_accounts).
+        join(tochka_bank_credentials, tochka_bank_credentials.c.id == tochka_bank_accounts.c.tochka_bank_credential_id).
+        join(pboxes, pboxes.c.id == tochka_bank_accounts.c.payboxes_id)
+    )
+    if active_accounts_with_credentials:
+        for account in active_accounts_with_credentials:
+            print(dict(account))
