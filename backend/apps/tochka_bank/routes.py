@@ -118,35 +118,53 @@ async def tochkaoauth(code: str, state: int):
                         'updated_at': int(datetime.utcnow().timestamp()),
                         'balance_date':created_date_ts
                     }
-                    id_paybox = await database.execute(pboxes.insert().values(data))
-                    bank_account = await database.execute(tochka_bank_accounts.insert().values(
-                        {
-                            'payboxes_id': id_paybox,
-                            'tochka_bank_credential_id': credentials_id,
-                            'customerCode': account.get('customerCode'),
-                            'accountId': account.get('accountId'),
-                            'transitAccount': account.get('transitAccount'),
-                            'status': account.get('status'),
-                            'statusUpdateDateTime': account.get('statusUpdateDateTime'),
-                            'currency': account.get('currency'),
-                            'accountType': account.get('accountType'),
-                            'accountSubType': account.get('accountSubType'),
-                            'registrationDate': account.get('registrationDate'),
-                            'is_deleted': False,
-                            'is_active': False
-                        }
-                    ))
-    result_accounts = await database.fetch_all(tochka_bank_accounts.select())
-    result_pbox = await database.fetch_all(pboxes.select())
-    print('Accounts: ',result_accounts)
-    print('Pboxes:', result_pbox)
-
+                    account_db = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.accountId == account.get('accountId')))
+                    if not account_db:
+                        id_paybox = await database.execute(pboxes.insert().values(data))
+                        await database.execute(tochka_bank_accounts.insert().values(
+                            {
+                                'payboxes_id': id_paybox,
+                                'tochka_bank_credential_id': credentials_id,
+                                'customerCode': account.get('customerCode'),
+                                'accountId': account.get('accountId'),
+                                'transitAccount': account.get('transitAccount'),
+                                'status': account.get('status'),
+                                'statusUpdateDateTime': account.get('statusUpdateDateTime'),
+                                'currency': account.get('currency'),
+                                'accountType': account.get('accountType'),
+                                'accountSubType': account.get('accountSubType'),
+                                'registrationDate': account.get('registrationDate'),
+                                'is_deleted': False,
+                                'is_active': False
+                            }
+                        ))
+                    else:
+                        del data['created_at']
+                        del data['updated_at']
+                        id_paybox = await database.execute(pboxes.update().where(pboxes.c.id == account_db.get('payboxes_id')).values(data))
+                        await database.execute(tochka_bank_accounts.update().where(tochka_bank_accounts.c.id == account_db.get('id')).values(
+                            {
+                                'payboxes_id': id_paybox,
+                                'tochka_bank_credential_id': credentials_id,
+                                'customerCode': account.get('customerCode'),
+                                'accountId': account.get('accountId'),
+                                'transitAccount': account.get('transitAccount'),
+                                'status': account.get('status'),
+                                'statusUpdateDateTime': account.get('statusUpdateDateTime'),
+                                'currency': account.get('currency'),
+                                'accountType': account.get('accountType'),
+                                'accountSubType': account.get('accountSubType'),
+                                'registrationDate': account.get('registrationDate'),
+                                'is_deleted': False,
+                                'is_active': False
+                            }
+                        ))
 
     if not scheduler.get_job(job_id = str(user_integration.get('installed_by'))):
         scheduler.add_job(refresh_token, 'interval', seconds = int(token_json.get('expires_in')), kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
     else:
         scheduler.get_job(job_id = str(user_integration.get('installed_by'))).reschedule('interval', seconds = int(token_json.get('expires_in')))
-    return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}', status_code=302)
+    return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}')
 
 
 @router.get("/bank/get_oauth_link/")
