@@ -255,6 +255,7 @@ nomenclature_barcodes = sqlalchemy.Table(
     sqlalchemy.Column("code", String),
 )
 
+
 categories = sqlalchemy.Table(
     "categories",
     metadata,
