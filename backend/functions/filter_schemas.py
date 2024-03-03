@@ -57,7 +57,7 @@ class PricesFiltersQuery(BaseModel):
     description_long: Optional[str]
     code: Optional[int]
     unit: Optional[int]
-    category: Optional[str]
+    category_ids: Optional[str]
     manufacturer: Optional[int]
     price_type_id: Optional[int]
     date_from: Optional[int]
