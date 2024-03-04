@@ -148,7 +148,7 @@ async def tochkaoauth(code: str, state: int):
                 id_paybox = await database.execute(pboxes.update().where(pboxes.c.id == account_db.get('payboxes_id')).values(data))
                 await database.execute(tochka_bank_accounts.update().where(tochka_bank_accounts.c.id == account_db.get('id')).values(
                             {
-                                'payboxes_id': id_paybox,
+                                'payboxes_id': account_db.get('payboxes_id'),
                                 'tochka_bank_credential_id': credentials_id,
                                 'customerCode': account.get('customerCode'),
                                 'accountId': account.get('accountId'),
