@@ -167,7 +167,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
 
         else:
             if phone_number:
-                q = contragents.select().where(contragents.c.phone == str(phone_number), contragents.c.cashbox == user.cashbox_id)
+                q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
                 loyality_card_contr = await database.fetch_one(q)
 
                 if loyality_card_contr:
@@ -181,7 +181,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                         { 
                             "name": contr_name if contr_name else "", 
                             "external_id": "", 
-                            "phone": str(phone_number), 
+                            "phone": phone_number,
                             "inn": "",
                             "description": "",
                             "cashbox": user.cashbox_id,
