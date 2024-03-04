@@ -59,6 +59,9 @@ async def tochkaoauth(code: str, state: int):
 
     user_integration = await integration_info(state, 1)
 
+    if not user_integration:
+        raise HTTPException( status_code = 432, detail = f"user not found with integration")
+
     async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.post(f'https://enter.tochka.com/connect/token', data = {
             'client_id': user_integration.get('client_app_id'),
@@ -69,6 +72,8 @@ async def tochkaoauth(code: str, state: int):
         }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
             token_json = await resp.json()
         await session.close()
+    if token_json.get('error'):
+        raise HTTPException(status_code = 432, detail = f"error OAuth2 {token_json.get('error')}")
     try:
         credential = await database.fetch_one(tochka_bank_credentials.select(tochka_bank_credentials.c.integration_cashboxes == user_integration.get('id')))
         if not credential:
