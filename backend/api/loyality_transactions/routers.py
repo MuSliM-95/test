@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from database.db import database, loyality_transactions, loyality_cards
 import api.loyality_transactions.schemas as schemas
 from typing import Optional
-from sqlalchemy import desc
+from sqlalchemy import desc, func, select
 
 from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, get_entity_by_id_and_created_by
 
@@ -61,45 +61,34 @@ async def get_loyality_transaction_by_id(token: str, idx: int):
 async def get_transactions(token: str, limit: int = 100, offset: int = 0, filters_q: schemas.LoyalityTranstactionFilters = Depends()):
     """Получение списка транзакций"""
     user = await get_user_by_token(token)
-
     filters = get_filters_transactions(loyality_transactions, filters_q)
+    query = (
+        loyality_transactions.select()
+        .where(
+            loyality_transactions.c.cashbox == user.cashbox_id,
+            loyality_transactions.c.is_deleted.is_not(True)
+        )
+        .order_by(desc(loyality_transactions.c.id))
+    )
 
     if filters:
-        query = (
-            loyality_transactions.select()
-            .where(
-                loyality_transactions.c.cashbox == user.cashbox_id,
-                loyality_transactions.c.is_deleted.is_not(True)
-                
-            )
-            .order_by(desc(loyality_transactions.c.id))
-            .filter(*filters)
-            .limit(limit)
-            .offset(offset)
-        )
-    else:
-        query = (
-            loyality_transactions.select()
-            .where(
-                loyality_transactions.c.cashbox == user.cashbox_id,
-                loyality_transactions.c.is_deleted.is_not(True)
-                
-            )
-            .order_by(desc(loyality_transactions.c.id))
-            .limit(limit)
-            .offset(offset)
-        )
+        query = query.filter(*filters)
 
-
+    query = query.limit(limit).offset(offset)
     loyality_transactions_db = await database.fetch_all(query)
     loyality_transactions_db = [*map(datetime_to_timestamp, loyality_transactions_db)]
 
-    c = f"SELECT count(*) FROM loyality_transactions WHERE loyality_transactions.created_by_id = {user.id} AND loyality_transactions.is_deleted = false"
-    count = await database.fetch_one(c)
+    count_query = (
+        select(func.count(loyality_transactions.c.id))
+        .where(
+            loyality_transactions.c.cashbox == user.cashbox_id,
+            loyality_transactions.c.is_deleted.is_not(True)
 
-    return {"result": loyality_transactions_db, "count": dict(count)['count']} # LOCAL
+        )
+    )
+    count = await database.execute(count_query)
 
-    # return loyality_transactions_db
+    return {"result": loyality_transactions_db, "count": count}
 
 
 @router.post("/loyality_transactions/", response_model=Optional[schemas.LoyalityTransaction])
