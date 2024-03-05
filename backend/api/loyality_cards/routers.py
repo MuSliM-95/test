@@ -197,7 +197,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                     new_contr_id = await database.execute(q)
                     q = contragents.select().where(contragents.c.id == new_contr_id)
                     loyality_card_contr = await database.fetch_one(q)
-                    loyality_cards_values["card_number"] = int(loyality_card_contr.phone)
+                    loyality_cards_values["card_number"] = clear_phone_number(phone_number=loyality_card_contr.phone)
 
             # loyality_cards_db_ex = [card]
             # loyality_cards_db_ex = [*map(add_status, loyality_cards_db_ex)]
