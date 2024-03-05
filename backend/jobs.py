@@ -10,15 +10,12 @@ from sqlalchemy.exc import DatabaseError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
-from sqlalchemy.orm import aliased
 
 from api.contracts.schemas import PaymentType
 from api.payments.routers import read_payments_list, create_payment
 from api.payments.schemas import PaymentCreate
 from apps.tochka_bank.schemas import StatementData
 
-
-from apps.tochka_bank.schemas import StatementData
 from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards,\
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation
@@ -262,7 +259,7 @@ async def distribution():
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=1, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=1000000000, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
@@ -292,6 +289,7 @@ async def tochka_update_transaction():
                 }, account.get('access_token'))
             status_info = ''
             info_statement = None
+            print(statement)
             while status_info != 'Ready':
                 sleep(2)
                 info_statement = await get_statement(
@@ -315,19 +313,7 @@ async def tochka_update_transaction():
                         stopped=True
                     ))
             else:
-                set_tochka_payments_statement = {'payment-2024-02-12_1281547196',
-                                                     'tariffer-2024-03-02_303514325_40802810520000171198_044525104_402', 'cbs-tb-92-492270921',
-                 'cbs-tb-92-517120309', 'cbs-tb-92-495002774', 'cbs-tb-92-476096414', 'cbs-tb-92-517146591',
-                 'payment-2024-02-04_1255301527', 'cbs-tb-92-498303325', 'payment-2024-02-12_1281551906',
-                 'cbs-tb-92-544291969', 'payment-2024-01-24_1220260712', 'cbs-tb-92-500681013', 'cbs-tb-92-514709794',
-                 'cbs-tb-92-506067339', 'payment-2024-01-24_1221665250', 'cbs-tb-92-514820813',
-                 'payment-2024-03-02_1349446719', 'cbs-tb-92-522914402', 'cbs-tb-92-474137196', 'cbs-tb-92-510422479',
-                 'payment-2024-02-12_1281504534', 'tariffer-2024-02-01_303514325_40802810520000171198_044525104_402',
-                 'cbs-tb-92-457153012', 'cbs-tb-92-492195692', 'cbs-tb-92-539847741', 'cbs-tb-92-528369595',
-                 'cbs-tb-92-514773261', 'cbs-tb-92-484546934', 'payment-2024-01-31_1243660484',
-                 'payment-2024-02-01_1246759314', 'cbs-tb-92-508994062', 'cbs-tb-92-458681285',
-                 'payment-2024-02-04_1255299586', 'payment-2024-02-01_1246728221', 'payment-2024-01-22_1212966261',
-                 'payment-2024-01-31_1243669245', 'cbs-tb-92-517046534', 'cbs-tb-92-463957782'}
+                set_tochka_payments_statement = {'payment-2023-12-28_1156743287', 'payment-2024-01-19_1207764055', 'payment-2024-01-24_1220260712', 'payment-2024-01-22_1212966261', 'cbs-tb-92-498303325', 'tariffer-2023-11-22_303514325_40802810520000171198_044525104_402', 'payment-2023-12-04_1069567688', 'payment-2023-11-28_1051511605', 'cbs-tb-92-495002774', 'payment-2024-02-04_1255299586', 'cardclaims-1e4a6905-3dc2-4873-a682-0f1ddaf494ca', 'cbs-tb-92-463957782', 'cbs-tb-92-457153012', 'payment-2024-01-12_1188136239', 'cbs-tb-92-506067339', 'cbs-tb-92-528369595', 'payment-2024-01-12_1188133905', 'payment-2024-02-12_1281504534', 'cbs-tb-92-458681285', 'cbs-tb-92-484546934', 'cbs-tb-92-511836073', 'payment-2024-02-12_1281551906', 'tariffer-2024-02-01_303514325_40802810520000171198_044525104_402', 'cbs-tb-92-544291969', 'payment-2023-12-04_1069579755', 'cbs-tb-92-474137196', 'payment-2024-01-12_1188148040', 'cbs-tb-92-431001536', 'cbs-tb-92-492195692', 'payment-2024-02-12_1281547196', 'cbs-tb-92-508994062', 'cbs-tb-92-492270921', 'payment-2024-02-04_1255301527', 'cbs-tb-92-517120309', 'cbs-tb-92-517046534', 'payment-2024-01-24_1221665250', 'cbs-tb-92-539847741', 'payment-2024-03-02_1349446719', 'payment-2023-11-23_1034528628', 'payment-2023-12-30_1166586991', 'cbs-tb-92-446156138', 'payment-2024-02-01_1246759314', 'payment-2023-12-06_1078594612', 'cbs-tb-92-514773261', 'payment-2023-12-07_1081369104', 'cbs-tb-92-514709794', 'cbs-tb-92-514820813', 'payment-2024-02-01_1246728221', 'payment-2023-11-23_1034528638', 'tariffer-2023-12-04_303514325_40802810520000171198_044525104_402', 'tariffer-2024-01-03_303514325_40802810520000171198_044525104_402', 'payment-2023-11-23_1034575833', 'payment-2024-01-31_1243669245', 'cbs-tb-92-522914402', 'cbs-tb-92-500681013', 'payment-2023-12-04_1069704581', 'cbs-tb-92-510422479', 'payment-2023-11-23_1034574780', 'cbs-tb-92-517146591', 'tariffer-2024-03-02_303514325_40802810520000171198_044525104_402', 'cbs-tb-92-476096414', 'payment-2024-01-03_1168228630', 'payment-2024-01-31_1243660484', 'payment-2023-11-28_1051484717'}
 
                 set_tochka_payments_db = set([item.get('external_id') for item in tochka_payments_db.get('result')])
                 print(list(set_tochka_payments_db-set_tochka_payments_statement))
