@@ -4,7 +4,7 @@ import api.loyality_transactions.schemas as schemas
 from typing import Optional
 from sqlalchemy import desc, func, select
 
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, get_entity_by_id_and_created_by, clear_phone_number
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, get_entity_by_id_cashbox, clear_phone_number
 
 from ws_manager import manager
 from functions.helpers import get_user_by_token
@@ -193,7 +193,7 @@ async def edit_loyality_transaction(
 ):
     """Редактирование транзакций"""
     user = await get_user_by_token(token)
-    loyality_transaction_db = await get_entity_by_id_and_created_by(loyality_transactions, idx, user.id)
+    loyality_transaction_db = await get_entity_by_id_cashbox(loyality_transactions, idx, user.cashbox_id)
     loyality_transaction_values = loyality_transaction.dict(exclude_unset=True)
 
     if loyality_transaction_values:
@@ -212,7 +212,7 @@ async def edit_loyality_transaction(
             .values(loyality_transaction_values)
         )
         await database.execute(query)
-        loyality_transaction_db = await get_entity_by_id_and_created_by(loyality_transactions, idx, user.id)
+        loyality_transaction_db = await get_entity_by_id_cashbox(loyality_transactions, idx, user.cashbox_id)
 
     loyality_transaction_db = datetime_to_timestamp(loyality_transaction_db)
 
@@ -231,7 +231,7 @@ async def delete_loyality_transaction(token: str, idx: int):
     """Удаление транзакций"""
     user = await get_user_by_token(token)
 
-    await get_entity_by_id_and_created_by(loyality_transactions, idx, user.id)
+    await get_entity_by_id_cashbox(loyality_transactions, idx, user.cashbox_id)
 
     query = (
         loyality_transactions.update()
