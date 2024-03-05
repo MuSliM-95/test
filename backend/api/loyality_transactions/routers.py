@@ -70,22 +70,22 @@ async def get_transactions(token: str, limit: int = 100, offset: int = 0, filter
         )
         .order_by(desc(loyality_transactions.c.id))
     )
-
-    if filters:
-        query = query.filter(*filters)
-
-    query = query.limit(limit).offset(offset)
-    loyality_transactions_db = await database.fetch_all(query)
-    loyality_transactions_db = [*map(datetime_to_timestamp, loyality_transactions_db)]
-
     count_query = (
         select(func.count(loyality_transactions.c.id))
         .where(
             loyality_transactions.c.cashbox == user.cashbox_id,
             loyality_transactions.c.is_deleted.is_not(True)
-
         )
     )
+
+    if filters:
+        query = query.filter(*filters)
+        count_query = count_query.filter(*filters)
+
+    query = query.limit(limit).offset(offset)
+    loyality_transactions_db = await database.fetch_all(query)
+    loyality_transactions_db = [*map(datetime_to_timestamp, loyality_transactions_db)]
+
     count = await database.execute(count_query)
 
     return {"result": loyality_transactions_db, "count": count}
@@ -153,6 +153,9 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
     loyality_transactions_values["created_by_id"] = user.id
     loyality_transactions_values['cashbox'] = user.cashbox_id
     loyality_transactions_values["loyality_card_id"] = card.id
+    loyality_transactions_values['loyality_card_number'] = clear_phone_number(
+        phone_number=loyality_transactions_values['loyality_card_number']
+    )
     # loyality_transactions_values["dead_at"] = datetime.fromtimestamp(loyality_transactions_values["dead_at"])
 
     query = loyality_transactions.insert().values(loyality_transactions_values)
