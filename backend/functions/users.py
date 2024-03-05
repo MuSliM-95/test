@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import select
 
 from ws_manager import manager
@@ -57,7 +59,7 @@ async def raschet(user, token):
         pr.pr_id for pr in update if pr.pr_id]]
 
     for i in update:
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
         if i.pb_id:
             q = pboxes.select().where(pboxes.c.id == i.pb_id)
             paybox = await database.fetch_one(q)
@@ -87,7 +89,7 @@ async def raschet(user, token):
             await manager.send_message(token, {"action": "edit", "target": "projects", "result": dict(project)})
 
     for z_paybox in z_pbs:
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
         q = pboxes.update().where(pboxes.c.id == z_paybox['id']).values(
             {"balance": z_paybox['start_balance'], "update_start_balance": int(datetime.utcnow().timestamp())})
         await database.execute(q)
@@ -96,7 +98,7 @@ async def raschet(user, token):
         await manager.send_message(token, {"action": "edit", "target": "payboxes", "result": dict(paybox)})
 
     for z_project in z_proj:
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
         q = projects.update().where(projects.c.id == z_project['id']).values(
             {"incoming": 0, "outgoing": 0, 'profitability': 0,
              "updated_at": int(datetime.utcnow().timestamp())}
