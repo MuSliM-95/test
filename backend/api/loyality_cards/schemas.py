@@ -34,7 +34,7 @@ class LoyalityCardFilters(BaseModel):
 
 class LoyalityCardCreate(BaseModel):
     # id: int
-    card_number: Optional[int]
+    card_number: Optional[str]
     tags: Optional[str]
     # balance: Optional[int]
     # income: Optional[int]

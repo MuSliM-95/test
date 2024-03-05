@@ -649,3 +649,7 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
             )
             return False
     return True
+
+
+def clear_phone_number(phone_number: str) -> int:
+    return int(''.join(i for i in phone_number if i in string.digits))

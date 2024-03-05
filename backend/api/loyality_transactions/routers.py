@@ -4,7 +4,7 @@ import api.loyality_transactions.schemas as schemas
 from typing import Optional
 from sqlalchemy import desc, func, select
 
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, get_entity_by_id_and_created_by
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, get_entity_by_id_and_created_by, clear_phone_number
 
 from ws_manager import manager
 from functions.helpers import get_user_by_token
@@ -99,8 +99,10 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
     if user:
         if user.status:
             if loyality_transaction_data.loyality_card_number:
-                    
-                    q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_transaction_data.loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
+                    loyality_card_number = clear_phone_number(
+                        phone_number=loyality_transaction_data.loyality_card_number
+                    )
+                    q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
                     card = await database.fetch_one(q)
 
                     card_dict = {
