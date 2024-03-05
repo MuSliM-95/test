@@ -62,20 +62,20 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 
 
 async def get_statement(statement_id: str, account_id: str, access_token: str):
-    async with aiohttp.ClientSession(trust_env = True) as session:
-        async with session.get(f'https://enter.tochka.com/sandbox/v2/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
                                headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
             try:
                 init_statement_json = await resp.json()
             except:
-                init_statement_json = {"status": "error"}
+                init_statement_json = {"Data": {"Statement": {"status": "error"}}}
         await session.close()
     return init_statement_json
 
 
 async def init_statement(statement_data: dict, access_token: str):
-    async with aiohttp.ClientSession(trust_env = True) as session:
-        async with session.post(f'https://enter.tochka.com/sandbox/v2/open-banking/v1.0/statements', json = {
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
             'Data': {
                 'Statement': {
                     'accountId': statement_data.get('accountId'),
@@ -87,7 +87,7 @@ async def init_statement(statement_data: dict, access_token: str):
             try:
                 init_statement_json = await resp.json()
             except:
-                init_statement_json = {"status": "error"}
+                init_statement_json = {"Data": {"Statement": {"status": "error"}}}
         await session.close()
     return init_statement_json
 
@@ -257,8 +257,9 @@ async def distribution():
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=1, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=100000, id="tochka_update_transaction")
 async def tochka_update_transaction():
+    await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
         select(tochka_bank_accounts.c.accountId,
                tochka_bank_accounts.c.registrationDate,
@@ -277,14 +278,9 @@ async def tochka_update_transaction():
     )
     if active_accounts_with_credentials:
         for account in active_accounts_with_credentials:
-            print(account.get('accountId'), datetime.utcnow().date())
-            status = ''
-            statement = None
-            while status != 'Created':
-                sleep(2)
-                statement = await init_statement({
+            statement = await init_statement({
                     "accountId": account.get('accountId'),
-                    "startDateTime":account.get('registrationDate'),
+                    "startDateTime": account.get('registrationDate'),
                     "endDateTime": str(datetime.utcnow().date())
                 }, account.get('access_token'))
             print(statement)
@@ -292,8 +288,10 @@ async def tochka_update_transaction():
             info_statement = None
             while status_info != 'Ready':
                 sleep(2)
-                info_statement = await get_statement(statement.get('id'), statement.get('accountId'), account.get('access_token'))
-                status_info = info_statement.get('status')
-
+                info_statement = await get_statement(
+                    statement.get('Data')['Statement'].get('statementId'),
+                    statement.get('Data')['Statement'].get('accountId'),
+                    account.get('access_token'))
+                status_info = info_statement.get('Data')['Statement'][0].get('status')
             print(info_statement)
 
