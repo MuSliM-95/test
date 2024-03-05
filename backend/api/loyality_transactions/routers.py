@@ -104,6 +104,8 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
                     )
                     q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
                     card = await database.fetch_one(q)
+                    if not card:
+                        raise HTTPException(status_code=400, detail=f"Карты с номером {loyality_transaction_data.loyality_card_number} не существует")
 
                     card_dict = {
                         "balance": card.balance,
