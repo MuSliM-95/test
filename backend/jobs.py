@@ -314,7 +314,6 @@ async def tochka_update_transaction():
                         status=True if payment.get('status') == 'Booked' else False,
                         stopped=True
                     ))
-
             else:
                 set_tochka_payments_statement = {'payment-2024-02-12_1281547196',
                                                      'tariffer-2024-03-02_303514325_40802810520000171198_044525104_402', 'cbs-tb-92-492270921',
