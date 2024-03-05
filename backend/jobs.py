@@ -11,14 +11,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 from sqlalchemy.orm import aliased
+
+from api.contracts.schemas import PaymentType
+from api.payments.routers import read_payments_list, create_payment
+from api.payments.schemas import PaymentCreate
 from apps.tochka_bank.schemas import StatementData
 
 
 from apps.tochka_bank.schemas import StatementData
 from const import PAID, DEMO, RepeatPeriod
-from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
-    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes
+from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards,\
+    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation
 from functions.account import make_account
+from functions.filter_schemas import PaymentFiltersQuery
 from functions.goods_distribution import process_distribution
 from functions.gross_profit import process_gross_profit_report
 from functions.payments import clear_repeats, repeat_payment
@@ -257,7 +262,7 @@ async def distribution():
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=100000, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=1, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
@@ -265,6 +270,7 @@ async def tochka_update_transaction():
                tochka_bank_accounts.c.registrationDate,
                tochka_bank_credentials.c.access_token,
                pboxes.c.id.label("pbox_id"),
+               users_cboxes_relation.c.token
                ).
         where(
             and_(
@@ -274,7 +280,8 @@ async def tochka_update_transaction():
         ).
         select_from(tochka_bank_accounts).
         join(tochka_bank_credentials, tochka_bank_credentials.c.id == tochka_bank_accounts.c.tochka_bank_credential_id).
-        join(pboxes, pboxes.c.id == tochka_bank_accounts.c.payboxes_id)
+        join(pboxes, pboxes.c.id == tochka_bank_accounts.c.payboxes_id).
+        join(users_cboxes_relation, users_cboxes_relation.c.id == pboxes.c.cashbox)
     )
     if active_accounts_with_credentials:
         for account in active_accounts_with_credentials:
@@ -283,7 +290,6 @@ async def tochka_update_transaction():
                     "startDateTime": account.get('registrationDate'),
                     "endDateTime": str(datetime.utcnow().date())
                 }, account.get('access_token'))
-            print(statement)
             status_info = ''
             info_statement = None
             while status_info != 'Ready':
@@ -293,5 +299,21 @@ async def tochka_update_transaction():
                     statement.get('Data')['Statement'].get('accountId'),
                     account.get('access_token'))
                 status_info = info_statement.get('Data')['Statement'][0].get('status')
-            print(info_statement)
+            tochka_payments_db = await read_payments_list(account.get('token'), PaymentFiltersQuery(tags=f"TochkaBank,{account.get('accountId')}"), limit=1000000)
+            if len(tochka_payments_db.get('result')) < 1:
+                for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
+                    await create_payment(account.get('token'), PaymentCreate(
+                        name=payment.get('transactionTypeCode'),
+                        description=payment.get('description'),
+                        type='incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
+                        tags=f"TochkaBank,{account.get('accountId')}",
+                        amount=payment.get('Amount').get('amount'),
+                        paybox=account.get('pbox_id'),
+                        amount_without_tax=payment.get('Amount').get('amount'),
+                        status=True if payment.get('status') == 'Booked' else False,
+                        stopped=True
+                    ))
 
+            else:
+                set_tochka_payments_db = set([item.get('tags').split(',')[1] for item in tochka_payments_db.get('result')])
+                print(set_tochka_payments_db)
