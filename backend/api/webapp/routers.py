@@ -76,6 +76,8 @@ async def get_nomenclature(
         filter_balance.append(warehouse_balances.c.warehouse_id == warehouse_id)
     if organization_id:
         filter_balance.append(warehouse_balances.c.organization_id == organization_id)
+    if filter_balance:
+        filter_balance.append(warehouse_balances.c.current_amount > 0)
     if manufacturer:
         filter_general.append(nomenclature.c.manufacturer.ilike(f"%{manufacturer}%"))
 
@@ -99,19 +101,10 @@ async def get_nomenclature(
                 nomenclature
                 .join(prices, nomenclature.c.id == prices.c.nomenclature, isouter=True)
                 .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
+                .join(warehouse_balances, nomenclature.c.id == warehouse_balances.c.nomenclature_id, isouter=True)
              )
-             .where(*filter_general, *filter_pics, *filter_prices))
-
-    if filter_balance:
-        filter_balance.extend(
-            [
-                warehouse_balances.c.nomenclature_id == nomenclature.c.id,
-                warehouse_balances.c.current_amount > 0
-            ]
-        )
-        query = query.join(filter_balance, and_(*filter_balance), isouter=True)
-
-    query = query.limit(limit).offset(offset)
+             .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
+             .limit(limit).offset(offset))
 
     result_nomenclature = await database.fetch_all(query)
     result_nomenclature = [*map(datetime_to_timestamp, result_nomenclature)]
@@ -128,16 +121,12 @@ async def get_nomenclature(
                 nomenclature
                 .join(prices, nomenclature.c.id == prices.c.nomenclature, isouter=True)
                 .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
+                .join(warehouse_balances, nomenclature.c.id == warehouse_balances.c.nomenclature_id, isouter=True)
             )
-            .where(*filter_general, *filter_pics, *filter_prices)
+            .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
             .alias()
         )
     )
-
-    if filter_balance:
-        count_query = query.join(filter_balance, and_(*filter_balance), isouter=True)
-
-    count_query = count_query.limit(limit).offset(offset)
 
     nomenclature_db_c = await database.fetch_one(count_query)
 
