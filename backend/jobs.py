@@ -304,6 +304,7 @@ async def tochka_update_transaction():
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     await create_payment(account.get('token'), PaymentCreate(
                         name=payment.get('transactionTypeCode'),
+                        external_id=payment.get('paymentId'),
                         description=payment.get('description'),
                         type='incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
                         tags=f"TochkaBank,{account.get('accountId')}",
@@ -315,5 +316,19 @@ async def tochka_update_transaction():
                     ))
 
             else:
-                set_tochka_payments_db = set([item.get('tags').split(',')[1] for item in tochka_payments_db.get('result')])
-                print(set_tochka_payments_db)
+                set_tochka_payments_statement = {'payment-2024-02-12_1281547196',
+                                                     'tariffer-2024-03-02_303514325_40802810520000171198_044525104_402', 'cbs-tb-92-492270921',
+                 'cbs-tb-92-517120309', 'cbs-tb-92-495002774', 'cbs-tb-92-476096414', 'cbs-tb-92-517146591',
+                 'payment-2024-02-04_1255301527', 'cbs-tb-92-498303325', 'payment-2024-02-12_1281551906',
+                 'cbs-tb-92-544291969', 'payment-2024-01-24_1220260712', 'cbs-tb-92-500681013', 'cbs-tb-92-514709794',
+                 'cbs-tb-92-506067339', 'payment-2024-01-24_1221665250', 'cbs-tb-92-514820813',
+                 'payment-2024-03-02_1349446719', 'cbs-tb-92-522914402', 'cbs-tb-92-474137196', 'cbs-tb-92-510422479',
+                 'payment-2024-02-12_1281504534', 'tariffer-2024-02-01_303514325_40802810520000171198_044525104_402',
+                 'cbs-tb-92-457153012', 'cbs-tb-92-492195692', 'cbs-tb-92-539847741', 'cbs-tb-92-528369595',
+                 'cbs-tb-92-514773261', 'cbs-tb-92-484546934', 'payment-2024-01-31_1243660484',
+                 'payment-2024-02-01_1246759314', 'cbs-tb-92-508994062', 'cbs-tb-92-458681285',
+                 'payment-2024-02-04_1255299586', 'payment-2024-02-01_1246728221', 'payment-2024-01-22_1212966261',
+                 'payment-2024-01-31_1243669245', 'cbs-tb-92-517046534', 'cbs-tb-92-463957782'}
+
+                set_tochka_payments_db = set([item.get('external_id') for item in tochka_payments_db.get('result')])
+                print(list(set_tochka_payments_db-set_tochka_payments_statement))
