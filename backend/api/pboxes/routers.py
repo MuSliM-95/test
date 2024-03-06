@@ -52,6 +52,26 @@ async def read_payboxes_meta(token: str, limit: int = 100, offset: int = 0, sort
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
+@router.get("/payboxes/{id}/")
+async def get_paybox_by_id(token: str, id: int):
+    """Получение счета по ID"""
+    query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
+    user = await database.fetch_one(query)
+    if user:
+        if user.status:
+            query = pboxes.select().where(pboxes.c.id == id, pboxes.c.cashbox == user.cashbox_id)
+            pbox = await database.fetch_one(query)
+
+            if not pbox:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Вы ввели несуществующий счет, либо он не принадлежит вам!"
+                )
+            return pbox
+
+    raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
+
+
 @router.post("/payboxes/", response_model=pboxes_schemas.Payboxes)
 async def create_paybox(token: str, paybox_data: pboxes_schemas.PayboxesCreate):
     """Создание счета"""
