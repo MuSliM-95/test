@@ -1,5 +1,5 @@
 import aiohttp
-from jobs import scheduler, jobstore
+from jobs import scheduler
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database, tochka_bank_credentials, pboxes, tochka_bank_accounts
@@ -349,29 +349,3 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
         raise HTTPException(status_code=432, detail=str(error))
 
 
-@router.post("/bank/statement/init/")
-async def init_statement(statement_data: StatementData, access_token: str):
-    statement_data = statement_data.dict()
-    async with aiohttp.ClientSession(trust_env = True) as session:
-        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
-            'Data': {
-                'Statement': {
-                    'accountId': statement_data.get('accountId'),
-                    'startDateTime': statement_data.get('startDateTime'),
-                    'endDateTime': statement_data.get('endDateTime'),
-                }
-            }
-        }, headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
-            init_statement_json = await resp.json()
-        await session.close()
-    return init_statement_json
-
-
-@router.get("/bank/statement/{statementId}")
-async def get_statement(statement_id: str, account_id: str, access_token: str):
-    async with aiohttp.ClientSession(trust_env = True) as session:
-        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
-                               headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
-            init_statement_json = await resp.json()
-        await session.close()
-    return init_statement_json
