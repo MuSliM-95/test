@@ -24,7 +24,7 @@ class LoyalityCardFilters(BaseModel):
     created_at_to: Optional[int]
 
     contragent_name: Optional[str]
-    phone_number: Optional[int]
+    phone_number: Optional[str]
     organization_name: Optional[str]
 
     # lifetime: Optional[int] # lifetime in seconds
@@ -34,12 +34,12 @@ class LoyalityCardFilters(BaseModel):
 
 class LoyalityCardCreate(BaseModel):
     # id: int
-    card_number: Optional[int]
+    card_number: Optional[str]
     tags: Optional[str]
     # balance: Optional[int]
     # income: Optional[int]
     # outcome: Optional[int]
-    phone_number: Optional[int]
+    phone_number: Optional[str]
     contragent_id: Optional[int]
     contragent_name: Optional[str]
     organization_id: Optional[int]

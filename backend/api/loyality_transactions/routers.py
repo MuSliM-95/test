@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from database.db import database, loyality_transactions, loyality_cards
 import api.loyality_transactions.schemas as schemas
 from typing import Optional
-from sqlalchemy import desc
+from sqlalchemy import desc, func, select
 
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, get_entity_by_id_and_created_by
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, get_entity_by_id_cashbox, clear_phone_number
 
 from ws_manager import manager
 from functions.helpers import get_user_by_token
@@ -61,45 +61,34 @@ async def get_loyality_transaction_by_id(token: str, idx: int):
 async def get_transactions(token: str, limit: int = 100, offset: int = 0, filters_q: schemas.LoyalityTranstactionFilters = Depends()):
     """Получение списка транзакций"""
     user = await get_user_by_token(token)
-
     filters = get_filters_transactions(loyality_transactions, filters_q)
+    query = (
+        loyality_transactions.select()
+        .where(
+            loyality_transactions.c.cashbox == user.cashbox_id,
+            loyality_transactions.c.is_deleted.is_not(True)
+        )
+        .order_by(desc(loyality_transactions.c.id))
+    )
+    count_query = (
+        select(func.count(loyality_transactions.c.id))
+        .where(
+            loyality_transactions.c.cashbox == user.cashbox_id,
+            loyality_transactions.c.is_deleted.is_not(True)
+        )
+    )
 
     if filters:
-        query = (
-            loyality_transactions.select()
-            .where(
-                loyality_transactions.c.cashbox == user.cashbox_id,
-                loyality_transactions.c.is_deleted.is_not(True)
-                
-            )
-            .order_by(desc(loyality_transactions.c.id))
-            .filter(*filters)
-            .limit(limit)
-            .offset(offset)
-        )
-    else:
-        query = (
-            loyality_transactions.select()
-            .where(
-                loyality_transactions.c.cashbox == user.cashbox_id,
-                loyality_transactions.c.is_deleted.is_not(True)
-                
-            )
-            .order_by(desc(loyality_transactions.c.id))
-            .limit(limit)
-            .offset(offset)
-        )
+        query = query.filter(*filters)
+        count_query = count_query.filter(*filters)
 
-
+    query = query.limit(limit).offset(offset)
     loyality_transactions_db = await database.fetch_all(query)
     loyality_transactions_db = [*map(datetime_to_timestamp, loyality_transactions_db)]
 
-    c = f"SELECT count(*) FROM loyality_transactions WHERE loyality_transactions.created_by_id = {user.id} AND loyality_transactions.is_deleted = false"
-    count = await database.fetch_one(c)
+    count = await database.execute(count_query)
 
-    return {"result": loyality_transactions_db, "count": dict(count)['count']} # LOCAL
-
-    # return loyality_transactions_db
+    return {"result": loyality_transactions_db, "count": count}
 
 
 @router.post("/loyality_transactions/", response_model=Optional[schemas.LoyalityTransaction])
@@ -110,9 +99,13 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
     if user:
         if user.status:
             if loyality_transaction_data.loyality_card_number:
-                    
-                    q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_transaction_data.loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
+                    loyality_card_number = clear_phone_number(
+                        phone_number=loyality_transaction_data.loyality_card_number
+                    )
+                    q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
                     card = await database.fetch_one(q)
+                    if not card:
+                        raise HTTPException(status_code=400, detail=f"Карты с номером {loyality_transaction_data.loyality_card_number} не существует")
 
                     card_dict = {
                         "balance": card.balance,
@@ -162,6 +155,9 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
     loyality_transactions_values["created_by_id"] = user.id
     loyality_transactions_values['cashbox'] = user.cashbox_id
     loyality_transactions_values["loyality_card_id"] = card.id
+    loyality_transactions_values['loyality_card_number'] = clear_phone_number(
+        phone_number=loyality_transactions_values['loyality_card_number']
+    )
     # loyality_transactions_values["dead_at"] = datetime.fromtimestamp(loyality_transactions_values["dead_at"])
 
     query = loyality_transactions.insert().values(loyality_transactions_values)
@@ -202,7 +198,7 @@ async def edit_loyality_transaction(
 ):
     """Редактирование транзакций"""
     user = await get_user_by_token(token)
-    loyality_transaction_db = await get_entity_by_id_and_created_by(loyality_transactions, idx, user.id)
+    loyality_transaction_db = await get_entity_by_id_cashbox(loyality_transactions, idx, user.cashbox_id)
     loyality_transaction_values = loyality_transaction.dict(exclude_unset=True)
 
     if loyality_transaction_values:
@@ -221,7 +217,7 @@ async def edit_loyality_transaction(
             .values(loyality_transaction_values)
         )
         await database.execute(query)
-        loyality_transaction_db = await get_entity_by_id_and_created_by(loyality_transactions, idx, user.id)
+        loyality_transaction_db = await get_entity_by_id_cashbox(loyality_transactions, idx, user.cashbox_id)
 
     loyality_transaction_db = datetime_to_timestamp(loyality_transaction_db)
 
@@ -240,7 +236,7 @@ async def delete_loyality_transaction(token: str, idx: int):
     """Удаление транзакций"""
     user = await get_user_by_token(token)
 
-    await get_entity_by_id_and_created_by(loyality_transactions, idx, user.id)
+    await get_entity_by_id_cashbox(loyality_transactions, idx, user.cashbox_id)
 
     query = (
         loyality_transactions.update()
