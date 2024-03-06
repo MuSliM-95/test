@@ -18,7 +18,8 @@ from apps.tochka_bank.schemas import StatementData
 
 from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards,\
-    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation
+    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation,\
+    entity_to_entity, tochka_bank_payments
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
 from functions.goods_distribution import process_distribution
@@ -259,7 +260,7 @@ async def distribution():
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=1000000000, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=1000000, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
@@ -267,7 +268,8 @@ async def tochka_update_transaction():
                tochka_bank_accounts.c.registrationDate,
                tochka_bank_credentials.c.access_token,
                pboxes.c.id.label("pbox_id"),
-               users_cboxes_relation.c.token
+               users_cboxes_relation.c.token,
+               pboxes.c.cashbox.label("cashbox_id")
                ).
         where(
             and_(
@@ -297,23 +299,176 @@ async def tochka_update_transaction():
                     statement.get('Data')['Statement'].get('accountId'),
                     account.get('access_token'))
                 status_info = info_statement.get('Data')['Statement'][0].get('status')
-            tochka_payments_db = await read_payments_list(account.get('token'), PaymentFiltersQuery(tags=f"TochkaBank,{account.get('accountId')}"), limit=1000000)
-            if len(tochka_payments_db.get('result')) < 1:
-                for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
-                    await create_payment(account.get('token'), PaymentCreate(
-                        name=payment.get('transactionTypeCode'),
-                        external_id=payment.get('paymentId'),
-                        description=payment.get('description'),
-                        type='incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
-                        tags=f"TochkaBank,{account.get('accountId')}",
-                        amount=payment.get('Amount').get('amount'),
-                        paybox=account.get('pbox_id'),
-                        amount_without_tax=payment.get('Amount').get('amount'),
-                        status=True if payment.get('status') == 'Booked' else False,
-                        stopped=True
-                    ))
-            else:
-                set_tochka_payments_statement = {'payment-2023-12-28_1156743287', 'payment-2024-01-19_1207764055', 'payment-2024-01-24_1220260712', 'payment-2024-01-22_1212966261', 'cbs-tb-92-498303325', 'tariffer-2023-11-22_303514325_40802810520000171198_044525104_402', 'payment-2023-12-04_1069567688', 'payment-2023-11-28_1051511605', 'cbs-tb-92-495002774', 'payment-2024-02-04_1255299586', 'cardclaims-1e4a6905-3dc2-4873-a682-0f1ddaf494ca', 'cbs-tb-92-463957782', 'cbs-tb-92-457153012', 'payment-2024-01-12_1188136239', 'cbs-tb-92-506067339', 'cbs-tb-92-528369595', 'payment-2024-01-12_1188133905', 'payment-2024-02-12_1281504534', 'cbs-tb-92-458681285', 'cbs-tb-92-484546934', 'cbs-tb-92-511836073', 'payment-2024-02-12_1281551906', 'tariffer-2024-02-01_303514325_40802810520000171198_044525104_402', 'cbs-tb-92-544291969', 'payment-2023-12-04_1069579755', 'cbs-tb-92-474137196', 'payment-2024-01-12_1188148040', 'cbs-tb-92-431001536', 'cbs-tb-92-492195692', 'payment-2024-02-12_1281547196', 'cbs-tb-92-508994062', 'cbs-tb-92-492270921', 'payment-2024-02-04_1255301527', 'cbs-tb-92-517120309', 'cbs-tb-92-517046534', 'payment-2024-01-24_1221665250', 'cbs-tb-92-539847741', 'payment-2024-03-02_1349446719', 'payment-2023-11-23_1034528628', 'payment-2023-12-30_1166586991', 'cbs-tb-92-446156138', 'payment-2024-02-01_1246759314', 'payment-2023-12-06_1078594612', 'cbs-tb-92-514773261', 'payment-2023-12-07_1081369104', 'cbs-tb-92-514709794', 'cbs-tb-92-514820813', 'payment-2024-02-01_1246728221', 'payment-2023-11-23_1034528638', 'tariffer-2023-12-04_303514325_40802810520000171198_044525104_402', 'tariffer-2024-01-03_303514325_40802810520000171198_044525104_402', 'payment-2023-11-23_1034575833', 'payment-2024-01-31_1243669245', 'cbs-tb-92-522914402', 'cbs-tb-92-500681013', 'payment-2023-12-04_1069704581', 'cbs-tb-92-510422479', 'payment-2023-11-23_1034574780', 'cbs-tb-92-517146591', 'tariffer-2024-03-02_303514325_40802810520000171198_044525104_402', 'cbs-tb-92-476096414', 'payment-2024-01-03_1168228630', 'payment-2024-01-31_1243660484', 'payment-2023-11-28_1051484717'}
 
-                set_tochka_payments_db = set([item.get('external_id') for item in tochka_payments_db.get('result')])
-                print(list(set_tochka_payments_db-set_tochka_payments_statement))
+            tochka_payments_db = await database.fetch_all(
+                select(*payments.columns, tochka_bank_payments.c.paymentId).
+                where(and_(payments.c.paybox == account.get('pbox_id'), payments.c.cashbox == account.get('cashbox_id'))).\
+                select_from(payments).\
+                join(tochka_bank_payments, tochka_bank_payments.c.payment_crm_id == payments.c.id))
+
+            if len(tochka_payments_db) < 1:
+                for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
+                    payment_create = await create_payment( account.get('token'), PaymentCreate(
+                        name = payment.get('transactionTypeCode'),
+                        description = payment.get('description'),
+                        type = 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
+                        tags = f"TochkaBank,{account.get('accountId')}",
+                        amount = float(payment.get('Amount').get('amount')),
+                        paybox = account.get('pbox_id'),
+                        amount_without_tax = float(payment.get('Amount').get('amount')),
+                        status = True if payment.get('status') == 'Booked' else False,
+                        stopped = True
+                    ))
+
+                    payment_data = {
+                        'accountId': info_statement.get('accountId'),
+                        'payment_crm_id': payment_create.get('id'),
+                        'statementId': info_statement.get('statementId'),
+                        'statement_creation_datetime': info_statement.get('creationDateTime'),
+                        'transactionTypeCode': payment.get('transactionTypeCode'),
+                        'transactionId': payment.get('transactionId'),
+                        'status': payment.get('status'),
+                        'paymentId': payment.get('paymentId'),
+                        'documentProcessDate': payment.get('documentProcessDate'),
+                        'documentNumber': payment.get('documentNumber'),
+                        'description': payment.get('description'),
+                        'creditDebitIndicator': payment.get('creditDebitIndicator'),
+                        'amount': payment.get('Amount').get('amount') if payment.get('Amount') else None,
+                        'amountNat': payment.get('Amount').get('amountNat') if payment.get('Amount') else None,
+                        'currency': payment.get('Amount').get('currency') if payment.get('Amount') else None,
+                    }
+                    if payment.get('CreditorParty'):
+                        payment_data.update({
+                            'creditor_party_inn': payment.get('CreditorParty').get('inn'),
+                            'creditor_party_name': payment.get('CreditorParty').get('name'),
+                            'creditor_party_kpp': payment.get('CreditorParty').get('kpp'),
+                            'creditor_account_identification': payment.get('CreditorAccount').get('identification'),
+                            'creditor_account_schemeName': payment.get('CreditorAccount').get('schemeName'),
+                            'creditor_agent_schemeName': payment.get('CreditorAgent').get('schemeName'),
+                            'creditor_agent_name': payment.get('CreditorAgent').get('name'),
+                            'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
+                            'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
+                        })
+                    elif payment.get('DebtorParty'):
+                        payment_data.update({
+                            'debitor_party_inn': payment.get('DebtorParty').get('inn'),
+                            'debitor_party_name': payment.get('DebtorParty').get('name'),
+                            'debitor_party_kpp': payment.get('DebtorParty').get('kpp'),
+                            'debitor_account_identification': payment.get('DebtorAccount').get('identification'),
+                            'debitor_account_schemeName': payment.get('DebtorAccount').get('schemeName'),
+                            'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
+                            'debitor_agent_name': payment.get( 'DebtorAgent').get('name'),
+                            'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
+                            'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
+                        }),
+                    else:
+                        raise Exception('не вилидный формат транзакции от Точка банка')
+
+                    await database.execute(tochka_bank_payments.insert().values(payment_data))
+            else:
+                set_tochka_payments_statement = set([item.get('paymentId') for item in info_statement.get('Data')['Statement'][0]['Transaction']])
+                set_tochka_payments_db = set([item.get('paymentId') for item in tochka_payments_db])
+                new_paymentsId = list(set_tochka_payments_statement - set_tochka_payments_db)
+                for payment in [item for item in info_statement.get('Data')['Statement'][0]['Transaction'] if item.get('paymentId') in new_paymentsId]:
+                    payment_create = await create_payment(account.get('token'), PaymentCreate(
+                        name = payment.get('transactionTypeCode'),
+                        description = payment.get('description'),
+                        type = 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
+                        tags = f"TochkaBank,{account.get('accountId')}",
+                        amount = float(payment.get('Amount').get('amount')),
+                        paybox = account.get('pbox_id'),
+                        amount_without_tax = float(payment.get('Amount').get('amount')),
+                        status = True if payment.get('status') == 'Booked' else False,
+                        stopped = True
+                    ))
+                    payment_data = {
+                        'accountId': info_statement.get('accountId'),
+                        'payment_crm_id':payment_create.get( 'id' ),
+                        'statementId':info_statement.get( 'statementId' ),
+                        'statement_creation_datetime':info_statement.get( 'creationDateTime' ),
+                        'transactionTypeCode':payment.get( 'transactionTypeCode' ),
+                        'transactionId':payment.get( 'transactionId' ),
+                        'status':payment.get( 'status' ),
+                        'paymentId':payment.get( 'paymentId' ),
+                        'documentProcessDate':payment.get( 'documentProcessDate' ),
+                        'documentNumber':payment.get( 'documentNumber' ),
+                        'description':payment.get( 'description' ),
+                        'creditDebitIndicator':payment.get( 'creditDebitIndicator' ),
+                        'amount':payment.get( 'Amount' ).get( 'amount' ) if payment.get( 'Amount' ) else None,
+                        'amountNat':payment.get( 'Amount' ).get( 'amountNat' ) if payment.get( 'Amount' ) else None,
+                        'currency':payment.get( 'Amount' ).get( 'currency' ) if payment.get( 'Amount' ) else None,
+                    }
+                    if payment.get('CreditorParty'):
+                        payment_data.update( {
+                            'creditor_party_inn':payment.get( 'CreditorParty' ).get( 'inn' ),
+                            'creditor_party_name':payment.get( 'CreditorParty' ).get( 'name' ),
+                            'creditor_party_kpp':payment.get( 'CreditorParty' ).get( 'kpp' ),
+                            'creditor_account_identification':payment.get( 'CreditorAccount' ).get( 'identification' ),
+                            'creditor_account_schemeName':payment.get( 'CreditorAccount' ).get( 'schemeName' ),
+                            'creditor_agent_schemeName':payment.get( 'CreditorAgent' ).get( 'schemeName' ),
+                            'creditor_agent_name':payment.get( 'CreditorAgent' ).get( 'name' ),
+                            'creditor_agent_identification':payment.get( 'CreditorAgent' ).get( 'identification' ),
+                            'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
+                        })
+                    elif payment.get('DebtorParty'):
+                        payment_data.update({
+                            'debitor_party_inn': payment.get('DebtorParty').get('inn'),
+                            'debitor_party_name': payment.get('DebtorParty').get('name'),
+                            'debitor_party_kpp': payment.get('DebtorParty').get('kpp'),
+                            'debitor_account_identification': payment.get('DebtorAccount').get('identification'),
+                            'debitor_account_schemeName': payment.get('DebtorAccount').get('schemeName'),
+                            'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
+                            'debitor_agent_name' :payment.get('DebtorAgent').get('name'),
+                            'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
+                            'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
+                        }),
+                    else:
+                        raise Exception( 'не вилидный формат транзакции от Точка банка' )
+
+                    await database.execute( tochka_bank_payments.insert().values(payment_data))
+
+                for payment in tochka_payments_db:
+                    payment_data = {
+                        'accountId': info_statement.get('accountId'),
+                        'statementId': info_statement.get('statementId'),
+                        'statement_creation_datetime': info_statement.get('creationDateTime'),
+                        'transactionTypeCode': payment.get('transactionTypeCode'),
+                        'transactionId': payment.get('transactionId'),
+                        'status': payment.get('status'),
+                        'paymentId': payment.get('paymentId'),
+                        'documentProcessDate': payment.get('documentProcessDate'),
+                        'documentNumber': payment.get('documentNumber'),
+                        'description': payment.get('description'),
+                        'creditDebitIndicator': payment.get('creditDebitIndicator'),
+                        'amount': payment.get('Amount').get('amount'),
+                        'amountNat': payment.get('Amount' ).get( 'amountNat'),
+                        'currency': payment.get('Amount').get('currency'),
+                    }
+                    if payment.get( 'CreditorParty' ):
+                        payment_data.update({
+                            'creditor_party_inn': payment.get('CreditorParty').get('inn'),
+                            'creditor_party_name': payment.get('CreditorParty').get('name'),
+                            'creditor_party_kpp': payment.get('CreditorParty').get('kpp'),
+                            'creditor_account_identification': payment.get('CreditorAccount').get('identification'),
+                            'creditor_account_schemeName': payment.get('CreditorAccount').get('schemeName'),
+                            'creditor_agent_schemeName': payment.get('CreditorAgent').get('schemeName'),
+                            'creditor_agent_name': payment.get('CreditorAgent').get('name'),
+                            'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
+                            'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
+                        })
+                    elif payment.get('DebtorParty'):
+                        payment_data.update({
+                            'debitor_party_inn': payment.get('DebtorParty').get('inn'),
+                            'debitor_party_name': payment.get('DebtorParty').get('name'),
+                            'debitor_party_kpp': payment.get('DebtorParty').get('kpp'),
+                            'debitor_account_identification': payment.get('DebtorAccount').get('identification'),
+                            'debitor_account_schemeName': payment.get('DebtorAccount').get('schemeName'),
+                            'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
+                            'debitor_agent_name': payment.get('DebtorAgent').get('name'),
+                            'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
+                            'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
+                        }),
+                    else:
+                        raise Exception('не вилидный формат транзакции от Точка банка')
+
+                    await database.execute(tochka_bank_payments.update().where(tochka_bank_payments.c.paymentId == payment.get('paymentId')).values(payment_data))
