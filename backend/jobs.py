@@ -24,6 +24,7 @@ from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
 from functions.goods_distribution import process_distribution
 from functions.gross_profit import process_gross_profit_report
+from functions.helpers import init_statement, get_statement
 from functions.payments import clear_repeats, repeat_payment
 
 scheduler = AsyncIOScheduler(
@@ -62,37 +63,6 @@ def add_job_to_sched(func, **kwargs):
 
 
 accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
-
-
-async def get_statement(statement_id: str, account_id: str, access_token: str):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
-                               headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
-            try:
-                init_statement_json = await resp.json()
-            except:
-                init_statement_json = {"Data": {"Statement": {"status": "error"}}}
-        await session.close()
-    return init_statement_json
-
-
-async def init_statement(statement_data: dict, access_token: str):
-    async with aiohttp.ClientSession() as session:
-        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
-            'Data': {
-                'Statement': {
-                    'accountId': statement_data.get('accountId'),
-                    'startDateTime': statement_data.get('startDateTime'),
-                    'endDateTime': statement_data.get('endDateTime'),
-                }
-            }
-        }, headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
-            try:
-                init_statement_json = await resp.json()
-            except:
-                init_statement_json = {"Data": {"Statement": {"status": "error"}}}
-        await session.close()
-    return init_statement_json
 
 
 
@@ -261,7 +231,7 @@ async def init_statement(statement_data: dict, access_token: str):
 #     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=2, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=1000, id="tochka_update_transaction")
 @database.transaction()
 async def tochka_update_transaction():
     await database.connect()
@@ -301,7 +271,6 @@ async def tochka_update_transaction():
                     statement.get('Data')['Statement'].get('accountId'),
                     account.get('access_token'))
                 status_info = info_statement.get('Data')['Statement'][0].get('status')
-
             tochka_payments_db = await database.fetch_all(
                 select(*payments.columns, tochka_bank_payments.c.paymentId).
                 where(and_(payments.c.paybox == account.get('pbox_id'), payments.c.cashbox == account.get('cashbox_id'))).\
@@ -318,11 +287,14 @@ async def tochka_update_transaction():
                         'amount': payment.get('Amount').get('amount'),
                         'cashbox': account.get('cashbox_id'),
                         'paybox': account.get('pbox_id'),
+                        'date': datetime.strptime(payment.get('documentProcessDate'), "%Y-%m-%d").timestamp(),
+                        'created_at': int(datetime.utcnow().timestamp()),
+                        'updated_at': int(datetime.utcnow().timestamp()),
+                        'is_deleted': False,
                         'amount_without_tax': payment.get('Amount').get('amount'),
                         'status': True if payment.get('status') == 'Booked' else False,
                         'stopped': True
                     }))
-                    print(payment_create_id)
                     payment_create = await database.fetch_one(payments.select().where(payments.c.id == payment_create_id))
                     payment_data = {
                         'accountId': info_statement.get('Data')['Statement'][0].get('accountId'),
@@ -382,6 +354,10 @@ async def tochka_update_transaction():
                         'amount': payment.get('Amount').get('amount'),
                         'cashbox': account.get('cashbox_id'),
                         'paybox': account.get('pbox_id'),
+                        'date': datetime.strptime(payment.get('documentProcessDate'), "%Y-%m-%d").timestamp(),
+                        'created_at': int(datetime.utcnow().timestamp()),
+                        'updated_at': int(datetime.utcnow().timestamp()),
+                        'is_deleted': False,
                         'amount_without_tax': payment.get('Amount').get('amount'),
                         'status': True if payment.get('status') == 'Booked' else False,
                         'stopped': True
@@ -450,7 +426,6 @@ async def tochka_update_transaction():
                         'amountNat': payment.get('Amount').get('amountNat') if payment.get('Amount') else None,
                         'currency': payment.get('Amount').get('currency') if payment.get('Amount') else None,
                     }
-                    print(payment)
                     if payment.get('CreditorParty'):
                         payment_data.update({
                             'creditor_party_inn': payment.get('CreditorParty').get('inn'),
@@ -479,3 +454,18 @@ async def tochka_update_transaction():
                         raise Exception('не вилидный формат транзакции от Точка банка')
 
                     await database.execute(tochka_bank_payments.update().where(tochka_bank_payments.c.paymentId == payment.get('paymentId')).values(payment_data))
+                    payment_update = await database.fetch_one(tochka_bank_payments.select().where(tochka_bank_payments.c.paymentId == payment.get('paymentId')))
+                    await database.execute(payments.update().where(payments.c.id == payment_update.get('payment_crm_id')).values({
+                        'name': payment.get('transactionTypeCode'),
+                        'description': payment.get('description'),
+                        'type': 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
+                        'tags': f"TochkaBank,{account.get('accountId')}",
+                        'amount': payment.get('Amount').get('amount'),
+                        'cashbox': account.get('cashbox_id'),
+                        'paybox': account.get('pbox_id'),
+                        'date': datetime.strptime(payment.get('documentProcessDate'), "%Y-%m-%d").timestamp(),
+                        'updated_at': int(datetime.utcnow().timestamp()),
+                        'is_deleted': False,
+                        'amount_without_tax': payment.get('Amount').get('amount'),
+                        'status': True if payment.get('status') == 'Booked' else False,
+                    }))
