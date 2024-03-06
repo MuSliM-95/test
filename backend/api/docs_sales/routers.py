@@ -1,3 +1,6 @@
+from typing import Optional, Union
+
+from databases.backends.postgres import Record
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select, asc, Date
 
@@ -205,6 +208,23 @@ async def check_foreign_keys(instance_values, user, exceptions) -> bool:
     return True
 
 
+async def add_number_to_docs_sales(user: Record, docs_sales_id: Optional[int] = None) -> Union[str, None]:
+    q = docs_sales.select().where(
+        docs_sales.c.cashbox == user.cashbox_id,
+        docs_sales.c.is_deleted == False,
+        docs_sales.c.number.is_(None)
+    ).order_by(asc(docs_sales.c.id))
+
+    docs_db = await database.fetch_all(q)
+    find_docs_number = None
+    for i, v in enumerate(docs_db):
+        number = str(i + 1)
+        if v.id == docs_sales_id:
+            find_docs_number = number
+        q = docs_sales.update().where(docs_sales.c.id == v.id).values({"number": number})
+        await database.execute(q)
+    return find_docs_number
+
 @router.post("/docs_sales/", response_model=schemas.ListView)
 async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: bool = True):
     """Создание документов"""
@@ -267,6 +287,10 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
+
+        if not instance_values.get('number'):
+            number = await add_number_to_docs_sales(user=user, docs_sales_id=instance_id)
+            instance_values['number'] = number
 
         # Процесс разделения тегов(в другую таблицу), а также связывание лида с документом продажи при наличии нужного тега
 
@@ -530,22 +554,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             body['to_warehouse'] = None
             await create_warehouse_docs(token, body, user.cashbox_id)
 
-
     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
 
-    q = docs_sales.select().where(
-        docs_sales.c.cashbox == user.cashbox_id,
-        docs_sales.c.is_deleted == False
-    ).order_by(asc(docs_sales.c.id))
-
-    docs_db = await database.fetch_all(q)
-
-    for i in range(0, len(docs_db)):
-        if not docs_db[i].number:
-            q = docs_sales.update().where(docs_sales.c.id == docs_db[i].id).values({ "number": str(i + 1) })
-            await database.execute(q)
+    await add_number_to_docs_sales(user=user)
 
     await manager.send_message(
         token,
