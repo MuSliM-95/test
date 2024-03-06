@@ -113,14 +113,14 @@ async def tochkaoauth(code: str, state: int):
                         datetime.combine(created_date, datetime.min.time())))
             data = {
                         'name': f"Счет банк Точка №{account.get('accountId').split('/')[0]}",
-                        'start_balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
+                        'start_balance': 0,
                         'cashbox': state,
-                        'balance': 0,
+                        'balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
                         'update_start_balance': int(datetime.utcnow().timestamp()),
                         'update_start_balance_date': int(datetime.utcnow().timestamp()),
                         'created_at': int(datetime.utcnow().timestamp()),
                         'updated_at': int(datetime.utcnow().timestamp()),
-                        'balance_date':created_date_ts
+                        'balance_date': 0
                     }
             account_db = await database.fetch_one(
                     tochka_bank_accounts.select().where(tochka_bank_accounts.c.accountId == account.get('accountId')))
