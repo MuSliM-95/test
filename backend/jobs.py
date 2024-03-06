@@ -261,7 +261,7 @@ async def distribution():
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=1, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
