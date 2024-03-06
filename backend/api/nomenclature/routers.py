@@ -108,6 +108,15 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     nomenclature_db = [*map(nomenclature_unit_id_to_name, nomenclature_db)]
     nomenclature_db = [await inst for inst in nomenclature_db]
 
+    for nomenclature_info in nomenclature_db:
+        query = (
+            select(nomenclature_barcodes.c.code)
+            .where(nomenclature_barcodes.c.nomenclature_id == nomenclature_info["id"])
+        )
+        barcodes_nomenclature_record = await database.fetch_all(query)
+        nomenclature_barcodes_list = [element.code for element in barcodes_nomenclature_record]
+        nomenclature_info["barcodes"] = nomenclature_barcodes_list
+
     query = select(func.count(nomenclature.c.id)).where(*filters)
     nomenclature_db_c = await database.fetch_one(query)
 
