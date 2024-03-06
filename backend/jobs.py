@@ -256,11 +256,12 @@ async def repeat_payments():
 
 @scheduler.scheduled_job("interval", seconds=5, id="distribution")
 async def distribution():
+    await database.connect()
     await process_distribution()
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=100000, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=1, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
@@ -418,7 +419,7 @@ async def tochka_update_transaction():
                             'debitor_account_identification': payment.get('DebtorAccount').get('identification'),
                             'debitor_account_schemeName': payment.get('DebtorAccount').get('schemeName'),
                             'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
-                            'debitor_agent_name' :payment.get('DebtorAgent').get('name'),
+                            'debitor_agent_name': payment.get('DebtorAgent').get('name'),
                             'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
                             'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
                         }),
@@ -427,7 +428,7 @@ async def tochka_update_transaction():
 
                     await database.execute( tochka_bank_payments.insert().values(payment_data))
 
-                for payment in tochka_payments_db:
+                for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     payment_data = {
                         'accountId': info_statement.get('accountId'),
                         'statementId': info_statement.get('statementId'),
@@ -444,7 +445,8 @@ async def tochka_update_transaction():
                         'amountNat': payment.get('Amount').get('amountNat') if payment.get('Amount') else None,
                         'currency': payment.get('Amount').get('currency') if payment.get('Amount') else None,
                     }
-                    if payment.get( 'CreditorParty'):
+                    print(payment)
+                    if payment.get('CreditorParty'):
                         payment_data.update({
                             'creditor_party_inn': payment.get('CreditorParty').get('inn'),
                             'creditor_party_name': payment.get('CreditorParty').get('name'),
