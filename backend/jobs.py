@@ -256,6 +256,16 @@ async def tochka_update_transaction():
     )
     if active_accounts_with_credentials:
         for account in active_accounts_with_credentials:
+            async with aiohttp.ClientSession(trust_env=True) as session:
+                async with session.get(
+                        f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account.get("accountId")}/balances',
+                        headers={
+                            'Authorization': f'Bearer {account.get("access_token")}',
+                            'Content-type': 'application/json'
+                        }) as resp:
+                    balance_json = await resp.json()
+                await session.close()
+            await database.execute(pboxes.update().where(pboxes.c.id == account.get('pbox_id')).values({'balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount")}))
             statement = await init_statement({
                     "accountId": account.get('accountId'),
                     "startDateTime": account.get('registrationDate'),
@@ -281,7 +291,7 @@ async def tochka_update_transaction():
                     payment_create_id = await database.execute(payments.insert().values({
                         'name': payment.get('transactionTypeCode'),
                         'description': payment.get('description'),
-                        'type': 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
+                        'type': 'outgoing' if payment.get('creditDebitIndicator') == 'Debit' else 'incoming',
                         'tags': f"TochkaBank,{account.get('accountId')}",
                         'amount': payment.get('Amount').get('amount'),
                         'cashbox': account.get('cashbox_id'),
@@ -384,7 +394,7 @@ async def tochka_update_transaction():
                     payment_create_id = await database.execute(payments.insert().values({
                         'name': payment.get('transactionTypeCode'),
                         'description': payment.get('description'),
-                        'type': 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
+                        'type': 'outgoing' if payment.get('creditDebitIndicator') == 'Debit' else 'incoming',
                         'tags': f"TochkaBank,{account.get('accountId')}",
                         'amount': payment.get('Amount').get('amount'),
                         'cashbox': account.get('cashbox_id'),
@@ -529,7 +539,7 @@ async def tochka_update_transaction():
                     await database.execute(payments.update().where(payments.c.id == payment_update.get('payment_crm_id')).values({
                         'name': payment.get('transactionTypeCode'),
                         'description': payment.get('description'),
-                        'type': 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
+                        'type': 'outgoing' if payment.get('creditDebitIndicator') == 'Debit' else 'incoming',
                         'tags': f"TochkaBank,{account.get('accountId')}",
                         'amount': payment.get('Amount').get('amount'),
                         'cashbox': account.get('cashbox_id'),
