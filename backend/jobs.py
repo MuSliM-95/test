@@ -231,7 +231,7 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 #     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=1, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction")
 @database.transaction()
 async def tochka_update_transaction():
     await database.connect()
