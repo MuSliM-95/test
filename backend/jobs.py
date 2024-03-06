@@ -316,6 +316,7 @@ async def tochka_update_transaction():
                         'type': 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
                         'tags': f"TochkaBank,{account.get('accountId')}",
                         'amount': payment.get('Amount').get('amount'),
+                        'cashbox': account.get('cashbox_id'),
                         'paybox': account.get('pbox_id'),
                         'amount_without_tax': payment.get('Amount').get('amount'),
                         'status': True if payment.get('status') == 'Booked' else False,
@@ -379,6 +380,7 @@ async def tochka_update_transaction():
                         'type': 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
                         'tags': f"TochkaBank,{account.get('accountId')}",
                         'amount': payment.get('Amount').get('amount'),
+                        'cashbox': account.get('cashbox_id'),
                         'paybox': account.get('pbox_id'),
                         'amount_without_tax': payment.get('Amount').get('amount'),
                         'status': True if payment.get('status') == 'Booked' else False,
@@ -429,7 +431,7 @@ async def tochka_update_transaction():
                     else:
                         raise Exception( 'не вилидный формат транзакции от Точка банка' )
 
-                    await database.execute( tochka_bank_payments.insert().values(payment_data))
+                    await database.execute(tochka_bank_payments.insert().values(payment_data))
 
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     payment_data = {
