@@ -310,7 +310,7 @@ async def tochka_update_transaction():
             if len(tochka_payments_db) < 1:
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     print(payment)
-                    payment_create = await create_payment(account.get('token'), PaymentCreate(
+                    payment_create_id = await database.execute(payments.insert().values(PaymentCreate(
                         name = payment.get('transactionTypeCode'),
                         description = payment.get('description'),
                         type = 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
@@ -318,10 +318,10 @@ async def tochka_update_transaction():
                         amount = payment.get('Amount').get('amount'),
                         paybox = account.get('pbox_id'),
                         amount_without_tax = payment.get('Amount').get('amount'),
-                        status = True if payment.get('status') == 'Booked' else False,
+                        status = True if payment.get( 'status' ) == 'Booked' else False,
                         stopped = True
-                    ))
-
+                    ).dict()))
+                    payment_create = await database.fetch_one(payments.select().where(payments.c.id == payment_create_id))
                     payment_data = {
                         'accountId': info_statement.get('accountId'),
                         'payment_crm_id': payment_create.get('id'),
@@ -372,17 +372,18 @@ async def tochka_update_transaction():
                 set_tochka_payments_db = set([item.get('paymentId') for item in tochka_payments_db])
                 new_paymentsId = list(set_tochka_payments_statement - set_tochka_payments_db)
                 for payment in [item for item in info_statement.get('Data')['Statement'][0]['Transaction'] if item.get('paymentId') in new_paymentsId]:
-                    payment_create = await create_payment(account.get('token'), PaymentCreate(
-                        name = payment.get('transactionTypeCode'),
-                        description = payment.get('description'),
-                        type = 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
-                        tags = f"TochkaBank,{account.get('accountId')}",
-                        amount = payment.get('Amount').get('amount'),
-                        paybox = account.get('pbox_id'),
-                        amount_without_tax = payment.get('Amount').get('amount'),
-                        status = True if payment.get('status') == 'Booked' else False,
+                    payment_create_id = await database.execute( payments.insert().values( PaymentCreate(
+                        name = payment.get( 'transactionTypeCode' ),
+                        description = payment.get( 'description' ),
+                        type = 'incoming' if payment.get( 'creditDebitIndicator' ) == 'Debit' else 'outgoing',
+                        tags = f"TochkaBank,{account.get( 'accountId' )}",
+                        amount = payment.get( 'Amount' ).get( 'amount' ),
+                        paybox = account.get( 'pbox_id' ),
+                        amount_without_tax = payment.get( 'Amount' ).get( 'amount' ),
+                        status = True if payment.get( 'status' ) == 'Booked' else False,
                         stopped = True
-                    ))
+                    ).dict() ) )
+                    payment_create = await database.fetch_one(payments.select().where( payments.c.id == payment_create_id))
                     payment_data = {
                         'accountId': info_statement.get('accountId'),
                         'payment_crm_id': payment_create.get('id'),
