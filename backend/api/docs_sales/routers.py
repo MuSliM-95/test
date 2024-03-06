@@ -368,11 +368,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
             
         if paid_rubles > 0:
-            paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
-            payboxes = await database.fetch_all(paybox_q)
-
             article_id = None
-
             article_q = articles.select().where(articles.c.cashbox == user.cashbox_id, articles.c.name == "Продажи")
             article_db = await database.fetch_one(article_q)
 
@@ -401,7 +397,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "tax_type": "internal",
                 "article_id": article_id,
                 "article": "Продажи",
-                "paybox": payboxes[0].id,
+                "paybox": instance_values.get('paybox'),
                 "date": int(datetime.datetime.now().timestamp()),
                 "account": user.user,
                 "cashbox": user.cashbox_id,
@@ -643,16 +639,13 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         proxy_lt = True
 
             if not proxy_payment:
-                paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
-                payboxes = await database.fetch_all(paybox_q)
-
                 rubles_body = {
                     "contragent": instance_values['contragent'],
                     "type": "outgoing",
                     "name": f"Оплата по документу {instance_values['number']}",
                     "amount_without_tax": instance_values.get("paid_rubles"),
                     "amount": instance_values.get("paid_rubles"),
-                    "paybox": payboxes[0].id,
+                    "paybox": instance_values.get('paybox'),
                     "date": int(datetime.datetime.now().timestamp()),
                     "account": user.user,
                     "cashbox": user.cashbox_id,

@@ -36,6 +36,7 @@ class Create(BaseModel):
     organization: int
     loyality_card_id: Optional[int]
     warehouse: Optional[int]
+    paybox: Optional[int]
     tax_included: Optional[bool]
     tax_active: Optional[bool]
     sales_manager: Optional[int]
