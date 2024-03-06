@@ -192,7 +192,7 @@ async def distribution():
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=2, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
@@ -240,7 +240,8 @@ async def tochka_update_transaction():
 
             if len(tochka_payments_db) < 1:
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
-                    payment_create = await create_payment( account.get('token'), PaymentCreate(
+                    print(payment)
+                    payment_create = await create_payment(account.get('token'), PaymentCreate(
                         name = payment.get('transactionTypeCode'),
                         description = payment.get('description'),
                         type = 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
