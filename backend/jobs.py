@@ -269,7 +269,7 @@ async def tochka_update_transaction():
             statement = await init_statement({
                     "accountId": account.get('accountId'),
                     "startDateTime": account.get('registrationDate'),
-                    "endDateTime": str(datetime.utcnow().date())
+                    "endDateTime": str(datetime.now().date())
                 }, account.get('access_token'))
             status_info = ''
             info_statement = None
