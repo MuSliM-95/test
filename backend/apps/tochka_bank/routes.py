@@ -269,6 +269,7 @@ async def integration_on(token: str, id_integration: int):
                 integrations_to_cashbox.c.integration_id == id_integration,
                 integrations_to_cashbox.c.installed_by == user.id
             )).values({'status': True}))
+
         else:
             await database.execute(integrations_to_cashbox.insert().values({
                 'integration_id': id_integration,
@@ -276,7 +277,7 @@ async def integration_on(token: str, id_integration: int):
                 'deactivated_by': user.get('id'),
                 'status': True,
             }))
-        await tochka_update_transaction()
+
         await manager.send_message(user.token,
                                     {"action": "on", "target": "IntegrationTochkaBank", "integration_status": True})
         return {'result': 'ok'}
@@ -344,6 +345,8 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
                     where(tochka_bank_accounts.c.id == idx).
                     values(updated_account.dict()))
         account_result = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
+        if account_result.get('is_active'):
+            await tochka_update_transaction()
         return {'result': account_result}
     except Exception as error:
         raise HTTPException(status_code=432, detail=str(error))
