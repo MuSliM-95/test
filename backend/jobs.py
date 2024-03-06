@@ -260,7 +260,7 @@ async def distribution():
     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=1000000, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=100000, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
@@ -383,31 +383,31 @@ async def tochka_update_transaction():
                     ))
                     payment_data = {
                         'accountId': info_statement.get('accountId'),
-                        'payment_crm_id':payment_create.get( 'id' ),
-                        'statementId':info_statement.get( 'statementId' ),
-                        'statement_creation_datetime':info_statement.get( 'creationDateTime' ),
-                        'transactionTypeCode':payment.get( 'transactionTypeCode' ),
-                        'transactionId':payment.get( 'transactionId' ),
-                        'status':payment.get( 'status' ),
-                        'paymentId':payment.get( 'paymentId' ),
-                        'documentProcessDate':payment.get( 'documentProcessDate' ),
-                        'documentNumber':payment.get( 'documentNumber' ),
-                        'description':payment.get( 'description' ),
-                        'creditDebitIndicator':payment.get( 'creditDebitIndicator' ),
-                        'amount':payment.get( 'Amount' ).get( 'amount' ) if payment.get( 'Amount' ) else None,
-                        'amountNat':payment.get( 'Amount' ).get( 'amountNat' ) if payment.get( 'Amount' ) else None,
-                        'currency':payment.get( 'Amount' ).get( 'currency' ) if payment.get( 'Amount' ) else None,
+                        'payment_crm_id': payment_create.get('id'),
+                        'statementId': info_statement.get('statementId'),
+                        'statement_creation_datetime': info_statement.get('creationDateTime'),
+                        'transactionTypeCode': payment.get('transactionTypeCode'),
+                        'transactionId': payment.get('transactionId'),
+                        'status': payment.get('status'),
+                        'paymentId': payment.get('paymentId'),
+                        'documentProcessDate': payment.get('documentProcessDate'),
+                        'documentNumber': payment.get('documentNumber'),
+                        'description': payment.get('description'),
+                        'creditDebitIndicator': payment.get('creditDebitIndicator'),
+                        'amount': payment.get('Amount').get('amount') if payment.get('Amount') else None,
+                        'amountNat': payment.get('Amount').get('amountNat') if payment.get('Amount') else None,
+                        'currency': payment.get('Amount').get('currency') if payment.get('Amount') else None,
                     }
                     if payment.get('CreditorParty'):
-                        payment_data.update( {
-                            'creditor_party_inn':payment.get( 'CreditorParty' ).get( 'inn' ),
-                            'creditor_party_name':payment.get( 'CreditorParty' ).get( 'name' ),
-                            'creditor_party_kpp':payment.get( 'CreditorParty' ).get( 'kpp' ),
-                            'creditor_account_identification':payment.get( 'CreditorAccount' ).get( 'identification' ),
-                            'creditor_account_schemeName':payment.get( 'CreditorAccount' ).get( 'schemeName' ),
-                            'creditor_agent_schemeName':payment.get( 'CreditorAgent' ).get( 'schemeName' ),
-                            'creditor_agent_name':payment.get( 'CreditorAgent' ).get( 'name' ),
-                            'creditor_agent_identification':payment.get( 'CreditorAgent' ).get( 'identification' ),
+                        payment_data.update({
+                            'creditor_party_inn': payment.get('CreditorParty').get('inn'),
+                            'creditor_party_name': payment.get('CreditorParty').get('name'),
+                            'creditor_party_kpp': payment.get('CreditorParty').get('kpp'),
+                            'creditor_account_identification': payment.get('CreditorAccount').get('identification'),
+                            'creditor_account_schemeName': payment.get('CreditorAccount').get('schemeName'),
+                            'creditor_agent_schemeName': payment.get('CreditorAgent').get('schemeName'),
+                            'creditor_agent_name': payment.get('CreditorAgent').get('name'),
+                            'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
                             'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
                         })
                     elif payment.get('DebtorParty'):
@@ -440,11 +440,11 @@ async def tochka_update_transaction():
                         'documentNumber': payment.get('documentNumber'),
                         'description': payment.get('description'),
                         'creditDebitIndicator': payment.get('creditDebitIndicator'),
-                        'amount': payment.get('Amount').get('amount'),
-                        'amountNat': payment.get('Amount' ).get( 'amountNat'),
-                        'currency': payment.get('Amount').get('currency'),
+                        'amount': payment.get('Amount').get('amount') if payment.get('Amount') else None,
+                        'amountNat': payment.get('Amount').get('amountNat') if payment.get('Amount') else None,
+                        'currency': payment.get('Amount').get('currency') if payment.get('Amount') else None,
                     }
-                    if payment.get( 'CreditorParty' ):
+                    if payment.get( 'CreditorParty'):
                         payment_data.update({
                             'creditor_party_inn': payment.get('CreditorParty').get('inn'),
                             'creditor_party_name': payment.get('CreditorParty').get('name'),
