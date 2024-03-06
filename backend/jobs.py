@@ -377,9 +377,9 @@ async def tochka_update_transaction():
                         description = payment.get('description'),
                         type = 'incoming' if payment.get('creditDebitIndicator') == 'Debit' else 'outgoing',
                         tags = f"TochkaBank,{account.get('accountId')}",
-                        amount = float(payment.get('Amount').get('amount')),
+                        amount = payment.get('Amount').get('amount'),
                         paybox = account.get('pbox_id'),
-                        amount_without_tax = float(payment.get('Amount').get('amount')),
+                        amount_without_tax = payment.get('Amount').get('amount'),
                         status = True if payment.get('status') == 'Booked' else False,
                         stopped = True
                     ))
