@@ -19,7 +19,7 @@ from apps.tochka_bank.schemas import StatementData
 from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards,\
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation,\
-    entity_to_entity, tochka_bank_payments
+    entity_to_entity, tochka_bank_payments, contragents
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
 from functions.goods_distribution import process_distribution
@@ -276,7 +276,6 @@ async def tochka_update_transaction():
                 where(and_(payments.c.paybox == account.get('pbox_id'), payments.c.cashbox == account.get('cashbox_id'))).\
                 select_from(payments).\
                 join(tochka_bank_payments, tochka_bank_payments.c.payment_crm_id == payments.c.id))
-
             if len(tochka_payments_db) < 1:
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     payment_create_id = await database.execute(payments.insert().values({
@@ -325,6 +324,24 @@ async def tochka_update_transaction():
                             'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
                             'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
                         })
+
+                        contragent_db = await database.fetch_one(
+                            contragents.select().where(contragents.c.inn == payment.get('CreditorParty').get('inn')))
+                        if not contragent_db:
+                            contragent_db = await database.execute(contragents.insert().values({
+                                'name': payment.get('CreditorParty').get('name'),
+                                'inn': payment.get('CreditorParty').get('inn'),
+                                'cashbox': account.get('cashbox_id'),
+                                'is_deleted': False,
+                                'created_at': int(datetime.utcnow().timestamp()),
+                                'updated_at': int(datetime.utcnow().timestamp()),
+                        }))
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db}))
+                        else:
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db.get('id')}))
+
                     elif payment.get('DebtorParty'):
                         payment_data.update({
                             'debitor_party_inn': payment.get('DebtorParty').get('inn'),
@@ -337,10 +354,28 @@ async def tochka_update_transaction():
                             'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
                             'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
                         }),
+
+                        contragent_db = await database.fetch_one(
+                            contragents.select().where(contragents.c.inn == payment.get('DebtorParty').get('inn')))
+                        if not contragent_db:
+                            contragent_db = await database.execute(contragents.insert().values({
+                                'name': payment.get('DebtorParty').get('name'),
+                                'inn': payment.get('DebtorParty').get('inn'),
+                                'cashbox': account.get('cashbox_id'),
+                                'is_deleted': False,
+                                'created_at': int(datetime.utcnow().timestamp()),
+                                'updated_at': int(datetime.utcnow().timestamp()),
+                            }))
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db}))
+                        else:
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db.get('id')}))
                     else:
                         raise Exception('не вилидный формат транзакции от Точка банка')
 
                     await database.execute(tochka_bank_payments.insert().values(payment_data))
+
             else:
                 set_tochka_payments_statement = set([item.get('paymentId') for item in info_statement.get('Data')['Statement'][0]['Transaction']])
                 set_tochka_payments_db = set([item.get('paymentId') for item in tochka_payments_db])
@@ -392,6 +427,24 @@ async def tochka_update_transaction():
                             'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
                             'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
                         })
+
+                        contragent_db = await database.fetch_one(
+                            contragents.select().where(contragents.c.inn == payment.get('CreditorParty').get('inn')))
+                        if not contragent_db:
+                            contragent_db = await database.execute(contragents.insert().values({
+                                'name': payment.get('CreditorParty').get('name'),
+                                'inn': payment.get('CreditorParty').get('inn'),
+                                'cashbox': account.get('cashbox_id'),
+                                'is_deleted': False,
+                                'created_at': int(datetime.utcnow().timestamp()),
+                                'updated_at': int(datetime.utcnow().timestamp()),
+                            }))
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db}))
+                        else:
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db.get('id')}))
+
                     elif payment.get('DebtorParty'):
                         payment_data.update({
                             'debitor_party_inn': payment.get('DebtorParty').get('inn'),
@@ -403,7 +456,25 @@ async def tochka_update_transaction():
                             'debitor_agent_name': payment.get('DebtorAgent').get('name'),
                             'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
                             'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
-                        }),
+                        })
+                        contragent_db = await database.fetch_one(
+                            contragents.select().where(contragents.c.inn == payment.get('CreditorParty').get('inn')))
+                        if not contragent_db:
+                            contragent_db = await database.execute(contragents.insert().values({
+                                'name': payment.get('DebtorParty').get('name'),
+                                'inn': payment.get('DebtorParty').get('inn'),
+                                'cashbox': account.get('cashbox_id'),
+                                'is_deleted': False,
+                                'created_at': int(datetime.utcnow().timestamp()),
+                                'updated_at': int(datetime.utcnow().timestamp()),
+                            }))
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                    {'contragent': contragent_db}))
+                        else:
+                            await database.execute(
+                                payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                    {'contragent': contragent_db.get('id')}))
                     else:
                         raise Exception( 'не вилидный формат транзакции от Точка банка' )
 

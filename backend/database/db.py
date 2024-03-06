@@ -67,6 +67,7 @@ tochka_bank_payments = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("accountId", String),
     sqlalchemy.Column("payment_crm_id", ForeignKey("payments.id")),
+    sqlalchemy.Column("contragent_crm_id", ForeignKey("contragents.id")),
     sqlalchemy.Column('statementId', String),
     sqlalchemy.Column('statement_creation_datetime', String),
     sqlalchemy.Column('transactionTypeCode', String),
