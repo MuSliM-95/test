@@ -185,7 +185,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                         { 
                             "name": contr_name if contr_name else "", 
                             "external_id": "", 
-                            "phone": clear_phone_number(phone_number=phone_number),
+                            "phone": str(clear_phone_number(phone_number=phone_number)),
                             "inn": "",
                             "description": "",
                             "cashbox": user.cashbox_id,

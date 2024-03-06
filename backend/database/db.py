@@ -475,6 +475,7 @@ events = sqlalchemy.Table(
     sqlalchemy.Column("user_id", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("token", String),
     sqlalchemy.Column("ip", String),
+    sqlalchemy.Column("status_code", Integer),
     sqlalchemy.Column("request_time", Float, nullable=True, default=0),
     sqlalchemy.Column("promoimage", String),
     sqlalchemy.Column("promodata", JSON),
