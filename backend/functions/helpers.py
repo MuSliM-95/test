@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime
 from typing import Optional
 
+import aiohttp
 import pytz
 from databases.backends.postgres import Record
 from fastapi import HTTPException
@@ -653,3 +654,34 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
 
 def clear_phone_number(phone_number: str) -> int:
     return int(''.join(i for i in phone_number if i in string.digits))
+
+
+async def get_statement(statement_id: str, account_id: str, access_token: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
+                               headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            try:
+                init_statement_json = await resp.json()
+            except:
+                init_statement_json = {"Data": {"Statement": {"status": "error"}}}
+        await session.close()
+    return init_statement_json
+
+
+async def init_statement(statement_data: dict, access_token: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
+            'Data': {
+                'Statement': {
+                    'accountId': statement_data.get('accountId'),
+                    'startDateTime': statement_data.get('startDateTime'),
+                    'endDateTime': statement_data.get('endDateTime'),
+                }
+            }
+        }, headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            try:
+                init_statement_json = await resp.json()
+            except:
+                init_statement_json = {"Data": {"Statement": {"status": "error"}}}
+        await session.close()
+    return init_statement_json
