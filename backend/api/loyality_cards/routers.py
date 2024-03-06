@@ -3,7 +3,7 @@ from database.db import database, loyality_cards, contragents, organizations, lo
 import api.loyality_cards.schemas as schemas
 from sqlalchemy import desc, or_
 
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, add_status, get_entity_by_id_cashbox, contr_org_ids_to_name, get_entity_by_id_and_created_by, get_filters_cards
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, add_status, get_entity_by_id_cashbox, contr_org_ids_to_name, get_entity_by_id_and_created_by, get_filters_cards, clear_phone_number
 
 from ws_manager import manager
 from functions.helpers import get_user_by_token
@@ -159,20 +159,24 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
 
         if contr_id:
             loyality_card_contr = await get_entity_by_id_cashbox(contragents, loyality_cards_values["contragent_id"], user.cashbox_id)
-            if not loyality_cards_values["card_number"]:
+            if loyality_cards_values["card_number"]:
+                loyality_cards_values["card_number"] = clear_phone_number(
+                    phone_number=loyality_cards_values["card_number"]
+                )
+            else:
                 if loyality_card_contr.phone:
-                    loyality_cards_values["card_number"] = int(loyality_card_contr.phone)
+                    loyality_cards_values["card_number"] = clear_phone_number(phone_number=loyality_card_contr.phone)
                 else:
                     loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
 
         else:
             if phone_number:
-                q = contragents.select().where(contragents.c.phone == str(phone_number), contragents.c.cashbox == user.cashbox_id)
+                q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
                 loyality_card_contr = await database.fetch_one(q)
 
                 if loyality_card_contr:
                     if loyality_card_contr.phone:
-                        loyality_cards_values["card_number"] = int(loyality_card_contr.phone)
+                        loyality_cards_values["card_number"] = clear_phone_number(phone_number=loyality_card_contr.phone)
                     else:
                         loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
                 else:
@@ -181,7 +185,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                         { 
                             "name": contr_name if contr_name else "", 
                             "external_id": "", 
-                            "phone": str(phone_number), 
+                            "phone": clear_phone_number(phone_number=phone_number),
                             "inn": "",
                             "description": "",
                             "cashbox": user.cashbox_id,
@@ -193,7 +197,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                     new_contr_id = await database.execute(q)
                     q = contragents.select().where(contragents.c.id == new_contr_id)
                     loyality_card_contr = await database.fetch_one(q)
-                    loyality_cards_values["card_number"] = int(loyality_card_contr.phone)
+                    loyality_cards_values["card_number"] = clear_phone_number(phone_number=loyality_card_contr.phone)
 
             # loyality_cards_db_ex = [card]
             # loyality_cards_db_ex = [*map(add_status, loyality_cards_db_ex)]

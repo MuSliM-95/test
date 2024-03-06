@@ -659,7 +659,6 @@ async def update_payment(
                 }:
                     # bg_tasks.add_task(raschet, user, token)
                     asyncio.create_task(raschet(user, token))
-
                 await manager.send_message(
                     token,
                     {

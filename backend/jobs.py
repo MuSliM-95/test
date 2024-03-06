@@ -178,7 +178,7 @@ async def init_statement(statement_data: dict, access_token: str):
 #         if balance.tariff_type == DEMO:
 #             now = datetime.utcnow()
 #             if now >= datetime.fromtimestamp(balance.created_at) + timedelta(
-#                 days=tariff.demo_days
+#                     days=tariff.demo_days
 #             ):
 #                 await make_account(balance)
 #         elif balance.tariff_type == PAID:
