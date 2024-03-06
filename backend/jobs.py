@@ -310,7 +310,6 @@ async def tochka_update_transaction():
 
             if len(tochka_payments_db) < 1:
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
-                    print(payment)
                     payment_create_id = await database.execute(payments.insert().values({
                         'name': payment.get('transactionTypeCode'),
                         'description': payment.get('description'),
@@ -322,12 +321,13 @@ async def tochka_update_transaction():
                         'status': True if payment.get('status') == 'Booked' else False,
                         'stopped': True
                     }))
+                    print(payment_create_id)
                     payment_create = await database.fetch_one(payments.select().where(payments.c.id == payment_create_id))
                     payment_data = {
-                        'accountId': info_statement.get('accountId'),
+                        'accountId': info_statement.get('Data')['Statement'].get('accountId'),
                         'payment_crm_id': payment_create.get('id'),
-                        'statementId': info_statement.get('statementId'),
-                        'statement_creation_datetime': info_statement.get('creationDateTime'),
+                        'statementId': info_statement.get('Data')['Statement'].get('statementId'),
+                        'statement_creation_datetime': info_statement.get('Data')['Statement'].get('creationDateTime'),
                         'transactionTypeCode': payment.get('transactionTypeCode'),
                         'transactionId': payment.get('transactionId'),
                         'status': payment.get('status'),
@@ -386,10 +386,10 @@ async def tochka_update_transaction():
                     } ) )
                     payment_create = await database.fetch_one(payments.select().where(payments.c.id == payment_create_id))
                     payment_data = {
-                        'accountId': info_statement.get('accountId'),
+                        'accountId': info_statement.get('Data')['Statement'].get('accountId'),
                         'payment_crm_id': payment_create.get('id'),
-                        'statementId': info_statement.get('statementId'),
-                        'statement_creation_datetime': info_statement.get('creationDateTime'),
+                        'statementId': info_statement.get('Data')['Statement'].get('statementId'),
+                        'statement_creation_datetime': info_statement.get('Data')['Statement'].get('creationDateTime'),
                         'transactionTypeCode': payment.get('transactionTypeCode'),
                         'transactionId': payment.get('transactionId'),
                         'status': payment.get('status'),
@@ -433,9 +433,9 @@ async def tochka_update_transaction():
 
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     payment_data = {
-                        'accountId': info_statement.get('accountId'),
-                        'statementId': info_statement.get('statementId'),
-                        'statement_creation_datetime': info_statement.get('creationDateTime'),
+                        'accountId': info_statement.get('Data')['Statement'].get('accountId'),
+                        'statementId': info_statement.get('Data')['Statement'].get('statementId'),
+                        'statement_creation_datetime': info_statement.get('Data')['Statement'].get('creationDateTime'),
                         'transactionTypeCode': payment.get('transactionTypeCode'),
                         'transactionId': payment.get('transactionId'),
                         'status': payment.get('status'),
