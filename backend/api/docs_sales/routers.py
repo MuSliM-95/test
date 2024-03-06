@@ -262,6 +262,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         except KeyError:
             pass
 
+        paybox = instance_values.get('paybox')
+        instance_values.pop('paybox')
+
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
 
@@ -397,7 +400,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "tax_type": "internal",
                 "article_id": article_id,
                 "article": "Продажи",
-                "paybox": instance_values.get('paybox'),
+                "paybox": paybox,
                 "date": int(datetime.datetime.now().timestamp()),
                 "account": user.user,
                 "cashbox": user.cashbox_id,
@@ -599,6 +602,9 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
             lt = instance_values["loyality_card_id"]
             del instance_values["loyality_card_id"]
 
+        paybox = instance_values.get('paybox')
+        instance_values.pop('paybox')
+
         instance_id_db = instance_values["id"]
         
         if paid_rubles or paid_lt or lt:
@@ -645,7 +651,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                     "name": f"Оплата по документу {instance_values['number']}",
                     "amount_without_tax": instance_values.get("paid_rubles"),
                     "amount": instance_values.get("paid_rubles"),
-                    "paybox": instance_values.get('paybox'),
+                    "paybox": paybox,
                     "date": int(datetime.datetime.now().timestamp()),
                     "account": user.user,
                     "cashbox": user.cashbox_id,
