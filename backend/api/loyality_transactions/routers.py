@@ -99,41 +99,39 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
     if user:
         if user.status:
             if loyality_transaction_data.loyality_card_number:
-                    loyality_card_number = clear_phone_number(
-                        phone_number=loyality_transaction_data.loyality_card_number
+                loyality_card_number = clear_phone_number(
+                    phone_number=loyality_transaction_data.loyality_card_number
+                )
+                q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
+                card = await database.fetch_one(q)
+                if not card:
+                    raise HTTPException(status_code=400, detail=f"Карты с номером {loyality_transaction_data.loyality_card_number} не существует")
+
+                card_dict = {
+                    "balance": card.balance,
+                    # "cashbox": user.cashbox_id
+                }
+
+                if loyality_transaction_data.type == "accrual":
+                    card_dict["balance"] = round(
+                        float(card_dict["balance"]) + float(loyality_transaction_data.amount), 2
                     )
-                    q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
-                    card = await database.fetch_one(q)
-                    if not card:
-                        raise HTTPException(status_code=400, detail=f"Карты с номером {loyality_transaction_data.loyality_card_number} не существует")
+                elif loyality_transaction_data.type == "withdraw":
+                    card_dict["balance"] = round(
+                        float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
+                    )
+                elif loyality_transaction_data.type == "autoburned":
+                    card_dict["balance"] = round(
+                        float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
+                    )
 
-                    card_dict = {
-                        "balance": card.balance,
-                        # "cashbox": user.cashbox_id
-                    }
-
-                    if loyality_transaction_data.type == "accrual":
-                        card_dict["balance"] = round(
-                            float(card_dict["balance"]) + float(loyality_transaction_data.amount), 2
-                        )
-                    elif loyality_transaction_data.type == "withdraw":
-                        card_dict["balance"] = round(
-                            float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
-                        )
-                    elif loyality_transaction_data.type == "autoburned":
-                        card_dict["balance"] = round(
-                            float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
-                        )
-
-                    if card.status_card:
-                        q = loyality_cards.update().where(loyality_cards.c.id == card.id).values(card_dict)
-                        await database.execute(q)
-                    else:
-                        raise HTTPException(status_code=403, detail="Данная карта заблокирована!")
+                if card.status_card:
+                    q = loyality_cards.update().where(loyality_cards.c.id == card.id).values(card_dict)
+                    await database.execute(q)
+                else:
+                    raise HTTPException(status_code=403, detail="Данная карта заблокирована!")
 
     inserted_ids = set()
-
-
     loyality_transactions_values = loyality_transaction_data.dict()
 
     if not loyality_transactions_values.get("dated"):
@@ -154,7 +152,6 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
 
     loyality_transactions_values["created_by_id"] = user.id
     loyality_transactions_values['cashbox'] = user.cashbox_id
-    loyality_transactions_values["loyality_card_id"] = card.id
     loyality_transactions_values['loyality_card_number'] = clear_phone_number(
         phone_number=loyality_transactions_values['loyality_card_number']
     )
