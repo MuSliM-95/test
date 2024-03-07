@@ -95,96 +95,96 @@ async def get_transactions(token: str, limit: int = 100, offset: int = 0, filter
 async def create_loyality_transaction(token: str, loyality_transaction_data: schemas.LoyalityTransactionCreate):
     """Создание транзакций"""
     user = await get_user_by_token(token)
+    loyality_transactions_values = loyality_transaction_data.dict()
 
     if user:
         if user.status:
-            if loyality_transaction_data.loyality_card_number:
-                loyality_card_number = clear_phone_number(
-                    phone_number=loyality_transaction_data.loyality_card_number
+            loyality_card_number = clear_phone_number(
+                phone_number=loyality_transaction_data.loyality_card_number
+            )
+            q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
+            card = await database.fetch_one(q)
+            if not card:
+                raise HTTPException(status_code=400, detail=f"Карты с номером {loyality_transaction_data.loyality_card_number} не существует")
+
+            card_dict = {
+                "balance": card.balance,
+                # "cashbox": user.cashbox_id
+            }
+
+            if loyality_transaction_data.type == "accrual":
+                card_dict["balance"] = round(
+                    float(card_dict["balance"]) + float(loyality_transaction_data.amount), 2
                 )
-                q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number, loyality_cards.c.cashbox_id == user.cashbox_id)
-                card = await database.fetch_one(q)
-                if not card:
-                    raise HTTPException(status_code=400, detail=f"Карты с номером {loyality_transaction_data.loyality_card_number} не существует")
+            elif loyality_transaction_data.type == "withdraw":
+                card_dict["balance"] = round(
+                    float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
+                )
+            elif loyality_transaction_data.type == "autoburned":
+                card_dict["balance"] = round(
+                    float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
+                )
 
-                card_dict = {
-                    "balance": card.balance,
-                    # "cashbox": user.cashbox_id
-                }
+            if card.status_card:
+                q = loyality_cards.update().where(loyality_cards.c.id == card.id).values(card_dict)
+                await database.execute(q)
+            else:
+                raise HTTPException(status_code=403, detail="Данная карта заблокирована!")
 
-                if loyality_transaction_data.type == "accrual":
-                    card_dict["balance"] = round(
-                        float(card_dict["balance"]) + float(loyality_transaction_data.amount), 2
-                    )
-                elif loyality_transaction_data.type == "withdraw":
-                    card_dict["balance"] = round(
-                        float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
-                    )
-                elif loyality_transaction_data.type == "autoburned":
-                    card_dict["balance"] = round(
-                        float(card_dict["balance"]) - float(loyality_transaction_data.amount), 2
-                    )
+            inserted_ids = set()
 
-                if card.status_card:
-                    q = loyality_cards.update().where(loyality_cards.c.id == card.id).values(card_dict)
-                    await database.execute(q)
-                else:
-                    raise HTTPException(status_code=403, detail="Данная карта заблокирована!")
+            if not loyality_transactions_values.get("dated"):
+                loyality_transactions_values['dated'] = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            else:
+                loyality_transactions_values["dated"] = datetime.fromtimestamp(loyality_transactions_values["dated"])
 
-    inserted_ids = set()
-    loyality_transactions_values = loyality_transaction_data.dict()
+            if loyality_transactions_values.get("preamount") and loyality_transactions_values.get("percentamount"):
+                loyality_transactions_values['amount'] = float(loyality_transaction_data.preamount) * float(loyality_transaction_data.percentamount)
 
-    if not loyality_transactions_values.get("dated"):
-        loyality_transactions_values['dated'] = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        loyality_transactions_values["dated"] = datetime.fromtimestamp(loyality_transactions_values["dated"])
+                loyality_transactions_values['amount'] = round(loyality_transactions_values['amount'], 2)
 
-    if loyality_transactions_values.get("preamount") and loyality_transactions_values.get("percentamount"):
-        loyality_transactions_values['amount'] = float(loyality_transaction_data.preamount) * float(loyality_transaction_data.percentamount)
+                del loyality_transactions_values['preamount']
+                del loyality_transactions_values['percentamount']
+            else:
+                del loyality_transactions_values['preamount']
+                del loyality_transactions_values['percentamount']
 
-        loyality_transactions_values['amount'] = round(loyality_transactions_values['amount'], 2)
+            loyality_transactions_values["created_by_id"] = user.id
+            loyality_transactions_values['cashbox'] = user.cashbox_id
+            loyality_transactions_values["loyality_card_id"] = card.id
+            loyality_transactions_values['loyality_card_number'] = clear_phone_number(
+                phone_number=loyality_transactions_values['loyality_card_number']
+            )
+            # loyality_transactions_values["dead_at"] = datetime.fromtimestamp(loyality_transactions_values["dead_at"])
 
-        del loyality_transactions_values['preamount']
-        del loyality_transactions_values['percentamount']
-    else:
-        del loyality_transactions_values['preamount']
-        del loyality_transactions_values['percentamount']
+            query = loyality_transactions.insert().values(loyality_transactions_values)
+            loyality_transaction_id = await database.execute(query)
+            inserted_ids.add(loyality_transaction_id)
 
-    loyality_transactions_values["created_by_id"] = user.id
-    loyality_transactions_values['cashbox'] = user.cashbox_id
-    loyality_transactions_values['loyality_card_number'] = clear_phone_number(
-        phone_number=loyality_transactions_values['loyality_card_number']
-    )
-    # loyality_transactions_values["dead_at"] = datetime.fromtimestamp(loyality_transactions_values["dead_at"])
+            query = (
+                loyality_transactions.select().where(
+                    loyality_transactions.c.created_by_id == user.id,
+                    loyality_transactions.c.id.in_(inserted_ids)
+                )
+            )
 
-    query = loyality_transactions.insert().values(loyality_transactions_values)
-    loyality_transaction_id = await database.execute(query)
-    inserted_ids.add(loyality_transaction_id)
+            loyality_transactions_db = await database.fetch_all(query)
+            loyality_transactions_db = [*map(datetime_to_timestamp, loyality_transactions_db)]
 
-    query = (
-        loyality_transactions.select().where(
-            loyality_transactions.c.created_by_id == user.id,
-            loyality_transactions.c.id.in_(inserted_ids)
-        )
-    )
 
-    loyality_transactions_db = await database.fetch_all(query)
-    loyality_transactions_db = [*map(datetime_to_timestamp, loyality_transactions_db)]
-    
+            await manager.send_message(
+                token,
+                {
+                    "action": "create",
+                    "target": "loyality_transactions",
+                    "result": loyality_transactions_db[0],
+                },
+            )
 
-    await manager.send_message(
-        token,
-        {
-            "action": "create",
-            "target": "loyality_transactions",
-            "result": loyality_transactions_db[0],
-        },
-    )
+            asyncio.create_task(raschet_bonuses(user))
 
-    asyncio.create_task(raschet_bonuses(user))
-
-    # return loyality_transactions_db[0]
-    return {**loyality_transactions_db[0],  **{ "data": { "status": "success" } }}
+            # return loyality_transactions_db[0]
+            return {**loyality_transactions_db[0],  **{ "data": { "status": "success" } }}
 
 
 @router.patch("/loyality_transactions/{idx}/", response_model=schemas.LoyalityTransaction)

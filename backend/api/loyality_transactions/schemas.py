@@ -29,7 +29,7 @@ class LoyalityTransactionCreate(BaseModel):
     type: str = "accrual"
     dated: Optional[int]
     amount: Optional[float]
-    loyality_card_number: Optional[str]
+    loyality_card_number: str
     tags: Optional[str]
     name: Optional[str]
     description: Optional[str]
