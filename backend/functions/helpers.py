@@ -2,7 +2,7 @@ import random
 import string
 import hashlib
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 import aiohttp
 import pytz
@@ -652,7 +652,9 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
     return True
 
 
-def clear_phone_number(phone_number: str) -> int:
+def clear_phone_number(phone_number: str) -> Union[int, None]:
+    if not phone_number:
+        return None
     return int(''.join(i for i in phone_number if i in string.digits))
 
 
