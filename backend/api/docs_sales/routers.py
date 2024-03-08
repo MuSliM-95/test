@@ -290,6 +290,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         if not paybox:
             paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
             paybox = await database.fetch_one(paybox_q)
+            if paybox:
+                paybox = paybox.id
 
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
