@@ -112,6 +112,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         query = (
             select(nomenclature_barcodes.c.code)
             .where(nomenclature_barcodes.c.nomenclature_id == nomenclature_info["id"])
+            .order_by(nomenclature_barcodes.c.id)
         )
         barcodes_nomenclature_record = await database.fetch_all(query)
         nomenclature_barcodes_list = [element.code for element in barcodes_nomenclature_record]
