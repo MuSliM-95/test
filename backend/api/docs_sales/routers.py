@@ -112,7 +112,6 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     if filters.dated:
         query = query.filter(
             func.date(func.to_timestamp(docs_sales.c.dated)) == datetime.datetime.fromtimestamp(filters.dated).date())
-        print(query)
 
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
