@@ -394,9 +394,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 )
                 await database.execute(query)
 
-            
         if paid_rubles > 0:
-            article_id = None
             article_q = articles.select().where(articles.c.cashbox == user.cashbox_id, articles.c.name == "Продажи")
             article_db = await database.fetch_one(article_q)
 
@@ -411,10 +409,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "created_at": tstamp,
                     "updated_at": tstamp
                 })
-                created_article_db = await database.execute(created_article_q)
-                article_id = created_article_db
+                article_id = await database.execute(created_article_q)
 
-            rubles_body = {
+            payment_id = await database.execute(payments.insert().values({
                 "contragent": instance_values['contragent'],
                 "type": "incoming",
                 "name": f"Оплата по документу {instance_values['number']}",
@@ -434,8 +431,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "updated_at": int(datetime.datetime.now().timestamp()),
                 "status": True,
                 "stopped": True,
-            }
-            payment_id = await database.execute(payments.insert().values(rubles_body))
+            }))
 
             await database.execute(entity_to_entity.insert().values(
                 {
@@ -533,7 +529,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                         }
                     )
 
-
             body = {
                 "number": None,
                 "dated": instance_values['dated'],
@@ -547,7 +542,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "docs_sales_id": instance_id,
                 "goods": goods_res
             }
-
             body['docs_purchases'] = None
             body['number'] = None
             body['to_warehouse'] = None
