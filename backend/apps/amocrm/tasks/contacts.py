@@ -175,8 +175,8 @@ async def split_contacts(contacts_list):
         else:
             query_q_2 = (
                 amo_contacts_double.select()
-                .where(amo_contacts.c.ext_id == contact["ext_id"])
-                .where(amo_contacts.c.amo_install_id == contact["amo_install_id"])
+                .where(amo_contacts_double.c.ext_id == contact["ext_id"])
+                .where(amo_contacts_double.c.amo_install_id == contact["amo_install_id"])
             )
             exist_2 = await database.fetch_one(query_q_2)
 
