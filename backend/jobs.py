@@ -144,7 +144,7 @@ async def autoburn():
             .where(
                 loyality_transactions.c.loyality_card_id == card_id,
                 loyality_transactions.c.type == "accrual",
-                loyality_transactions.c.created_at + card.lifetime < datetime.now().timestamp()
+                loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now()
             )
         )
         print(q)
