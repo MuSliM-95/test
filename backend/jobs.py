@@ -140,8 +140,7 @@ async def autoburn():
         card_id = card.id
         balance = card.balance
         q = (
-            loyality_transactions
-            .select(func.sum(loyality_transactions.c.amount).label("total_accrual"))
+            select(func.sum(loyality_transactions.c.amount).label("total_accrual"))
             .where(
                 loyality_transactions.c.loyality_card_id == card_id,
                 loyality_transactions.c.type == "accrual",
