@@ -149,7 +149,7 @@ async def autoburn():
             .select()
             .where(
                 loyality_transactions.c.loyality_card_id == card.id,
-                loyality_transactions.c.type == "accrual",
+                loyality_transactions.c.type.in_(["accrual", "withdraw"]),
                 loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
                 loyality_transactions.c.amount > 0,
                 loyality_transactions.c.autoburned.is_not(True)
@@ -158,7 +158,8 @@ async def autoburn():
         transactions = await database.fetch_all(q)
 
         for transaction in transactions:
-            await _burn(card=card, transaction=transaction)
+            print(transaction.id, transaction.type, transaction.amount)
+            # await _burn(card=card, transaction=transaction)
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
