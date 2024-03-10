@@ -148,6 +148,7 @@ async def autoburn():
                 loyality_transactions.c.created_at + card.lifetime < datetime.now().timestamp()
             )
         )
+        print(q)
         total_accrual = await database.fetch_val(q)
         burn_amount = balance - total_accrual
         if burn_amount > 0:
