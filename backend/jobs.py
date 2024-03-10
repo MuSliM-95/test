@@ -123,7 +123,7 @@ async def autoburn():
                 "created_by_id": card.created_by_id,
                 "cashbox": card.cashbox_id,
                 "tags": "",
-                "name": f"Автосгорание от {transaction_accrual.created_at.strftime('%d.%m.%Y')} по сумме {update_balance_sum}",
+                "name": f"Автосгорание от {transaction_accrual.created_at.strftime('%d.%m.%Y')} по сумме {transaction_accrual.amount}",
                 "description": None,
                 "status": True,
                 "external_id": None,
