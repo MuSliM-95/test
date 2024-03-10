@@ -4,8 +4,9 @@ from time import sleep
 
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
+from databases.backends.postgres import Record
 from fastapi.exceptions import HTTPException
-from sqlalchemy import desc, select, or_, and_, alias
+from sqlalchemy import desc, select, or_, and_, alias, func
 from sqlalchemy.exc import DatabaseError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -86,57 +87,71 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 #             await make_account(balance)
 
 
-# @scheduler.scheduled_job("interval", seconds=5, id="autoburn")
-# async def autoburn():
-#     await database.connect()
-#
-#     all_cards = await database.fetch_all(loyality_cards.select().where(loyality_cards.c.balance > 0))
-#     for card in all_cards:
-#         card_id = card.id
-#         balance = card.balance
-#         lifetime = card.lifetime
-#         if lifetime:
-#             q = loyality_transactions.select().where(loyality_transactions.c.loyality_card_id == card_id)
-#             all_transactions = await database.fetch_all(q)
-#             total_accrual = 0
-#             for transaction in all_transactions:
-#                 if transaction.created_at.timestamp() + lifetime < datetime.now().timestamp():
-#                     if transaction.type == "accrual":
-#                         total_accrual += transaction.amount
-#             burn_amount = balance - total_accrual
-#             if burn_amount > 0:
-#                 new_balance = balance - burn_amount
-#                 query = loyality_cards.update().where(loyality_cards.c.id == card_id).values({"balance": new_balance})
-#                 await database.execute(query)
-#
-#             cashbox = await database.fetch_one(cboxes.select().where(cboxes.c.id == card.cashbox_id))
-#             admin = cashbox.admin
-#
-#             rubles_body = {
-#                 "type": "autoburned",
-#                 "dated": datetime.now(),
-#                 "amount": burn_amount,
-#                 "loyality_card_id": card_id,
-#                 "loyality_card_number": card.card_number,
-#                 "created_by_id": admin,
-#                 "cashbox": cashbox['id'],
-#                 "tags": "",
-#                 "name": "Автосписание",
-#                 "description": None,
-#                 "status": True,
-#                 "external_id": None,
-#                 "cashier_name": None,
-#                 # "percentamount": None, что это?
-#                 # "preamount": None, что это?
-#                 "dead_at": None,
-#                 "is_deleted": False,
-#                 "autoburned": True,
-#                 "created_at": datetime.now(),
-#                 "updated_at": datetime.now()
-#             }
-#
-#             await database.execute(loyality_transactions.insert().values(rubles_body))
+@scheduler.scheduled_job("interval", seconds=60, id="autoburn") # seconds = 5
+async def autoburn():
+    await database.connect()
 
+    @database.transaction()
+    async def _burn(card: Record, burn_amount: float):
+        update_balance_query = (
+            loyality_cards
+            .update()
+            .where(loyality_cards.c.id == card_id)
+            .values({"balance": card.balance - burn_amount})
+        )
+        create_transcation_query = (
+            loyality_transactions
+            .insert()
+            .values({
+                "type": "autoburned",
+                "amount": burn_amount,
+                "loyality_card_id": card.id,
+                "loyality_card_number": card.card_number,
+                "created_by_id": card.created_by_id,
+                "cashbox": card.cashbox_id,
+                "tags": "",
+                "name": "Автосписание",
+                "description": None,
+                "status": True,
+                "external_id": None,
+                "cashier_name": None,
+                "percentamount": None,
+                "preamount": None,
+                "dead_at": None,
+                "is_deleted": False,
+                "autoburned": True,
+            })
+        )
+        query_list = [update_balance_query, create_transcation_query]
+        for query in query_list:
+            await database.execute(query)
+
+    cards_query = (
+        loyality_cards
+        .select()
+        .where(
+            loyality_cards.c.balance > 0,
+            loyality_cards.c.lifetime.is_not(None),
+            loyality_cards.c.lifetime > 0
+        )
+    )
+    all_cards = await database.fetch_all(cards_query)
+    for card in all_cards:
+        card_id = card.id
+        balance = card.balance
+        q = (
+            loyality_transactions
+            .select(func.sum(loyality_transactions.c.amount).label("total_accrual"))
+            .where(
+                loyality_transactions.c.loyality_card_id == card_id,
+                loyality_transactions.c.type == "accrual",
+                loyality_transactions.c.created_at + card.lifetime < func.current_timestamp()
+            )
+        )
+        total_accrual = await database.fetch_val(q)
+        burn_amount = balance - total_accrual
+        if burn_amount > 0:
+            await _burn()
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")

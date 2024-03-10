@@ -1069,7 +1069,7 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("card_number", BigInteger),
     sqlalchemy.Column("tags", String),
-    sqlalchemy.Column("balance", Integer),
+    sqlalchemy.Column("balance", Float),
     sqlalchemy.Column("income", Integer),
     sqlalchemy.Column("outcome", Integer),
     sqlalchemy.Column("cashback_percent", Integer),
