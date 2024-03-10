@@ -88,17 +88,17 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 #             await make_account(balance)
 
 
-@scheduler.scheduled_job("interval", seconds=60, id="autoburn") # seconds = 5
+@scheduler.scheduled_job("interval", seconds=5, id="autoburn")
 async def autoburn():
     await database.connect()
 
     @database.transaction()
-    async def _burn(card: Record, burn_amount: float, transaction_ids: List[int]) -> None:
+    async def _burn(card: Record, transaction: Record) -> None:
         update_transaction_status_query = (
             loyality_transactions
             .update()
             .where(
-                loyality_transactions.c.id.in_(transaction_ids)
+                loyality_transactions.c.id == transaction.id
             )
             .values({"autoburned": True})
         )
@@ -106,20 +106,20 @@ async def autoburn():
             loyality_cards
             .update()
             .where(loyality_cards.c.id == card.id)
-            .values({"balance": card.balance - burn_amount})
+            .values({"balance": card.balance - transaction.amount})
         )
         create_transcation_query = (
             loyality_transactions
             .insert()
             .values({
                 "type": "autoburned",
-                "amount": burn_amount,
+                "amount": transaction.amount,
                 "loyality_card_id": card.id,
                 "loyality_card_number": card.card_number,
                 "created_by_id": card.created_by_id,
                 "cashbox": card.cashbox_id,
                 "tags": "",
-                "name": "Автосписание",
+                "name": f"Автосгорание от {transaction.created_at.strftime('%d.%m.%Y')} по сумме {transaction.amount}",
                 "description": None,
                 "status": True,
                 "external_id": None,
@@ -151,19 +151,14 @@ async def autoburn():
                 loyality_transactions.c.loyality_card_id == card.id,
                 loyality_transactions.c.type == "accrual",
                 loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
+                loyality_transactions.c.amount > 0,
                 loyality_transactions.c.autoburned.is_not(True)
             )
         )
         transactions = await database.fetch_all(q)
 
-        burn_amount = card.balance
-        transaction_ids = []
-        for i in transactions:
-            burn_amount -= i.amount
-            transaction_ids.append(i.id)
-
-        if burn_amount > 0:
-            await _burn(card=card, burn_amount=burn_amount, transaction_ids=transaction_ids)
+        for transaction in transactions:
+            await _burn(card=card, transaction=transaction)
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
