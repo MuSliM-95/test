@@ -92,11 +92,19 @@ async def autoburn():
     await database.connect()
 
     @database.transaction()
-    async def _burn(card: Record, burn_amount: float):
+    async def _burn(card: Record, burn_amount: float, transaction_id: int) -> None:
+        update_transaction_status_query = (
+            loyality_transactions
+            .update()
+            .where(
+                loyality_transactions.c.id == transaction_id
+            )
+            .values({"autoburned": True})
+        )
         update_balance_query = (
             loyality_cards
             .update()
-            .where(loyality_cards.c.id == card_id)
+            .where(loyality_cards.c.id == card.id)
             .values({"balance": card.balance - burn_amount})
         )
         create_transcation_query = (
@@ -122,7 +130,7 @@ async def autoburn():
                 "autoburned": True,
             })
         )
-        query_list = [update_balance_query, create_transcation_query]
+        query_list = [update_transaction_status_query, update_balance_query, create_transcation_query]
         for query in query_list:
             await database.execute(query)
 
@@ -137,18 +145,18 @@ async def autoburn():
     )
     all_cards = await database.fetch_all(cards_query)
     for card in all_cards:
-        card_id = card.id
-        balance = card.balance
         q = (
-            select(func.sum(loyality_transactions.c.amount).label("total_accrual"))
+            select(loyality_transactions.c.id, func.sum(loyality_transactions.c.amount).label("total_accrual"))
             .where(
-                loyality_transactions.c.loyality_card_id == card_id,
+                loyality_transactions.c.loyality_card_id == card.id,
                 loyality_transactions.c.type == "accrual",
-                loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now()
+                loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
+                loyality_transactions.c.autoburned.is_not(True)
             )
         )
-        total_accrual = await database.fetch_one(q)
-        print(dict(total_accrual)) # add if
+        total_accrual = await database.fetch_all(q)
+        print(list(map(lambda x: dict(x), total_accrual))) # add if
+        # balance = card.balance
         # burn_amount = balance - total_accrual
         # if burn_amount > 0:
         #     await _burn()
