@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta
 from time import sleep
 from typing import List, Union
+from itertools import zip_longest
 
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
@@ -168,8 +169,8 @@ async def autoburn():
         for i in transactions:
             eval(f"{i.type}").append(i)
 
-        for i, e in enumerate(accrual):
-            await _burn(card=card, transaction_accrual=e, transaction_withdraw=next(iter(withdraw[i+1:i+2]), None))
+        for a, w in zip_longest(accrual, withdraw):
+            await _burn(card=card, transaction_accrual=a, transaction_withdraw=w)
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
