@@ -155,7 +155,7 @@ async def autoburn():
         )
     )
     all_cards = await database.fetch_all(cards_query)
-    for card in all_cards:
+    for card in all_cards: # TODO: восстановление всей цепочки изменений
         q = (
             loyality_transactions
             .select()
@@ -174,7 +174,6 @@ async def autoburn():
             eval(f"{i.type}").append(i)
 
         for a, w in zip_longest(accrual, withdraw):
-            print(a.id, w)
             await _burn(card=card, transaction_accrual=a, transaction_withdraw=w)
 
 
