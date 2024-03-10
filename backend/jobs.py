@@ -153,6 +153,7 @@ async def autoburn():
                 loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
                 loyality_transactions.c.autoburned.is_not(True)
             )
+            .group_by(loyality_transactions.c.id)
         )
         total_accrual = await database.fetch_all(q)
         print(list(map(lambda x: dict(x), total_accrual))) # add if
