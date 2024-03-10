@@ -124,8 +124,6 @@ async def autoburn():
                 "status": True,
                 "external_id": None,
                 "cashier_name": None,
-                "percentamount": None,
-                "preamount": None,
                 "dead_at": None,
                 "is_deleted": False,
                 "autoburned": True,
