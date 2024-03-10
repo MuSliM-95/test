@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from time import sleep
-from typing import List
+from typing import List, Union
 
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
@@ -93,33 +93,37 @@ async def autoburn():
     await database.connect()
 
     @database.transaction()
-    async def _burn(card: Record, transaction: Record) -> None:
+    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None] = None) -> None:
+        update_transaction_status_ids = [transaction_accrual.id, transaction_withdraw.id] if transaction_withdraw else [transaction_accrual.id]
         update_transaction_status_query = (
             loyality_transactions
             .update()
             .where(
-                loyality_transactions.c.id == transaction.id
+                loyality_transactions.c.id.in_(update_transaction_status_ids)
             )
             .values({"autoburned": True})
         )
+
+        update_balance_sum = transaction_accrual.amount - transaction_withdraw.amount if transaction_withdraw else transaction_accrual.amount
         update_balance_query = (
             loyality_cards
             .update()
             .where(loyality_cards.c.id == card.id)
-            .values({"balance": card.balance - transaction.amount})
+            .values({"balance": card.balance - update_balance_sum})
         )
+
         create_transcation_query = (
             loyality_transactions
             .insert()
             .values({
                 "type": "autoburned",
-                "amount": transaction.amount,
+                "amount": update_balance_sum,
                 "loyality_card_id": card.id,
                 "loyality_card_number": card.card_number,
                 "created_by_id": card.created_by_id,
                 "cashbox": card.cashbox_id,
                 "tags": "",
-                "name": f"Автосгорание от {transaction.created_at.strftime('%d.%m.%Y')} по сумме {transaction.amount}",
+                "name": f"Автосгорание от {transaction_accrual.created_at.strftime('%d.%m.%Y')} по сумме {update_balance_sum}",
                 "description": None,
                 "status": True,
                 "external_id": None,
@@ -129,6 +133,9 @@ async def autoburn():
                 "autoburned": True,
             })
         )
+
+        if update_balance_sum <= 0:
+            return
         query_list = [update_transaction_status_query, update_balance_query, create_transcation_query]
         for query in query_list:
             await database.execute(query)
@@ -156,10 +163,13 @@ async def autoburn():
             )
         )
         transactions = await database.fetch_all(q)
+        accrual = []
+        withdraw = []
+        for i in transactions:
+            eval(f"{i.type}").append(i)
 
-        for transaction in transactions:
-            print(transaction.id, transaction.type, transaction.amount)
-            # await _burn(card=card, transaction=transaction)
+        for i, e in enumerate(accrual):
+            await _burn(card=card, transaction_accrual=e, transaction_withdraw=withdraw[i])
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
