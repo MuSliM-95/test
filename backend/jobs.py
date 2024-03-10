@@ -95,7 +95,16 @@ async def autoburn():
 
     @database.transaction()
     async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None] = None) -> None:
-        update_transaction_status_ids = [transaction_accrual.id, transaction_withdraw.id] if transaction_withdraw else [transaction_accrual.id]
+        update_transaction_status_ids = [transaction_accrual.id]
+        update_balance_sum = transaction_accrual.amount
+        
+        if transaction_withdraw:
+            update_transaction_status_ids.append(transaction_withdraw.id)
+            update_balance_sum -= transaction_withdraw.amount
+
+        if update_balance_sum <= 0:
+            return
+
         update_transaction_status_query = (
             loyality_transactions
             .update()
@@ -104,15 +113,12 @@ async def autoburn():
             )
             .values({"autoburned": True})
         )
-
-        update_balance_sum = transaction_accrual.amount - transaction_withdraw.amount if transaction_withdraw else transaction_accrual.amount
         update_balance_query = (
             loyality_cards
             .update()
             .where(loyality_cards.c.id == card.id)
             .values({"balance": card.balance - update_balance_sum})
         )
-
         create_transcation_query = (
             loyality_transactions
             .insert()
@@ -135,8 +141,6 @@ async def autoburn():
             })
         )
 
-        if update_balance_sum <= 0:
-            return
         query_list = [update_transaction_status_query, update_balance_query, create_transcation_query]
         for query in query_list:
             await database.execute(query)
