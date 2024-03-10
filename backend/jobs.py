@@ -169,7 +169,7 @@ async def autoburn():
             eval(f"{i.type}").append(i)
 
         for i, e in enumerate(accrual):
-            await _burn(card=card, transaction_accrual=e, transaction_withdraw=withdraw[i] if len(withdraw) > i else None)
+            await _burn(card=card, transaction_accrual=e, transaction_withdraw=next(iter(withdraw[i+1:i+2]), None))
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
