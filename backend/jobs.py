@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from time import sleep
+from typing import List
 
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
@@ -92,12 +93,12 @@ async def autoburn():
     await database.connect()
 
     @database.transaction()
-    async def _burn(card: Record, burn_amount: float, transaction_id: int) -> None:
+    async def _burn(card: Record, burn_amount: float, transaction_ids: List[int]) -> None:
         update_transaction_status_query = (
             loyality_transactions
             .update()
             .where(
-                loyality_transactions.c.id == transaction_id
+                loyality_transactions.c.id.in_(transaction_ids)
             )
             .values({"autoburned": True})
         )
@@ -146,21 +147,25 @@ async def autoburn():
     all_cards = await database.fetch_all(cards_query)
     for card in all_cards:
         q = (
-            select(loyality_transactions.c.id, func.sum(loyality_transactions.c.amount).label("total_accrual"))
+            loyality_transactions
+            .select()
             .where(
                 loyality_transactions.c.loyality_card_id == card.id,
                 loyality_transactions.c.type == "accrual",
                 loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
                 loyality_transactions.c.autoburned.is_not(True)
             )
-            .group_by(loyality_transactions.c.id)
         )
-        total_accrual = await database.fetch_all(q)
-        print(list(map(lambda x: dict(x), total_accrual))) # add if
-        # balance = card.balance
-        # burn_amount = balance - total_accrual
-        # if burn_amount > 0:
-        #     await _burn()
+        transactions = await database.fetch_all(q)
+
+        burn_amount = card.balance
+        transaction_ids = []
+        for i in transactions:
+            burn_amount -= i.amount
+            transaction_ids.append(i.id)
+
+        if burn_amount > 0:
+            await _burn(card=card, burn_amount=burn_amount, transaction_ids=transaction_ids)
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
