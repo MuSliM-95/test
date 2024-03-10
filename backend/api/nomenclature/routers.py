@@ -79,7 +79,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
 
 
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
-async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, limit: int = 100,
+async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0):
     """Получение списка категорий"""
     user = await get_user_by_token(token)
@@ -100,6 +100,8 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     if barcode:
         query = query.join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
         filters.append(nomenclature_barcodes.c.code == barcode)
+    if category:
+        filters.append(nomenclature.c.category == category)
 
     query = query.where(*filters).limit(limit).offset(offset)
 
