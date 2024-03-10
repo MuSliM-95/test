@@ -1313,7 +1313,7 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
     extend_existing=True,
 )
 
-SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"
+SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@94.250.250.135:48425/cash_2"
 SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_job_store"
 database = databases.Database(SQLALCHEMY_DATABASE_URL)
 engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
