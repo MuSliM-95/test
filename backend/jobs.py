@@ -145,7 +145,7 @@ async def autoburn():
             .where(
                 loyality_transactions.c.loyality_card_id == card_id,
                 loyality_transactions.c.type == "accrual",
-                loyality_transactions.c.created_at + card.lifetime < func.current_timestamp()
+                loyality_transactions.c.created_at + card.lifetime < datetime.now().timestamp()
             )
         )
         total_accrual = await database.fetch_val(q)
