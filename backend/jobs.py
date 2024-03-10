@@ -94,10 +94,10 @@ async def autoburn():
     await database.connect()
 
     @database.transaction()
-    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None] = None) -> None:
+    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None]) -> None:
         update_transaction_status_ids = [transaction_accrual.id]
         update_balance_sum = transaction_accrual.amount
-        
+
         if transaction_withdraw:
             update_transaction_status_ids.append(transaction_withdraw.id)
             update_balance_sum -= transaction_withdraw.amount
@@ -174,6 +174,7 @@ async def autoburn():
             eval(f"{i.type}").append(i)
 
         for a, w in zip_longest(accrual, withdraw):
+            print(a.id, w)
             await _burn(card=card, transaction_accrual=a, transaction_withdraw=w)
 
 
