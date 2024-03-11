@@ -1,5 +1,5 @@
 import aiohttp
-from jobs import scheduler, jobstore
+from jobs import scheduler, tochka_update_transaction
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database, tochka_bank_credentials, pboxes, tochka_bank_accounts
@@ -113,14 +113,14 @@ async def tochkaoauth(code: str, state: int):
                         datetime.combine(created_date, datetime.min.time())))
             data = {
                         'name': f"Счет банк Точка №{account.get('accountId').split('/')[0]}",
-                        'start_balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
+                        'start_balance': 0,
                         'cashbox': state,
-                        'balance': 0,
+                        'balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
                         'update_start_balance': int(datetime.utcnow().timestamp()),
                         'update_start_balance_date': int(datetime.utcnow().timestamp()),
                         'created_at': int(datetime.utcnow().timestamp()),
                         'updated_at': int(datetime.utcnow().timestamp()),
-                        'balance_date':created_date_ts
+                        'balance_date': 0
                     }
             account_db = await database.fetch_one(
                     tochka_bank_accounts.select().where(tochka_bank_accounts.c.accountId == account.get('accountId')))
@@ -269,6 +269,7 @@ async def integration_on(token: str, id_integration: int):
                 integrations_to_cashbox.c.integration_id == id_integration,
                 integrations_to_cashbox.c.installed_by == user.id
             )).values({'status': True}))
+
         else:
             await database.execute(integrations_to_cashbox.insert().values({
                 'integration_id': id_integration,
@@ -340,38 +341,14 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
         account_model = AccountUpdate(**account_db)
         updated_account = account_model.copy(update=account_data)
         await database.execute(
-                    tochka_bank_accounts.update().
-                    where(tochka_bank_accounts.c.id == idx).
-                    values(updated_account.dict()))
+                        tochka_bank_accounts.update().
+                        where(tochka_bank_accounts.c.id == idx).
+                        values(updated_account.dict()))
         account_result = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
+        if account_result.get('is_active'):
+            await tochka_update_transaction()
         return {'result': account_result}
     except Exception as error:
         raise HTTPException(status_code=432, detail=str(error))
 
 
-@router.post("/bank/statement/init/")
-async def init_statement(statement_data: StatementData, access_token: str):
-    statement_data = statement_data.dict()
-    async with aiohttp.ClientSession(trust_env = True) as session:
-        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
-            'Data': {
-                'Statement': {
-                    'accountId': statement_data.get('accountId'),
-                    'startDateTime': statement_data.get('startDateTime'),
-                    'endDateTime': statement_data.get('endDateTime'),
-                }
-            }
-        }, headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
-            init_statement_json = await resp.json()
-        await session.close()
-    return init_statement_json
-
-
-@router.get("/bank/statement/{statementId}")
-async def get_statement(statement_id: str, account_id: str, access_token: str):
-    async with aiohttp.ClientSession(trust_env = True) as session:
-        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
-                               headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
-            init_statement_json = await resp.json()
-        await session.close()
-    return init_statement_json

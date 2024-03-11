@@ -44,3 +44,24 @@ class CategoryList(BaseModel):
 class CategoryListGet(BaseModel):
     result: Optional[List[Category]]
     count: int
+
+
+class CategoryTree(BaseModel):
+    key: int
+    name: str
+    description: Optional[str]
+    code: Optional[int]
+    status: bool = True
+    parent: Optional[int]
+    children: Optional[List["CategoryTree"]]
+    expanded_flag: bool
+    updated_at: int
+    created_at: int
+
+    class Config:
+        orm_mode = True
+
+
+class CategoryTreeGet(BaseModel):
+    result: Optional[List[CategoryTree]]
+    count: int

@@ -10,7 +10,7 @@ class Event(BaseModel):
     name: Optional[str]
     method: Optional[str]
     url: Optional[str]
-    payload: Optional[dict]
+    payload: Optional[Union[dict, List]]
     cashbox_id: Optional[int]
     user_id: Optional[int]
     token: Optional[str]

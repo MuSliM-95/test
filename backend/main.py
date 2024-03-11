@@ -148,37 +148,42 @@ async def write_event_middleware(request: Request, call_next):
         await set_body(request, body)
         return body
 
+    async def _write_event(request: Request, body: bytes, time_start: float, status_code: int = 500) -> None:
+        try:
+            if "openapi.json" not in request.url.path:
+                token = request.query_params.get("token")
+                token = token if token else request.path_params.get("token")
+
+                user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token=token)
+                type = "cashevent"
+                payload = {} if not body and request.headers.get("content-type") != "application/json" else json.loads(body)
+                name = "" if request.scope.get("endpoint") != create_payment else payload.get("type")
+
+                await write_event(
+                    type=type,
+                    name=name,
+                    method=request.method,
+                    url=request.url.__str__(),
+                    payload=payload,
+                    cashbox_id=cashbox_id,
+                    user_id=user_id,
+                    token=token,
+                    ip=request.headers.get("X-Forwarded-For"),
+                    status_code=status_code,
+                    request_time=time.time() - time_start
+                )
+        except: pass
+
     time_start = time.time()
     await set_body(request, await request.body())
     body = await get_body(request)
-    response = await call_next(request)
-
     try:
-        if "openapi.json" not in request.url.path:
-            token = request.query_params.get("token")
-            token = token if token else request.path_params.get("token")
-
-            user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token=token)
-            type = "cashevent"
-            payload = {} if not body and request.headers.get("content-type") != "application/json" else json.loads(body)
-            name = "" if request.scope.get("endpoint") != create_payment else payload.get("type")
-
-            await write_event(
-                type=type,
-                name=name,
-                method=request.method,
-                url=request.url.__str__(),
-                payload=payload,
-                cashbox_id=cashbox_id,
-                user_id=user_id,
-                token=token,
-                ip=request.headers.get("x-forwarded-for"),
-                request_time=time.time()-time_start
-            )
-    except:
-        pass
-
-    return response
+        response = await call_next(request)
+        await _write_event(request=request, body=body, time_start=time_start, status_code=response.status_code)
+        return response
+    except Exception as e:
+        await _write_event(request=request, body=body, time_start=time_start)
+        raise e
 
 
 @app.on_event("startup")

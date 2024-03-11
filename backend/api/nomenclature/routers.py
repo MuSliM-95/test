@@ -14,7 +14,7 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select, and_
+from sqlalchemy import func, select, and_, desc
 from ws_manager import manager
 
 router = APIRouter(tags=["nomenclature"])
@@ -79,7 +79,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
 
 
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
-async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, limit: int = 100,
+async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0):
     """Получение списка категорий"""
     user = await get_user_by_token(token)
@@ -100,6 +100,8 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     if barcode:
         query = query.join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
         filters.append(nomenclature_barcodes.c.code == barcode)
+    if category:
+        filters.append(nomenclature.c.category == category)
 
     query = query.where(*filters).limit(limit).offset(offset)
 
@@ -107,6 +109,16 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
     nomenclature_db = [*map(nomenclature_unit_id_to_name, nomenclature_db)]
     nomenclature_db = [await inst for inst in nomenclature_db]
+
+    for nomenclature_info in nomenclature_db:
+        query = (
+            select(nomenclature_barcodes.c.code)
+            .where(nomenclature_barcodes.c.nomenclature_id == nomenclature_info["id"])
+            .order_by(desc(nomenclature_barcodes.c.id))
+        )
+        barcodes_nomenclature_record = await database.fetch_all(query)
+        nomenclature_barcodes_list = [element.code for element in barcodes_nomenclature_record]
+        nomenclature_info["barcodes"] = nomenclature_barcodes_list
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
     nomenclature_db_c = await database.fetch_one(query)

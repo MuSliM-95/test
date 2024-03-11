@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token
 from sqlalchemy import func, select
 from ws_manager import manager
+import asyncio
 
 router = APIRouter(tags=["categories"])
 
@@ -44,6 +45,78 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
 
     return {"result": categories_db, "count": categories_db_count.count_1}
 
+async def build_hierarchy(data, parent_id = None):
+    async def build_children(parent_id):
+        children = []
+        for item in data:
+            item = datetime_to_timestamp(item)
+            item['children'] = []
+            item['key'] = item['id']
+            item['expanded_flag'] = False
+            if item['parent'] == parent_id:
+                grandchildren = await build_children(item['id'])
+                if grandchildren:
+                    item['children'] = grandchildren
+                children.append(item)
+        return children
+    
+    tasks = [build_children(parent_id)]
+    results = await asyncio.gather(*tasks)
+    return results[0]
+
+
+@router.get("/categories_tree/", response_model=schemas.CategoryTreeGet)
+async def get_categories(token: str):
+    """Получение древа списка категорий"""
+    user = await get_user_by_token(token)
+    query = (
+        categories.select()
+        .where(
+            categories.c.owner == user.id,
+            categories.c.is_deleted.is_not(True),
+            categories.c.parent == None
+        )
+    )
+
+    categories_db = await database.fetch_all(query)
+    result = []
+    for category in categories_db:
+        category_dict = dict(category)
+        category_dict['key'] = category_dict['id']
+        category_dict['expanded_flag'] = False
+        query = (
+            f"""
+                with recursive categories_hierarchy as (
+                select id, name, parent, description, code, status, updated_at, created_at
+                from categories where parent = {category.id}
+
+                union all
+                select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at
+                from categories_hierarchy as H
+                join categories as F on F.parent = H.id
+                ) 
+                select * from categories_hierarchy 
+            """
+        )
+        childrens = await database.fetch_all(query)
+        if childrens:
+            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id)
+        else:
+            category_dict['children'] = []
+        
+        result.append(category_dict)
+        
+
+    categories_db = [*map(datetime_to_timestamp, result)]
+
+    query = select(func.count(categories.c.id)).where(
+        categories.c.owner == user.id,
+        categories.c.is_deleted.is_not(True),
+    )
+
+    categories_db_count = await database.fetch_one(query)
+
+    return {"result": categories_db, "count": categories_db_count.count_1}
 
 @router.post("/categories/", response_model=schemas.CategoryList)
 async def new_categories(token: str, categories_data: schemas.CategoryCreateMass):

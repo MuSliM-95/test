@@ -1,10 +1,10 @@
 from datetime import datetime
 from fastapi import APIRouter, Query
-from sqlalchemy import func, select, case
+from sqlalchemy import func, select, case, and_
 from typing import Optional
 
 import api.webapp.schemas as schemas
-from database.db import (pictures, price_types, categories, prices, nomenclature, database,
+from database.db import (pictures, price_types, categories, prices, nomenclature, database, warehouse_balances,
                          warehouses, manufacturers, warehouse_register_movement, units, organizations)
 from functions.helpers import datetime_to_timestamp, get_user_by_token, raise_bad_request, nomenclature_unit_id_to_name
 
@@ -50,6 +50,7 @@ async def get_nomenclature(
     ]
     filter_pics = []
     filter_prices = []
+    filter_balance = []
 
     if name:
         filter_general.append(nomenclature.c.name.ilike(f"%{name}%"))
@@ -69,6 +70,14 @@ async def get_nomenclature(
         except ValueError:
             raise_bad_request("Category IDs must contain only numbers")
         filter_general.append(nomenclature.c.category.in_(category_ids))
+    if nomenclature_id:
+        filter_general.append(nomenclature.c.id == nomenclature_id)
+    if warehouse_id:
+        filter_balance.append(warehouse_balances.c.warehouse_id == warehouse_id)
+    if organization_id:
+        filter_balance.append(warehouse_balances.c.organization_id == organization_id)
+    if filter_balance:
+        filter_balance.append(warehouse_balances.c.current_amount > 0)
     if manufacturer:
         filter_general.append(nomenclature.c.manufacturer.ilike(f"%{manufacturer}%"))
 
@@ -92,10 +101,10 @@ async def get_nomenclature(
                 nomenclature
                 .join(prices, nomenclature.c.id == prices.c.nomenclature, isouter=True)
                 .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
+                .join(warehouse_balances, nomenclature.c.id == warehouse_balances.c.nomenclature_id, isouter=True)
              )
-             .where(*filter_general, *filter_pics, *filter_prices)
-             .limit(limit)
-             .offset(offset))
+             .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
+             .limit(limit).offset(offset))
 
     result_nomenclature = await database.fetch_all(query)
     result_nomenclature = [*map(datetime_to_timestamp, result_nomenclature)]
@@ -112,8 +121,9 @@ async def get_nomenclature(
                 nomenclature
                 .join(prices, nomenclature.c.id == prices.c.nomenclature, isouter=True)
                 .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
+                .join(warehouse_balances, nomenclature.c.id == warehouse_balances.c.nomenclature_id, isouter=True)
             )
-            .where(*filter_general, *filter_pics, *filter_prices)
+            .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
             .alias()
         )
     )

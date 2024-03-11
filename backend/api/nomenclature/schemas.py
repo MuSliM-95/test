@@ -47,6 +47,7 @@ class Nomenclature(NomenclatureCreate):
 class NomenclatureGet(NomenclatureCreate):
     id: int
     unit_name: Optional[str]
+    barcodes: Optional[List[str]]
     updated_at: int
     created_at: int
 

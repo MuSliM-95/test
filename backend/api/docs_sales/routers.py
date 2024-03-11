@@ -1,3 +1,6 @@
+from typing import Optional, Union
+
+from databases.backends.postgres import Record
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select, asc, Date
 
@@ -107,7 +110,6 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     if filters.dated:
         query = query.filter(
             func.date(func.to_timestamp(docs_sales.c.dated)) == datetime.datetime.fromtimestamp(filters.dated).date())
-        print(query)
 
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
@@ -116,9 +118,11 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     items_db = [*map(raschet_oplat, items_db)]
     items_db = [await instance for instance in items_db]
 
-    count_query = select(func.count()).select_from(docs_sales).where(docs_sales.c.is_deleted.is_not(True),
-                                                                     docs_sales.c.cashbox == user.cashbox_id)
-    count = await database.fetch_val(count_query)
+    query = (
+        select(func.count(docs_sales.c.id)).where(docs_sales.c.is_deleted.is_not(True),
+                                                  docs_sales.c.cashbox == user.cashbox_id)
+    )
+    count = await database.fetch_one(query)
 
     if show_goods:
         for item in items_db:
@@ -131,7 +135,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
             item['goods'] = goods_db
 
-    return {"result": items_db, "count": count}
+    return {"result": items_db, "count": count.count_1}
 
 
 async def check_foreign_keys(instance_values, user, exceptions) -> bool:
@@ -202,6 +206,41 @@ async def check_foreign_keys(instance_values, user, exceptions) -> bool:
     return True
 
 
+async def add_number_to_docs_sales(user: Record) -> None:
+    q = docs_sales.select().where(
+        docs_sales.c.cashbox == user.cashbox_id,
+        docs_sales.c.is_deleted == False,
+        docs_sales.c.number.is_(None)
+    ).order_by(asc(docs_sales.c.id))
+
+    docs_db = await database.fetch_all(q)
+    for i, v in enumerate(docs_db):
+        number = str(i + 1)
+        q = docs_sales.update().where(docs_sales.c.id == v.id).values({"number": number})
+        await database.execute(q)
+
+        q = entity_to_entity.select().where(
+            entity_to_entity.c.from_id == v.id
+        )
+        ids = await database.fetch_all(q)
+        for j in ids:
+            if j.type == "docs_sales_payments":
+                q = (
+                    payments
+                        .update()
+                        .where(payments.c.id == j.to_id)
+                        .values({"name": f"Оплата по документу {number}"})
+                )
+            elif j.type == "docs_sales_loyality_transactions":
+                q = (
+                    loyality_transactions
+                        .update()
+                        .where(loyality_transactions.c.id == j.to_id)
+                        .values({"name": f"Кешбек по документу {number}"})
+                )
+            await database.execute(q)
+
+
 @router.post("/docs_sales/", response_model=schemas.ListView)
 async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: bool = True):
     """Создание документов"""
@@ -210,23 +249,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
     inserted_ids = set()
     exceptions = []
 
-    # q = docs_sales.select().where(
-    #     docs_sales.c.cashbox == user.cashbox_id,
-    #     docs_sales.c.status == True,
-    #     docs_sales.c.is_deleted == False
-    # )
-    # docs_db = await database.fetch_all(q)
-    # number = len(docs_db) + 1
-
     for instance_values in docs_sales_data.dict()["__root__"]:
         instance_values["created_by"] = user.id
         instance_values["sales_manager"] = user.id
         instance_values["is_deleted"] = False
         instance_values["cashbox"] = user.cashbox_id
-
-        # if not instance_values['number']:
-        #     instance_values['number'] = str(number)
-        #     number += 1
 
         paid_rubles = instance_values["paid_rubles"]
         paid_lt = instance_values["paid_lt"]
@@ -235,8 +262,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         del instance_values["paid_lt"]
         del instance_values["paid_rubles"]
         del instance_values["loyality_card_id"]
-
-        # if paid_rubles 
 
         if not await check_period_blocked(
                 instance_values["organization"], instance_values.get("dated"), exceptions
@@ -258,11 +283,18 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         except KeyError:
             pass
 
+        paybox = instance_values.get('paybox')
+        instance_values.pop('paybox')
+        if not paybox:
+            paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
+            paybox = await database.fetch_one(paybox_q)
+            if paybox:
+                paybox = paybox.id
+
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
 
         # Процесс разделения тегов(в другую таблицу), а также связывание лида с документом продажи при наличии нужного тега
-
         tags = instance_values.get("tags")
         if tags:
             tags_insert_list = []
@@ -363,11 +395,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 await database.execute(query)
 
         if paid_rubles > 0:
-            paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
-            payboxes = await database.fetch_all(paybox_q)
-
-            article_id = None
-
             article_q = articles.select().where(articles.c.cashbox == user.cashbox_id, articles.c.name == "Продажи")
             article_db = await database.fetch_one(article_q)
 
@@ -382,10 +409,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "created_at": tstamp,
                     "updated_at": tstamp
                 })
-                created_article_db = await database.execute(created_article_q)
-                article_id = created_article_db
+                article_id = await database.execute(created_article_q)
 
-            rubles_body = {
+            payment_id = await database.execute(payments.insert().values({
                 "contragent": instance_values['contragent'],
                 "type": "incoming",
                 "name": f"Оплата по документу {instance_values['number']}",
@@ -396,7 +422,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "tax_type": "internal",
                 "article_id": article_id,
                 "article": "Продажи",
-                "paybox": payboxes[0].id,
+                "paybox": paybox,
                 "date": int(datetime.datetime.now().timestamp()),
                 "account": user.user,
                 "cashbox": user.cashbox_id,
@@ -405,8 +431,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "updated_at": int(datetime.datetime.now().timestamp()),
                 "status": True,
                 "stopped": True,
-            }
-            payment_id = await database.execute(payments.insert().values(rubles_body))
+            }))
 
             await database.execute(entity_to_entity.insert().values(
                 {
@@ -431,7 +456,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "name": f"Кешбек по документу {instance_values['number']}",
                     "amount": round((paid_rubles * (lcard.cashback_percent / 100)), 2),
                     "created_by_id": user.id,
-                    "tags": "",
+                    "tags": instance_values.get("tags", ""),
                     "dated": datetime.datetime.now(),
                     "cashbox": user.cashbox_id,
                     "is_deleted": False,
@@ -456,7 +481,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "name": f"Оплата по документу {instance_values['number']}",
                     "amount": paid_lt,
                     "created_by_id": user.id,
-                    "tags": "",
+                    "tags": instance_values.get("tags", ""),
                     "dated": datetime.datetime.now(),
                     "cashbox": user.cashbox_id,
                     "is_deleted": False,
@@ -518,7 +543,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "docs_sales_id": instance_id,
                 "goods": goods_res
             }
-
             body['docs_purchases'] = None
             body['number'] = None
             body['to_warehouse'] = None
@@ -528,17 +552,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
 
-    q = docs_sales.select().where(
-        docs_sales.c.cashbox == user.cashbox_id,
-        docs_sales.c.is_deleted == False
-    ).order_by(asc(docs_sales.c.id))
-
-    docs_db = await database.fetch_all(q)
-
-    for i in range(0, len(docs_db)):
-        if not docs_db[i].number:
-            q = docs_sales.update().where(docs_sales.c.id == docs_db[i].id).values({"number": str(i + 1)})
-            await database.execute(q)
+    await add_number_to_docs_sales(user=user)
 
     await manager.send_message(
         token,
@@ -595,6 +609,12 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
             lt = instance_values["loyality_card_id"]
             del instance_values["loyality_card_id"]
 
+        paybox = instance_values.get('paybox')
+        instance_values.pop('paybox')
+        if not paybox:
+            paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
+            paybox = await database.fetch_one(paybox_q)
+
         instance_id_db = instance_values["id"]
 
         if paid_rubles or paid_lt or lt:
@@ -636,16 +656,13 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         proxy_lt = True
 
             if not proxy_payment:
-                paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
-                payboxes = await database.fetch_all(paybox_q)
-
                 rubles_body = {
                     "contragent": instance_values['contragent'],
                     "type": "outgoing",
                     "name": f"Оплата по документу {instance_values['number']}",
                     "amount_without_tax": instance_values.get("paid_rubles"),
                     "amount": instance_values.get("paid_rubles"),
-                    "paybox": payboxes[0].id,
+                    "paybox": paybox,
                     "date": int(datetime.datetime.now().timestamp()),
                     "account": user.user,
                     "cashbox": user.cashbox_id,
@@ -680,7 +697,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         "name": f"Кешбек по документу {instance_values['number']}",
                         "amount": round((paid_rubles * (lcard.cashback_percent / 100)), 2),
                         "created_by_id": user.id,
-                        "tags": "",
+                        "tags": instance_values.get("tags", ""),
                         "dated": datetime.datetime.now(),
                         "cashbox": user.cashbox_id,
                         "is_deleted": False,
@@ -705,7 +722,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         "name": f"Оплата по документу {instance_values['number']}",
                         "amount": paid_lt,
                         "created_by_id": user.id,
-                        "tags": "",
+                        "tags": instance_values.get("tags", ""),
                         "dated": datetime.datetime.now(),
                         "cashbox": user.cashbox_id,
                         "is_deleted": False,

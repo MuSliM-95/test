@@ -492,6 +492,58 @@ async def create(
     return docs_warehouse_db
 
 
+@router.delete("/docs_warehouse/{idx}")
+@database.transaction()
+async def delete_docs_warehouse_route(token: str, idx: int):
+    """Удаление документа"""
+    await get_user_by_token(token)
+
+    query = docs_warehouse.select().where(docs_warehouse.c.id == idx, docs_warehouse.c.is_deleted.is_not(True))
+    item_db = await database.fetch_one(query)
+    item_db = datetime_to_timestamp(item_db)
+
+    if item_db:
+        query = (
+            docs_warehouse.update()
+            .where(docs_warehouse.c.id == idx, docs_warehouse.c.is_deleted.is_not(True))
+            .values({"is_deleted": True})
+        )
+        await database.execute(query)
+
+        """ Изменение остатка на складе - удаление движения в регистре """
+        try:
+            query = (
+                warehouse_register_movement
+                .select()
+                .where(
+                    warehouse_register_movement.c.document_warehouse_id == item_db['id']
+                )
+            )
+            result = await database.fetch_all(query)
+            item_db.update({'deleted': result})
+            query = (
+                warehouse_register_movement
+                .delete()
+                .where(
+                    warehouse_register_movement.c.document_warehouse_id == item_db['id']
+                )
+            )
+            await database.execute(query)
+        except Exception as error:
+            raise HTTPException(status_code=433, detail=str(error))
+
+        await manager.send_message(
+            token,
+            {
+                "action": "delete",
+                "target": "docs_warehouse",
+                "result": item_db,
+            },
+        )
+
+    return item_db
+
+
 @database.transaction()
 @router.patch("/alt_docs_warehouse/",
               tags=["Alternative docs_warehouse"],

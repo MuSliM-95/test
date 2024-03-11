@@ -5,7 +5,7 @@ from datetime import date
 
 class LoyalityCardFilters(BaseModel):
     card_number: Optional[int]
-    balance: Optional[int]
+    balance: Optional[float]
     tags: Optional[str]
     income: Optional[int]
     outcome: Optional[int]
@@ -24,7 +24,7 @@ class LoyalityCardFilters(BaseModel):
     created_at_to: Optional[int]
 
     contragent_name: Optional[str]
-    phone_number: Optional[int]
+    phone_number: Optional[str]
     organization_name: Optional[str]
 
     # lifetime: Optional[int] # lifetime in seconds
@@ -34,12 +34,12 @@ class LoyalityCardFilters(BaseModel):
 
 class LoyalityCardCreate(BaseModel):
     # id: int
-    card_number: Optional[int]
+    card_number: Optional[str]
     tags: Optional[str]
-    # balance: Optional[int]
+    # balance: Optional[float]
     # income: Optional[int]
     # outcome: Optional[int]
-    phone_number: Optional[int]
+    phone_number: Optional[str]
     contragent_id: Optional[int]
     contragent_name: Optional[str]
     organization_id: Optional[int]
@@ -86,7 +86,7 @@ class LoyalityCardGet(BaseModel):
     id: int
     card_number: int
     tags: Optional[str]
-    balance: int
+    balance: float
     income: int
     outcome: int
     contragent_id: int
