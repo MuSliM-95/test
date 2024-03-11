@@ -269,7 +269,6 @@ async def integration_on(token: str, id_integration: int):
                 integrations_to_cashbox.c.integration_id == id_integration,
                 integrations_to_cashbox.c.installed_by == user.id
             )).values({'status': True}))
-
         else:
             await database.execute(integrations_to_cashbox.insert().values({
                 'integration_id': id_integration,
@@ -277,9 +276,16 @@ async def integration_on(token: str, id_integration: int):
                 'deactivated_by': user.get('id'),
                 'status': True,
             }))
+        refresh = await refresh_token(check.get('id'))
+        if not refresh:
+            raise HTTPException(status_code=422, detail="ошибка обновления ключа доступа")
 
         await manager.send_message(user.token,
-                                    {"action": "on", "target": "IntegrationTochkaBank", "integration_status": True})
+                                    {"action": "on",
+                                     "target": "IntegrationTochkaBank",
+                                     "integration_status": True,
+                                     "integration_isAuth": True if refresh else False
+                                     })
         return {'result': 'ok'}
     except:
         raise HTTPException(status_code = 422, detail = "ошибка установки связи аккаунта пользователя и интеграции")
