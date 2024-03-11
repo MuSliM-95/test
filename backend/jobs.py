@@ -324,7 +324,7 @@ async def tochka_update_transaction():
                 where(and_(payments.c.paybox == account.get('pbox_id'), payments.c.cashbox == account.get('cashbox_id'))).\
                 select_from(payments).\
                 join(tochka_bank_payments, tochka_bank_payments.c.payment_crm_id == payments.c.id))
-            print(info_statement)
+
             if len(tochka_payments_db) < 1:
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     payment_create_id = await database.execute(payments.insert().values({
@@ -507,7 +507,7 @@ async def tochka_update_transaction():
                             'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
                         })
                         contragent_db = await database.fetch_one(
-                            contragents.select().where(contragents.c.inn == payment.get('CreditorParty').get('inn')))
+                            contragents.select().where(contragents.c.inn == payment.get('DebtorParty').get('inn')))
                         if not contragent_db:
                             contragent_db = await database.execute(contragents.insert().values({
                                 'name': payment.get('DebtorParty').get('name'),
