@@ -324,6 +324,7 @@ async def tochka_update_transaction():
                 where(and_(payments.c.paybox == account.get('pbox_id'), payments.c.cashbox == account.get('cashbox_id'))).\
                 select_from(payments).\
                 join(tochka_bank_payments, tochka_bank_payments.c.payment_crm_id == payments.c.id))
+            print(info_statement)
             if len(tochka_payments_db) < 1:
                 for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
                     payment_create_id = await database.execute(payments.insert().values({
@@ -444,7 +445,7 @@ async def tochka_update_transaction():
                         'amount_without_tax': payment.get('Amount').get('amount'),
                         'status': True if payment.get('status') == 'Booked' else False,
                         'stopped': True
-                    } ) )
+                    }))
                     payment_create = await database.fetch_one(payments.select().where(payments.c.id == payment_create_id))
                     payment_data = {
                         'accountId': info_statement.get('Data')['Statement'][0].get('accountId'),
