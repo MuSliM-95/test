@@ -118,11 +118,10 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     items_db = [*map(raschet_oplat, items_db)]
     items_db = [await instance for instance in items_db]
 
-    query = (
-        select(func.count(docs_sales.c.id)).where(docs_sales.c.is_deleted.is_not(True),
-                                                  docs_sales.c.cashbox == user.cashbox_id)
-    )
-    count = await database.fetch_one(query)
+    count_query = select(func.count()).select_from(docs_sales).where(docs_sales.c.is_deleted.is_not(True),
+                                                                     docs_sales.c.cashbox == user.cashbox_id)
+    count = await database.fetch_val(count_query)
+
 
     if show_goods:
         for item in items_db:
@@ -135,7 +134,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
             item['goods'] = goods_db
 
-    return {"result": items_db, "count": count.count_1}
+    return {"result": items_db, "count": count}
 
 
 async def check_foreign_keys(instance_values, user, exceptions) -> bool:
