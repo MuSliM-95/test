@@ -42,14 +42,15 @@ async def patch_nomenclature_barcodes(token: str, barcodes: List[schemas.Nomencl
             })
             continue
 
-        query = nomenclature_barcodes.select().where(and_(
-            nomenclature_barcodes.c.nomenclature_id == barcode.idx,
-            nomenclature_barcodes.c.code == barcode.new_barcode
-        ))
-        barcode_ex = await database.fetch_one(query)
+        query = (
+            select(nomenclature_barcodes.c.code)
+            .where(nomenclature_barcodes.c.nomenclature_id == barcode.idx),
+        )
+        barcode_ex_list = await database.fetch_all(query)
+        barcodes = [barcode_info.code for barcode_info in barcode_ex_list]
 
         async with database.transaction():
-            if barcode_ex:
+            if barcode.new_barcode in barcodes:
                 query = (
                     nomenclature_barcodes.delete().where(and_(
                         nomenclature_barcodes.c.nomenclature_id == barcode.idx,
@@ -64,6 +65,15 @@ async def patch_nomenclature_barcodes(token: str, barcodes: List[schemas.Nomencl
                         nomenclature_barcodes.c.code == barcode.old_barcode
                     ))
                     .values({
+                        "code": barcode.new_barcode
+                    })
+                )
+                await database.execute(query)
+            elif not barcodes:
+                query = (
+                    nomenclature_barcodes.insert()
+                    .values({
+                        "nomenclature_id": barcode.idx,
                         "code": barcode.new_barcode
                     })
                 )
