@@ -280,6 +280,13 @@ async def integration_on(token: str, id_integration: int):
                 'status': True,
             }))
             refresh = False
+        if not scheduler.get_job(job_id = str(check.get('installed_by'))):
+            scheduler.add_job(refresh_token, 'interval', seconds = 84000,
+                              kwargs = {'integration_cashboxes': check.get('id')},
+                              name = 'refresh token', id = str(check.get('installed_by')))
+        else:
+            scheduler.get_job(job_id = str(check.get('installed_by'))).reschedule('interval', seconds = 84000)
+
         await manager.send_message(user.token,
                                     {"action": "on",
                                      "target": "IntegrationTochkaBank",
