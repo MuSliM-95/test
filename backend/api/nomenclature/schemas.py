@@ -76,5 +76,5 @@ class NomenclatureListGetRes(BaseModel):
 
 class NomenclaturesListPatch(BaseModel):
     idx: int
-    old_barcode: str
+    old_barcode: Optional[str]
     new_barcode: str
