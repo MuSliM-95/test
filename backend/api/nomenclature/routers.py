@@ -43,7 +43,7 @@ async def patch_nomenclature_barcodes(token: str, barcodes: List[schemas.Nomencl
             continue
 
         query = (
-            select(nomenclature_barcodes.c.code)
+            nomenclature_barcodes.select()
             .where(nomenclature_barcodes.c.nomenclature_id == barcode.idx),
         )
         barcode_ex_list = await database.fetch_all(query)
