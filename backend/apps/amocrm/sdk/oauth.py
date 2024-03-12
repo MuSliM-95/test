@@ -63,4 +63,5 @@ class AmoCRMAuthenticator(AmoCRMAuthenticationService):
                 return AmoCRMAuthenticationResult(data['access_token'], data['refresh_token'],
                                                   self.amo_domain, int(data['expires_in']))
             else:
+                print(data)
                 raise ValueError('Authentication failed')
