@@ -272,7 +272,6 @@ async def autoburn():
 @scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction")
 @database.transaction()
 async def tochka_update_transaction():
-    await database.connect()
     active_accounts_with_credentials = await database.fetch_all(
         select(tochka_bank_accounts.c.accountId,
                tochka_bank_accounts.c.registrationDate,
