@@ -377,7 +377,11 @@ async def tochka_update_transaction():
                             })
 
                             contragent_db = await database.fetch_one(
-                                contragents.select().where(contragents.c.inn == payment.get('CreditorParty').get('inn')))
+                                contragents.select().where(
+                                    and_(
+                                      contragents.c.inn == payment.get('CreditorParty').get('inn')),
+                                      contragents.c.cashbox == account.get('cashbox_id')
+                                ))
                             if not contragent_db:
                                 contragent_db = await database.execute(contragents.insert().values({
                                     'name': payment.get('CreditorParty').get('name'),
@@ -407,7 +411,10 @@ async def tochka_update_transaction():
                             }),
 
                             contragent_db = await database.fetch_one(
-                                contragents.select().where(contragents.c.inn == payment.get('DebtorParty').get('inn')))
+                                contragents.select().where(and_(
+                                      contragents.c.inn == payment.get('DebtorParty').get('inn')),
+                                      contragents.c.cashbox == account.get('cashbox_id')
+                                ))
                             if not contragent_db:
                                 contragent_db = await database.execute(contragents.insert().values({
                                     'name': payment.get('DebtorParty').get('name'),
@@ -480,7 +487,10 @@ async def tochka_update_transaction():
                             })
 
                             contragent_db = await database.fetch_one(
-                                contragents.select().where(contragents.c.inn == payment.get('CreditorParty').get('inn')))
+                                contragents.select().where(and_(
+                                      contragents.c.inn == payment.get('CreditorParty').get('inn')),
+                                      contragents.c.cashbox == account.get('cashbox_id')
+                                ))
                             if not contragent_db:
                                 contragent_db = await database.execute(contragents.insert().values({
                                     'name': payment.get('CreditorParty').get('name'),
@@ -509,7 +519,10 @@ async def tochka_update_transaction():
                                 'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
                             })
                             contragent_db = await database.fetch_one(
-                                contragents.select().where(contragents.c.inn == payment.get('DebtorParty').get('inn')))
+                                contragents.select().where(and_(
+                                      contragents.c.inn == payment.get('DebtorParty').get('inn')),
+                                      contragents.c.cashbox == account.get('cashbox_id')
+                                ))
                             if not contragent_db:
                                 contragent_db = await database.execute(contragents.insert().values({
                                     'name': payment.get('DebtorParty').get('name'),
