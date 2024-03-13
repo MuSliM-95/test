@@ -306,6 +306,7 @@ async def tochka_update_transaction():
                         balance_json = await resp.json()
                     await session.close()
                 await database.execute(pboxes.update().where(pboxes.c.id == account.get('pbox_id')).values({'balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount")}))
+                print(balance_json)
                 statement = await init_statement({
                         "accountId": account.get('accountId'),
                         "startDateTime": account.get('registrationDate'),
