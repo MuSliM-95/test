@@ -309,7 +309,16 @@ async def tochka_update_transaction():
                 if not balance_json.get("Data"):
                     raise Exception("проблема с получением баланса (вероятно некорректный access_token)")
 
-                await database.execute(pboxes.update().where(pboxes.c.id == account.get('pbox_id')).values({'balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount")}))
+                await database.execute(pboxes.
+                                       update().
+                                       where(pboxes.c.id == account.get('pbox_id')).
+                                       values(
+                    {
+                        'balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
+                        'updated_at': int(datetime.utcnow().timestamp()),
+                        'balance_date': int(datetime.utcnow().timestamp())
+                    }
+                ))
 
                 statement = await init_statement({
                         "accountId": account.get('accountId'),
