@@ -213,7 +213,7 @@ async def add_number_to_docs_sales(user: Record) -> None:
     )
 
     last_id_query = (
-        select(docs_sales.c.number)
+        select(docs_sales.c.id)
         .where(
             docs_sales.c.cashbox == user.cashbox_id,
             docs_sales.c.is_deleted.is_(False)
@@ -222,10 +222,10 @@ async def add_number_to_docs_sales(user: Record) -> None:
         .limit(1)
     )
 
-    last_number = await database.fetch_val(last_id_query, column=0)
+    last_id = await database.fetch_val(last_id_query, column=0)
     docs_db = await database.fetch_all(q)
     for i, v in enumerate(docs_db):
-        number = str(int(last_number) + i + 1)
+        number = str(last_id + i + 1)
         q = docs_sales.update().where(docs_sales.c.id == v.id).values({"number": number})
         await database.execute(q)
 
@@ -443,7 +443,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "stopped": True,
             }))
             await database.execute(
-                pboxes.update().where(pboxes.c.id == paybox).values({"balance": pboxes.balance - paid_rubles})
+                pboxes.update().where(pboxes.c.id == paybox).values({"balance": pboxes.c.balance - paid_rubles})
             )
 
             await database.execute(entity_to_entity.insert().values(
@@ -506,7 +506,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 await database.execute(
                     loyality_cards.update() \
                         .where(loyality_cards.c.card_number == payboxes.card_number) \
-                        .values({"balance": loyality_cards.balance - paid_lt})
+                        .values({"balance": loyality_cards.c.balance - paid_lt})
                 )
 
                 await database.execute(entity_to_entity.insert().values(
