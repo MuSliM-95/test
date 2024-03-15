@@ -239,15 +239,15 @@ async def check(token: str, id_integration: int):
         "target": "IntegrationTochkaBank",
         "integration_status": check.get('status'),
     }
-    if check.get('status'):
-        isAuth = await database.fetch_one(
+
+    isAuth = await database.fetch_one(
             tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == check.get("id"))
         )
 
-        if isAuth:
-            message.update({'integration_isAuth': True})
-        else:
-            message.update({'integration_isAuth': False})
+    if isAuth:
+        message.update({'integration_isAuth': True})
+    else:
+        message.update({'integration_isAuth': False})
     await manager.send_message(user.token, message)
     return {"isAuth": message.get('integration_isAuth')}
 
@@ -269,7 +269,9 @@ async def integration_on(token: str, id_integration: int):
                 integrations_to_cashbox.c.integration_id == id_integration,
                 integrations_to_cashbox.c.installed_by == user.id
             )).values({'status': True}))
-
+            refresh = await refresh_token(check.get('id'))
+            if not refresh:
+                raise HTTPException(status_code=422, detail="ошибка обновления ключа доступа")
         else:
             await database.execute(integrations_to_cashbox.insert().values({
                 'integration_id': id_integration,
@@ -277,9 +279,20 @@ async def integration_on(token: str, id_integration: int):
                 'deactivated_by': user.get('id'),
                 'status': True,
             }))
+            refresh = False
+        if not scheduler.get_job(job_id = str(check.get('installed_by'))):
+            scheduler.add_job(refresh_token, 'interval', seconds = 86400,
+                              kwargs = {'integration_cashboxes': check.get('id')},
+                              name = 'refresh token', id = str(check.get('installed_by')))
+        else:
+            scheduler.get_job(job_id = str(check.get('installed_by'))).reschedule('interval', seconds = 86400)
 
         await manager.send_message(user.token,
-                                    {"action": "on", "target": "IntegrationTochkaBank", "integration_status": True})
+                                    {"action": "on",
+                                     "target": "IntegrationTochkaBank",
+                                     "integration_status": True,
+                                     "integration_isAuth": True if refresh else False
+                                     })
         return {'result': 'ok'}
     except:
         raise HTTPException(status_code = 422, detail = "ошибка установки связи аккаунта пользователя и интеграции")
@@ -341,9 +354,9 @@ async def update_account(token: str, idx: int, account: AccountUpdate):
         account_model = AccountUpdate(**account_db)
         updated_account = account_model.copy(update=account_data)
         await database.execute(
-                    tochka_bank_accounts.update().
-                    where(tochka_bank_accounts.c.id == idx).
-                    values(updated_account.dict()))
+                        tochka_bank_accounts.update().
+                        where(tochka_bank_accounts.c.id == idx).
+                        values(updated_account.dict()))
         account_result = await database.fetch_one(tochka_bank_accounts.select().where(tochka_bank_accounts.c.id == idx))
         if account_result.get('is_active'):
             await tochka_update_transaction()

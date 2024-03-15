@@ -53,7 +53,8 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                 pair_token=gen_token(),
                 expires_in=int(amo_crm_install.expires_in),
                 field_id=field_id,
-                active=True
+                active=True,
+                from_widget=setting_info.id,
             )
             if install and not install_active:
                 await database.execute(query)

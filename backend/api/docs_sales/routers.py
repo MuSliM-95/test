@@ -95,11 +95,11 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     user = await get_user_by_token(token)
     query = (
         docs_sales
-        .select()
-        .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
-        .limit(limit)
-        .offset(offset)
-        .order_by(desc(docs_sales.c.id))
+            .select()
+            .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
+            .limit(limit)
+            .offset(offset)
+            .order_by(desc(docs_sales.c.id))
     )
 
     if filters.tags:
@@ -118,11 +118,10 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     items_db = [*map(raschet_oplat, items_db)]
     items_db = [await instance for instance in items_db]
 
-    query = (
-        select(func.count(docs_sales.c.id)).where(docs_sales.c.is_deleted.is_not(True),
-                                                  docs_sales.c.cashbox == user.cashbox_id)
-    )
-    count = await database.fetch_one(query)
+    count_query = select(func.count()).select_from(docs_sales).where(docs_sales.c.is_deleted.is_not(True),
+                                                                     docs_sales.c.cashbox == user.cashbox_id)
+    count = await database.fetch_val(count_query)
+
 
     if show_goods:
         for item in items_db:
@@ -135,7 +134,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
             item['goods'] = goods_db
 
-    return {"result": items_db, "count": count.count_1}
+    return {"result": items_db, "count": count}
 
 
 async def check_foreign_keys(instance_values, user, exceptions) -> bool:
@@ -238,16 +237,16 @@ async def add_number_to_docs_sales(user: Record) -> None:
             if j.type == "docs_sales_payments":
                 q = (
                     payments
-                    .update()
-                    .where(payments.c.id == j.to_id)
-                    .values({"name": f"Оплата по документу {number}"})
+                        .update()
+                        .where(payments.c.id == j.to_id)
+                        .values({"name": f"Оплата по документу {number}"})
                 )
             elif j.type == "docs_sales_loyality_transactions":
                 q = (
                     loyality_transactions
-                    .update()
-                    .where(loyality_transactions.c.id == j.to_id)
-                    .values({"name": f"Кешбек по документу {number}"})
+                        .update()
+                        .where(loyality_transactions.c.id == j.to_id)
+                        .values({"name": f"Кешбек по документу {number}"})
                 )
             await database.execute(q)
 
@@ -379,11 +378,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             if instance_values.get("warehouse") is not None:
                 query = (
                     warehouse_balances.select()
-                    .where(
+                        .where(
                         warehouse_balances.c.warehouse_id == instance_values["warehouse"],
                         warehouse_balances.c.nomenclature_id == item["nomenclature"]
                     )
-                    .order_by(desc(warehouse_balances.c.created_at))
+                        .order_by(desc(warehouse_balances.c.created_at))
                 )
                 last_warehouse_balance = await database.fetch_one(query)
                 warehouse_amount = (
@@ -527,8 +526,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         query = (
             docs_sales.update()
-            .where(docs_sales.c.id == instance_id)
-            .values({"sum": items_sum})
+                .where(docs_sales.c.id == instance_id)
+                .values({"sum": items_sum})
         )
         await database.execute(query)
 
@@ -642,8 +641,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
             query = (
                 entity_to_entity.select()
-                .where(entity_to_entity.c.cashbox_id == user.cashbox_id,
-                       entity_to_entity.c.from_id == instance_values["id"])
+                    .where(entity_to_entity.c.cashbox_id == user.cashbox_id,
+                           entity_to_entity.c.from_id == instance_values["id"])
             )
             proxyes = await database.fetch_all(query)
 
@@ -772,8 +771,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
             del instance_values['paid_rubles']
         query = (
             docs_sales.update()
-            .where(docs_sales.c.id == instance_values["id"])
-            .values(instance_values)
+                .where(docs_sales.c.id == instance_values["id"])
+                .values(instance_values)
         )
         await database.execute(query)
         instance_id = instance_values["id"]
@@ -811,11 +810,11 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                 if instance_values.get("warehouse") is not None:
                     query = (
                         warehouse_balances.select()
-                        .where(
+                            .where(
                             warehouse_balances.c.warehouse_id == instance_values["warehouse"],
                             warehouse_balances.c.nomenclature_id == item["nomenclature"]
                         )
-                        .order_by(desc(warehouse_balances.c.created_at))
+                            .order_by(desc(warehouse_balances.c.created_at))
                     )
                     last_warehouse_balance = await database.fetch_one(query)
                     warehouse_amount = (
@@ -839,8 +838,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
             query = (
                 docs_sales.update()
-                .where(docs_sales.c.id == instance_id)
-                .values({"sum": items_sum})
+                    .where(docs_sales.c.id == instance_id)
+                    .values({"sum": items_sum})
             )
             await database.execute(query)
 
@@ -917,8 +916,8 @@ async def delete(token: str, ids: list[int]):
     if items_db:
         query = (
             docs_sales.update()
-            .where(docs_sales.c.id.in_(ids), docs_sales.c.is_deleted.is_not(True))
-            .values({"is_deleted": True})
+                .where(docs_sales.c.id.in_(ids), docs_sales.c.is_deleted.is_not(True))
+                .values({"is_deleted": True})
         )
         await database.execute(query)
 
@@ -948,8 +947,8 @@ async def delete(token: str, idx: int):
     if items_db:
         query = (
             docs_sales.update()
-            .where(docs_sales.c.id == idx, docs_sales.c.is_deleted.is_not(True))
-            .values({"is_deleted": True})
+                .where(docs_sales.c.id == idx, docs_sales.c.is_deleted.is_not(True))
+                .values({"is_deleted": True})
         )
         await database.execute(query)
 

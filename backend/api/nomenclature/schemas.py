@@ -72,3 +72,9 @@ class NomenclatureListGet(BaseModel):
 class NomenclatureListGetRes(BaseModel):
     result: Optional[List[NomenclatureGet]]
     count: int
+
+
+class NomenclaturesListPatch(BaseModel):
+    idx: int
+    old_barcode: Optional[str]
+    new_barcode: str

@@ -20,6 +20,80 @@ from ws_manager import manager
 router = APIRouter(tags=["nomenclature"])
 
 
+@router.patch("/nomenclature/barcode")
+async def patch_nomenclature_barcodes(token: str, barcodes: List[schemas.NomenclaturesListPatch]):
+    """Изменение штрихкодов категории по ID"""
+    user = await get_user_by_token(token)
+
+    errors = []
+
+    for barcode in barcodes:
+        query = nomenclature.select().where(
+            nomenclature.c.id == barcode.idx,
+            nomenclature.c.owner == user.id,
+            nomenclature.c.is_deleted.is_not(True),
+        )
+        nomenclature_db = await database.fetch_one(query)
+        if not nomenclature_db:
+            errors.append({
+                "idx": barcode.idx,
+                "error_code": 404,
+                "type_error": "Nomenclature not found"
+            })
+            continue
+
+        query = (
+            nomenclature_barcodes.select()
+            .where(nomenclature_barcodes.c.nomenclature_id == barcode.idx)
+        )
+        barcode_ex_list = await database.fetch_all(query)
+        barcodes = [barcode_info.code for barcode_info in barcode_ex_list]
+
+        async with database.transaction():
+            if barcode.new_barcode in barcodes:
+                query = (
+                    nomenclature_barcodes.delete().where(and_(
+                        nomenclature_barcodes.c.nomenclature_id == barcode.idx,
+                        nomenclature_barcodes.c.code == barcode.new_barcode
+                    ))
+                )
+                await database.execute(query)
+
+                query = (
+                    nomenclature_barcodes.update().where(and_(
+                        nomenclature_barcodes.c.nomenclature_id == barcode.idx,
+                        nomenclature_barcodes.c.code == barcode.old_barcode
+                    ))
+                    .values({
+                        "code": barcode.new_barcode
+                    })
+                )
+                await database.execute(query)
+            elif not barcodes:
+                query = (
+                    nomenclature_barcodes.insert()
+                    .values({
+                        "nomenclature_id": barcode.idx,
+                        "code": barcode.new_barcode
+                    })
+                )
+                await database.execute(query)
+            else:
+                query = (
+                    nomenclature_barcodes.update().where(and_(
+                        nomenclature_barcodes.c.nomenclature_id == barcode.idx,
+                        nomenclature_barcodes.c.code == barcode.old_barcode
+                    ))
+                    .values({
+                        "code": barcode.new_barcode
+                    })
+                )
+                await database.execute(query)
+    return {
+        "errors": errors
+    }
+
+
 @router.get("/nomenclature/{idx}/barcode")
 async def get_nomenclature_barcodes(token: str, idx: int):
     """Получение штрихкодов категории по ID"""

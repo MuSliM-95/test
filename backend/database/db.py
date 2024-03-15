@@ -693,6 +693,7 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("field_id", Integer),
+    sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
 )
 
 amo_integrations = sqlalchemy.Table(
