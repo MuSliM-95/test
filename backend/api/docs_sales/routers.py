@@ -36,7 +36,6 @@ from api.docs_warehouses.utils import create_warehouse_docs
 from api.docs_warehouses.routers import update as update_warehouse_doc
 from api.docs_warehouses.schemas import EditMass as WarehouseUpdate
 
-
 from functions.helpers import (
     datetime_to_timestamp,
     check_contragent_exists,
@@ -90,7 +89,8 @@ async def get_by_id(token: str, idx: int):
 
 
 @router.get("/docs_sales/", response_model=schemas.CountRes)
-async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bool = False, filters: schemas.FilterSchema = Depends()):
+async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bool = False,
+                   filters: schemas.FilterSchema = Depends()):
     """Получение списка документов"""
     user = await get_user_by_token(token)
     query = (
@@ -102,12 +102,10 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
         .order_by(desc(docs_sales.c.id))
     )
 
-
     if filters.tags:
         tags = list(map(lambda x: x.strip().lower(), filters.tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: docs_sales.c.tags.ilike(f'%{x}%'), tags))
         query = query.filter(and_(*filter_tags))
-
 
     if filters.dated:
         query = query.filter(
@@ -121,7 +119,8 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     items_db = [await instance for instance in items_db]
 
     query = (
-        select(func.count(docs_sales.c.id)).where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
+        select(func.count(docs_sales.c.id)).where(docs_sales.c.is_deleted.is_not(True),
+                                                  docs_sales.c.cashbox == user.cashbox_id)
     )
     count = await database.fetch_one(query)
 
@@ -210,13 +209,24 @@ async def check_foreign_keys(instance_values, user, exceptions) -> bool:
 async def add_number_to_docs_sales(user: Record) -> None:
     q = docs_sales.select().where(
         docs_sales.c.cashbox == user.cashbox_id,
-        docs_sales.c.is_deleted == False,
+        docs_sales.c.is_deleted.is_(False),
         docs_sales.c.number.is_(None)
-    ).order_by(asc(docs_sales.c.id))
+    )
 
+    last_id_query = (
+        select(docs_sales.c.id)
+        .where(
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales.c.is_deleted.is_(False)
+        )
+        .order_by(asc(docs_sales.c.id))
+        .limit(1)
+    )
+
+    last_id = await database.fetch_val(last_id_query, column=0)
     docs_db = await database.fetch_all(q)
     for i, v in enumerate(docs_db):
-        number = str(i + 1)
+        number = str(last_id + i + 1)
         q = docs_sales.update().where(docs_sales.c.id == v.id).values({"number": number})
         await database.execute(q)
 
@@ -263,16 +273,16 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         del instance_values["paid_lt"]
         del instance_values["paid_rubles"]
         del instance_values["loyality_card_id"]
-        
+
         if not await check_period_blocked(
-            instance_values["organization"], instance_values.get("dated"), exceptions
+                instance_values["organization"], instance_values.get("dated"), exceptions
         ):
             continue
 
         if not await check_foreign_keys(
-            instance_values,
-            user,
-            exceptions,
+                instance_values,
+                user,
+                exceptions,
         ):
             continue
 
@@ -284,9 +294,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         except KeyError:
             pass
 
-        paybox = instance_values.get('paybox')
-        instance_values.pop('paybox')
-        if not paybox:
+        paybox = instance_values.get('paybox', None)
+        instance_values.pop('paybox', None)
+        if paybox is None:
             paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
             paybox = await database.fetch_one(paybox_q)
             if paybox:
@@ -296,7 +306,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         instance_id = await database.execute(query)
 
         # Процесс разделения тегов(в другую таблицу), а также связывание лида с документом продажи при наличии нужного тега
-        tags = instance_values.get("tags")
+        tags = instance_values.get("tags", "")
         if tags:
             tags_insert_list = []
             tags_split = tags.split(",")
@@ -417,7 +427,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "type": "incoming",
                 "name": f"Оплата по документу {instance_values['number']}",
                 "amount_without_tax": paid_rubles,
-                "tags": instance_values.get("tags", ""),
+                "tags": tags,
                 "amount": paid_rubles,
                 "tax": 0,
                 "tax_type": "internal",
@@ -433,6 +443,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "status": True,
                 "stopped": True,
             }))
+            await database.execute(
+                pboxes.update().where(pboxes.c.id == paybox).values({"balance": pboxes.balance - paid_rubles})
+            )
 
             await database.execute(entity_to_entity.insert().values(
                 {
@@ -457,7 +470,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "name": f"Кешбек по документу {instance_values['number']}",
                     "amount": round((paid_rubles * (lcard.cashback_percent / 100)), 2),
                     "created_by_id": user.id,
-                    "tags": instance_values.get("tags", ""),
+                    "tags": tags,
                     "dated": datetime.datetime.now(),
                     "cashbox": user.cashbox_id,
                     "is_deleted": False,
@@ -482,7 +495,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "name": f"Оплата по документу {instance_values['number']}",
                     "amount": paid_lt,
                     "created_by_id": user.id,
-                    "tags": instance_values.get("tags", ""),
+                    "tags": tags,
                     "dated": datetime.datetime.now(),
                     "cashbox": user.cashbox_id,
                     "is_deleted": False,
@@ -491,6 +504,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "status": True,
                 }
                 lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
+                await database.execute(
+                    loyality_cards.update() \
+                        .where(loyality_cards.c.card_number == payboxes.card_number) \
+                        .values({"balance": loyality_cards.balance - paid_lt})
+                )
 
                 await database.execute(entity_to_entity.insert().values(
                     {
@@ -518,7 +536,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
             goods_res = []
             for good in goods:
-                nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+                nomenclature_db = await database.fetch_one(
+                    nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
                 if nomenclature_db.type == "product":
                     goods_res.append(
                         {
@@ -580,7 +599,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
     exceptions = []
     for instance_values in docs_sales_data.dict(exclude_unset=True)["__root__"]:
         if not await check_period_blocked(
-            instance_values["organization"], instance_values.get("dated"), exceptions
+                instance_values["organization"], instance_values.get("dated"), exceptions
         ):
             continue
 
@@ -596,32 +615,35 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
         paid_rubles = None
         paid_lt = None
         lt = None
-        
+
         if instance_values.get("paid_rubles") is not None:
             paid_rubles = instance_values["paid_rubles"]
             del instance_values["paid_rubles"]
-            
+
         if instance_values.get("paid_lt") is not None:
             paid_lt = instance_values["paid_lt"]
             del instance_values["paid_lt"]
-            
+
         if instance_values.get("loyality_card_id") is not None:
             lt = instance_values["loyality_card_id"]
             del instance_values["loyality_card_id"]
 
-        paybox = instance_values.get('paybox')
-        instance_values.pop('paybox')
-        if not paybox:
+        paybox = instance_values.get('paybox', None)
+        instance_values.pop('paybox', None)
+        if paybox is None:
             paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
             paybox = await database.fetch_one(paybox_q)
+            if paybox:
+                paybox = paybox.id
 
         instance_id_db = instance_values["id"]
-        
+
         if paid_rubles or paid_lt or lt:
-            
+
             query = (
                 entity_to_entity.select()
-                .where(entity_to_entity.c.cashbox_id == user.cashbox_id, entity_to_entity.c.from_id == instance_values["id"])
+                .where(entity_to_entity.c.cashbox_id == user.cashbox_id,
+                       entity_to_entity.c.from_id == instance_values["id"])
             )
             proxyes = await database.fetch_all(query)
 
@@ -637,9 +659,9 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         q_payment = payments.update().where(
                             payments.c.id == proxy.to_id,
                             payments.c.cashbox == user.cashbox_id,
-                            payments.c.status == True, 
+                            payments.c.status == True,
                             payments.c.is_deleted == False
-                        ).values({ "amount": paid_rubles, "amount_without_tax": paid_rubles })
+                        ).values({"amount": paid_rubles, "amount_without_tax": paid_rubles})
                         await database.execute(q_payment)
                         proxy_payment = True
 
@@ -648,9 +670,9 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         q_trans = loyality_transactions.update().where(
                             loyality_transactions.c.id == proxy.to_id,
                             loyality_transactions.c.cashbox == user.cashbox_id,
-                            loyality_transactions.c.status == True, 
+                            loyality_transactions.c.status == True,
                             loyality_transactions.c.is_deleted == False
-                        ).values({ "amount": paid_lt })
+                        ).values({"amount": paid_lt})
                         await database.execute(q_trans)
                         proxy_lt = True
 
@@ -822,11 +844,14 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
             )
             await database.execute(query)
 
-            doc_warehouse = await database.fetch_one(docs_warehouse.select().where(docs_warehouse.c.docs_sales_id == instance_id).order_by(desc(docs_warehouse.c.id)))
+            doc_warehouse = await database.fetch_one(
+                docs_warehouse.select().where(docs_warehouse.c.docs_sales_id == instance_id).order_by(
+                    desc(docs_warehouse.c.id)))
 
             goods_res = []
             for good in goods:
-                nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+                nomenclature_db = await database.fetch_one(
+                    nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
                 if nomenclature_db.type == "product":
                     goods_res.append(
                         {
@@ -838,26 +863,24 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         }
                     )
 
-
             body = WarehouseUpdate(__root__=[
                 {
-                "id": doc_warehouse.id,
-                "number": None,
-                "dated": instance_values['dated'],
-                "docs_purchases": None,
-                "to_warehouse": None,
-                "status": False,
-                "contragent": instance_values['contragent'],
-                "operation": "outgoing",
-                "comment": instance_values['comment'],
-                "warehouse": instance_values['warehouse'],
-                "docs_sales_id": instance_id,
-                "goods": goods_res
-            }
+                    "id": doc_warehouse.id,
+                    "number": None,
+                    "dated": instance_values['dated'],
+                    "docs_purchases": None,
+                    "to_warehouse": None,
+                    "status": False,
+                    "contragent": instance_values['contragent'],
+                    "operation": "outgoing",
+                    "comment": instance_values['comment'],
+                    "warehouse": instance_values['warehouse'],
+                    "docs_sales_id": instance_id,
+                    "goods": goods_res
+                }
             ])
 
             await update_warehouse_doc(token, body)
-
 
     query = docs_sales.select().where(docs_sales.c.id.in_(updated_ids))
     docs_sales_db = await database.fetch_all(query)
