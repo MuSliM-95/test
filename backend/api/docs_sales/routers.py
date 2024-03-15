@@ -212,20 +212,19 @@ async def add_number_to_docs_sales(user: Record) -> None:
         docs_sales.c.number.is_(None)
     )
 
-    last_id_query = (
-        select(docs_sales.c.id)
+    count_query = (
+        select(func.count(docs_sales.c.id))
         .where(
             docs_sales.c.cashbox == user.cashbox_id,
-            docs_sales.c.is_deleted.is_(False)
+            docs_sales.c.is_deleted.is_(False),
+            docs_sales.c.number.is_not(None)
         )
-        .order_by(asc(docs_sales.c.id))
-        .limit(1)
     )
 
-    last_id = await database.fetch_val(last_id_query, column=0)
+    count = await database.fetch_val(count_query, column=0)
     docs_db = await database.fetch_all(q)
     for i, v in enumerate(docs_db):
-        number = str(last_id + i + 1)
+        number = str(count + i + 1)
         q = docs_sales.update().where(docs_sales.c.id == v.id).values({"number": number})
         await database.execute(q)
 
