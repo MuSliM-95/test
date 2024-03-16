@@ -147,9 +147,11 @@ async def autoburn():
                 transaction_list = await database.fetch_all(q)
 
                 minus_index = 0
-                self.accrual_list.extend([dict(i) for i in transaction_list if i.type == "accrual"])
+                self.accrual_list.extend(
+                    [dict(i, start_amount=i.amount) for i in transaction_list if i.type == "accrual"]
+                )
                 for transaction in transaction_list:
-                    transaction: Dict[str, Any] = dict(transaction)
+                    transaction: Dict[str, Any] = dict(transaction, start_amount=transaction["amount"])
                     self.burned_list.append(transaction["id"])
                     if transaction["type"] == "withdraw":
                         if self.accrual_list[minus_index]["amount"] > 0:
@@ -193,7 +195,7 @@ async def autoburn():
         def _get_autoburned_operation_dict(
                 self,
                 update_balance_sum: float,
-                amount: float,
+                start_amount: float,
                 created_at: datetime
         ) -> dict:
             return {
@@ -204,7 +206,7 @@ async def autoburn():
                 "created_by_id": self.card.created_by_id,
                 "cashbox": self.card.cashbox_id,
                 "tags": "",
-                "name": f"Автосгорание от {created_at.strftime('%d.%m.%Y')} по сумме {amount}",
+                "name": f"Автосгорание от {created_at.strftime('%d.%m.%Y')} по сумме {start_amount}",
                 "description": None,
                 "status": True,
                 "external_id": None,
@@ -242,14 +244,15 @@ async def autoburn():
                     self.card_balance -= update_balance_sum
                     self.autoburn_operation_list.append(
                         self._get_autoburned_operation_dict(
-                            update_balance_sum=update_balance_sum, amount=a["amount"], created_at=a["created_at"]
+                            update_balance_sum=update_balance_sum, start_amount=a["start_amount"],
+                            created_at=a["created_at"]
                         )
                     )
                 else:
                     self.card_balance -= a["amount"]
                     self.autoburn_operation_list.append(
                         self._get_autoburned_operation_dict(
-                            update_balance_sum=a["amount"], amount=a["amount"], created_at=a["created_at"]
+                            update_balance_sum=a["amount"], start_amount=a["start_amount"], created_at=a["created_at"]
                         )
                     )
 
