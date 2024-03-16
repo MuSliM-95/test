@@ -173,33 +173,35 @@ async def autoburn():
             .limit(1)
         )
         first_operation = await database.fetch_one(q_first)
-        q = (
-            loyality_transactions
-            .select()
-            .where(
-                loyality_transactions.c.loyality_card_id == card.id,
-                loyality_transactions.c.type.in_(["accrual", "withdraw"]),
-                loyality_transactions.c.amount > 0,
-                loyality_transactions.c.autoburned.is_not(True),
-                loyality_transactions.c.id > first_operation.id
+        if first_operation:
+            q = (
+                loyality_transactions
+                .select()
+                .where(
+                    loyality_transactions.c.loyality_card_id == card.id,
+                    loyality_transactions.c.type.in_(["accrual", "withdraw"]),
+                    loyality_transactions.c.amount > 0,
+                    loyality_transactions.c.autoburned.is_not(True),
+                    loyality_transactions.c.id > first_operation.id
+                )
             )
-        )
-        transactions = await database.fetch_all(q)
-        accrual = []
-        withdraw = []
-        for i in transactions:
-            eval(f"{i.type}").append(i)
-        for a in accrual:
-            if a.amount == 0:
-                continue
-            for w in range(len(withdraw)):
+            transactions = await database.fetch_all(q)
+            accrual = []
+            withdraw = []
+            for i in transactions:
+                eval(f"{i.type}").append(i)
+            for a in accrual:
+                print(dict(a))
                 if a.amount == 0:
-                    break
-                amount_burn = await _burn(card=card, transaction_accrual=a, transaction_withdraw=withdraw[w])
-                a.amount -= amount_burn
-                withdraw.pop(w)
-            if a.amount != 0:
-                await _burn(card=card, transaction_accrual=a)
+                    continue
+                for w in range(len(withdraw)):
+                    if a.amount == 0:
+                        break
+                    amount_burn = await _burn(card=card, transaction_accrual=a, transaction_withdraw=withdraw[w])
+                    a.amount -= amount_burn
+                    withdraw.pop(w)
+                if a.amount != 0:
+                    await _burn(card=card, transaction_accrual=a)
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
