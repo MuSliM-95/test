@@ -20,8 +20,8 @@ from api.payments.schemas import PaymentCreate
 from apps.tochka_bank.schemas import StatementData
 
 from const import PAID, DEMO, RepeatPeriod
-from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards,\
-    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation,\
+from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
+    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
@@ -52,7 +52,7 @@ try:
     except JobLookupError:
         pass
     # try:
-        # jobstore.remove_job("amo_import")
+    # jobstore.remove_job("amo_import")
     # except JobLookupError:
     #     pass
 except DatabaseError:
@@ -66,7 +66,6 @@ def add_job_to_sched(func, **kwargs):
 
 
 accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
-
 
 
 # accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
@@ -93,115 +92,141 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 async def autoburn():
     await database.connect()
 
-    @database.transaction()
-    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None] = None) -> float:
-        update_transaction_status_ids = [transaction_accrual.id]
-        update_balance_sum = transaction_accrual.amount
+    class AutoBurn:
+        def __init__(self, card: Record) -> None:
+            self.card: Record = card
+            self.first_operation_burned: Union[Record, None] = None
+            self.accrual_list: List[Record] = []
+            self.withdraw_list: List[Record] = []
 
-        if transaction_withdraw:
-            update_transaction_status_ids.append(transaction_withdraw.id)
-            update_balance_sum -= transaction_withdraw.amount
-
-        if update_balance_sum <= 0:
-            return 0
-
-        update_transaction_status_query = (
-            loyality_transactions
-            .update()
-            .where(
-                loyality_transactions.c.id.in_(update_transaction_status_ids)
+        @staticmethod
+        async def get_cards() -> List[Record]:
+            cards_query = (
+                loyality_cards
+                .select()
+                .where(
+                    loyality_cards.c.balance > 0,
+                    loyality_cards.c.lifetime.is_not(None),
+                    loyality_cards.c.lifetime > 0
+                )
             )
-            .values({"autoburned": True})
-        )
-        update_balance_query = (
-            loyality_cards
-            .update()
-            .where(loyality_cards.c.id == card.id)
-            .values({"balance": card.balance - update_balance_sum})
-        )
-        create_transcation_query = (
-            loyality_transactions
-            .insert()
-            .values({
-                "type": "autoburned",
-                "amount": update_balance_sum,
-                "loyality_card_id": card.id,
-                "loyality_card_number": card.card_number,
-                "created_by_id": card.created_by_id,
-                "cashbox": card.cashbox_id,
-                "tags": "",
-                "name": f"Автосгорание от {transaction_accrual.created_at.strftime('%d.%m.%Y')} по сумме {transaction_accrual.amount}",
-                "description": None,
-                "status": True,
-                "external_id": None,
-                "cashier_name": None,
-                "dead_at": None,
-                "is_deleted": False,
-                "autoburned": True,
-            })
-        )
+            return await database.fetch_all(cards_query)
 
-        query_list = [update_transaction_status_query, update_balance_query, create_transcation_query]
-        for query in query_list:
-            await database.execute(query)
-
-        return update_balance_sum
-
-    cards_query = (
-        loyality_cards
-        .select()
-        .where(
-            loyality_cards.c.balance > 0,
-            loyality_cards.c.lifetime.is_not(None),
-            loyality_cards.c.lifetime > 0
-        )
-    )
-    all_cards = await database.fetch_all(cards_query)
-    for card in all_cards:
-        q_first = (
-            loyality_transactions
-            .select()
-            .where(
-                loyality_transactions.c.loyality_card_id == card.id,
-                loyality_transactions.c.type == "accrual",
-                loyality_transactions.c.amount > 0,
-                loyality_transactions.c.autoburned.is_not(True),
-                loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
-                loyality_transactions.c.card_balance == 0
-            )
-            .order_by(asc(loyality_transactions.c.id))
-            .limit(1)
-        )
-        first_operation = await database.fetch_one(q_first)
-        if first_operation:
-            q = (
+        async def get_first_operation_burned(self) -> None:
+            q_first = (
                 loyality_transactions
                 .select()
                 .where(
-                    loyality_transactions.c.loyality_card_id == card.id,
-                    loyality_transactions.c.type.in_(["accrual", "withdraw"]),
+                    loyality_transactions.c.loyality_card_id == self.card.id,
+                    loyality_transactions.c.type == "accrual",
                     loyality_transactions.c.amount > 0,
                     loyality_transactions.c.autoburned.is_not(True),
-                    loyality_transactions.c.id > first_operation.id
+                    loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.now(),
+                    loyality_transactions.c.card_balance == 0
                 )
+                .order_by(asc(loyality_transactions.c.id))
+                .limit(1)
             )
-            transactions = await database.fetch_all(q)
-            accrual = []
-            withdraw = []
-            for i in transactions:
-                eval(f"{i.type}").append(i)
-            for a in accrual:
-                print(dict(a))
-                if a.amount == 0:
+            self.first_operation_burned = await database.fetch_one(q_first)
+
+        async def get_transaction(self) -> None:
+            if self.first_operation_burned is not None:
+                q = (
+                    loyality_transactions
+                    .select()
+                    .where(
+                        loyality_transactions.c.loyality_card_id == self.card.id,
+                        loyality_transactions.c.type.in_(["accrual", "withdraw"]),
+                        loyality_transactions.c.amount > 0,
+                        loyality_transactions.c.autoburned.is_not(True),
+                        loyality_transactions.c.id > self.first_operation_burned.id
+                    )
+                )
+                transaction_list = await database.fetch_all(q)
+                for transaction in transaction_list:
+                    eval(f"self.{transaction.type}_list").append(transaction)
+                    self.burned_list.append(transaction.id)
+
+        @database.transaction()
+        async def _burn(
+                self,
+                burned_list: List[int],
+                update_balance_sum: float,
+                created_at: datetime,
+                amount: float
+        ) -> None:
+            update_transaction_status_query = (
+                loyality_transactions
+                .update()
+                .where(
+                    loyality_transactions.c.id.in_(burned_list)
+                )
+                .values({"autoburned": True})
+            )
+            update_balance_query = (
+                loyality_cards
+                .update()
+                .where(loyality_cards.c.id == self.card.id)
+                .values({"balance": self.card.balance - update_balance_sum})
+            )
+            create_transcation_query = (
+                loyality_transactions
+                .insert()
+                .values({
+                    "type": "autoburned",
+                    "amount": update_balance_sum,
+                    "loyality_card_id": self.card.id,
+                    "loyality_card_number": self.card.card_number,
+                    "created_by_id": self.card.created_by_id,
+                    "cashbox": self.card.cashbox_id,
+                    "tags": "",
+                    "name": f"Автосгорание от {created_at.strftime('%d.%m.%Y')} по сумме {amount}",
+                    "description": None,
+                    "status": True,
+                    "external_id": None,
+                    "cashier_name": None,
+                    "dead_at": None,
+                    "is_deleted": False,
+                    "autoburned": True,
+                })
+            )
+
+            query_list = [update_transaction_status_query, update_balance_query, create_transcation_query]
+            for query in query_list:
+                await database.execute(query)
+
+        async def start(self) -> None:
+            await self.get_first_operation_burned()
+            await self.get_transaction()
+            for a in self.accrual_list:
+                amount = a.amount
+                if amount == 0:
                     continue
-                for w in range(len(withdraw)):
+                for w in range(len(self.withdraw_list)):
+                    update_balance_sum = amount - self.withdraw_list[w]
+                    if update_balance_sum <= 0:
+                        continue
                     if a.amount == 0:
                         break
-                    amount_burn = await _burn(card=card, transaction_accrual=a, transaction_withdraw=withdraw[w])
-                    a.amount -= amount_burn
-                    withdraw.pop(w)
-                if a.amount != 0:
-                    await _burn(card=card, transaction_accrual=a)
+                    amount_burn = await self._burn(
+                        burned_list=[a.id, self.withdraw_list[w].id],
+                        update_balance_sum=update_balance_sum,
+                        created_at=a.created_at,
+                        amount=a.amount
+                    )
+                    amount -= amount_burn
+                    self.withdraw_list.pop(w)
+                if amount != 0:
+                    await self._burn(
+                        burned_list=[a.id],
+                        update_balance_sum=amount,
+                        created_at=a.created_at,
+                        amount=a.amount
+                    )
+
+    card_list = await AutoBurn.get_cards()
+    for card in card_list:
+        await AutoBurn(card=card).start()
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
@@ -317,7 +342,8 @@ async def tochka_update_transaction():
                 )
             ).
             select_from(tochka_bank_accounts).
-            join(tochka_bank_credentials, tochka_bank_credentials.c.id == tochka_bank_accounts.c.tochka_bank_credential_id).
+            join(tochka_bank_credentials,
+                 tochka_bank_credentials.c.id == tochka_bank_accounts.c.tochka_bank_credential_id).
             join(pboxes, pboxes.c.id == tochka_bank_accounts.c.payboxes_id).
             join(users_cboxes_relation, users_cboxes_relation.c.id == pboxes.c.cashbox)
         )
@@ -337,9 +363,9 @@ async def tochka_update_transaction():
                     raise Exception("проблема с получением баланса (вероятно некорректный access_token)")
 
                 await database.execute(pboxes.
-                                       update().
-                                       where(pboxes.c.id == account.get('pbox_id')).
-                                       values(
+                update().
+                where(pboxes.c.id == account.get('pbox_id')).
+                values(
                     {
                         'balance': balance_json.get("Data").get("Balance")[0].get("Amount").get("amount"),
                         'updated_at': int(datetime.utcnow().timestamp()),
@@ -348,10 +374,10 @@ async def tochka_update_transaction():
                 ))
 
                 statement = await init_statement({
-                        "accountId": account.get('accountId'),
-                        "startDateTime": account.get('registrationDate'),
-                        "endDateTime": str(datetime.now().date()+timedelta(days=1))
-                    }, account.get('access_token'))
+                    "accountId": account.get('accountId'),
+                    "startDateTime": account.get('registrationDate'),
+                    "endDateTime": str(datetime.now().date() + timedelta(days=1))
+                }, account.get('access_token'))
                 status_info = ''
                 info_statement = None
                 while status_info != 'Ready':
@@ -363,8 +389,9 @@ async def tochka_update_transaction():
                     status_info = info_statement.get('Data')['Statement'][0].get('status')
                 tochka_payments_db = await database.fetch_all(
                     select(*payments.columns, tochka_bank_payments.c.paymentId).
-                    where(and_(payments.c.paybox == account.get('pbox_id'), payments.c.cashbox == account.get('cashbox_id'))).\
-                    select_from(payments).\
+                    where(and_(payments.c.paybox == account.get('pbox_id'),
+                               payments.c.cashbox == account.get('cashbox_id'))). \
+                    select_from(payments). \
                     join(tochka_bank_payments, tochka_bank_payments.c.payment_crm_id == payments.c.id))
 
                 if len(tochka_payments_db) < 1:
@@ -385,12 +412,14 @@ async def tochka_update_transaction():
                             'status': True if payment.get('status') == 'Booked' else False,
                             'stopped': True
                         }))
-                        payment_create = await database.fetch_one(payments.select().where(payments.c.id == payment_create_id))
+                        payment_create = await database.fetch_one(
+                            payments.select().where(payments.c.id == payment_create_id))
                         payment_data = {
                             'accountId': info_statement.get('Data')['Statement'][0].get('accountId'),
                             'payment_crm_id': payment_create.get('id'),
                             'statementId': info_statement.get('Data')['Statement'][0].get('statementId'),
-                            'statement_creation_datetime': info_statement.get('Data')['Statement'][0].get('creationDateTime'),
+                            'statement_creation_datetime': info_statement.get('Data')['Statement'][0].get(
+                                'creationDateTime'),
                             'transactionTypeCode': payment.get('transactionTypeCode'),
                             'transactionId': payment.get('transactionId'),
                             'status': payment.get('status'),
@@ -413,123 +442,15 @@ async def tochka_update_transaction():
                                 'creditor_agent_schemeName': payment.get('CreditorAgent').get('schemeName'),
                                 'creditor_agent_name': payment.get('CreditorAgent').get('name'),
                                 'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
-                                'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
+                                'creditor_agent_accountIdentification': payment.get('CreditorAgent').get(
+                                    'accountIdentification'),
                             })
 
                             contragent_db = await database.fetch_one(
                                 contragents.select().where(
                                     and_(
-                                      contragents.c.inn == payment.get('CreditorParty').get('inn')),
-                                      contragents.c.cashbox == account.get('cashbox_id')
-                                ))
-                            if not contragent_db:
-                                contragent_db = await database.execute(contragents.insert().values({
-                                    'name': payment.get('CreditorParty').get('name'),
-                                    'inn': payment.get('CreditorParty').get('inn'),
-                                    'cashbox': account.get('cashbox_id'),
-                                    'is_deleted': False,
-                                    'created_at': int(datetime.utcnow().timestamp()),
-                                    'updated_at': int(datetime.utcnow().timestamp()),
-                            }))
-                                await database.execute(
-                                    payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db}))
-                            else:
-                                await database.execute(
-                                    payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db.get('id')}))
-
-                        elif payment.get('DebtorParty'):
-                            payment_data.update({
-                                'debitor_party_inn': payment.get('DebtorParty').get('inn'),
-                                'debitor_party_name': payment.get('DebtorParty').get('name'),
-                                'debitor_party_kpp': payment.get('DebtorParty').get('kpp'),
-                                'debitor_account_identification': payment.get('DebtorAccount').get('identification'),
-                                'debitor_account_schemeName': payment.get('DebtorAccount').get('schemeName'),
-                                'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
-                                'debitor_agent_name': payment.get( 'DebtorAgent').get('name'),
-                                'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
-                                'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
-                            }),
-
-                            contragent_db = await database.fetch_one(
-                                contragents.select().where(and_(
-                                      contragents.c.inn == payment.get('DebtorParty').get('inn')),
-                                      contragents.c.cashbox == account.get('cashbox_id')
-                                ))
-                            if not contragent_db:
-                                contragent_db = await database.execute(contragents.insert().values({
-                                    'name': payment.get('DebtorParty').get('name'),
-                                    'inn': payment.get('DebtorParty').get('inn'),
-                                    'cashbox': account.get('cashbox_id'),
-                                    'is_deleted': False,
-                                    'created_at': int(datetime.utcnow().timestamp()),
-                                    'updated_at': int(datetime.utcnow().timestamp()),
-                                }))
-                                await database.execute(
-                                    payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db}))
-                            else:
-                                await database.execute(
-                                    payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db.get('id')}))
-                        else:
-                            raise Exception('не вилидный формат транзакции от Точка банка')
-
-                        await database.execute(tochka_bank_payments.insert().values(payment_data))
-
-                else:
-                    set_tochka_payments_statement = set([item.get('paymentId') for item in info_statement.get('Data')['Statement'][0]['Transaction']])
-                    set_tochka_payments_db = set([item.get('paymentId') for item in tochka_payments_db])
-                    new_paymentsId = list(set_tochka_payments_statement - set_tochka_payments_db)
-                    for payment in [item for item in info_statement.get('Data')['Statement'][0]['Transaction'] if item.get('paymentId') in new_paymentsId]:
-                        payment_create_id = await database.execute(payments.insert().values({
-                            'name': payment.get('transactionTypeCode'),
-                            'description': payment.get('description'),
-                            'type': 'outgoing' if payment.get('creditDebitIndicator') == 'Debit' else 'incoming',
-                            'tags': f"TochkaBank,{account.get('accountId')}",
-                            'amount': payment.get('Amount').get('amount'),
-                            'cashbox': account.get('cashbox_id'),
-                            'paybox': account.get('pbox_id'),
-                            'date': datetime.strptime(payment.get('documentProcessDate'), "%Y-%m-%d").timestamp(),
-                            'created_at': int(datetime.utcnow().timestamp()),
-                            'updated_at': int(datetime.utcnow().timestamp()),
-                            'is_deleted': False,
-                            'amount_without_tax': payment.get('Amount').get('amount'),
-                            'status': True if payment.get('status') == 'Booked' else False,
-                            'stopped': True
-                        }))
-                        payment_create = await database.fetch_one(payments.select().where(payments.c.id == payment_create_id))
-                        payment_data = {
-                            'accountId': info_statement.get('Data')['Statement'][0].get('accountId'),
-                            'payment_crm_id': payment_create.get('id'),
-                            'statementId': info_statement.get('Data')['Statement'][0].get('statementId'),
-                            'statement_creation_datetime': info_statement.get('Data')['Statement'][0].get('creationDateTime'),
-                            'transactionTypeCode': payment.get('transactionTypeCode'),
-                            'transactionId': payment.get('transactionId'),
-                            'status': payment.get('status'),
-                            'paymentId': payment.get('paymentId'),
-                            'documentProcessDate': payment.get('documentProcessDate'),
-                            'documentNumber': payment.get('documentNumber'),
-                            'description': payment.get('description'),
-                            'creditDebitIndicator': payment.get('creditDebitIndicator'),
-                            'amount': payment.get('Amount').get('amount') if payment.get('Amount') else None,
-                            'amountNat': payment.get('Amount').get('amountNat') if payment.get('Amount') else None,
-                            'currency': payment.get('Amount').get('currency') if payment.get('Amount') else None,
-                        }
-                        if payment.get('CreditorParty'):
-                            payment_data.update({
-                                'creditor_party_inn': payment.get('CreditorParty').get('inn'),
-                                'creditor_party_name': payment.get('CreditorParty').get('name'),
-                                'creditor_party_kpp': payment.get('CreditorParty').get('kpp'),
-                                'creditor_account_identification': payment.get('CreditorAccount').get('identification'),
-                                'creditor_account_schemeName': payment.get('CreditorAccount').get('schemeName'),
-                                'creditor_agent_schemeName': payment.get('CreditorAgent').get('schemeName'),
-                                'creditor_agent_name': payment.get('CreditorAgent').get('name'),
-                                'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
-                                'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
-                            })
-
-                            contragent_db = await database.fetch_one(
-                                contragents.select().where(and_(
-                                      contragents.c.inn == payment.get('CreditorParty').get('inn')),
-                                      contragents.c.cashbox == account.get('cashbox_id')
+                                        contragents.c.inn == payment.get('CreditorParty').get('inn')),
+                                    contragents.c.cashbox == account.get('cashbox_id')
                                 ))
                             if not contragent_db:
                                 contragent_db = await database.execute(contragents.insert().values({
@@ -541,10 +462,12 @@ async def tochka_update_transaction():
                                     'updated_at': int(datetime.utcnow().timestamp()),
                                 }))
                                 await database.execute(
-                                    payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db}))
+                                    payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                        {'contragent': contragent_db}))
                             else:
                                 await database.execute(
-                                    payments.update().where(payments.c.id == payment_create.get('id')).values({'contragent': contragent_db.get('id')}))
+                                    payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                        {'contragent': contragent_db.get('id')}))
 
                         elif payment.get('DebtorParty'):
                             payment_data.update({
@@ -556,12 +479,14 @@ async def tochka_update_transaction():
                                 'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
                                 'debitor_agent_name': payment.get('DebtorAgent').get('name'),
                                 'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
-                                'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
-                            })
+                                'debitor_agent_accountIdentification': payment.get('DebtorAgent').get(
+                                    'accountIdentification'),
+                            }),
+
                             contragent_db = await database.fetch_one(
                                 contragents.select().where(and_(
-                                      contragents.c.inn == payment.get('DebtorParty').get('inn')),
-                                      contragents.c.cashbox == account.get('cashbox_id')
+                                    contragents.c.inn == payment.get('DebtorParty').get('inn')),
+                                    contragents.c.cashbox == account.get('cashbox_id')
                                 ))
                             if not contragent_db:
                                 contragent_db = await database.execute(contragents.insert().values({
@@ -580,15 +505,41 @@ async def tochka_update_transaction():
                                     payments.update().where(payments.c.id == payment_create.get('id')).values(
                                         {'contragent': contragent_db.get('id')}))
                         else:
-                            raise Exception( 'не вилидный формат транзакции от Точка банка' )
+                            raise Exception('не вилидный формат транзакции от Точка банка')
 
                         await database.execute(tochka_bank_payments.insert().values(payment_data))
 
-                    for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
+                else:
+                    set_tochka_payments_statement = set(
+                        [item.get('paymentId') for item in info_statement.get('Data')['Statement'][0]['Transaction']])
+                    set_tochka_payments_db = set([item.get('paymentId') for item in tochka_payments_db])
+                    new_paymentsId = list(set_tochka_payments_statement - set_tochka_payments_db)
+                    for payment in [item for item in info_statement.get('Data')['Statement'][0]['Transaction'] if
+                                    item.get('paymentId') in new_paymentsId]:
+                        payment_create_id = await database.execute(payments.insert().values({
+                            'name': payment.get('transactionTypeCode'),
+                            'description': payment.get('description'),
+                            'type': 'outgoing' if payment.get('creditDebitIndicator') == 'Debit' else 'incoming',
+                            'tags': f"TochkaBank,{account.get('accountId')}",
+                            'amount': payment.get('Amount').get('amount'),
+                            'cashbox': account.get('cashbox_id'),
+                            'paybox': account.get('pbox_id'),
+                            'date': datetime.strptime(payment.get('documentProcessDate'), "%Y-%m-%d").timestamp(),
+                            'created_at': int(datetime.utcnow().timestamp()),
+                            'updated_at': int(datetime.utcnow().timestamp()),
+                            'is_deleted': False,
+                            'amount_without_tax': payment.get('Amount').get('amount'),
+                            'status': True if payment.get('status') == 'Booked' else False,
+                            'stopped': True
+                        }))
+                        payment_create = await database.fetch_one(
+                            payments.select().where(payments.c.id == payment_create_id))
                         payment_data = {
                             'accountId': info_statement.get('Data')['Statement'][0].get('accountId'),
+                            'payment_crm_id': payment_create.get('id'),
                             'statementId': info_statement.get('Data')['Statement'][0].get('statementId'),
-                            'statement_creation_datetime': info_statement.get('Data')['Statement'][0].get('creationDateTime'),
+                            'statement_creation_datetime': info_statement.get('Data')['Statement'][0].get(
+                                'creationDateTime'),
                             'transactionTypeCode': payment.get('transactionTypeCode'),
                             'transactionId': payment.get('transactionId'),
                             'status': payment.get('status'),
@@ -611,7 +562,101 @@ async def tochka_update_transaction():
                                 'creditor_agent_schemeName': payment.get('CreditorAgent').get('schemeName'),
                                 'creditor_agent_name': payment.get('CreditorAgent').get('name'),
                                 'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
-                                'creditor_agent_accountIdentification': payment.get('CreditorAgent').get('accountIdentification'),
+                                'creditor_agent_accountIdentification': payment.get('CreditorAgent').get(
+                                    'accountIdentification'),
+                            })
+
+                            contragent_db = await database.fetch_one(
+                                contragents.select().where(and_(
+                                    contragents.c.inn == payment.get('CreditorParty').get('inn')),
+                                    contragents.c.cashbox == account.get('cashbox_id')
+                                ))
+                            if not contragent_db:
+                                contragent_db = await database.execute(contragents.insert().values({
+                                    'name': payment.get('CreditorParty').get('name'),
+                                    'inn': payment.get('CreditorParty').get('inn'),
+                                    'cashbox': account.get('cashbox_id'),
+                                    'is_deleted': False,
+                                    'created_at': int(datetime.utcnow().timestamp()),
+                                    'updated_at': int(datetime.utcnow().timestamp()),
+                                }))
+                                await database.execute(
+                                    payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                        {'contragent': contragent_db}))
+                            else:
+                                await database.execute(
+                                    payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                        {'contragent': contragent_db.get('id')}))
+
+                        elif payment.get('DebtorParty'):
+                            payment_data.update({
+                                'debitor_party_inn': payment.get('DebtorParty').get('inn'),
+                                'debitor_party_name': payment.get('DebtorParty').get('name'),
+                                'debitor_party_kpp': payment.get('DebtorParty').get('kpp'),
+                                'debitor_account_identification': payment.get('DebtorAccount').get('identification'),
+                                'debitor_account_schemeName': payment.get('DebtorAccount').get('schemeName'),
+                                'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
+                                'debitor_agent_name': payment.get('DebtorAgent').get('name'),
+                                'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
+                                'debitor_agent_accountIdentification': payment.get('DebtorAgent').get(
+                                    'accountIdentification'),
+                            })
+                            contragent_db = await database.fetch_one(
+                                contragents.select().where(and_(
+                                    contragents.c.inn == payment.get('DebtorParty').get('inn')),
+                                    contragents.c.cashbox == account.get('cashbox_id')
+                                ))
+                            if not contragent_db:
+                                contragent_db = await database.execute(contragents.insert().values({
+                                    'name': payment.get('DebtorParty').get('name'),
+                                    'inn': payment.get('DebtorParty').get('inn'),
+                                    'cashbox': account.get('cashbox_id'),
+                                    'is_deleted': False,
+                                    'created_at': int(datetime.utcnow().timestamp()),
+                                    'updated_at': int(datetime.utcnow().timestamp()),
+                                }))
+                                await database.execute(
+                                    payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                        {'contragent': contragent_db}))
+                            else:
+                                await database.execute(
+                                    payments.update().where(payments.c.id == payment_create.get('id')).values(
+                                        {'contragent': contragent_db.get('id')}))
+                        else:
+                            raise Exception('не вилидный формат транзакции от Точка банка')
+
+                        await database.execute(tochka_bank_payments.insert().values(payment_data))
+
+                    for payment in info_statement.get('Data')['Statement'][0]['Transaction']:
+                        payment_data = {
+                            'accountId': info_statement.get('Data')['Statement'][0].get('accountId'),
+                            'statementId': info_statement.get('Data')['Statement'][0].get('statementId'),
+                            'statement_creation_datetime': info_statement.get('Data')['Statement'][0].get(
+                                'creationDateTime'),
+                            'transactionTypeCode': payment.get('transactionTypeCode'),
+                            'transactionId': payment.get('transactionId'),
+                            'status': payment.get('status'),
+                            'paymentId': payment.get('paymentId'),
+                            'documentProcessDate': payment.get('documentProcessDate'),
+                            'documentNumber': payment.get('documentNumber'),
+                            'description': payment.get('description'),
+                            'creditDebitIndicator': payment.get('creditDebitIndicator'),
+                            'amount': payment.get('Amount').get('amount') if payment.get('Amount') else None,
+                            'amountNat': payment.get('Amount').get('amountNat') if payment.get('Amount') else None,
+                            'currency': payment.get('Amount').get('currency') if payment.get('Amount') else None,
+                        }
+                        if payment.get('CreditorParty'):
+                            payment_data.update({
+                                'creditor_party_inn': payment.get('CreditorParty').get('inn'),
+                                'creditor_party_name': payment.get('CreditorParty').get('name'),
+                                'creditor_party_kpp': payment.get('CreditorParty').get('kpp'),
+                                'creditor_account_identification': payment.get('CreditorAccount').get('identification'),
+                                'creditor_account_schemeName': payment.get('CreditorAccount').get('schemeName'),
+                                'creditor_agent_schemeName': payment.get('CreditorAgent').get('schemeName'),
+                                'creditor_agent_name': payment.get('CreditorAgent').get('name'),
+                                'creditor_agent_identification': payment.get('CreditorAgent').get('identification'),
+                                'creditor_agent_accountIdentification': payment.get('CreditorAgent').get(
+                                    'accountIdentification'),
                             })
                         elif payment.get('DebtorParty'):
                             payment_data.update({
@@ -623,25 +668,30 @@ async def tochka_update_transaction():
                                 'debitor_agent_schemeName': payment.get('DebtorAgent').get('schemeName'),
                                 'debitor_agent_name': payment.get('DebtorAgent').get('name'),
                                 'debitor_agent_identification': payment.get('DebtorAgent').get('identification'),
-                                'debitor_agent_accountIdentification': payment.get('DebtorAgent').get('accountIdentification'),
+                                'debitor_agent_accountIdentification': payment.get('DebtorAgent').get(
+                                    'accountIdentification'),
                             }),
                         else:
                             raise Exception('не вилидный формат транзакции от Точка банка')
 
-                        await database.execute(tochka_bank_payments.update().where(tochka_bank_payments.c.paymentId == payment.get('paymentId')).values(payment_data))
-                        payment_update = await database.fetch_one(tochka_bank_payments.select().where(tochka_bank_payments.c.paymentId == payment.get('paymentId')))
-                        await database.execute(payments.update().where(payments.c.id == payment_update.get('payment_crm_id')).values({
-                            'name': payment.get('transactionTypeCode'),
-                            'description': payment.get('description'),
-                            'type': 'outgoing' if payment.get('creditDebitIndicator') == 'Debit' else 'incoming',
-                            'tags': f"TochkaBank,{account.get('accountId')}",
-                            'amount': payment.get('Amount').get('amount'),
-                            'cashbox': account.get('cashbox_id'),
-                            'paybox': account.get('pbox_id'),
-                            'date': datetime.strptime(payment.get('documentProcessDate'), "%Y-%m-%d").timestamp(),
-                            'updated_at': int(datetime.utcnow().timestamp()),
-                            'is_deleted': False,
-                            'amount_without_tax': payment.get('Amount').get('amount'),
-                            'status': True if payment.get('status') == 'Booked' else False,
-                        }))
+                        await database.execute(tochka_bank_payments.update().where(
+                            tochka_bank_payments.c.paymentId == payment.get('paymentId')).values(payment_data))
+                        payment_update = await database.fetch_one(tochka_bank_payments.select().where(
+                            tochka_bank_payments.c.paymentId == payment.get('paymentId')))
+                        await database.execute(
+                            payments.update().where(payments.c.id == payment_update.get('payment_crm_id')).values({
+                                'name': payment.get('transactionTypeCode'),
+                                'description': payment.get('description'),
+                                'type': 'outgoing' if payment.get('creditDebitIndicator') == 'Debit' else 'incoming',
+                                'tags': f"TochkaBank,{account.get('accountId')}",
+                                'amount': payment.get('Amount').get('amount'),
+                                'cashbox': account.get('cashbox_id'),
+                                'paybox': account.get('pbox_id'),
+                                'date': datetime.strptime(payment.get('documentProcessDate'), "%Y-%m-%d").timestamp(),
+                                'updated_at': int(datetime.utcnow().timestamp()),
+                                'is_deleted': False,
+                                'amount_without_tax': payment.get('Amount').get('amount'),
+                                'status': True if payment.get('status') == 'Booked' else False,
+                            }))
+
     await _tochka_update()
