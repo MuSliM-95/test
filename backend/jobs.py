@@ -145,7 +145,6 @@ async def autoburn():
                 transaction_list = await database.fetch_all(q)
                 for transaction in transaction_list:
                     eval(f"self.{transaction.type}_list").append(transaction)
-                    self.burned_list.append(transaction.id)
 
         @database.transaction()
         async def _burn(
