@@ -202,7 +202,7 @@ async def autoburn():
                 if amount == 0:
                     continue
                 for w in range(len(self.withdraw_list)):
-                    update_balance_sum = amount - self.withdraw_list[w]
+                    update_balance_sum = amount - self.withdraw_list[w].amount
                     if update_balance_sum <= 0:
                         continue
                     if a.amount == 0:
