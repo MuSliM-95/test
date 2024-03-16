@@ -94,7 +94,7 @@ async def autoburn():
     await database.connect()
 
     @database.transaction()
-    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None]) -> float:
+    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None] = None) -> float:
         update_transaction_status_ids = [transaction_accrual.id]
         update_balance_sum = transaction_accrual.amount
 
