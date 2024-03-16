@@ -214,7 +214,7 @@ async def autoburn():
                         amount=a.amount
                     )
                     amount -= self.withdraw_list[w].amount
-                    self.withdraw_list.pop(w)
+                    del self.withdraw_list[w]
                 if amount != 0:
                     await self._burn(
                         burned_list=[a.id],
