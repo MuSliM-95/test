@@ -199,7 +199,7 @@ async def autoburn():
                 created_at: datetime
         ) -> dict:
             return {
-                "type": "autoburned",
+                "type": "withdraw",
                 "amount": update_balance_sum,
                 "loyality_card_id": self.card.id,
                 "loyality_card_number": self.card.card_number,
