@@ -1100,6 +1100,7 @@ loyality_transactions = sqlalchemy.Table(
     sqlalchemy.Column("loyality_card_id", ForeignKey("loyality_cards.id")),
     sqlalchemy.Column("loyality_card_number", Integer, index=True),
     sqlalchemy.Column("created_by_id", ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("card_balance", Float),
     sqlalchemy.Column("docs_sales_id", ForeignKey("docs_sales.id")),
     sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("tags", String),
