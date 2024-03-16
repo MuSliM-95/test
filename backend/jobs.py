@@ -97,8 +97,8 @@ async def autoburn():
             self.card: Record = card
             self.card_balance: float = card.balance
             self.first_operation_burned: Union[Record, None] = None
-            self.accrual_list: List[Record] = []
-            self.withdraw_list: List[Record] = []
+            self.accrual_list: List[dict] = []
+            self.withdraw_list: List[dict] = []
 
         @staticmethod
         async def get_cards() -> List[Record]:
@@ -145,7 +145,7 @@ async def autoburn():
                 )
                 transaction_list = await database.fetch_all(q)
                 for transaction in transaction_list:
-                    eval(f"self.{transaction.type}_list").append(transaction)
+                    eval(f"self.{transaction.type}_list").append(dict(transaction))
 
         @database.transaction()
         async def _burn(
@@ -200,30 +200,38 @@ async def autoburn():
             await self.get_first_operation_burned()
             await self.get_transaction()
             for a in self.accrual_list:
-                amount = a.amount
+                amount = a["amount"]
                 if amount == 0:
                     continue
                 for w in range(len(self.withdraw_list)):
                     if amount == 0:
                         break
 
-                    update_balance_sum = a.amount - self.withdraw_list[w].amount
+                    w_id = self.withdraw_list[w]["id"]
+
+                    if a["amount"] < self.withdraw_list[w]["amount"]:
+                        update_balance_sum = a["amount"]
+                        self.withdraw_list[w]["amount"] -= a["amount"]
+                    else:
+                        update_balance_sum = a["amount"] - self.withdraw_list[w]["amount"]
+                        del self.withdraw_list[w]
+
                     if update_balance_sum <= 0:
                         continue
+
                     await self._burn(
-                        burned_list=[a.id, self.withdraw_list[w].id],
+                        burned_list=[a["id"], w_id],
                         update_balance_sum=update_balance_sum,
-                        created_at=a.created_at,
-                        amount=a.amount
+                        created_at=a["created_at"],
+                        amount=a["amount"]
                     )
-                    amount -= self.withdraw_list[w].amount
-                    del self.withdraw_list[w]
+                    amount -= update_balance_sum
                 if amount != 0:
                     await self._burn(
-                        burned_list=[a.id],
+                        burned_list=[a["id"]],
                         update_balance_sum=amount,
-                        created_at=a.created_at,
-                        amount=a.amount
+                        created_at=a["created_at"],
+                        amount=a["amount"]
                     )
 
     card_list = await AutoBurn.get_cards()
