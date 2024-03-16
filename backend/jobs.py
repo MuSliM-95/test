@@ -140,7 +140,7 @@ async def autoburn():
                         loyality_transactions.c.type.in_(["accrual", "withdraw"]),
                         loyality_transactions.c.amount > 0,
                         loyality_transactions.c.autoburned.is_not(True),
-                        loyality_transactions.c.id > self.first_operation_burned.id
+                        loyality_transactions.c.id >= self.first_operation_burned.id
                     )
                 )
                 transaction_list = await database.fetch_all(q)
