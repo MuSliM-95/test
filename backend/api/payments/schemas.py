@@ -36,7 +36,7 @@ class PaymentCreate(BaseModel):
     type: PaymentType
     name: Optional[str]
     external_id: Optional[str]
-    tags: Optional[str]
+    tags: Optional[str] = ""
     amount_without_tax: float
     article: Optional[str]
     article_id: Optional[int]

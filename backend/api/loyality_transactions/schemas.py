@@ -30,7 +30,7 @@ class LoyalityTransactionCreate(BaseModel):
     dated: Optional[int]
     amount: Optional[float]
     loyality_card_number: str
-    tags: Optional[str]
+    tags: Optional[str] = ""
     name: Optional[str]
     description: Optional[str]
     status: bool = True

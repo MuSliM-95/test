@@ -684,6 +684,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                     "amount_without_tax": instance_values.get("paid_rubles"),
                     "amount": instance_values.get("paid_rubles"),
                     "paybox": paybox,
+                    "tags": instance_values.get("tags", ""),
                     "date": int(datetime.datetime.now().timestamp()),
                     "account": user.user,
                     "cashbox": user.cashbox_id,
