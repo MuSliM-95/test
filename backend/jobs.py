@@ -99,6 +99,8 @@ async def autoburn():
             self.first_operation_burned: Union[Record, None] = None
             self.accrual_list: List[dict] = []
             self.withdraw_list: List[dict] = []
+            self.burned_list: List[int] = []
+            self.autoburn_operation_list: List[dict] = []
 
         @staticmethod
         async def get_cards() -> List[Record]:
@@ -113,7 +115,7 @@ async def autoburn():
             )
             return await database.fetch_all(cards_query)
 
-        async def get_first_operation_burned(self) -> None:
+        async def _get_first_operation_burned(self) -> None:
             q_first = (
                 loyality_transactions
                 .select()
@@ -130,7 +132,7 @@ async def autoburn():
             )
             self.first_operation_burned = await database.fetch_one(q_first)
 
-        async def get_transaction(self) -> None:
+        async def _get_transaction(self) -> None:
             if self.first_operation_burned is not None:
                 q = (
                     loyality_transactions
@@ -146,93 +148,78 @@ async def autoburn():
                 transaction_list = await database.fetch_all(q)
                 for transaction in transaction_list:
                     eval(f"self.{transaction.type}_list").append(dict(transaction))
+                    self.burned_list.append(transaction.id)
 
         @database.transaction()
-        async def _burn(
-                self,
-                burned_list: List[int],
-                update_balance_sum: float,
-                created_at: datetime,
-                amount: float
-        ) -> None:
+        async def _burn(self) -> None:
             update_transaction_status_query = (
                 loyality_transactions
                 .update()
                 .where(
-                    loyality_transactions.c.id.in_(burned_list)
+                    loyality_transactions.c.id.in_(self.burned_list)
                 )
                 .values({"autoburned": True})
             )
-            self.card_balance -= update_balance_sum
+            await database.execute(update_transaction_status_query)
+
             update_balance_query = (
                 loyality_cards
                 .update()
                 .where(loyality_cards.c.id == self.card.id)
                 .values({"balance": self.card_balance})
             )
+            await database.execute(update_balance_query)
+
             create_transcation_query = (
                 loyality_transactions
                 .insert()
-                .values({
-                    "type": "autoburned",
-                    "amount": update_balance_sum,
-                    "loyality_card_id": self.card.id,
-                    "loyality_card_number": self.card.card_number,
-                    "created_by_id": self.card.created_by_id,
-                    "cashbox": self.card.cashbox_id,
-                    "tags": "",
-                    "name": f"Автосгорание от {created_at.strftime('%d.%m.%Y')} по сумме {amount}",
-                    "description": None,
-                    "status": True,
-                    "external_id": None,
-                    "cashier_name": None,
-                    "dead_at": None,
-                    "is_deleted": False,
-                    "autoburned": True,
-                })
+                .values()
             )
-
-            query_list = [update_transaction_status_query, update_balance_query, create_transcation_query]
-            for query in query_list:
-                await database.execute(query)
+            await database.execute_many(query=create_transcation_query, values=self.autoburn_operation_list)
 
         async def start(self) -> None:
-            await self.get_first_operation_burned()
-            await self.get_transaction()
+            await self._get_first_operation_burned()
+            await self._get_transaction()
             for a in self.accrual_list:
                 amount = a["amount"]
                 if amount == 0:
                     continue
+
+                update_balance_sum = 0
+
                 for w in range(len(self.withdraw_list)):
                     if amount == 0:
                         break
 
-                    w_id = self.withdraw_list[w]["id"]
-
                     if a["amount"] < self.withdraw_list[w]["amount"]:
-                        update_balance_sum = a["amount"]
+                        update_balance_sum += a["amount"]
                         self.withdraw_list[w]["amount"] -= a["amount"]
                     else:
-                        update_balance_sum = a["amount"] - self.withdraw_list[w]["amount"]
+                        update_balance_sum += a["amount"] - self.withdraw_list[w]["amount"]
                         del self.withdraw_list[w]
-
-                    if update_balance_sum <= 0:
-                        continue
-
-                    await self._burn(
-                        burned_list=[a["id"], w_id],
-                        update_balance_sum=update_balance_sum,
-                        created_at=a["created_at"],
-                        amount=a["amount"]
-                    )
                     amount -= update_balance_sum
-                if amount != 0:
-                    await self._burn(
-                        burned_list=[a["id"]],
-                        update_balance_sum=amount,
-                        created_at=a["created_at"],
-                        amount=a["amount"]
-                    )
+
+                if update_balance_sum != 0:
+                    self.card_balance -= update_balance_sum
+                    self.autoburn_operation_list.append({
+                        "type": "autoburned",
+                        "amount": update_balance_sum,
+                        "loyality_card_id": self.card.id,
+                        "loyality_card_number": self.card.card_number,
+                        "created_by_id": self.card.created_by_id,
+                        "cashbox": self.card.cashbox_id,
+                        "tags": "",
+                        "name": f"Автосгорание от {a['created_at'].strftime('%d.%m.%Y')} по сумме {a['amount']}",
+                        "description": None,
+                        "status": True,
+                        "external_id": None,
+                        "cashier_name": None,
+                        "dead_at": None,
+                        "is_deleted": False,
+                        "autoburned": True,
+                    })
+
+            await self._burn()
 
     card_list = await AutoBurn.get_cards()
     for card in card_list:
