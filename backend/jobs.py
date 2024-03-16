@@ -177,11 +177,36 @@ async def autoburn():
             )
             await database.execute_many(query=create_transcation_query, values=self.autoburn_operation_list)
 
+        def _get_autoburned_operation_dict(
+                self,
+                update_balance_sum: float,
+                amount: float,
+                created_at: datetime
+        ) -> dict:
+            return {
+                "type": "autoburned",
+                "amount": update_balance_sum,
+                "loyality_card_id": self.card.id,
+                "loyality_card_number": self.card.card_number,
+                "created_by_id": self.card.created_by_id,
+                "cashbox": self.card.cashbox_id,
+                "tags": "",
+                "name": f"Автосгорание от {created_at.strftime('%d.%m.%Y')} по сумме {amount}",
+                "description": None,
+                "status": True,
+                "external_id": None,
+                "cashier_name": None,
+                "dead_at": None,
+                "is_deleted": False,
+                "autoburned": True,
+                "card_balance": self.card_balance
+            }
+
         async def start(self) -> None:
             await self._get_first_operation_burned()
             await self._get_transaction()
             for a in self.accrual_list:
-                amount, update_balance_sum= a["amount"], a["amount"]
+                amount, update_balance_sum = a["amount"], 0
                 if amount == 0:
                     continue
 
@@ -189,34 +214,28 @@ async def autoburn():
                     if amount == 0:
                         break
 
-                    if a["amount"] < self.withdraw_list[w]["amount"]:
-                        update_balance_sum += a["amount"]
-                        self.withdraw_list[w]["amount"] -= a["amount"]
-                    else:
+                    if a["amount"] >= self.withdraw_list[w]["amount"]:
                         update_balance_sum += a["amount"] - self.withdraw_list[w]["amount"]
                         del self.withdraw_list[w]
+                    else:
+                        update_balance_sum += a["amount"]
+                        self.withdraw_list[w]["amount"] -= a["amount"]
                     amount -= update_balance_sum
 
                 if update_balance_sum != 0:
                     self.card_balance -= update_balance_sum
-                    self.autoburn_operation_list.append({
-                        "type": "autoburned",
-                        "amount": update_balance_sum,
-                        "loyality_card_id": self.card.id,
-                        "loyality_card_number": self.card.card_number,
-                        "created_by_id": self.card.created_by_id,
-                        "cashbox": self.card.cashbox_id,
-                        "tags": "",
-                        "name": f"Автосгорание от {a['created_at'].strftime('%d.%m.%Y')} по сумме {a['amount']}",
-                        "description": None,
-                        "status": True,
-                        "external_id": None,
-                        "cashier_name": None,
-                        "dead_at": None,
-                        "is_deleted": False,
-                        "autoburned": True,
-                        "card_balance": self.card_balance
-                    })
+                    self.autoburn_operation_list.append(
+                        self._get_autoburned_operation_dict(
+                            update_balance_sum=update_balance_sum, amount=update_balance_sum, created_at=a["created_at"]
+                        )
+                    )
+                else:
+                    self.card_balance -= a["amount"]
+                    self.autoburn_operation_list.append(
+                        self._get_autoburned_operation_dict(
+                            update_balance_sum=update_balance_sum, amount=a["amount"], created_at=a["created_at"]
+                        )
+                    )
 
             await self._burn()
 
