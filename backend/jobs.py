@@ -131,6 +131,8 @@ async def autoburn():
                 .limit(1)
             )
             self.first_operation_burned = await database.fetch_one(q_first)
+            self.burned_list.append(self.first_operation_burned)
+            self.accrual_list.append(self.first_operation_burned)
 
         async def _get_transaction(self) -> None:
             if self.first_operation_burned is not None:
@@ -142,13 +144,13 @@ async def autoburn():
                         loyality_transactions.c.type.in_(["accrual", "withdraw"]),
                         loyality_transactions.c.amount > 0,
                         loyality_transactions.c.autoburned.is_not(True),
-                        loyality_transactions.c.id >= self.first_operation_burned.id
+                        loyality_transactions.c.id > self.first_operation_burned.id
                     )
                 )
                 transaction_list = await database.fetch_all(q)
 
                 minus_index = 0
-                self.accrual_list = [dict(i) for i in transaction_list if i.type == "accrual"]
+                self.accrual_list.extend([dict(i) for i in transaction_list if i.type == "accrual"])
                 for transaction in transaction_list:
                     transaction: Dict[str, Any] = dict(transaction)
                     self.burned_list.append(transaction["id"])
