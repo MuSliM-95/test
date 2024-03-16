@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from time import sleep
-from typing import List, Union
+from typing import List, Union, Any, Dict
 from itertools import zip_longest
 
 import aiohttp
@@ -146,9 +146,23 @@ async def autoburn():
                     )
                 )
                 transaction_list = await database.fetch_all(q)
+
+                minus_index = 0
+                self.accrual_list = [i for i in transaction_list if i.type == "accrual"]
                 for transaction in transaction_list:
-                    eval(f"self.{transaction.type}_list").append(dict(transaction))
-                    self.burned_list.append(transaction.id)
+                    transaction: Dict[str, Any] = dict(transaction)
+                    self.burned_list.append(transaction["id"])
+                    if transaction["type"] == "withdraw":
+                        if self.accrual_list[minus_index]["amount"] > 0:
+                            if self.accrual_list[minus_index]["amount"] >= transaction["amount"]:
+                                self.accrual_list[minus_index]["amount"] -= transaction["amount"]
+                            else:
+                                transaction["amount"] = transaction["amount"] - self.accrual_list[minus_index]["amount"]
+                                self.accrual_list[minus_index]["amount"] = 0
+                            if self.accrual_list[minus_index]["amount"] == 0:
+                                minus_index += 1
+
+                        self.withdraw_list.append(transaction)
 
         @database.transaction()
         async def _burn(self) -> None:
@@ -210,17 +224,20 @@ async def autoburn():
                 if amount == 0:
                     continue
 
-                for w in range(len(self.withdraw_list)):
+                w = 0
+                while w < len(self.withdraw_list):
                     if amount == 0:
                         break
 
                     if a["amount"] >= self.withdraw_list[w]["amount"]:
                         update_balance_sum += a["amount"] - self.withdraw_list[w]["amount"]
                         del self.withdraw_list[w]
+                        w -= 1
                     else:
                         update_balance_sum += a["amount"]
                         self.withdraw_list[w]["amount"] -= a["amount"]
                     amount -= update_balance_sum
+                    w += 1
 
                 if update_balance_sum != 0:
                     self.card_balance -= update_balance_sum
