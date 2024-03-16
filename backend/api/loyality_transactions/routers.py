@@ -107,8 +107,9 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
             if not card:
                 raise HTTPException(status_code=400, detail=f"Карты с номером {loyality_transaction_data.loyality_card_number} не существует")
 
+            card_balance = card.balance
             card_dict = {
-                "balance": card.balance,
+                "balance": card_balance,
                 # "cashbox": user.cashbox_id
             }
 
@@ -155,6 +156,7 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
             loyality_transactions_values['loyality_card_number'] = clear_phone_number(
                 phone_number=loyality_transactions_values['loyality_card_number']
             )
+            loyality_transactions_values['card_balance'] = card_balance
             # loyality_transactions_values["dead_at"] = datetime.fromtimestamp(loyality_transactions_values["dead_at"])
 
             query = loyality_transactions.insert().values(loyality_transactions_values)

@@ -8,7 +8,7 @@ import aiohttp
 from apscheduler.jobstores.base import JobLookupError
 from databases.backends.postgres import Record
 from fastapi.exceptions import HTTPException
-from sqlalchemy import desc, select, or_, and_, alias, func
+from sqlalchemy import desc, select, or_, and_, alias, func, asc
 from sqlalchemy.exc import DatabaseError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -94,7 +94,7 @@ async def autoburn():
     await database.connect()
 
     @database.transaction()
-    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None]) -> None:
+    async def _burn(card: Record, transaction_accrual: Record, transaction_withdraw: Union[Record, None]) -> float:
         update_transaction_status_ids = [transaction_accrual.id]
         update_balance_sum = transaction_accrual.amount
 
@@ -103,7 +103,7 @@ async def autoburn():
             update_balance_sum -= transaction_withdraw.amount
 
         if update_balance_sum <= 0:
-            return
+            return 0
 
         update_transaction_status_query = (
             loyality_transactions
@@ -145,6 +145,8 @@ async def autoburn():
         for query in query_list:
             await database.execute(query)
 
+        return update_balance_sum
+
     cards_query = (
         loyality_cards
         .select()
@@ -155,16 +157,31 @@ async def autoburn():
         )
     )
     all_cards = await database.fetch_all(cards_query)
-    for card in all_cards: # TODO: восстановление всей цепочки изменений
+    for card in all_cards:
+        q_first = (
+            loyality_transactions
+            .select()
+            .where(
+                loyality_transactions.c.loyality_card_id == card.id,
+                loyality_transactions.c.type == "accrual",
+                loyality_transactions.c.amount > 0,
+                loyality_transactions.c.autoburned.is_not(True),
+                loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
+                loyality_transactions.c.card_balance == 0
+            )
+            .order_by(asc(loyality_transactions.c.id))
+            .limit(1)
+        )
+        first_operation = await database.fetch_one(q_first)
         q = (
             loyality_transactions
             .select()
             .where(
                 loyality_transactions.c.loyality_card_id == card.id,
                 loyality_transactions.c.type.in_(["accrual", "withdraw"]),
-                loyality_transactions.c.created_at + timedelta(seconds=card.lifetime) < datetime.now(),
                 loyality_transactions.c.amount > 0,
-                loyality_transactions.c.autoburned.is_not(True)
+                loyality_transactions.c.autoburned.is_not(True),
+                loyality_transactions.c.id > first_operation.id
             )
         )
         transactions = await database.fetch_all(q)
@@ -172,9 +189,17 @@ async def autoburn():
         withdraw = []
         for i in transactions:
             eval(f"{i.type}").append(i)
-
-        for a, w in zip_longest(accrual, withdraw):
-            await _burn(card=card, transaction_accrual=a, transaction_withdraw=w)
+        for a in accrual:
+            if a.amount == 0:
+                continue
+            for w in range(len(withdraw)):
+                if a.amount == 0:
+                    break
+                amount_burn = await _burn(card=card, transaction_accrual=a, transaction_withdraw=withdraw[w])
+                a.amount -= amount_burn
+                withdraw.pop(w)
+            if a.amount != 0:
+                await _burn(card=card, transaction_accrual=a)
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
