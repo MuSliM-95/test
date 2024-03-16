@@ -129,7 +129,7 @@ async def autoburn():
                 .order_by(asc(loyality_transactions.c.id))
                 .limit(1)
             )
-            self.first_operation_burned = await database.val(q_first)
+            self.first_operation_burned = await database.fetch_val(q_first)
 
         async def _get_transaction(self) -> None:
             if self.first_operation_burned is not None:
