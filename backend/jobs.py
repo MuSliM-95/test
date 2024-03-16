@@ -181,11 +181,9 @@ async def autoburn():
             await self._get_first_operation_burned()
             await self._get_transaction()
             for a in self.accrual_list:
-                amount = a["amount"]
+                amount, update_balance_sum= a["amount"], a["amount"]
                 if amount == 0:
                     continue
-
-                update_balance_sum = 0
 
                 for w in range(len(self.withdraw_list)):
                     if amount == 0:
@@ -217,6 +215,7 @@ async def autoburn():
                         "dead_at": None,
                         "is_deleted": False,
                         "autoburned": True,
+                        "card_balance": self.card_balance
                     })
 
             await self._burn()
