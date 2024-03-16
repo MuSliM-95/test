@@ -207,13 +207,13 @@ async def autoburn():
                         continue
                     if a.amount == 0:
                         break
-                    amount_burn = await self._burn(
+                    await self._burn(
                         burned_list=[a.id, self.withdraw_list[w].id],
                         update_balance_sum=update_balance_sum,
                         created_at=a.created_at,
                         amount=a.amount
                     )
-                    amount -= amount_burn
+                    amount -= update_balance_sum
                     self.withdraw_list.pop(w)
                 if amount != 0:
                     await self._burn(
