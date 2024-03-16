@@ -148,7 +148,7 @@ async def autoburn():
                 transaction_list = await database.fetch_all(q)
 
                 minus_index = 0
-                self.accrual_list = [i for i in transaction_list if i.type == "accrual"]
+                self.accrual_list = [dict(i) for i in transaction_list if i.type == "accrual"]
                 for transaction in transaction_list:
                     transaction: Dict[str, Any] = dict(transaction)
                     self.burned_list.append(transaction["id"])
