@@ -96,7 +96,7 @@ async def autoburn():
         def __init__(self, card: Record) -> None:
             self.card: Record = card
             self.card_balance: float = card.balance
-            self.first_operation_burned: Union[Record, None] = None
+            self.first_operation_burned: Union[int, None] = None
             self.accrual_list: List[dict] = []
             self.withdraw_list: List[dict] = []
             self.burned_list: List[int] = []
@@ -117,8 +117,7 @@ async def autoburn():
 
         async def _get_first_operation_burned(self) -> None:
             q_first = (
-                loyality_transactions
-                .select()
+                select(loyality_transactions.c.id)
                 .where(
                     loyality_transactions.c.loyality_card_id == self.card.id,
                     loyality_transactions.c.type == "accrual",
@@ -130,9 +129,7 @@ async def autoburn():
                 .order_by(asc(loyality_transactions.c.id))
                 .limit(1)
             )
-            self.first_operation_burned = await database.fetch_one(q_first)
-            self.burned_list.append(self.first_operation_burned)
-            self.accrual_list.append(self.first_operation_burned)
+            self.first_operation_burned = await database.val(q_first)
 
         async def _get_transaction(self) -> None:
             if self.first_operation_burned is not None:
@@ -144,7 +141,7 @@ async def autoburn():
                         loyality_transactions.c.type.in_(["accrual", "withdraw"]),
                         loyality_transactions.c.amount > 0,
                         loyality_transactions.c.autoburned.is_not(True),
-                        loyality_transactions.c.id > self.first_operation_burned.id
+                        loyality_transactions.c.id >= self.first_operation_burned
                     )
                 )
                 transaction_list = await database.fetch_all(q)
