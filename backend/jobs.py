@@ -162,11 +162,12 @@ async def autoburn():
                 )
                 .values({"autoburned": True})
             )
+            self.card.balance -= update_balance_sum
             update_balance_query = (
                 loyality_cards
                 .update()
                 .where(loyality_cards.c.id == self.card.id)
-                .values({"balance": self.card.balance - update_balance_sum})
+                .values({"balance": self.card.balance})
             )
             create_transcation_query = (
                 loyality_transactions
