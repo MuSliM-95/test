@@ -226,14 +226,14 @@ async def autoburn():
                     self.card_balance -= update_balance_sum
                     self.autoburn_operation_list.append(
                         self._get_autoburned_operation_dict(
-                            update_balance_sum=update_balance_sum, amount=update_balance_sum, created_at=a["created_at"]
+                            update_balance_sum=update_balance_sum, amount=a["amount"], created_at=a["created_at"]
                         )
                     )
                 else:
                     self.card_balance -= a["amount"]
                     self.autoburn_operation_list.append(
                         self._get_autoburned_operation_dict(
-                            update_balance_sum=update_balance_sum, amount=a["amount"], created_at=a["created_at"]
+                            update_balance_sum=a["amount"], amount=a["amount"], created_at=a["created_at"]
                         )
                     )
 
