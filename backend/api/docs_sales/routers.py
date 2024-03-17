@@ -478,9 +478,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "status": True,
                 }
                 lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-                await asyncio.create_task(raschet_bonuses(user))
+                await asyncio.gather(raschet_bonuses(user))
 
-            await asyncio.create_task(raschet(user, token))
+            await asyncio.gather(raschet(user, token))
 
         if lt:
             if paid_lt > 0:
@@ -523,7 +523,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     }
                 ))
 
-                await asyncio.create_task(raschet_bonuses(user))
+                await asyncio.gather(raschet_bonuses(user))
 
         query = (
             docs_sales.update()
@@ -729,9 +729,9 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         "status": True,
                     }
                     lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-                    await asyncio.create_task(raschet_bonuses(user))
+                    await asyncio.gather(raschet_bonuses(user))
 
-                await asyncio.create_task(raschet(user, token))
+                await asyncio.gather(raschet(user, token))
 
             if lt and not proxy_lt:
                 if paid_lt > 0:
@@ -769,7 +769,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         }
                     ))
 
-                    await asyncio.create_task(raschet_bonuses(user))
+                    await asyncio.gather(raschet_bonuses(user))
 
         if instance_values.get("paid_rubles"):
             del instance_values['paid_rubles']
