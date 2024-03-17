@@ -193,7 +193,7 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
                 },
             )
 
-            await asyncio.gather(raschet_bonuses(user.cashbox_id))
+            await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
 
             # return loyality_transactions_db[0]
             return {**loyality_transactions_db[0], **{"data": {"status": "success"}}}
@@ -237,7 +237,7 @@ async def edit_loyality_transaction(
         {"action": "edit", "target": "loyality_transactions", "result": loyality_transaction_db},
     )
 
-    await asyncio.gather(raschet_bonuses(user.cashbox_id))
+    await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
 
     return {**loyality_transaction_db, **{"data": {"status": "success"}}}
 
@@ -271,6 +271,6 @@ async def delete_loyality_transaction(token: str, idx: int):
         },
     )
 
-    await asyncio.gather(raschet_bonuses(user.cashbox_id))
+    await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
 
     return {**loyality_transaction_db, **{"data": {"status": "success"}}}
