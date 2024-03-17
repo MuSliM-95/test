@@ -1,11 +1,12 @@
 import api.categories.schemas as schemas
 from asyncpg import ForeignKeyViolationError, IntegrityConstraintViolationError
-from database.db import categories, database
+from database.db import categories, database, nomenclature
 from fastapi import APIRouter, HTTPException
 from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token
 from sqlalchemy import func, select
 from ws_manager import manager
 import asyncio
+from typing import Optional
 
 router = APIRouter(tags=["categories"])
 
@@ -66,7 +67,7 @@ async def build_hierarchy(data, parent_id = None):
 
 
 @router.get("/categories_tree/", response_model=schemas.CategoryTreeGet)
-async def get_categories(token: str):
+async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     """Получение древа списка категорий"""
     user = await get_user_by_token(token)
     query = (
@@ -80,6 +81,11 @@ async def get_categories(token: str):
 
     categories_db = await database.fetch_all(query)
     result = []
+
+    if nomenclature_name != None:
+        q = nomenclature.select().where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category != None)
+        nomenclature_list = await database.fetch_all(q)
+
     for category in categories_db:
         category_dict = dict(category)
         category_dict['key'] = category_dict['id']
@@ -104,7 +110,21 @@ async def get_categories(token: str):
         else:
             category_dict['children'] = []
         
-        result.append(category_dict)
+        flag = True
+        if nomenclature_name != None:
+            flag = False
+            cats_ids = [child.parent for child in childrens]
+            if len(childrens) != 0:
+                cats_ids.append(childrens[-1].id)
+            else:
+                cats_ids = [category.id]
+            for nomenclature_entity in nomenclature_list:
+                if nomenclature_entity.category in cats_ids:
+                    flag = True
+                    break
+
+        if flag is True:
+            result.append(category_dict)
         
 
     categories_db = [*map(datetime_to_timestamp, result)]
