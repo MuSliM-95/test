@@ -658,7 +658,7 @@ async def update_payment(
                     "date",
                 }:
                     # bg_tasks.add_task(raschet, user, token)
-                    asyncio.create_task(raschet(user, token))
+                    await asyncio.create_task(raschet(user, token))
                 await manager.send_message(
                     token,
                     {
@@ -886,7 +886,7 @@ async def raspil_platezha(
                         await database.execute(q)
 
                     # bg_tasks.add_task(raschet, user, token)
-                    asyncio.create_task(raschet(user, token))
+                    await asyncio.create_task(raschet(user, token))
 
     else:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
@@ -945,7 +945,7 @@ async def update_childs_payments(
                     await database.execute(q)
 
             # bg_tasks.add_task(raschet, user, token)
-            asyncio.create_task(raschet(user, token))
+            await asyncio.create_task(raschet(user, token))
 
     else:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
@@ -994,7 +994,7 @@ async def split_payment(token: str, id: int, bg_tasks: BackgroundTasks):
                     )
 
                     # bg_tasks.add_task(raschet, user, token)
-                    asyncio.create_task(raschet(user, token))
+                    await asyncio.create_task(raschet(user, token))
 
     else:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")

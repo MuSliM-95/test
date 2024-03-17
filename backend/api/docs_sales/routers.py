@@ -240,7 +240,7 @@ async def add_number_to_docs_sales(user: Record) -> None:
                         .where(payments.c.id == j.to_id)
                         .values({"name": f"Оплата по документу {number}"})
                 )
-            elif j.type == "docs_sales_loyality_transactions":
+            if j.type == "docs_sales_loyality_transactions":
                 q = (
                     loyality_transactions
                         .update()
@@ -478,9 +478,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "status": True,
                 }
                 lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-                asyncio.create_task(raschet_bonuses(user))
+                await asyncio.create_task(raschet_bonuses(user))
 
-            asyncio.create_task(raschet(user, token))
+            await asyncio.create_task(raschet(user, token))
 
         if lt:
             if paid_lt > 0:
@@ -523,7 +523,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     }
                 ))
 
-                asyncio.create_task(raschet_bonuses(user))
+                await asyncio.create_task(raschet_bonuses(user))
 
         query = (
             docs_sales.update()
@@ -729,9 +729,9 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         "status": True,
                     }
                     lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-                    asyncio.create_task(raschet_bonuses(user))
+                    await asyncio.create_task(raschet_bonuses(user))
 
-                asyncio.create_task(raschet(user, token))
+                await asyncio.create_task(raschet(user, token))
 
             if lt and not proxy_lt:
                 if paid_lt > 0:
@@ -769,7 +769,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         }
                     ))
 
-                    asyncio.create_task(raschet_bonuses(user))
+                    await asyncio.create_task(raschet_bonuses(user))
 
         if instance_values.get("paid_rubles"):
             del instance_values['paid_rubles']
@@ -888,6 +888,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
     query = docs_sales.select().where(docs_sales.c.id.in_(updated_ids))
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
+
+    await add_number_to_docs_sales(user=user)
 
     await manager.send_message(
         token,
