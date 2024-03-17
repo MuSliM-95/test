@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.sql.functions import coalesce
+
 from database.db import database, loyality_transactions, loyality_cards
 import api.loyality_transactions.schemas as schemas
 from typing import Optional, Dict, Any
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, case
 
 from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, \
     get_entity_by_id_cashbox, clear_phone_number
@@ -17,8 +19,6 @@ router = APIRouter(tags=["loyality_transactions"])
 
 
 async def raschet_bonuses(cashbox_id: int) -> None:
-    await database.connect()
-
     q = (
         loyality_cards
         .select()
@@ -31,12 +31,21 @@ async def raschet_bonuses(cashbox_id: int) -> None:
     all_cards = await database.fetch_all(q)
 
     for card in all_cards:
+        a_q = (
+            coalesce(
+                func.sum(loyality_transactions.c.amount)
+                .filter(loyality_transactions.c.type == "accrual"), 0
+            ).label("income")
+        )
+        w_q = (
+            coalesce(
+                func.sum(loyality_transactions.c.amount)
+                .filter(loyality_transactions.c.type == "withdraw"), 0
+            ).label("outcome")
+        )
         q = (
             select(
-                func.sum(loyality_transactions.c.amount).filter(loyality_transactions.c.type == "accrual").label(
-                    "accrual_amount"),
-                func.sum(loyality_transactions.c.amount).filter(loyality_transactions.c.type == "withdraw").label(
-                    "withdraw_amount")
+                a_q, w_q, case((a_q > w_q, a_q - w_q), (a_q < w_q, 0), else_=0).label("balance")
             )
             .filter(
                 loyality_transactions.c.loyality_card_id == card.id,
@@ -44,14 +53,7 @@ async def raschet_bonuses(cashbox_id: int) -> None:
                 loyality_transactions.c.is_deleted.is_(False)
             )
         )
-        amounts: Dict[str, Any] = dict(await database.fetch_one(q))
-        balance = amounts["accrual_amount"] - amounts["withdraw_amount"]
-        edit_dict = {
-            "balance": balance if balance > 0 else 0,
-            "income": amounts["accrual_amount"],
-            "outcome": amounts["withdraw_amount"]
-        }
-
+        edit_dict: Dict[str, Any] = dict(await database.fetch_one(q))
         await database.execute(loyality_cards.update().where(loyality_cards.c.id == card.id).values(edit_dict))
 
 
