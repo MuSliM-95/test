@@ -478,7 +478,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "status": True,
                 }
                 lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-                await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
+                await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
 
             await asyncio.gather(asyncio.create_task(raschet(user, token)))
 
@@ -523,7 +523,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     }
                 ))
 
-                await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
+                await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
 
         query = (
             docs_sales.update()
@@ -729,7 +729,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         "status": True,
                     }
                     lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-                    await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
+                    await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
 
                 await asyncio.gather(asyncio.create_task(raschet(user, token)))
 
@@ -769,7 +769,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         }
                     ))
 
-                    await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
+                    await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
 
         if instance_values.get("paid_rubles"):
             del instance_values['paid_rubles']

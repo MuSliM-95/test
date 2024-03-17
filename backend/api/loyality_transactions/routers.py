@@ -18,43 +18,31 @@ import asyncio
 router = APIRouter(tags=["loyality_transactions"])
 
 
-async def raschet_bonuses(cashbox_id: int) -> None:
+async def raschet_bonuses(card_id: int) -> None:
+    a_q = (
+        coalesce(
+            func.sum(loyality_transactions.c.amount)
+            .filter(loyality_transactions.c.type == "accrual"), 0
+        ).label("income")
+    )
+    w_q = (
+        coalesce(
+            func.sum(loyality_transactions.c.amount)
+            .filter(loyality_transactions.c.type == "withdraw"), 0
+        ).label("outcome")
+    )
     q = (
-        loyality_cards
-        .select()
-        .where(
-            loyality_cards.c.cashbox_id == cashbox_id,
-            loyality_cards.c.status_card.is_(True),
-            loyality_cards.c.is_deleted.is_(False)
+        select(
+            a_q, w_q, case((a_q > w_q, a_q - w_q), (a_q < w_q, 0), else_=0).label("balance")
+        )
+        .filter(
+            loyality_transactions.c.loyality_card_id == card_id,
+            loyality_transactions.c.status.is_(True),
+            loyality_transactions.c.is_deleted.is_(False)
         )
     )
-    all_cards = await database.fetch_all(q)
-
-    for card in all_cards:
-        a_q = (
-            coalesce(
-                func.sum(loyality_transactions.c.amount)
-                .filter(loyality_transactions.c.type == "accrual"), 0
-            ).label("income")
-        )
-        w_q = (
-            coalesce(
-                func.sum(loyality_transactions.c.amount)
-                .filter(loyality_transactions.c.type == "withdraw"), 0
-            ).label("outcome")
-        )
-        q = (
-            select(
-                a_q, w_q, case((a_q > w_q, a_q - w_q), (a_q < w_q, 0), else_=0).label("balance")
-            )
-            .filter(
-                loyality_transactions.c.loyality_card_id == card.id,
-                loyality_transactions.c.status.is_(True),
-                loyality_transactions.c.is_deleted.is_(False)
-            )
-        )
-        edit_dict: Dict[str, Any] = dict(await database.fetch_one(q))
-        await database.execute(loyality_cards.update().where(loyality_cards.c.id == card.id).values(edit_dict))
+    edit_dict: Dict[str, Any] = dict(await database.fetch_one(q))
+    await database.execute(loyality_cards.update().where(loyality_cards.c.id == card_id).values(edit_dict))
 
 
 @router.get("/loyality_transactions/{idx}/", response_model=schemas.LoyalityTransaction)
@@ -193,7 +181,7 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
                 },
             )
 
-            await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
+            await asyncio.gather(asyncio.create_task(raschet_bonuses(card.id)))
 
             # return loyality_transactions_db[0]
             return {**loyality_transactions_db[0], **{"data": {"status": "success"}}}
@@ -237,7 +225,7 @@ async def edit_loyality_transaction(
         {"action": "edit", "target": "loyality_transactions", "result": loyality_transaction_db},
     )
 
-    await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
+    await asyncio.gather(asyncio.create_task(raschet_bonuses(loyality_transaction_values.get('loyality_card_id'))))
 
     return {**loyality_transaction_db, **{"data": {"status": "success"}}}
 
@@ -271,6 +259,6 @@ async def delete_loyality_transaction(token: str, idx: int):
         },
     )
 
-    await asyncio.gather(asyncio.create_task(raschet_bonuses(user.cashbox_id)))
+    await asyncio.gather(asyncio.create_task(raschet_bonuses(loyality_transaction_db.loyality_card_id)))
 
     return {**loyality_transaction_db, **{"data": {"status": "success"}}}
