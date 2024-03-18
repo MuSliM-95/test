@@ -229,7 +229,6 @@ async def edit_loyality_transaction(
         select(loyality_transactions.c.loyality_card_id)
         .where(loyality_transactions.c.id == idx)
         .limit(1)
-        .scalar_one()
     )
     card_idx = await database.fetch_val(card_idx, column=0)
 
