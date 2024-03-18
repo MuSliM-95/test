@@ -225,7 +225,15 @@ async def edit_loyality_transaction(
         {"action": "edit", "target": "loyality_transactions", "result": loyality_transaction_db},
     )
 
-    await asyncio.gather(asyncio.create_task(raschet_bonuses(loyality_transaction_values.get('loyality_card_id'))))
+    card_idx = (
+        select(loyality_transactions.c.loyality_card_id)
+        .where(loyality_transactions.c.id == idx)
+        .limit(1)
+        .scalar_one()
+    )
+    card_idx = await database.fetch_val(card_idx, column=0)
+
+    await asyncio.gather(asyncio.create_task(raschet_bonuses(card_idx)))
 
     return {**loyality_transaction_db, **{"data": {"status": "success"}}}
 
