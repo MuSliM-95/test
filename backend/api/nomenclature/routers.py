@@ -177,7 +177,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     if category:
         filters.append(nomenclature.c.category == category)
 
-    query = query.where(*filters).limit(limit).offset(offset)
+    query = query.where(*filters).limit(limit).offset(offset).order_by(desc(nomenclature.c.id))
 
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
