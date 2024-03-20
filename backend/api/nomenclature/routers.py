@@ -14,7 +14,7 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select, and_, desc
+from sqlalchemy import func, select, and_, desc, asc
 from ws_manager import manager
 
 router = APIRouter(tags=["nomenclature"])
@@ -177,7 +177,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     if category:
         filters.append(nomenclature.c.category == category)
 
-    query = query.where(*filters).limit(limit).offset(offset).order_by(desc(nomenclature.c.id))
+    query = query.where(*filters).limit(limit).offset(offset).order_by(asc(nomenclature.c.id))
 
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
