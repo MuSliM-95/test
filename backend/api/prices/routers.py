@@ -191,7 +191,7 @@ async def get_prices(
     if filters.price_type_id:
         filters_price.append(prices.c.price_type == filters.price_type_id)
     if filters.date_from:
-        filters_price.append(prices.c.price_type >= filters.date_from)
+        filters_price.append(prices.c.date_from >= filters.date_from)
     if filters.date_to:
         filters_price.append(prices.c.date_to <= filters.date_to)
 
