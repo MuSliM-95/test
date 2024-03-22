@@ -489,7 +489,7 @@ async def create(
         },
     )
 
-    await update(token, schemas.EditMass([{"id": doc["id"], "status": doc["status"]} for doc in docs_warehouse_db]))
+    await update(token, [{"id": doc["id"], "status": doc["status"]} for doc in docs_warehouse_db])
 
     return docs_warehouse_db
 
