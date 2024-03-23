@@ -53,6 +53,7 @@ services:
       - nginx-proxy
 
   nginx:
+    image: nginx
     build: ./nginx
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     restart: always
@@ -90,6 +91,7 @@ services:
 
 
   rabbitmq_consumer:
+    image: rabbitmq_consumer
     build: ./backend
     restart: always
     command: python3 consumer.py
@@ -123,6 +125,7 @@ services:
       - nginx-proxy
 
   backup:
+    image: backup
     # image: eeshugerman/postgres-backup-s3:15
     build: ./backup
     restart: always
