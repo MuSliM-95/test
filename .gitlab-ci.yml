@@ -1,6 +1,5 @@
 stages:
 #  - test
-  - build
   - build_up_docker
 
 #test:
@@ -38,23 +37,6 @@ stages:
 #    - unset CHEQUES_TOKEN
 #    - unset ACCOUNT_INTERVAL
 
-
-build:
-  stage: build
-  only:
-    - master
-  tags:
-    - master_runner
-  image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
-  script:
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/nginx/Dockerfile"
-      --destination "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
-
-
 build-up-docker-job:
   stage: build_up_docker
   only:
@@ -64,5 +46,5 @@ build-up-docker-job:
   environment: production
   script:
     - echo "Deploying application..."
-    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
-    - APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker stack deploy -c docker-compose.yml tablecrm
+    - docker compose stop
+    - APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up --build -d
