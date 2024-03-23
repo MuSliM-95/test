@@ -464,6 +464,7 @@ async def create(
                         doc_good['unit'] = 116
 
         response.append(await call_type_movement(doc['operation'], entity_values=doc, token=token))
+
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
     docs_warehouse_db = await database.fetch_all(query)
     docs_warehouse_db = [*map(datetime_to_timestamp, docs_warehouse_db)]
@@ -480,6 +481,8 @@ async def create(
             q = docs_warehouse.update().where(docs_warehouse.c.id == docs_db[i].id).values({ "number": str(i + 1) })
             await database.execute(q)
 
+    docs_warehouse_db = await update(token, schemas.EditMass(__root__=[{"id": doc["id"], "status": doc["status"]} for doc in docs_warehouse_db]))
+
     await manager.send_message(
         token,
         {
@@ -488,9 +491,6 @@ async def create(
             "result": docs_warehouse_db,
         },
     )
-
-    await update(token, schemas.EditMass(__root__=[{"id": doc["id"], "status": doc["status"]} for doc in docs_warehouse_db]))
-
     return docs_warehouse_db
 
 
