@@ -2,6 +2,7 @@ version: "3.9"
 
 services:
   backend:
+    image: backend-table
     build: ./backend
     restart: always
     command: bash -c "alembic revision --autogenerate && alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 8000 --reload --log-level=info"
@@ -25,6 +26,7 @@ services:
       - nginx-proxy
 
   teleg_bot:
+    image: teleg_bot-table
     build: ./backend
     restart: always
     command: python3 bot.py
@@ -43,6 +45,7 @@ services:
       - nginx-proxy
 
   docasaurus:
+    image: docasaurus-table
     build: ./submodule-docurus
     restart: always
     command: npm run serve -- --build --port 3000 --host 0.0.0.0
@@ -50,6 +53,7 @@ services:
       - nginx-proxy
 
   nginx:
+    image: nginx-table
     build: ./nginx
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     restart: always
@@ -87,6 +91,7 @@ services:
 
 
   rabbitmq_consumer:
+    image: rabbitmq_consumer-table
     build: ./backend
     restart: always
     command: python3 consumer.py
@@ -120,6 +125,7 @@ services:
       - nginx-proxy
 
   backup:
+    image: backup-table
     # image: eeshugerman/postgres-backup-s3:15
     build: ./backup
     restart: always
