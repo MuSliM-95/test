@@ -1,5 +1,5 @@
 stages:
-#  - test
+  - build_containers
   - build_up_docker
 
 #test:
@@ -36,6 +36,15 @@ stages:
 #    - unset POSTGRES_PASS
 #    - unset CHEQUES_TOKEN
 #    - unset ACCOUNT_INTERVAL
+
+build-backend-container:
+  stage: build_containers
+  tags:
+    - master_runner
+  script:
+    - cd backend
+    - docker build -t table-backend .
+
 
 build-up-docker-job:
   stage: build_up_docker

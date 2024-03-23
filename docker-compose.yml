@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   backend:
-    image: backend-table
+    image: table-backend
     build: ./backend
     restart: always
     command: bash -c "alembic revision --autogenerate && alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 8000 --reload --log-level=info"
