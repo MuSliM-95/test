@@ -231,4 +231,3 @@ volumes:
 
 networks:
   nginx-proxy:
-    attachable: true
