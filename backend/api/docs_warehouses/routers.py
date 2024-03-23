@@ -440,7 +440,9 @@ async def delete(token: str, ids: list[int]):
              tags=["Alternative docs_warehouse"], response_model=schemas.ListView)
 async def create(
         token: str,
-        docs_warehouse_data: schemas.CreateMass):
+        docs_warehouse_data: schemas.CreateMass,
+        holding: bool = False
+):
     """
     Создание документов движения товарных остатков
     operation:
@@ -481,7 +483,11 @@ async def create(
             q = docs_warehouse.update().where(docs_warehouse.c.id == docs_db[i].id).values({ "number": str(i + 1) })
             await database.execute(q)
 
-    docs_warehouse_db = await update(token, schemas.EditMass(__root__=[{"id": doc["id"], "status": True} for doc in docs_warehouse_db]))
+    if holding:
+        await update(token, schemas.EditMass(__root__=[{"id": doc["id"], "status": True} for doc in docs_warehouse_db]))
+        query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
+        docs_warehouse_db = await database.fetch_all(query)
+        docs_warehouse_db = [*map(datetime_to_timestamp, docs_warehouse_db)]
 
     await manager.send_message(
         token,
