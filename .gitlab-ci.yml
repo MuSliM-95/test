@@ -1,5 +1,5 @@
 stages:
-#  - build_containers
+#  - test
   - build_up_docker
 
 #test:
@@ -37,7 +37,6 @@ stages:
 #    - unset CHEQUES_TOKEN
 #    - unset ACCOUNT_INTERVAL
 
-
 build-up-docker-job:
   stage: build_up_docker
   only:
@@ -47,7 +46,5 @@ build-up-docker-job:
   environment: production
   script:
     - echo "Deploying application..."
-    - cd backend
-    - docker build -t table-backend .
-    - cd ..
-    - APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker stack deploy -c docker-compose.yml table
+    - docker compose stop
+    - APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up --build -d
