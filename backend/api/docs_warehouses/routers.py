@@ -481,7 +481,7 @@ async def create(
             q = docs_warehouse.update().where(docs_warehouse.c.id == docs_db[i].id).values({ "number": str(i + 1) })
             await database.execute(q)
 
-    docs_warehouse_db = await update(token, schemas.EditMass(__root__=[{"id": doc["id"], "status": doc["status"]} for doc in docs_warehouse_db]))
+    docs_warehouse_db = await update(token, schemas.EditMass(__root__=[{"id": doc["id"], "status": True} for doc in docs_warehouse_db]))
 
     await manager.send_message(
         token,
