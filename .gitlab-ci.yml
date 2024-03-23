@@ -40,6 +40,10 @@ stages:
 
 build-image:
   stage: build
+  only:
+    - master
+  tags:
+    - master_runner
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
