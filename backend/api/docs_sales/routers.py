@@ -95,20 +95,25 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     user = await get_user_by_token(token)
     query = (
         docs_sales
-            .select()
-            .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
-            .limit(limit)
-            .offset(offset)
-            .order_by(desc(docs_sales.c.id))
+        .select()
+        .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
+        .limit(limit)
+        .offset(offset)
+        .order_by(desc(docs_sales.c.id))
     )
+    count_query = select(func.count()).select_from(docs_sales).where(docs_sales.c.is_deleted.is_not(True),
+                                                                     docs_sales.c.cashbox == user.cashbox_id)
 
     if filters.tags:
         tags = list(map(lambda x: x.strip().lower(), filters.tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: docs_sales.c.tags.ilike(f'%{x}%'), tags))
         query = query.filter(and_(*filter_tags))
+        count_query = count_query.filter(and_(*filter_tags))
 
     if filters.dated:
         query = query.filter(
+            func.date(func.to_timestamp(docs_sales.c.dated)) == datetime.datetime.fromtimestamp(filters.dated).date())
+        count_query = count_query.filter(
             func.date(func.to_timestamp(docs_sales.c.dated)) == datetime.datetime.fromtimestamp(filters.dated).date())
 
     items_db = await database.fetch_all(query)
@@ -118,10 +123,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     items_db = [*map(raschet_oplat, items_db)]
     items_db = [await instance for instance in items_db]
 
-    count_query = select(func.count()).select_from(docs_sales).where(docs_sales.c.is_deleted.is_not(True),
-                                                                     docs_sales.c.cashbox == user.cashbox_id)
     count = await database.fetch_val(count_query)
-
 
     if show_goods:
         for item in items_db:
