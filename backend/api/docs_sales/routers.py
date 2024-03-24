@@ -873,7 +873,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                     "dated": instance_values['dated'],
                     "docs_purchases": None,
                     "to_warehouse": None,
-                    "status": False,
+                    "status": True,
                     "contragent": instance_values['contragent'],
                     "operation": "outgoing",
                     "comment": instance_values['comment'],
