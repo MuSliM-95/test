@@ -224,7 +224,6 @@ services:
     command: telegraf --config /etc/telegraf/telegraf.conf
     networks:
       - nginx-proxy
-    
 
 volumes:
   pgdata:
