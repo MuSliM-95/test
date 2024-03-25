@@ -105,7 +105,9 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
         .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
     )
 
-    filters_dict = filters.dict()
+    filters_dict = dict()
+    if filters:
+        filters_dict = filters.dict()
     filter_list = []
     for k, v in filters_dict.values():
         if k == "tags":
@@ -125,7 +127,6 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
         else:
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
-
 
     query = query.filter(and_(*filter_list))
     count_query = count_query.filter(and_(*filter_list))
