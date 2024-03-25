@@ -125,9 +125,13 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
         if flag is True:
             result.append(category_dict)
-        
 
     categories_db = [*map(datetime_to_timestamp, result)]
+
+    for category in categories_db:
+        category["nom_count"] = await database.fetch_all(
+            nomenclature.select(func.count(nomenclature.c.category )).
+            where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
 
     query = select(func.count(categories.c.id)).where(
         categories.c.owner == user.id,
