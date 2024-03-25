@@ -107,7 +107,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
     filters_dict = filters.dict(exclude_none=True)
     filter_list = []
-    for k, v in filters_dict.values():
+    for k, v in filters_dict.items():
         if k == "tags":
             tags = list(map(lambda x: x.strip().lower(), v.replace(' ', '').strip().split(',')))
             filter_list.append(and_(*list(map(lambda x: docs_sales.c.tags.ilike(f'%{x}%'), tags))))
