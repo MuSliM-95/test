@@ -123,7 +123,6 @@ class CountRes(BaseModel):
 
 class FilterSchema(BaseModel):
     tags: Optional[str]
-
     operation: Optional[str]
     comment: Optional[str]
 

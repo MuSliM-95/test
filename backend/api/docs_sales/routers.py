@@ -108,11 +108,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     filters_dict = filters.dict(exclude_none=True)
     filter_list = []
     for k, v in filters_dict.items():
-        if k == "tags":
-            tags = list(map(lambda x: x.strip().lower(), v.replace(' ', '').strip().split(',')))
-            filter_list.append(and_(*list(map(lambda x: docs_sales.c.tags.ilike(f'%{x}%'), tags))))
-
-        elif k.split("_")[-1] == "from":
+        if k.split("_")[-1] == "from":
             filter_list.append(
                 and_(v <= func.to_timestamp(docs_sales.c.dated) <= filters_dict.get(f"{k.replace('from', 'to')}"))
             )
@@ -124,7 +120,14 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
             filter_list.append(and_(eval(f"docs_sales.c.{k}.is_({v})")))
 
         elif type(v) is str:
-            filter_list.append(and_(eval(f"docs_sales.c.{k}.ilike(f'%{v}%')")))
+            filter_list.append(
+                and_(*list(
+                    map(
+                        lambda x: eval(f"docs_sales.c.{k}.ilike(f'%{x.strip().lower()}%')"),
+                        v.replace(' ', '').strip().split(',')
+                    )
+                ))
+            )
 
         else:
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
