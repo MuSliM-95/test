@@ -105,9 +105,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
         .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
     )
 
-    filters_dict = dict()
-    if filters:
-        filters_dict = filters.dict()
+    filters_dict = filters.dict(exclude_none=True)
     filter_list = []
     for k, v in filters_dict.values():
         if k == "tags":
