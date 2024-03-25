@@ -123,6 +123,9 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
         elif type(v) is bool:
             filter_list.append(and_(eval(f"docs_sales.c.{k}.is_({v})")))
 
+        elif type(v) is str:
+            filter_list.append(and_(eval(f"docs_sales.c.{k}.ilike(f'%{v}%')")))
+
         else:
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
 
