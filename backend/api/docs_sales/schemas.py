@@ -126,7 +126,6 @@ class FilterSchema(BaseModel):
     operation: Optional[str]
     comment: Optional[str]
 
-    cashbox: Optional[int]
     contragent: Optional[int]
     contract: Optional[int]
     organization: Optional[int]
