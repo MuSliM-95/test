@@ -130,7 +130,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
     for category in categories_db:
         print(dict(category))
-        nomenclature_in_category = await database.fetch_one(
+        nomenclature_in_category = await database.fetch_all(
             select(func.count(nomenclature.c.category)).
             where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
         print(dict(nomenclature_in_category))
