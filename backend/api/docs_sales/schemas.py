@@ -123,4 +123,26 @@ class CountRes(BaseModel):
 
 class FilterSchema(BaseModel):
     tags: Optional[str]
-    dated: Optional[int]
+
+    operation: Optional[str]
+    comment: Optional[str]
+
+    cashbox: Optional[int]
+    contragent: Optional[int]
+    contract: Optional[int]
+    organization: Optional[int]
+    warehouse: Optional[int]
+    sales_manager: Optional[int]
+    created_by: Optional[int]
+
+    status: Optional[bool]
+    tax_included: Optional[bool]
+    tax_active: Optional[bool]
+    is_deleted: Optional[bool]
+
+    dated_from: Optional[int]
+    dated_to: Optional[int]
+    created_at_from: Optional[int]
+    created_at_to: Optional[int]
+    updated_at_from: Optional[int]
+    updated_at_to: Optional[int]

@@ -1,8 +1,6 @@
-from typing import Optional, Union
-
 from databases.backends.postgres import Record
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy import desc, or_, func, and_, cast, DateTime, String, select, asc, Date
+from sqlalchemy import desc, func, and_, select
 
 from database.db import (
     database,
@@ -101,20 +99,36 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
         .offset(offset)
         .order_by(desc(docs_sales.c.id))
     )
-    count_query = select(func.count()).select_from(docs_sales).where(docs_sales.c.is_deleted.is_not(True),
-                                                                     docs_sales.c.cashbox == user.cashbox_id)
+    count_query = (
+        select(func.count())
+        .select_from(docs_sales)
+        .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
+    )
 
-    if filters.tags:
-        tags = list(map(lambda x: x.strip().lower(), filters.tags.replace(' ', '').strip().split(',')))
-        filter_tags = list(map(lambda x: docs_sales.c.tags.ilike(f'%{x}%'), tags))
-        query = query.filter(and_(*filter_tags))
-        count_query = count_query.filter(and_(*filter_tags))
+    filters_dict = filters.dict()
+    filter_list = []
+    for k, v in filters_dict.values():
+        if k == "tags":
+            tags = list(map(lambda x: x.strip().lower(), v.replace(' ', '').strip().split(',')))
+            filter_list.append(and_(*list(map(lambda x: docs_sales.c.tags.ilike(f'%{x}%'), tags))))
 
-    if filters.dated:
-        query = query.filter(
-            func.date(func.to_timestamp(docs_sales.c.dated)) == datetime.datetime.fromtimestamp(filters.dated).date())
-        count_query = count_query.filter(
-            func.date(func.to_timestamp(docs_sales.c.dated)) == datetime.datetime.fromtimestamp(filters.dated).date())
+        elif k.split("_")[-1] == "from":
+            filter_list.append(
+                and_(v <= func.to_timestamp(docs_sales.c.dated) <= filters_dict.get(f"{k.replace('from', 'to')}"))
+            )
+
+        elif k.split("_")[-1] == "to":
+            continue
+
+        elif type(v) is bool:
+            filter_list.append(and_(eval(f"docs_sales.c.{k}.is_({v})")))
+
+        else:
+            filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
+
+
+    query = query.filter(and_(*filter_list))
+    count_query = count_query.filter(and_(*filter_list))
 
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
@@ -238,16 +252,16 @@ async def add_number_to_docs_sales(user: Record) -> None:
             if j.type == "docs_sales_payments":
                 q = (
                     payments
-                        .update()
-                        .where(payments.c.id == j.to_id)
-                        .values({"name": f"Оплата по документу {number}"})
+                    .update()
+                    .where(payments.c.id == j.to_id)
+                    .values({"name": f"Оплата по документу {number}"})
                 )
             if j.type == "docs_sales_loyality_transactions":
                 q = (
                     loyality_transactions
-                        .update()
-                        .where(loyality_transactions.c.id == j.to_id)
-                        .values({"name": f"Кешбек по документу {number}"})
+                    .update()
+                    .where(loyality_transactions.c.id == j.to_id)
+                    .values({"name": f"Кешбек по документу {number}"})
                 )
             await database.execute(q)
 
@@ -379,11 +393,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             if instance_values.get("warehouse") is not None:
                 query = (
                     warehouse_balances.select()
-                        .where(
+                    .where(
                         warehouse_balances.c.warehouse_id == instance_values["warehouse"],
                         warehouse_balances.c.nomenclature_id == item["nomenclature"]
                     )
-                        .order_by(desc(warehouse_balances.c.created_at))
+                    .order_by(desc(warehouse_balances.c.created_at))
                 )
                 last_warehouse_balance = await database.fetch_one(query)
                 warehouse_amount = (
@@ -529,8 +543,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         query = (
             docs_sales.update()
-                .where(docs_sales.c.id == instance_id)
-                .values({"sum": items_sum})
+            .where(docs_sales.c.id == instance_id)
+            .values({"sum": items_sum})
         )
         await database.execute(query)
 
@@ -644,8 +658,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
             query = (
                 entity_to_entity.select()
-                    .where(entity_to_entity.c.cashbox_id == user.cashbox_id,
-                           entity_to_entity.c.from_id == instance_values["id"])
+                .where(entity_to_entity.c.cashbox_id == user.cashbox_id,
+                       entity_to_entity.c.from_id == instance_values["id"])
             )
             proxyes = await database.fetch_all(query)
 
@@ -777,8 +791,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
             del instance_values['paid_rubles']
         query = (
             docs_sales.update()
-                .where(docs_sales.c.id == instance_values["id"])
-                .values(instance_values)
+            .where(docs_sales.c.id == instance_values["id"])
+            .values(instance_values)
         )
         await database.execute(query)
         instance_id = instance_values["id"]
@@ -816,11 +830,11 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                 if instance_values.get("warehouse") is not None:
                     query = (
                         warehouse_balances.select()
-                            .where(
+                        .where(
                             warehouse_balances.c.warehouse_id == instance_values["warehouse"],
                             warehouse_balances.c.nomenclature_id == item["nomenclature"]
                         )
-                            .order_by(desc(warehouse_balances.c.created_at))
+                        .order_by(desc(warehouse_balances.c.created_at))
                     )
                     last_warehouse_balance = await database.fetch_one(query)
                     warehouse_amount = (
@@ -844,8 +858,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
             query = (
                 docs_sales.update()
-                    .where(docs_sales.c.id == instance_id)
-                    .values({"sum": items_sum})
+                .where(docs_sales.c.id == instance_id)
+                .values({"sum": items_sum})
             )
             await database.execute(query)
 
@@ -924,8 +938,8 @@ async def delete(token: str, ids: list[int]):
     if items_db:
         query = (
             docs_sales.update()
-                .where(docs_sales.c.id.in_(ids), docs_sales.c.is_deleted.is_not(True))
-                .values({"is_deleted": True})
+            .where(docs_sales.c.id.in_(ids), docs_sales.c.is_deleted.is_not(True))
+            .values({"is_deleted": True})
         )
         await database.execute(query)
 
@@ -955,8 +969,8 @@ async def delete(token: str, idx: int):
     if items_db:
         query = (
             docs_sales.update()
-                .where(docs_sales.c.id == idx, docs_sales.c.is_deleted.is_not(True))
-                .values({"is_deleted": True})
+            .where(docs_sales.c.id == idx, docs_sales.c.is_deleted.is_not(True))
+            .values({"is_deleted": True})
         )
         await database.execute(query)
 
