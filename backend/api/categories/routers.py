@@ -128,11 +128,13 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
     categories_db = [*map(datetime_to_timestamp, result)]
 
+    categories_db = [*map(dict, categories_db)]
+
     for category in categories_db:
         nomenclature_in_category = await database.fetch_all(
             nomenclature.select().
             where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
-        category["nom_count"] = len(nomenclature_in_category)
+        category.update({"nom_count": len(nomenclature_in_category)})
 
     query = select(func.count(categories.c.id)).where(
         categories.c.owner == user.id,
