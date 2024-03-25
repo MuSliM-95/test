@@ -49,6 +49,7 @@ class CategoryListGet(BaseModel):
 class CategoryTree(BaseModel):
     key: int
     name: str
+    nom_count: int
     description: Optional[str]
     code: Optional[int]
     status: bool = True
