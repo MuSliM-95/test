@@ -142,7 +142,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     )
 
     categories_db_count = await database.fetch_one(query)
-
+    print(categories_db)
     return {"result": categories_db, "count": categories_db_count.count_1}
 
 @router.post("/categories/", response_model=schemas.CategoryList)
