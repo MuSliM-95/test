@@ -128,13 +128,11 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
     categories_db = [*map(datetime_to_timestamp, result)]
 
-    categories_db = [*map(dict, categories_db)]
-
     for category in categories_db:
-        nomenclature_in_category = await database.fetch_all(
-            nomenclature.select().
+        nomenclature_in_category = await database.fetch_one(
+            select(func.count(nomenclature.c.category)).
             where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
-        category.update({"nom_count": len(nomenclature_in_category)})
+        category["nom_count"] = nomenclature_in_category.get("count_1")
 
     query = select(func.count(categories.c.id)).where(
         categories.c.owner == user.id,
@@ -142,7 +140,6 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     )
 
     categories_db_count = await database.fetch_one(query)
-    print(categories_db)
     return {"result": categories_db, "count": categories_db_count.count_1}
 
 @router.post("/categories/", response_model=schemas.CategoryList)
