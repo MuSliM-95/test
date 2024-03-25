@@ -759,7 +759,6 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("dated", Integer),
     sqlalchemy.Column("operation", String),
     sqlalchemy.Column("tags", String),
-    sqlalchemy.Column("docs_sales", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("comment", String),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
