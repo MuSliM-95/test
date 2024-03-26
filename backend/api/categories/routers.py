@@ -132,6 +132,17 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         childrens = await database.fetch_all(query)
         if childrens:
             category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id, nomenclature_name)
+
+            def count_nomeclature(data, s):
+                res = category_dict["nom_count"]+s
+                for item in data:
+                    if item['children']:
+                        count_nomeclature(item['children'], item['nom_count'])
+                    else:
+                        continue
+                return res
+
+            category_dict["nom_count"] = count_nomeclature(category_dict['children'], 0)
         else:
             category_dict['children'] = []
         
