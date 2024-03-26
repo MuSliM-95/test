@@ -11,7 +11,7 @@ from aiogram.client.session import aiohttp
 from aiogram.dispatcher.filters.command import CommandObject
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
-from aiogram.types import PhotoSize
+from aiogram.types import PhotoSize, ContentType
 
 import texts
 from api.articles.routers import new_article
@@ -626,6 +626,30 @@ async def broadcast_message(message: types.Message, state: FSMContext):
         await state.set_state(DeliveryForm.send)
 
 
+@router_comm.message(content_types=ContentType.TEXT, state=DeliveryForm.send)
+async def send_text_broadcast_message(message: types.Message, state: FSMContext):
+    """
+    Get and send text message
+    """
+    BroadcastMessageStore.picture = None
+    BroadcastMessageStore.text = message.md_text.replace("\\", "")
+    BroadcastMessageStore.tg_message_id = message.message_id
+    BroadcastMessageStore.tg_user_or_chat = str(message.chat.id)
+    BroadcastMessageStore.created_at = str(message.date)
+
+    query = users.select().where(users.c.is_blocked == False)
+    last_active_users = await database.fetch_all(query)
+    await store_user_message(message)
+    await message.answer(
+        f"Вы уверены что хотите разослать сообщение по {len(last_active_users) - 1} живым пользователям?",
+        reply_markup=choose_keyboard
+    )
+    await store_bot_message(message.message_id + 1, message.chat.id, bot.id,
+                            f"Вы уверены что хотите разослать сообщение "
+                            f"по {len(last_active_users) - 1} живым пользователям?")
+    await state.set_state(DeliveryForm.submit)
+
+
 @router_comm.message(content_types=["photo"], state=DeliveryForm.send)
 async def confirm_broadcast_message(message: types.Message, state: FSMContext):
     """
@@ -800,9 +824,12 @@ async def finish_broadcast_messaging(chat_id: str, total: int, active_before: in
         print("Notification failed")
 
 
-async def message_to_chat_by_id(chat_id: str, message: str):
+async def message_to_chat_by_id(chat_id: str, message: str, picture):
     try:
-        await bot.send_message(chat_id=chat_id, text=message, parse_mode="markdown")
+        if picture:
+            await bot.send_photo(chat_id=chat_id, photo=picture, caption=message, parse_mode="markdown")
+        else:
+            await bot.send_message(chat_id=chat_id, text=message, parse_mode="markdown")
         print(f"Sent to {chat_id}")
     except Exception as e:
         print(f"Broadcast sending message to {chat_id} exception occured {e}")

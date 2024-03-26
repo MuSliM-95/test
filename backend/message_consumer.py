@@ -1,30 +1,31 @@
 import asyncio
-from database.db import database, messages, users
 import aio_pika
 import json
 import logging
 
+from database.db import database, messages, users
+from bot import finish_broadcast_messaging, message_to_chat_by_id
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Message-Consumer")
+logger.setLevel(logging.INFO)
+
 
 async def message_consumer() -> None:
-    logging.basicConfig(level=logging.INFO)
+    logger.info("START CONSUMER")
     connection = await aio_pika.connect_robust(host="rabbitmq", port=5672, timeout=10)
-    queue_name = "message_queue"
     await database.connect()
     async with connection:
-        # Creating channel
         channel = await connection.channel()
 
-        # Will take no more than 100 messages in advance
-        await channel.set_qos(prefetch_count=100)
+        # await channel.set_qos(prefetch_count=100)
 
-        # Declaring queue
-        queue = await channel.declare_queue(queue_name)
+        queue = await channel.declare_queue("message_queue")
+
         query = users.select(users.c.is_blocked == True)
         s = await database.fetch_all(query)
-        print([i.id for i in s])
         active_before = len(s)
-        print(f"Blocked before: {s}")
-        message_count = int(0)
+        message_count = 0
         async with queue.iterator() as queue_iter:
             async for message in queue_iter:
                 message_count += 1
@@ -39,8 +40,10 @@ async def message_consumer() -> None:
                     created_at=data['created_at'],
                     body=data['text']
                 )
-                from bot import finish_broadcast_messaging, message_to_chat_by_id
-                await message_to_chat_by_id(chat_id=str(data['from_or_to']), message=data['text'])
+
+                await message_to_chat_by_id(chat_id=str(data['from_or_to']), message=data['text'],
+                                            picture=data['picture'])
+                await message.ack()  # Accept message
                 await database.execute(relship)
                 if message_count == data['size']:
                     query = users.select(users.c.is_blocked == True)
@@ -50,6 +53,7 @@ async def message_consumer() -> None:
                                                      active_after, data['message_id'] + message_count + 1)
                     await channel.queue_delete(queue_name='message_queue')
                     await message_consumer()
+
 
 if __name__ == "__main__":
     asyncio.run(message_consumer())
