@@ -11,7 +11,9 @@ import functools
 
 router = APIRouter(tags=["categories"])
 
+
 async def count_nomeclature(data, s):
+    @functools.lru_cache(maxsize = None)
     async def count(d, sm):
         for item in d:
             print(item)
