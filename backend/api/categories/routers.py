@@ -79,6 +79,21 @@ async def build_hierarchy(data, parent_id = None, name = None):
     return results[0]
 
 
+def count_nomeclature(data, s):
+    def count(d, sm):
+        for item in d:
+            if item['children']:
+                print( item )
+                sm = +item['nom_count']
+                await count( item['children'], item['nom_count'] )
+            else:
+                continue
+        return sm
+
+    r = count(data, s)
+    return r
+
+
 @router.get("/categories_tree/", response_model=schemas.CategoryTreeGet)
 async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     """Получение древа списка категорий"""
@@ -131,19 +146,6 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         if childrens:
             category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id, nomenclature_name)
 
-            async def count_nomeclature(data, s):
-                async def count(d, sm):
-                    for item in d:
-                        if item['children']:
-                            print(item)
-                            sm = +item['nom_count']
-                            await count(item['children'], item['nom_count'])
-                        else:
-                            continue
-                    return sm
-                r = await count(data, s)
-                return r
-
             category_dict["nom_count"] = await count_nomeclature(category_dict['children'], category_dict["nom_count"])
         else:
             category_dict['children'] = []
@@ -162,6 +164,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
                     break
 
         if flag is True:
+            print(category_dict)
             result.append(category_dict)
 
     categories_db = [*map(datetime_to_timestamp, result)]
@@ -174,6 +177,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
     categories_db_count = await database.fetch_one(query)
     return {"result": categories_db, "count": categories_db_count.count_1}
+
 
 @router.post("/categories/", response_model=schemas.CategoryList)
 async def new_categories(token: str, categories_data: schemas.CategoryCreateMass):
