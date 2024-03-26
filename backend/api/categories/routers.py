@@ -137,7 +137,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
                         if item['children']:
                             print(item)
                             sm = +item['nom_count']
-                            await count(data, s)
+                            await count(item['children'], s)
                         else:
                             continue
                     return sm
