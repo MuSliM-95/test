@@ -86,9 +86,10 @@ async def build_hierarchy(data, parent_id = None, name = None):
                 grandchildren = await build_children(item['id'])
                 if grandchildren:
                     item['children'] = grandchildren
-                    item['nom_count'] = await count_nomeclature(item['children'], item['nom_count'])
+
                 if (item['nom_count'] == 0) and (name is not None):
                     continue
+                item['nom_count'] = await count_nomeclature(item['children'], item['nom_count'])
                 children.append(item)
         return children
     
