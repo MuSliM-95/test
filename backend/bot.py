@@ -246,8 +246,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         except Exception as exc:
             logging.info(exc)
 
-    
-
     if "referral" in str(invite_token):
         ref_id = invite_token.split("referral_")[-1]
 
@@ -308,8 +306,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             await state.set_state(Form.join)
             await state.update_data(cbox=dict(cbox_by_invite))
         return
-
-    
 
     users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
 
