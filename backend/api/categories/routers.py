@@ -83,7 +83,7 @@ async def count_nomeclature(data, s):
     async def count(d, sm):
         for item in d:
             if item['children']:
-                print( item )
+                print(item)
                 sm = +item['nom_count']
                 await count(item['children'], item['nom_count'] )
             else:
@@ -91,6 +91,7 @@ async def count_nomeclature(data, s):
         return sm
 
     r = count(data, s)
+    print(r)
     return r
 
 
