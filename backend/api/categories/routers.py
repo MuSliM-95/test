@@ -70,7 +70,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
                 if grandchildren:
                     item['children'] = grandchildren
                 print(dict(item))
-                if item['nom_count'] == 0:
+                if (item['nom_count'] == 0) and (name is not None):
                     print('continue')
                     continue
                 children.append(item)
