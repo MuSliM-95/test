@@ -28,7 +28,7 @@ class Create(BaseModel):
     dated: Optional[int]
     operation: Optional[SaleOperations]
     tags: Optional[str] = ""
-    docs_sales: Optional[int]
+    # docs_sales: Optional[int]
     comment: Optional[str]
     client: Optional[int]
     contragent: Optional[int]
