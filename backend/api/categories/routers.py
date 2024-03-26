@@ -8,7 +8,7 @@ from ws_manager import manager
 import asyncio
 from typing import Optional
 import functools
-import memoization
+from memoization import cached, CachingAlgorithmFlag
 
 
 router = APIRouter(tags=["categories"])
@@ -50,7 +50,7 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
     return {"result": categories_db, "count": categories_db_count.count_1}
 
 async def build_hierarchy(data, parent_id = None, name = None):
-    @functools.lru_cache(maxsize=64)
+    @cached(max_size=64, algorithm=CachingAlgorithmFlag.FIFO, thread_safe=False)
     async def build_children(parent_id):
         children = []
         for item in data:
@@ -86,7 +86,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
 
 
 async def count_nomeclature(data, s):
-    @memoization.cached(max_size=64)
+    @cached(max_size=64, algorithm=CachingAlgorithmFlag.FIFO, thread_safe=False)
     async def count(d, sm):
         for item in d:
             if len(item['children']) > 0:
