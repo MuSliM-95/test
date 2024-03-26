@@ -13,7 +13,7 @@ router = APIRouter(tags=["categories"])
 
 
 async def count_nomeclature(data, s):
-    @functools.lru_cache(maxsize = None)
+
     async def count(d, sm):
         for item in d:
             print(item)
@@ -25,6 +25,7 @@ async def count_nomeclature(data, s):
     r = await count(data, s)
     print(r)
     return r
+
 
 @router.get("/categories/{idx}/", response_model=schemas.Category)
 async def get_category_by_id(token: str, idx: int):
@@ -86,10 +87,9 @@ async def build_hierarchy(data, parent_id = None, name = None):
                 grandchildren = await build_children(item['id'])
                 if grandchildren:
                     item['children'] = grandchildren
-
+                    item['nom_count'] = await count_nomeclature(item['children'], item['nom_count'])
                 if (item['nom_count'] == 0) and (name is not None):
                     continue
-                item['nom_count'] = await count_nomeclature(item['children'], item['nom_count'])
                 children.append(item)
         return children
     
