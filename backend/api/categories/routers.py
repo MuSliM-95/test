@@ -90,7 +90,7 @@ async def count_nomeclature(data, s):
                 continue
         return sm
 
-    r = count(data, s)
+    r = await count(data, s)
     print(r)
     return r
 
