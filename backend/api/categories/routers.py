@@ -61,6 +61,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
                            nomenclature.c.category == item.get("id")))
                 item["nom_count"] = len(nomenclature_in_category)
                 if nomenclature_in_category == 0:
+                    print('continue')
                     continue
             else:
                 item["nom_count"] = 0
