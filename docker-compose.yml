@@ -151,7 +151,7 @@ services:
     image: rabbitmq
     restart: always
     ports:
-      - 5672:5672
+      - "5672:5672"
     networks:
       - nginx-proxy
 
