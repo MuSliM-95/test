@@ -46,13 +46,18 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
 
     return {"result": categories_db, "count": categories_db_count.count_1}
 
-async def build_hierarchy(data, parent_id = None):
+async def build_hierarchy(data, parent_id = None, name = None):
     async def build_children(parent_id):
         children = []
         for item in data:
+            nomenclature_in_category = await database.fetch_all(
+                nomenclature.select().
+                where( nomenclature.c.name.ilike(f"%{name}%"),
+                       nomenclature.c.category == item.get("id")))
             item = datetime_to_timestamp(item)
             item['children'] = []
             item['key'] = item['id']
+            item["nom_count"] = len(nomenclature_in_category)
             item['expanded_flag'] = False
             if item['parent'] == parent_id:
                 grandchildren = await build_children(item['id'])
@@ -82,6 +87,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     categories_db = await database.fetch_all(query)
     result = []
 
+    nomenclature_list = []
     if nomenclature_name != None:
         q = nomenclature.select().where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category != None)
         nomenclature_list = await database.fetch_all(q)
@@ -90,7 +96,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         nomenclature_in_category = await database.fetch_all(
             nomenclature.select().
             where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
-
+        print(nomenclature_in_category)
         category_dict = dict(category)
         category_dict['key'] = category_dict['id']
         category_dict["nom_count"] = len(nomenclature_in_category)
@@ -111,7 +117,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         )
         childrens = await database.fetch_all(query)
         if childrens:
-            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id)
+            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id, nomenclature_name)
         else:
             category_dict['children'] = []
         
