@@ -68,6 +68,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
                 grandchildren = await build_children(item['id'])
                 if grandchildren:
                     item['children'] = grandchildren
+                print(dict(item))
                 children.append(item)
         return children
     
