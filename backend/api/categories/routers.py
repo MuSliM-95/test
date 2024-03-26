@@ -79,13 +79,13 @@ async def build_hierarchy(data, parent_id = None, name = None):
     return results[0]
 
 
-def count_nomeclature(data, s):
-    def count(d, sm):
+async def count_nomeclature(data, s):
+    async def count(d, sm):
         for item in d:
             if item['children']:
                 print( item )
                 sm = +item['nom_count']
-                await count( item['children'], item['nom_count'] )
+                await count(item['children'], item['nom_count'] )
             else:
                 continue
         return sm
