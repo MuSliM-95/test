@@ -85,22 +85,22 @@ services:
     networks:
       - nginx-proxy
 
-#  message_consumer_task:
-#    build: ./backend
-#    restart: always
-#    command: python3 message_consumer.py
-#    volumes:
-#      - ./backend:/backend
-#    depends_on:
-#      - rabbitmq
-#    environment:
-#      POSTGRES_USER: ${POSTGRES_USER}
-#      POSTGRES_PASS: ${POSTGRES_PASS}
-#      TG_TOKEN: ${TG_TOKEN}
-#      RABBITMQ_HOST: ${RABBITMQ_HOST}
-#      RABBITMQ_PORT: ${RABBITMQ_PORT}
-#    networks:
-#      - nginx-proxy
+  message_consumer_task:
+    build: ./backend
+    restart: always
+    command: python3 message_consumer.py
+    volumes:
+      - ./backend:/backend
+    depends_on:
+      - rabbitmq
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASS: ${POSTGRES_PASS}
+      TG_TOKEN: ${TG_TOKEN}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+    networks:
+      - nginx-proxy
 
   db:
     image: postgres:14.2
@@ -147,13 +147,13 @@ services:
     depends_on:
       - db
 
-#  rabbitmq:
-#    image: rabbitmq
-#    restart: always
-#    ports:
-#      - "5672:5672"
-#    networks:
-#      - nginx-proxy
+  rabbitmq:
+    image: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+    networks:
+      - nginx-proxy
 
   node-exporter:
     image: prom/node-exporter:latest
