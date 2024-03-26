@@ -69,9 +69,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
                 grandchildren = await build_children(item['id'])
                 if grandchildren:
                     item['children'] = grandchildren
-                print(dict(item))
                 if (item['nom_count'] == 0) and (name is not None):
-                    print('continue')
                     continue
                 children.append(item)
         return children
@@ -135,9 +133,8 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
             def count_nomeclature(data, s):
                 for item in data:
-                    print(item)
                     if item['children']:
-                        print(item['nom_count'])
+                        print(item)
                         s = +item['nom_count']
                         count_nomeclature(item['children'], item['nom_count'])
                     else:
