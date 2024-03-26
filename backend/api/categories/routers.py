@@ -82,7 +82,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
 async def count_nomeclature(data, s):
     async def count(d, sm):
         for item in d:
-            if item['children']:
+            if len(item['children']) > 0:
                 print(item)
                 sm = +item['nom_count']
                 await count(item['children'], item['nom_count'] )
