@@ -137,7 +137,9 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
                 res = + s
                 print(res)
                 for item in data:
+                    print(item)
                     if item['children']:
+                        print(item['nom_count'])
                         count_nomeclature(item['children'], item['nom_count'])
                     else:
                         continue
