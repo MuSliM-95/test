@@ -9,11 +9,11 @@ import asyncio
 from typing import Optional
 import functools
 
+
 router = APIRouter(tags=["categories"])
 
 
 async def count_nomeclature(data, s):
-
     async def count(d, sm):
         for item in d:
             print(item)
@@ -23,7 +23,6 @@ async def count_nomeclature(data, s):
         return sm
 
     r = await count(data, s)
-    print(r)
     return r
 
 
@@ -152,8 +151,8 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         childrens = await database.fetch_all(query)
         if childrens:
             category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id, nomenclature_name)
-
-
+            category_dict["nom_count"] = await count_nomeclature(category_dict['children'],
+                                                                  category_dict["nom_count"])
         else:
             category_dict['children'] = []
         
@@ -171,8 +170,6 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
                     break
 
         if flag is True:
-            category_dict["nom_count"] = await count_nomeclature( category_dict['children'],
-                                                                  category_dict["nom_count"] )
             result.append(category_dict)
 
     categories_db = [*map(datetime_to_timestamp, result)]
