@@ -60,8 +60,10 @@ async def build_hierarchy(data, parent_id = None, name = None):
                     where( nomenclature.c.name.ilike(f"%{name}%"),
                            nomenclature.c.category == item.get("id")))
                 item["nom_count"] = len(nomenclature_in_category)
+                if nomenclature_in_category == 0:
+                    continue
             else:
-                continue
+                item["nom_count"] = 0
 
             item['expanded_flag'] = False
             if item['parent'] == parent_id:
