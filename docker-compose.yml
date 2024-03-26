@@ -85,7 +85,7 @@ services:
     networks:
       - nginx-proxy
 
-  message_consumer:
+  message_consumer_task:
     build: ./backend
     restart: always
     command: python3 message_consumer.py
