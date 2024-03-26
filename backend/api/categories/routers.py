@@ -50,14 +50,19 @@ async def build_hierarchy(data, parent_id = None, name = None):
     async def build_children(parent_id):
         children = []
         for item in data:
-            nomenclature_in_category = await database.fetch_all(
-                nomenclature.select().
-                where( nomenclature.c.name.ilike(f"%{name}%"),
-                       nomenclature.c.category == item.get("id")))
             item = datetime_to_timestamp(item)
             item['children'] = []
             item['key'] = item['id']
-            item["nom_count"] = len(nomenclature_in_category)
+
+            if name is not None:
+                nomenclature_in_category = await database.fetch_all(
+                    nomenclature.select().
+                    where( nomenclature.c.name.ilike(f"%{name}%"),
+                           nomenclature.c.category == item.get("id")))
+                item["nom_count"] = len(nomenclature_in_category)
+            else:
+                item["nom_count"] = 0
+
             item['expanded_flag'] = False
             if item['parent'] == parent_id:
                 grandchildren = await build_children(item['id'])
