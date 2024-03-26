@@ -119,7 +119,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
                 select id, name, parent, description, code, status, updated_at, created_at
                 from categories where parent = {category.id}
 
-                union all
+                union
                 select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at
                 from categories_hierarchy as H
                 join categories as F on F.parent = H.id
