@@ -76,3 +76,4 @@ pytest
 httpx
 pytest-asyncio
 pillow
+memoization

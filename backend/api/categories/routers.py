@@ -8,22 +8,10 @@ from ws_manager import manager
 import asyncio
 from typing import Optional
 import functools
+import memoization
 
 
 router = APIRouter(tags=["categories"])
-
-
-async def count_nomeclature(data, s):
-    async def count(d, sm):
-        for item in d:
-            print(item)
-            if len(item['children']) > 0:
-                print(item)
-                sm = sm + await count(item['children'], item['nom_count'])
-        return sm
-
-    r = await count(data, s)
-    return r
 
 
 @router.get("/categories/{idx}/", response_model=schemas.Category)
@@ -62,8 +50,7 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
     return {"result": categories_db, "count": categories_db_count.count_1}
 
 async def build_hierarchy(data, parent_id = None, name = None):
-
-    @functools.lru_cache(maxsize = None)
+    @functools.lru_cache(maxsize=64)
     async def build_children(parent_id):
         children = []
         for item in data:
@@ -82,6 +69,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
                 item["nom_count"] = 0
 
             item['expanded_flag'] = False
+
             if item['parent'] == parent_id:
                 grandchildren = await build_children(item['id'])
                 if grandchildren:
@@ -97,8 +85,16 @@ async def build_hierarchy(data, parent_id = None, name = None):
     return results[0]
 
 
-
-
+async def count_nomeclature(data, s):
+    @memoization.cached(max_size=64)
+    async def count(d, sm):
+        for item in d:
+            if len(item['children']) > 0:
+                print(item)
+                sm = sm + await count(item['children'], item['nom_count'])
+        return sm
+    r = await count(data, s)
+    return r
 
 @router.get("/categories_tree/", response_model=schemas.CategoryTreeGet)
 async def get_categories(token: str, nomenclature_name: Optional[str] = None):
