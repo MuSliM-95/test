@@ -95,13 +95,16 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     for category in categories_db:
         category_dict = dict(category)
         category_dict['key'] = category_dict['id']
+
         if nomenclature_name is not None:
             nomenclature_in_category = await database.fetch_all(
                 nomenclature.select().
-                where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"),
-                       nomenclature.c.category == category.get("id")))
+                where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
             print(list(*map(dict, nomenclature_in_category)))
             category_dict["nom_count"] = len(nomenclature_in_category)
+        else:
+            category_dict["nom_count"] = 0
+
         category_dict['expanded_flag'] = False
         query = (
             f"""
