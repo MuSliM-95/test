@@ -61,7 +61,7 @@ async def build_hierarchy(data, parent_id = None, name = None):
                            nomenclature.c.category == item.get("id")))
                 item["nom_count"] = len(nomenclature_in_category)
             else:
-                item["nom_count"] = 0
+                continue
 
             item['expanded_flag'] = False
             if item['parent'] == parent_id:
