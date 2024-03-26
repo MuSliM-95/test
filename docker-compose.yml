@@ -85,19 +85,18 @@ services:
     networks:
       - nginx-proxy
 
-
-  rabbitmq_consumer:
+  message_consumer:
     build: ./backend
     restart: always
-    command: python3 consumer.py
+    command: python3 message_consumer.py
     volumes:
       - ./backend:/backend
     depends_on:
       - rabbitmq
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASS: ${POSTGRES_PASS}
-      TG_TOKEN: ${TG_TOKEN}
+      POSTGRES_USER: ${POSTGRES_USER_DEV}
+      POSTGRES_PASS: ${POSTGRES_PASS_DEV}
+      TG_TOKEN: ${TG_TOKEN_DEV}
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
     networks:
