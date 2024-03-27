@@ -49,6 +49,7 @@ class Create(BaseModel):
     status: Optional[bool]
     comment: Optional[str]
     warehouse: Optional[int]
+    organization: Optional[int]
     goods: Optional[List[Item]]
     status: Optional[bool] = True
     docs_sales_id: Optional[int] = None

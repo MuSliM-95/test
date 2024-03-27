@@ -36,6 +36,11 @@ async def check_relationship(entity):
             exeptions.add(f"error not found warehouse in warehouses.id = {entity['warehouse']}")
             del entity['warehouse']
 
+        if not await database.fetch_one(organizations.select().where(
+                organizations.c.id == entity['organization'])):
+            exeptions.add(f"error not found warehouse in organizations.id = {entity['organization']}")
+            del entity['organization']
+
         if not await database.fetch_one(warehouses.select().where(
                 warehouses.c.id == entity['to_warehouse'])):
             exeptions.add(f"error not found to_warehouse in warehouses.id = {entity['to_warehouse']}")
@@ -66,8 +71,6 @@ async def set_data_doc_warehouse(**kwargs):
     entity['created_by'] = users_cboxes.get('user')
     entity['cashbox'] = users_cboxes.get('cashbox_id')
     entity['is_deleted'] = False
-    organization = await database.fetch_one(organizations.select().where(organizations.c.owner == users_cboxes.id))
-    entity['organization'] = organization.get('id')
 
     return entity
 
