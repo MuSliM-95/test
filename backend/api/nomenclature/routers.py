@@ -19,6 +19,7 @@ from functions.helpers import (
 )
 from sqlalchemy import func, select, and_, desc, asc
 from ws_manager import manager
+import memoization
 
 
 router = APIRouter(tags=["nomenclature"])
@@ -156,6 +157,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
     return nomenclature_db
 
 
+@memoization.cached(max_size = 256)
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0, with_prices: bool = False):
@@ -200,7 +202,6 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         if with_prices:
             price = await get_prices(token, filters = PricesFiltersQuery(name=nomenclature_info["name"]))
             nomenclature_info["prices"] = dict(price)["result"]
-
 
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
