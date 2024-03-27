@@ -162,7 +162,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
 @memoization.cached(max_size=None)
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
-                           offset: int = 0, with_prices: bool = False, with_balance: bool = False):
+                           offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
     """Получение списка категорий"""
     user = await get_user_by_token(token)
 
@@ -211,7 +211,6 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
             )
             nomenclature_info["prices"] = price
         if with_balance:
-            warehouse_db = await database.fetch_all(warehouses.select().where(warehouses.c.cashbox == user.cashbox_id))
             q = case(
                 [
                     (
@@ -232,7 +231,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
                     warehouse_register_movement.c.warehouse_id,
                     func.sum(q).label("current_amount"))
                 .where(warehouse_register_movement.c.nomenclature_id == nomenclature_info['id'],
-                       warehouse_register_movement.c.warehouse_id.in_([w['id'] for w in warehouse_db])
+                       warehouse_register_movement.c.warehouse_id == in_warehouse
                        )
                 .limit(limit)
                 .offset(offset)
