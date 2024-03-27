@@ -127,15 +127,12 @@ class FilterSchema(BaseModel):
     comment: Optional[str]
 
     contragent: Optional[int]
-    contract: Optional[int]
     organization: Optional[int]
     warehouse: Optional[int]
     sales_manager: Optional[int]
     created_by: Optional[int]
 
     status: Optional[bool]
-    tax_included: Optional[bool]
-    tax_active: Optional[bool]
     is_deleted: Optional[bool]
 
     dated_from: Optional[int]
