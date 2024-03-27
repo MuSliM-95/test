@@ -5,7 +5,8 @@ from starlette import status
 
 import api.nomenclature.schemas as schemas
 from api.prices.routers import get_prices
-from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types
+from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
+    warehouse_register_movement, warehouses
 from fastapi import APIRouter, HTTPException
 
 from functions.filter_schemas import PricesFiltersQuery
@@ -17,7 +18,7 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select, and_, desc, asc
+from sqlalchemy import func, select, and_, desc, asc, case
 from ws_manager import manager
 import memoization
 import time
@@ -161,7 +162,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
 @memoization.cached(max_size=None)
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
-                           offset: int = 0, with_prices: bool = False):
+                           offset: int = 0, with_prices: bool = False, with_balance: bool = False):
     """Получение списка категорий"""
     user = await get_user_by_token(token)
 
@@ -208,9 +209,48 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
                 select_from(prices).
                 join(price_types, price_types.c.id == prices.c.price_type)
             )
-
             nomenclature_info["prices"] = price
+        if with_balance:
+            warehouse_db = await database.fetch_all(warehouses.select().where(warehouses.c.cashbox == user.cashbox_id))
+            q = case(
+                [
+                    (
+                        warehouse_register_movement.c.type_amount == 'minus',
+                        warehouse_register_movement.c.amount * (-1)
+                    )
+                ],
+                else_=warehouse_register_movement.c.amount
 
+            )
+            query =  (
+                select(
+                    nomenclature.c.id,
+                    nomenclature.c.name,
+                    nomenclature.c.category,
+                    warehouses.c.name.label("warehouse_name"),
+                    warehouse_register_movement.c.organization_id,
+                    warehouse_register_movement.c.warehouse_id,
+                    func.sum(q).label("current_amount"))
+                .where(warehouse_register_movement.c.nomenclature_id == nomenclature_info['id'],
+                       warehouse_register_movement.c.warehouse_id.in_([w['id'] for w in warehouse_db])
+                       )
+                .limit(limit)
+                .offset(offset)
+            ).group_by(
+                nomenclature.c.name,
+                nomenclature.c.id,
+                warehouses.c.name,
+                warehouse_register_movement.c.organization_id,
+                warehouse_register_movement.c.warehouse_id
+            ) \
+                .select_from(warehouse_register_movement
+                             .join(nomenclature,
+                                   warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                                   )) \
+                .select_from(warehouse_register_movement) \
+                .join(warehouses, warehouses.c.id == warehouse_register_movement.c.warehouse_id)
+            warehouse_balances_db = await database.fetch_all(query)
+            nomenclature_info["balances"] = warehouse_balances_db
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
     nomenclature_db_c = await database.fetch_one(query)
