@@ -77,9 +77,9 @@ async def add_referral_user(user_id: str, user_id_ref: str):
     query = (
         users.update()
         .where(and_(
-            users.c.chat_id == user_id,
-            users.c.owner_id == user_id
-        )).values({"ref_id": user_id_ref})
+            users.c.chat_id == str(user_id),
+            users.c.owner_id == str(user_id)
+        )).values({"ref_id": str(user_id_ref)})
     )
     await database.execute(query)
 
@@ -117,7 +117,9 @@ SHARE_NUMBER_KEYBOARD = types.ReplyKeyboardMarkup(keyboard=[
 async def get_open_app_link(token: str) -> types.InlineKeyboardMarkup:
     error_keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
-            types.InlineKeyboardButton(text="Произошла ошибка", callback_data="...")
+            [
+                types.InlineKeyboardButton(text="Произошла ошибка", callback_data="...")
+            ]
         ]
     )
     query = (
@@ -818,18 +820,32 @@ async def reg_user_join(message: types.Message, state: FSMContext):
     if message.contact:
         created, user_query = await prepare_registration(message)
 
-        user = await database.fetch_one(user_query)
+        user_id = await database.fetch_one(user_query)
         data = await state.get_data()
         if data.get("cbox"):
-            rel = await join_cbox(user, data['cbox'])
+            rel = await join_cbox(user_id, data['cbox'])
             answer = texts.invite_cbox.format(token=rel.token, url=app_url)
             await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
             await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
             await state.clear()
         elif data.get("ref_id"):
+            tariff_query = tariffs.select().where(tariffs.c.actual is True)
+            tariff = await database.fetch_one(tariff_query)
+
             await add_referral_user(message.from_user.id, data['ref_id'])
             answer = f"У Вас новая регистрация от {message.from_user.first_name}"
             await bot.send_message(chat_id=int(data['ref_id']), text=answer)
+
+            query = users.select().where(users.c.id == user_id)
+            user = await database.fetch_one(query)
+            rel = await create_cbox(user)
+
+            answer = texts.create_cbox.format(token=rel.token, url=app_url)
+            await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
+            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+            await create_balance(rel.cashbox_id, message, tariff)
+
+            await state.clear()
 
 
 @router_comm.message(lambda message: message.text == "Отменить регистрацию", state="*")
