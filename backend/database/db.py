@@ -461,6 +461,7 @@ users = sqlalchemy.Table(
     sqlalchemy.Column("username", String),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("ref_id", String),
 )
 
 events = sqlalchemy.Table(

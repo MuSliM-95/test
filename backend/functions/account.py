@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 
 import texts
 from bot import bot
-from const import PAID, SUCCESS, BLOCKED, PAY_LINK
+from const import PAID, SUCCESS, BLOCKED
 from database.db import accounts_balances, database, transactions, tariffs, users_cboxes_relation, users
 
 
@@ -93,6 +93,6 @@ async def make_account(balance: accounts_balances) -> None:
             users=users_quantity,
             per_user=balance_tariff.price if balance_tariff.per_user else 0,
             total=price,
-            link=PAY_LINK,
+            link=texts.url_link_pay.format(user_id=user.owner_id, cashbox_id=balance.cashbox),
         ),
     )
