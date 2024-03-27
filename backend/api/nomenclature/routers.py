@@ -20,6 +20,7 @@ from functions.helpers import (
 from sqlalchemy import func, select, and_, desc, asc
 from ws_manager import manager
 import memoization
+import time
 
 
 router = APIRouter(tags=["nomenclature"])
@@ -199,9 +200,12 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         barcodes_nomenclature_record = await database.fetch_all(query)
         nomenclature_barcodes_list = [element.code for element in barcodes_nomenclature_record]
         nomenclature_info["barcodes"] = nomenclature_barcodes_list
+
         if with_prices:
+            print('start: ', time.time())
             price = await get_prices(token, filters = PricesFiltersQuery(name=nomenclature_info["name"]))
             nomenclature_info["prices"] = dict(price)["result"]
+            print('end: ', time.time())
 
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
