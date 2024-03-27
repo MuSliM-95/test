@@ -199,7 +199,6 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         nomenclature_info["barcodes"] = nomenclature_barcodes_list
         if with_prices:
             price = await get_prices(token, filters = PricesFiltersQuery(name=nomenclature_info["name"]))
-            print(price)
             nomenclature_info["prices"] = dict(price)["result"]
 
 
