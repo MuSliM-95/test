@@ -49,9 +49,11 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
 
     return {"result": categories_db, "count": categories_db_count.count_1}
 
+
 async def build_hierarchy(data, parent_id = None, name = None):
     @cached(max_size=128, algorithm=CachingAlgorithmFlag.FIFO, thread_safe=False)
     async def build_children(parent_id):
+
         children = []
         for item in data:
             item = datetime_to_timestamp(item)
@@ -64,7 +66,6 @@ async def build_hierarchy(data, parent_id = None, name = None):
                     where( nomenclature.c.name.ilike(f"%{name}%"),
                            nomenclature.c.category == item.get("id")))
                 item["nom_count"] = len(nomenclature_in_category)
-
             else:
                 item["nom_count"] = 0
 
@@ -76,26 +77,11 @@ async def build_hierarchy(data, parent_id = None, name = None):
 
                 if (item['nom_count'] == 0) and (name is not None):
                     continue
-                item['nom_count'] = count_nomeclature(item['children'], item['nom_count'])
                 children.append(item)
         return children
-    
     tasks = [build_children(parent_id)]
     results = await asyncio.gather(*tasks)
     return results[0]
-
-
-@cached(max_size=128, algorithm=CachingAlgorithmFlag.FIFO, thread_safe=False)
-def count_nomeclature(data, s):
-    @cached(max_size=64, algorithm=CachingAlgorithmFlag.FIFO, thread_safe=False)
-    def count(d, sm):
-        for item in d:
-            if len(item['children']) > 0:
-                sm = sm + count(item['children'], item['nom_count'])
-                print(sm)
-        return sm
-    r = count(data, s)
-    return r
 
 
 @router.get("/categories_tree/", response_model=schemas.CategoryTreeGet)
@@ -135,11 +121,11 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         query = (
             f"""
                 with recursive categories_hierarchy as (
-                select id, name, parent, description, code, status, updated_at, created_at
+                select id, name, parent, description, code, status, updated_at, created_at, 1 as lvl
                 from categories where parent = {category.id}
 
-                union all
-                select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at
+                union
+                select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, H.lvl+1
                 from categories_hierarchy as H
                 join categories as F on F.parent = H.id
                 ) 
@@ -149,8 +135,6 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         childrens = await database.fetch_all(query)
         if childrens:
             category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id, nomenclature_name)
-            category_dict["nom_count"] = count_nomeclature(category_dict['children'],
-                                                                 category_dict["nom_count"])
         else:
             category_dict['children'] = []
         
@@ -168,11 +152,9 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
                     break
 
         if flag is True:
-
             result.append(category_dict)
 
     categories_db = [*map(datetime_to_timestamp, result)]
-
 
     query = select(func.count(categories.c.id)).where(
         categories.c.owner == user.id,
