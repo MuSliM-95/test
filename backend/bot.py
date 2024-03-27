@@ -11,7 +11,7 @@ from aiogram.client.session import aiohttp
 from aiogram.dispatcher.filters.command import CommandObject
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
-from aiogram.types import PhotoSize, ContentType, ChatType
+from aiogram.types import PhotoSize, ContentType
 from sqlalchemy import and_
 
 import texts
