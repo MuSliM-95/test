@@ -4,8 +4,11 @@ from h11._abnf import status_code
 from starlette import status
 
 import api.nomenclature.schemas as schemas
+from api.prices.routers import get_prices
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes
 from fastapi import APIRouter, HTTPException
+
+from functions.filter_schemas import PricesFiltersQuery
 from functions.helpers import (
     check_entity_exists,
     check_unit_exists,
@@ -16,6 +19,7 @@ from functions.helpers import (
 )
 from sqlalchemy import func, select, and_, desc, asc
 from ws_manager import manager
+
 
 router = APIRouter(tags=["nomenclature"])
 
@@ -154,7 +158,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
 
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
-                           offset: int = 0):
+                           offset: int = 0, with_prices: bool = False):
     """Получение списка категорий"""
     user = await get_user_by_token(token)
 
@@ -193,6 +197,11 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         barcodes_nomenclature_record = await database.fetch_all(query)
         nomenclature_barcodes_list = [element.code for element in barcodes_nomenclature_record]
         nomenclature_info["barcodes"] = nomenclature_barcodes_list
+        if with_prices:
+            price = await get_prices(token, filters = PricesFiltersQuery(name=nomenclature_info["name"]))
+            nomenclature_info["prices"] = price["result"]
+
+
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
     nomenclature_db_c = await database.fetch_one(query)

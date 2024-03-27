@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional, List
 
+from api.prices.schemas import  PriceInList
+
 
 class NomenclatureBarcodeCreate(BaseModel):
     barcode: str
@@ -48,6 +50,7 @@ class NomenclatureGet(NomenclatureCreate):
     id: int
     unit_name: Optional[str]
     barcodes: Optional[List[str]]
+    prices: Optional[List[PriceInList]]
     updated_at: int
     created_at: int
 
