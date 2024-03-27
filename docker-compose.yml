@@ -85,11 +85,10 @@ services:
     networks:
       - nginx-proxy
 
-
-  rabbitmq_consumer:
+  message_consumer_task:
     build: ./backend
     restart: always
-    command: python3 consumer.py
+    command: python3 message_consumer.py
     volumes:
       - ./backend:/backend
     depends_on:
@@ -152,7 +151,7 @@ services:
     image: rabbitmq
     restart: always
     ports:
-      - 5672:5672
+      - "5672:5672"
     networks:
       - nginx-proxy
 
@@ -224,7 +223,6 @@ services:
     command: telegraf --config /etc/telegraf/telegraf.conf
     networks:
       - nginx-proxy
-    
 
 volumes:
   pgdata:

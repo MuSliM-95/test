@@ -7,6 +7,9 @@ from sqlalchemy import func, select
 from ws_manager import manager
 import asyncio
 from typing import Optional
+import functools
+from memoization import cached, CachingAlgorithmFlag
+
 
 router = APIRouter(tags=["categories"])
 
@@ -46,21 +49,36 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
 
     return {"result": categories_db, "count": categories_db_count.count_1}
 
-async def build_hierarchy(data, parent_id = None):
+
+async def build_hierarchy(data, parent_id = None, name = None):
+    @cached(max_size=128, algorithm=CachingAlgorithmFlag.FIFO, thread_safe=False)
     async def build_children(parent_id):
+
         children = []
         for item in data:
             item = datetime_to_timestamp(item)
             item['children'] = []
             item['key'] = item['id']
+
+            if name is not None:
+                nomenclature_in_category = await database.fetch_all(
+                    nomenclature.select().
+                    where( nomenclature.c.name.ilike(f"%{name}%"),
+                           nomenclature.c.category == item.get("id")))
+                item["nom_count"] = len(nomenclature_in_category)
+            else:
+                item["nom_count"] = 0
+
             item['expanded_flag'] = False
             if item['parent'] == parent_id:
                 grandchildren = await build_children(item['id'])
                 if grandchildren:
                     item['children'] = grandchildren
+
+                if (item['nom_count'] == 0) and (name is not None):
+                    continue
                 children.append(item)
         return children
-    
     tasks = [build_children(parent_id)]
     results = await asyncio.gather(*tasks)
     return results[0]
@@ -82,27 +100,32 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     categories_db = await database.fetch_all(query)
     result = []
 
+    nomenclature_list = []
     if nomenclature_name != None:
         q = nomenclature.select().where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category != None)
         nomenclature_list = await database.fetch_all(q)
 
     for category in categories_db:
-        nomenclature_in_category = await database.fetch_all(
-            nomenclature.select().
-            where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
-
         category_dict = dict(category)
         category_dict['key'] = category_dict['id']
-        category_dict["nom_count"] = len(nomenclature_in_category)
+
+        if nomenclature_name is not None:
+            nomenclature_in_category = await database.fetch_all(
+                nomenclature.select().
+                where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
+            category_dict["nom_count"] = len(nomenclature_in_category)
+        else:
+            category_dict["nom_count"] = 0
+
         category_dict['expanded_flag'] = False
         query = (
             f"""
                 with recursive categories_hierarchy as (
-                select id, name, parent, description, code, status, updated_at, created_at
+                select id, name, parent, description, code, status, updated_at, created_at, 1 as lvl
                 from categories where parent = {category.id}
 
-                union all
-                select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at
+                union
+                select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, H.lvl+1
                 from categories_hierarchy as H
                 join categories as F on F.parent = H.id
                 ) 
@@ -111,7 +134,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
         )
         childrens = await database.fetch_all(query)
         if childrens:
-            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id)
+            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id, nomenclature_name)
         else:
             category_dict['children'] = []
         
@@ -133,7 +156,6 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
     categories_db = [*map(datetime_to_timestamp, result)]
 
-
     query = select(func.count(categories.c.id)).where(
         categories.c.owner == user.id,
         categories.c.is_deleted.is_not(True),
@@ -141,6 +163,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
 
     categories_db_count = await database.fetch_one(query)
     return {"result": categories_db, "count": categories_db_count.count_1}
+
 
 @router.post("/categories/", response_model=schemas.CategoryList)
 async def new_categories(token: str, categories_data: schemas.CategoryCreateMass):

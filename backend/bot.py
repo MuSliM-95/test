@@ -11,7 +11,8 @@ from aiogram.client.session import aiohttp
 from aiogram.dispatcher.filters.command import CommandObject
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
-from aiogram.types import PhotoSize
+from aiogram.types import PhotoSize, ContentType
+from sqlalchemy import and_
 
 import texts
 from api.articles.routers import new_article
@@ -22,7 +23,7 @@ from api.payments.routers import create_payment
 from api.payments.schemas import PaymentCreate
 from api.pboxes.routers import create_paybox
 from api.pboxes.schemas import PayboxesCreate
-from const import DEMO, PAY_LINK, cheque_service_url
+from const import DEMO, cheque_service_url
 from database.db import database, cboxes, users, users_cboxes_relation, accounts_balances, tariffs, pboxes, payments, \
     articles, cheques, contragents, messages
 from functions.cboxes import create_cbox, join_cbox
@@ -72,6 +73,17 @@ choose_keyboard = types.ReplyKeyboardMarkup(
 )
 
 
+async def add_referral_user(user_id: str, user_id_ref: str):
+    query = (
+        users.update()
+        .where(and_(
+            users.c.chat_id == user_id,
+            users.c.owner_id == user_id
+        )).values({"ref_id": user_id_ref})
+    )
+    await database.execute(query)
+
+
 async def store_user_message(message: types.Message):
     relship = messages.insert().values(
         tg_message_id=message.message_id,
@@ -102,7 +114,30 @@ SHARE_NUMBER_KEYBOARD = types.ReplyKeyboardMarkup(keyboard=[
 ], row_width=1, resize_keyboard=True)
 
 
-def get_open_app_link(token: str) -> types.InlineKeyboardMarkup:
+async def get_open_app_link(token: str) -> types.InlineKeyboardMarkup:
+    error_keyboard = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            types.InlineKeyboardButton(text="Произошла ошибка", callback_data="...")
+        ]
+    )
+    query = (
+        users_cboxes_relation.select()
+        .where(users_cboxes_relation.c.token == token)
+    )
+    user_cbox_relation = await database.fetch_one(query)
+
+    if not user_cbox_relation:
+        return error_keyboard
+
+    query = (
+        users.select()
+        .where(users.c.id == user_cbox_relation.user)
+    )
+    tg_account_info = await database.fetch_one(query)
+
+    if not tg_account_info:
+        return error_keyboard
+
     return types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -114,7 +149,7 @@ def get_open_app_link(token: str) -> types.InlineKeyboardMarkup:
             [
                 types.InlineKeyboardButton(
                     text="💰 Оплатить подписку",
-                    url=PAY_LINK
+                    url=texts.url_link_pay.format(user_id=tg_account_info.owner_id, cashbox_id=user_cbox_relation.cashbox_id)
                 )
             ],
         ]
@@ -176,7 +211,7 @@ async def generate_new_user_access_token_for_cashbox(user_id: int, cashbox_id: i
     return token
 
 
-@router_comm.message(commands="referral")
+@router_comm.message(F.chat.type == "private", commands="referral")
 async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
     """
     /referral command handler for all chats
@@ -189,7 +224,12 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             users.c.owner_id == str(message.from_user.id)
         )
     )
-    ref_url = f"https://t.me/tablecrmbot?start=referral_{message.chat.id}"
+    if not user:
+        await welcome_and_share_number(message)
+        await state.set_state(Form.start)
+        return
+
+    ref_url = f"https://t.me/tablecrmbot?start=referral_{message.from_user.id}"
 
     answer = f'''
 Ваша ссылка для приглашения:
@@ -210,7 +250,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
     """
     /start command handler for private chats
-    :param message: Telegram message with "/start" command
     """
     await store_user_message(message)
 
@@ -221,115 +260,129 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         )
     )
 
-    if not user:
+    command_args = command.args
+
+    if not user and not command_args:
         # В случае если юзера не приглашали и он ещё не был зарегистрирован - приглашаем и выходим
         await welcome_and_share_number(message)
         await state.set_state(Form.start)
         return
-        
-    invite_token = command.args
 
-    if "referral" in str(invite_token):
-        try:
-            if user:
-                phone = user.phone_number
-            if phone:
-                    answer = f"У вас уже есть регистрация в tablecrm.com!"   
-                    await message.answer(text=answer)
-                    await store_bot_message(
-                        tg_message_id=message.message_id + 1,
-                        tg_user_or_chat=str(message.from_user.id),
-                        from_or_to=str(bot.id),
-                        body=answer
-                    )
-                    return
-        except Exception as exc:
-            logging.info(exc)
+    if user and not command_args:
+        users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
 
-    
-
-    if "referral" in str(invite_token):
-        ref_id = invite_token.split("referral_")[-1]
-
-        if int(ref_id) != int(message.from_user.id):
-            answer = f'''
-У Вас новая регистрация:
-@{message.from_user.username}
-'''     
-
+        if users_cbox:
+            # Если у юзера есть cashbox - генерируем новый токен для него
+            token = await generate_new_user_access_token_for_cashbox(user_id=user.id, cashbox_id=users_cbox.id)
+            answer = texts.change_token.format(token=token, url=app_url)
         else:
-            answer = f'''
-Вы не можете регистировать самого себя!
-'''     
-        await bot.send_message(chat_id=int(ref_id), text=answer)
+            # В ином случае создаем новый cashbox
+            token = (await create_cbox(user)).token
+            answer = texts.create_cbox.format(token=token, url=app_url)
+
+        # Возвращаем ссылку на открытие приложения
+        await message.answer(text=answer, reply_markup=await get_open_app_link(token))
         await store_bot_message(
             tg_message_id=message.message_id + 1,
-            tg_user_or_chat=str(ref_id),
+            tg_user_or_chat=str(message.chat.id),
             from_or_to=str(bot.id),
             body=answer
         )
-        return
 
-    if invite_token:
-        # Если пользователь пришел по пригласительной ссылке -
-        # пытаемся достать cashbox к которому его хотят присоединить
-        cbox_by_invite = await database.fetch_one(cboxes.select().where(cboxes.c.invite_token == invite_token))
-
-        if not cbox_by_invite:
-            # Если пригласительный токен - невалидный - возвращаем ошибку
-            answer = texts.bad_token
-            await message.answer(text=answer, reply_markup=types.ReplyKeyboardRemove())
+    if user and command_args:
+        if "referral" in str(command_args):
+            answer = f"У вас уже есть регистрация в tablecrm.com!"
+            await message.answer(text=answer)
             await store_bot_message(
                 tg_message_id=message.message_id + 1,
-                tg_user_or_chat=str(message.chat.id),
+                tg_user_or_chat=str(message.from_user.id),
                 from_or_to=str(bot.id),
                 body=answer
             )
             return
+        else:
+            # Если пользователь пришел по пригласительной ссылке -
+            # пытаемся достать cashbox к которому его хотят присоединить
+            cbox_by_invite = await database.fetch_one(cboxes.select().where(cboxes.c.invite_token == command_args))
 
-        if user:
-            # Если юзер уже существовал - проверяем привязку к cashbox в который его пригласили.
+            if not cbox_by_invite:
+                # Если пригласительный токен - невалидный - возвращаем ошибку
+                answer = texts.bad_token
+                await message.answer(text=answer, reply_markup=types.ReplyKeyboardRemove())
+                await store_bot_message(
+                    tg_message_id=message.message_id + 1,
+                    tg_user_or_chat=str(message.chat.id),
+                    from_or_to=str(bot.id),
+                    body=answer
+                )
+                return
+
+            # Если юзер уже существовует - проверяем привязку к cashbox в который его пригласили.
             # Если привязки нет - создаем новую.
             user_to_cashbox_rel = await user_rel_to_cashbox(user_id=user.id, cbox_id=cbox_by_invite.id)
             if not user_to_cashbox_rel:
                 user_to_cashbox_rel = await create_user_to_cashbox_rel(user_id=user.id, cbox_id=cbox_by_invite.id)
 
             answer = texts.invite_cbox.format(token=user_to_cashbox_rel.token, url=app_url)
-            await message.answer(text=answer, reply_markup=get_open_app_link(user_to_cashbox_rel.token))
+            await message.answer(text=answer, reply_markup=await get_open_app_link(user_to_cashbox_rel.token))
             await store_bot_message(
                 tg_message_id=message.message_id + 1,
                 tg_user_or_chat=str(message.chat.id),
                 from_or_to=str(bot.id),
                 body=answer
             )
+
+    if not user and command_args:
+        if "referral" in str(command_args):
+            ref_id = command_args.split("referral_")[-1]
+
+            query = users.select().where(and_(users.c.chat_id == ref_id, users.c.owner_id == ref_id))
+            users_ref_exist = await database.fetch_one(query)
+
+            if not users_ref_exist:
+                await message.answer(text="Пользователя, который вас пригласил, не существует")
+                await store_bot_message(
+                    tg_message_id=message.message_id + 1,
+                    tg_user_or_chat=str(ref_id),
+                    from_or_to=str(bot.id),
+                    body="Вы не можете регистировать самого себя!"
+                )
+                return
+
+            if int(ref_id) == int(message.from_user.id):
+                await message.answer(text="Вы не можете регистировать самого себя!")
+                await store_bot_message(
+                    tg_message_id=message.message_id + 1,
+                    tg_user_or_chat=str(ref_id),
+                    from_or_to=str(bot.id),
+                    body="Вы не можете регистировать самого себя!"
+                )
+                return
+
+            # Приглашаем юзера присоединиться в систему и сохраняем информацию о приглашении
+            await welcome_and_share_number(message)
+            await state.set_state(Form.join)
+            await state.update_data(ref_id=ref_id)
         else:
-            # Иначе приглашаем юзера присоединиться в систему и сохраняем информацию о приглашении
+            # Если пользователь пришел по пригласительной ссылке -
+            # пытаемся достать cashbox к которому его хотят присоединить
+            cbox_by_invite = await database.fetch_one(cboxes.select().where(cboxes.c.invite_token == command_args))
+
+            if not cbox_by_invite:
+                # Если пригласительный токен - невалидный - возвращаем ошибку
+                answer = texts.bad_token
+                await message.answer(text=answer, reply_markup=types.ReplyKeyboardRemove())
+                await store_bot_message(
+                    tg_message_id=message.message_id + 1,
+                    tg_user_or_chat=str(message.chat.id),
+                    from_or_to=str(bot.id),
+                    body=answer
+                )
+                return
+            # Приглашаем юзера присоединиться в систему и сохраняем информацию о приглашении
             await welcome_and_share_number(message)
             await state.set_state(Form.join)
             await state.update_data(cbox=dict(cbox_by_invite))
-        return
-
-    
-
-    users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
-
-    if users_cbox:
-        # Если у юзера есть cashbox - генерируем новый токен для него
-        token = await generate_new_user_access_token_for_cashbox(user_id=user.id, cashbox_id=users_cbox.id)
-        answer = texts.change_token.format(token=token, url=app_url)
-    else:
-        # В ином случае создаем новый cashbox
-        token = (await create_cbox(user)).token
-        answer = texts.create_cbox.format(token=token, url=app_url)
-
-    # Возвращаем ссылку на открытие приложения
-    await message.answer(text=answer, reply_markup=get_open_app_link(token))
-    await store_bot_message(
-        tg_message_id=message.message_id + 1,
-        tg_user_or_chat=str(message.chat.id),
-        from_or_to=str(bot.id),
-        body=answer
-    )
 
 
 @router_comm.message(commands="newcheque")
@@ -566,12 +619,12 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
 
                     await database.execute(query)
                     answer = texts.change_token.format(token=new_token, url=app_url)
-                    await message.answer(text=answer, reply_markup=get_open_app_link(new_token))
+                    await message.answer(text=answer, reply_markup=await get_open_app_link(new_token))
                     await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
                 else:
                     rel = await create_cbox(user_and_chat)
                     answer = texts.create_cbox.format(token=rel.token, url=app_url)
-                    await message.answer(text=answer, reply_markup=get_open_app_link(rel.token))
+                    await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
                     await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
                     await create_balance(rel.cashbox_id, message)
             else:
@@ -595,7 +648,7 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
 
                 rel = await create_cbox(user)
                 answer = texts.create_cbox.format(token=rel.token, url=app_url)
-                await message.answer(text=answer, reply_markup=get_open_app_link(rel.token))
+                await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
                 await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
                 await create_balance(rel.cashbox_id, message)
 
@@ -624,6 +677,30 @@ async def broadcast_message(message: types.Message, state: FSMContext):
         await message.answer(texts.send_broadcast_message)
         await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.send_broadcast_message)
         await state.set_state(DeliveryForm.send)
+
+
+@router_comm.message(content_types=ContentType.TEXT, state=DeliveryForm.send)
+async def send_text_broadcast_message(message: types.Message, state: FSMContext):
+    """
+    Get and send text message
+    """
+    BroadcastMessageStore.picture = None
+    BroadcastMessageStore.text = message.md_text.replace("\\", "")
+    BroadcastMessageStore.tg_message_id = message.message_id
+    BroadcastMessageStore.tg_user_or_chat = str(message.chat.id)
+    BroadcastMessageStore.created_at = str(message.date)
+
+    query = users.select().where(users.c.is_blocked == False)
+    last_active_users = await database.fetch_all(query)
+    await store_user_message(message)
+    await message.answer(
+        f"Вы уверены что хотите разослать сообщение по {len(last_active_users) - 1} живым пользователям?",
+        reply_markup=choose_keyboard
+    )
+    await store_bot_message(message.message_id + 1, message.chat.id, bot.id,
+                            f"Вы уверены что хотите разослать сообщение "
+                            f"по {len(last_active_users) - 1} живым пользователям?")
+    await state.set_state(DeliveryForm.submit)
 
 
 @router_comm.message(content_types=["photo"], state=DeliveryForm.send)
@@ -701,14 +778,14 @@ async def create_balance(cashbox_id, message, tariff=None):
             n=tariff.demo_days,
             tax=tariff.price,
             for_user=" за пользователя" if tariff.per_user else "",
-            link=PAY_LINK,
+            link=texts.url_link_pay.format(user_id=message.from_user.od, cashbox_id=cashbox_id),
         ),
     )
     await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.you_got_demo.format(
         n=tariff.demo_days,
         tax=tariff.price,
         for_user=" за пользователя" if tariff.per_user else "",
-        link=PAY_LINK,
+        link=texts.url_link_pay.format(user_id=message.from_user.od, cashbox_id=cashbox_id),
     ))
 
 
@@ -728,7 +805,7 @@ async def reg_user_create(message: types.Message, state: FSMContext):
         rel = await create_cbox(user)
 
         answer = texts.create_cbox.format(token=rel.token, url=app_url)
-        await message.answer(text=answer, reply_markup=get_open_app_link(rel.token))
+        await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
         await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
         await create_balance(rel.cashbox_id, message, tariff)
 
@@ -743,11 +820,16 @@ async def reg_user_join(message: types.Message, state: FSMContext):
 
         user = await database.fetch_one(user_query)
         data = await state.get_data()
-        rel = await join_cbox(user, data['cbox'])
-        answer = texts.invite_cbox.format(token=rel.token, url=app_url)
-        await message.answer(text=answer, reply_markup=get_open_app_link(rel.token))
-        await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
-        await state.clear()
+        if data.get("cbox"):
+            rel = await join_cbox(user, data['cbox'])
+            answer = texts.invite_cbox.format(token=rel.token, url=app_url)
+            await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
+            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+            await state.clear()
+        elif data.get("ref_id"):
+            await add_referral_user(message.from_user.id, data['ref_id'])
+            answer = f"У Вас новая регистрация от {message.from_user.first_name}"
+            await bot.send_message(chat_id=int(data['ref_id']), text=answer)
 
 
 @router_comm.message(lambda message: message.text == "Отменить регистрацию", state="*")
@@ -800,9 +882,12 @@ async def finish_broadcast_messaging(chat_id: str, total: int, active_before: in
         print("Notification failed")
 
 
-async def message_to_chat_by_id(chat_id: str, message: str):
+async def message_to_chat_by_id(chat_id: str, message: str, picture):
     try:
-        await bot.send_message(chat_id=chat_id, text=message, parse_mode="markdown")
+        if picture:
+            await bot.send_photo(chat_id=chat_id, photo=picture, caption=message, parse_mode="markdown")
+        else:
+            await bot.send_message(chat_id=chat_id, text=message, parse_mode="markdown")
         print(f"Sent to {chat_id}")
     except Exception as e:
         print(f"Broadcast sending message to {chat_id} exception occured {e}")

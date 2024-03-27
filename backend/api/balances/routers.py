@@ -2,9 +2,9 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import func, select
 
-from const import PAY_LINK
-from database.db import users_cboxes_relation, database, accounts_balances, tariffs
+from database.db import users_cboxes_relation, database, accounts_balances, tariffs, users
 from api.balances.schemas import AccountInfo
+from texts import url_link_pay
 
 router = APIRouter(tags=["account"])
 
@@ -18,7 +18,7 @@ async def get_account_info(token: str):
     if user:
         if user.status:
             balance = await database.fetch_one(
-                accounts_balances.select(accounts_balances.c.cashbox==user.cashbox_id)
+                accounts_balances.select(accounts_balances.c.cashbox == user.cashbox_id)
             )
             if balance:
                 balance_tariff = await database.fetch_one(
@@ -34,17 +34,23 @@ async def get_account_info(token: str):
                     .timestamp()
                 )
                 demo_left = demo_expiration - datetime.utcnow().timestamp()
+
+                tg_account_info = users.select().where(users.c.id == user.user)
+
+                if not tg_account_info:
+                    raise HTTPException(status_code=404, detail="Нет доп. информации о вашем телеграм аккаунте")
+
                 info = AccountInfo(
-                    type = balance.tariff_type,
-                    demo_expiration = demo_expiration,
-                    demo_left = demo_left if demo_left >= 0 else 0,
-                    balance = balance.balance,
-                    users = users_quantity,
-                    price = balance_tariff.price,
-                    is_per_user = balance_tariff.per_user,
-                    tariff = balance_tariff.name,
-                    link_for_pay = PAY_LINK,
-                    demo_period = balance_tariff.demo_days,
+                    type=balance.tariff_type,
+                    demo_expiration=demo_expiration,
+                    demo_left=demo_left if demo_left >= 0 else 0,
+                    balance=balance.balance,
+                    users=users_quantity,
+                    price=balance_tariff.price,
+                    is_per_user=balance_tariff.per_user,
+                    tariff=balance_tariff.name,
+                    link_for_pay=url_link_pay.format(user_id=tg_account_info.owner_id, cashbox_id=user.cashbox_id),
+                    demo_period=balance_tariff.demo_days,
                 )
                 return info
             raise HTTPException(status_code=404, detail="Нет доп. информации о вашем аккаунте")

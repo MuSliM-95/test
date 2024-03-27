@@ -90,3 +90,8 @@ class PriceListPure(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PriceGetWithNomenclature(BaseModel):
+    price: Optional[float]
+    price_type: Optional[str]

@@ -1,6 +1,6 @@
 welcome = """Добро пожаловать, {username}."""
 app_url_with_token = """https://{base_url}?token={token}"""
-
+url_link_pay = """t.me/tablecrmhelpbot?start=user{user_id}cashbox{cashbox_id}"""
 invite_cbox = """Вы успешно были приглашены в кассу! 
 
 Ваш токен: <code>{token}</code> 

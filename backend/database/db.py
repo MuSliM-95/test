@@ -449,8 +449,8 @@ users = sqlalchemy.Table(
     "tg_accounts",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("is_admin", Boolean, default=False),
-    sqlalchemy.Column("is_blocked", Boolean, default=False),
+    sqlalchemy.Column("is_admin", Boolean, server_default="false"),
+    sqlalchemy.Column("is_blocked", Boolean, server_default="false"),
     sqlalchemy.Column("chat_id", String, unique=True),
     sqlalchemy.Column("owner_id", String),
     sqlalchemy.Column("phone_number", String),
@@ -461,6 +461,7 @@ users = sqlalchemy.Table(
     sqlalchemy.Column("username", String),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("ref_id", String),
 )
 
 events = sqlalchemy.Table(

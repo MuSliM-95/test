@@ -57,3 +57,8 @@ class RegisterStockView(BaseModel):
     cashbox_id: Optional[int]
     updated_at: int
     created_at: int
+
+
+class WarehouseWithNomenclature(BaseModel):
+    warehouse_name: Optional[str]
+    current_amount: float
