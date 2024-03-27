@@ -5,7 +5,7 @@ from starlette import status
 
 import api.nomenclature.schemas as schemas
 from api.prices.routers import get_prices
-from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes
+from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types
 from fastapi import APIRouter, HTTPException
 
 from functions.filter_schemas import PricesFiltersQuery
@@ -158,7 +158,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
     return nomenclature_db
 
 
-@memoization.cached(max_size = 256)
+@memoization.cached(max_size=None)
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0, with_prices: bool = False):
@@ -202,10 +202,14 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         nomenclature_info["barcodes"] = nomenclature_barcodes_list
 
         if with_prices:
-            print('start: ', time.time())
-            price = await get_prices(token, filters = PricesFiltersQuery(name=nomenclature_info["name"]))
-            nomenclature_info["prices"] = dict(price)["result"]
-            print('end: ', time.time())
+            price = await database.fetch_all(
+                select(prices.c.price, price_types.c.name.label('price_type')).
+                where(prices.c.nomenclature == nomenclature_info['id']).
+                select_from(prices).
+                join(price_types, price_types.c.id == prices.c.price_type)
+            )
+
+            nomenclature_info["prices"] = price
 
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
