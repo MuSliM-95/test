@@ -753,7 +753,7 @@ async def prepare_registration(message):
         username=message.from_user.username,
         created_at=created,
         updated_at=created
-    )
+    ).returning(users)
     return created, user_query
 
 
@@ -836,7 +836,7 @@ async def reg_user_join(message: types.Message, state: FSMContext):
             answer = f"У Вас новая регистрация от {message.from_user.first_name}"
             await bot.send_message(chat_id=int(data['ref_id']), text=answer)
 
-            query = users.select().where(users.c.id == user_id)
+            query = users.select().where(users.c.id == user_id.id)
             user = await database.fetch_one(query)
             rel = await create_cbox(user)
 
