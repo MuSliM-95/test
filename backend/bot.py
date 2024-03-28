@@ -780,14 +780,14 @@ async def create_balance(cashbox_id, message, tariff=None):
             n=tariff.demo_days,
             tax=tariff.price,
             for_user=" за пользователя" if tariff.per_user else "",
-            link=texts.url_link_pay.format(user_id=message.from_user.od, cashbox_id=cashbox_id),
+            link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
         ),
     )
     await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.you_got_demo.format(
         n=tariff.demo_days,
         tax=tariff.price,
         for_user=" за пользователя" if tariff.per_user else "",
-        link=texts.url_link_pay.format(user_id=message.from_user.od, cashbox_id=cashbox_id),
+        link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
     ))
 
 
