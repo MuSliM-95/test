@@ -800,9 +800,9 @@ async def reg_user_create(message: types.Message, state: FSMContext):
 
         created, user_query = await prepare_registration(message)
 
-        user_id = await database.execute(user_query)
+        user_create_record = await database.fetch_one(user_query)
 
-        query = users.select().where(users.c.id == user_id)
+        query = users.select().where(users.c.id == user_create_record.id)
         user = await database.fetch_one(query)
         rel = await create_cbox(user)
 
@@ -820,10 +820,10 @@ async def reg_user_join(message: types.Message, state: FSMContext):
     if message.contact:
         created, user_query = await prepare_registration(message)
 
-        user_id = await database.fetch_one(user_query)
+        user_create_record = await database.fetch_one(user_query)
         data = await state.get_data()
         if data.get("cbox"):
-            rel = await join_cbox(user_id, data['cbox'])
+            rel = await join_cbox(user_create_record, data['cbox'])
             answer = texts.invite_cbox.format(token=rel.token, url=app_url)
             await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
             await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
@@ -836,7 +836,7 @@ async def reg_user_join(message: types.Message, state: FSMContext):
             answer = f"У Вас новая регистрация от {message.from_user.first_name}"
             await bot.send_message(chat_id=int(data['ref_id']), text=answer)
 
-            query = users.select().where(users.c.id == user_id.id)
+            query = users.select().where(users.c.id == user_create_record.id)
             user = await database.fetch_one(query)
             rel = await create_cbox(user)
 
