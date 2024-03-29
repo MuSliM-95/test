@@ -52,7 +52,7 @@ async def check_relationship(entity):
 
         return {"error": exeptions, "entity": entity}
     except Exception as error:
-        raise Exception("error check doc_warehouse failed")
+        raise Exception(f"error check doc_warehouse failed {error}")
 
 
 async def set_data_doc_warehouse(**kwargs):
