@@ -577,6 +577,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "to_warehouse": None,
                 "status": True,
                 "contragent": instance_values['contragent'],
+                "organization":instance_values['organization'],
                 "operation": "outgoing",
                 "comment": instance_values['comment'],
                 "warehouse": instance_values['warehouse'],
