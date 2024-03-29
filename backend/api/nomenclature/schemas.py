@@ -14,7 +14,7 @@ class NomenclatureCreate(BaseModel):
     type: Optional[str]
     description_short: Optional[str]
     description_long: Optional[str]
-    code: Optional[int]
+    code: Optional[str]
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
