@@ -167,8 +167,13 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
                             detail="Укажите только один из параметров: 'name' или 'barcode'")
 
     query = (
-        select(nomenclature, units.c.convent_national_view.label("unit_name"))
+        select(
+            nomenclature,
+            units.c.convent_national_view.label("unit_name"),
+            func.array_agg(func.distinct(nomenclature_barcodes.c.code)).label("barcodes")
+        )
         .join(units, units.c.id == nomenclature.c.unit)
+        .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
     )
 
     filters = [
@@ -184,21 +189,12 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     if category:
         filters.append(nomenclature.c.category == category)
 
-    query = query.where(*filters).limit(limit).offset(offset).order_by(asc(nomenclature.c.id))
+    query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id, units.c.convent_national_view).order_by(asc(nomenclature.c.id))
 
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
     for nomenclature_info in nomenclature_db:
-        query = (
-            select(nomenclature_barcodes.c.code)
-            .where(nomenclature_barcodes.c.nomenclature_id == nomenclature_info["id"])
-            .order_by(desc(nomenclature_barcodes.c.id))
-        )
-        barcodes_nomenclature_record = await database.fetch_all(query)
-        nomenclature_barcodes_list = [element.code for element in barcodes_nomenclature_record]
-        nomenclature_info["barcodes"] = nomenclature_barcodes_list
-
         if with_prices:
             price = await database.fetch_all(
                 select(prices.c.price, price_types.c.name.label('price_type')).
