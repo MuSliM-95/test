@@ -1,15 +1,12 @@
 from typing import List, Optional
 
-from h11._abnf import status_code
 from starlette import status
 
 import api.nomenclature.schemas as schemas
-from api.prices.routers import get_prices
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
-    warehouse_register_movement, warehouses
+    warehouse_register_movement, warehouses, units
 from fastapi import APIRouter, HTTPException
 
-from functions.filter_schemas import PricesFiltersQuery
 from functions.helpers import (
     check_entity_exists,
     check_unit_exists,
@@ -21,7 +18,6 @@ from functions.helpers import (
 from sqlalchemy import func, select, and_, desc, asc, case
 from ws_manager import manager
 import memoization
-import time
 
 
 router = APIRouter(tags=["nomenclature"])
@@ -170,7 +166,10 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Укажите только один из параметров: 'name' или 'barcode'")
 
-    query = nomenclature.select()
+    query = (
+        select(nomenclature, units.c.convent_national_view.label("unit_name"))
+        .join(units, units.c.id == nomenclature.c.unit)
+    )
 
     filters = [
         nomenclature.c.cashbox == user.cashbox_id,
@@ -189,8 +188,6 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
 
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
-    nomenclature_db = [*map(nomenclature_unit_id_to_name, nomenclature_db)]
-    nomenclature_db = [await inst for inst in nomenclature_db]
 
     for nomenclature_info in nomenclature_db:
         query = (
@@ -221,7 +218,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
                 else_=warehouse_register_movement.c.amount
 
             )
-            query =  (
+            query = (
                 select(
                     nomenclature.c.id,
                     nomenclature.c.name,
