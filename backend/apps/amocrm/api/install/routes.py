@@ -2,6 +2,7 @@ from datetime import datetime
 
 import aiohttp
 from fastapi import HTTPException, APIRouter
+from sqlalchemy import and_
 from starlette import status
 
 
@@ -18,14 +19,17 @@ router = APIRouter(tags=["amocrm"])
 
 @router.get("/amo_connect")
 async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widget: str):
-    query = amo_install.select().where(amo_install.c.referrer == referer)
-    install = await database.fetch_one(query)
-
     query = amo_settings.select().where(amo_settings.c.integration_id == client_id)
     setting_info = await database.fetch_one(query)
 
     if not setting_info:
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="widget not found")
+
+    query = amo_install.select().where(and_(
+        amo_install.c.referrer == referer,
+        amo_install.c.from_widget == setting_info.id
+    ))
+    install = await database.fetch_one(query)
 
     async with aiohttp.ClientSession() as session:
 
