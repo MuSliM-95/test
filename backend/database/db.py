@@ -695,6 +695,7 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("field_id", Integer),
     sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
+    sqlalchemy.Column("is_refresh", Boolean, server_default="false"),
 )
 
 amo_integrations = sqlalchemy.Table(
@@ -1188,7 +1189,6 @@ amo_settings = sqlalchemy.Table(
     sqlalchemy.Column("load_type_id", Integer, ForeignKey("amo_settings_load_types.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.Column("is_refresh", Boolean, server_default="false"),
     extend_existing=True
 )
 
