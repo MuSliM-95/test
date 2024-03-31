@@ -174,7 +174,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         )
         .select_from(nomenclature)
         .join(units, units.c.id == nomenclature.c.unit)
-        .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
+        # .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
     )
 
     filters = [
@@ -185,7 +185,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     if name:
         filters.append(nomenclature.c.name.ilike(f"%{name}%"))
     if barcode:
-        # query = query.join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
+        query = query.join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
         filters.append(nomenclature_barcodes.c.code == barcode)
     if category:
         filters.append(nomenclature.c.category == category)
