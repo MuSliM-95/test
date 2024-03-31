@@ -60,30 +60,6 @@ class NomenclatureGet(NomenclatureCreate):
         orm_mode = True
 
 
-class NomenclatureGetFind(BaseModel):
-    id: int
-    name: str
-    type: Optional[str]
-    description_short: Optional[str]
-    description_long: Optional[str]
-    code: Optional[str]
-    unit: Optional[int]
-    category: Optional[int]
-    manufacturer: Optional[int]
-    unit_name: Optional[str]
-    barcodes: Optional[List[str]]
-    prices: Optional[List[PriceGetWithNomenclature]]
-    balances: Optional[List[WarehouseWithNomenclature]]
-
-    class Config:
-        orm_mode = True
-
-
-class NomenclatureListGetResFind(BaseModel):
-    result: Optional[List[NomenclatureGetFind]]
-    count: int
-
-
 class NomenclatureList(BaseModel):
     __root__: Optional[List[Nomenclature]]
 

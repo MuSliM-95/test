@@ -250,14 +250,6 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
 
 
-@router.get("/nomenclature/find", response_model=schemas.NomenclatureListGetResFind)
-async def get_nomenclature_find(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
-                           offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
-    """Получение списка категорий"""
-    result = await get_nomenclature(token, name, barcode, category, limit, offset, with_prices, with_balance, in_warehouse)
-    return result
-
-
 @router.post("/nomenclature/", response_model=schemas.NomenclatureList)
 async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCreateMass):
     """Создание категории"""
