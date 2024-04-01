@@ -862,7 +862,7 @@ docs_warehouse = sqlalchemy.Table(
     sqlalchemy.Column("warehouse", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("to_warehouse", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("sum", Float),
-    sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("created_by", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
