@@ -170,7 +170,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         select(
             nomenclature,
             units.c.convent_national_view.label("unit_name"),
-            func.array_agg(func.distinct(coalesce(nomenclature_barcodes.c.code, None))).label("barcodes")
+            func.array_remove(func.array_agg(func.distinct(nomenclature_barcodes.c.code)), None).label("barcodes")
         )
         .select_from(nomenclature)
         .join(units, units.c.id == nomenclature.c.unit, full=True)
@@ -190,7 +190,6 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         filters.append(nomenclature.c.category == category)
 
     query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id, units.c.convent_national_view).order_by(asc(nomenclature.c.id))
-    print(query)
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
@@ -245,9 +244,9 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
             nomenclature_info["balances"] = warehouse_balances_db
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
-    nomenclature_db_c = await database.fetch_one(query)
+    nomenclature_db_count = await database.fetch_val(query)
 
-    return {"result": nomenclature_db, "count": nomenclature_db_c.count_1}
+    return {"result": nomenclature_db, "count": nomenclature_db_count}
 
 
 @router.post("/nomenclature/", response_model=schemas.NomenclatureList)
