@@ -64,7 +64,7 @@ from apps.tochka_bank.routes import router as tochka_router
 
 
 sentry_sdk.init(
-    dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
+    dsn="https://86b45a2d42bd46a582ff4cdb6f3fe117@sentry.tablecrm.com/2",
     # Set traces_sample_rate to 1.0 to capture 100%
     # of transactions for performance monitoring.
     # We recommend adjusting this value in production,
