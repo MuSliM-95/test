@@ -15,7 +15,8 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select, and_, desc, asc, case
+from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null
+from sqlalchemy.sql.functions import coalesce
 from ws_manager import manager
 import memoization
 
@@ -169,11 +170,11 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         select(
             nomenclature,
             units.c.convent_national_view.label("unit_name"),
-            func.array_agg(func.distinct(nomenclature_barcodes.c.code)).label("barcodes")
+            func.array_agg(func.distinct(coalesce(nomenclature_barcodes.c.code, null))).label("barcodes")
         )
         .select_from(nomenclature)
-        .join(units, units.c.id == nomenclature.c.unit)
-        .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id)
+        .join(units, units.c.id == nomenclature.c.unit, full=True)
+        .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, full=True)
     )
 
     filters = [
@@ -190,7 +191,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         filters.append(nomenclature.c.category == category)
 
     query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id, units.c.convent_national_view).order_by(asc(nomenclature.c.id))
-
+    print(query)
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
