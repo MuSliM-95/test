@@ -170,7 +170,7 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
         select(
             nomenclature,
             units.c.convent_national_view.label("unit_name"),
-            func.array_agg(func.distinct(coalesce(nomenclature_barcodes.c.code, null))).label("barcodes")
+            func.array_agg(func.distinct(coalesce(nomenclature_barcodes.c.code, ''))).label("barcodes")
         )
         .select_from(nomenclature)
         .join(units, units.c.id == nomenclature.c.unit, full=True)
