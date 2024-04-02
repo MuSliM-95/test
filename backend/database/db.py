@@ -688,7 +688,6 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("client_secret", String),
     sqlalchemy.Column("refresh_token", String),
     sqlalchemy.Column("access_token", String),
-    sqlalchemy.Column("pair_token", String),
     sqlalchemy.Column("expires_in", Integer),
     sqlalchemy.Column("active", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -704,6 +703,7 @@ amo_install_groups = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("referrer", String),
+    sqlalchemy.Column("pair_token", String),
 )
 
 amo_integrations = sqlalchemy.Table(
@@ -1285,15 +1285,6 @@ amo_lead_statuses = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     extend_existing=True
-)
-
-amo_install_settings = sqlalchemy.Table(
-    "amo_install_settings",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("amo_install_id", Integer, ForeignKey("amo_install.id")),
-    sqlalchemy.Column("contacts", Boolean, server_default="false"),
-    sqlalchemy.Column("leads", Boolean, server_default="false"),
 )
 
 amo_leads = sqlalchemy.Table(
