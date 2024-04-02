@@ -6,12 +6,9 @@ from sqlalchemy import and_
 from starlette import status
 
 
-from apps.amocrm.function import refresh_token, add_job_compare
 from apps.amocrm.sdk.oauth import AmoCRMAuthenticator
-from database.db import amo_install, database, amo_settings, amo_install_table_cashboxes, users_cboxes_relation, \
-    amo_install_settings, amo_settings_load_types, amo_install_groups
+from database.db import amo_install, database, amo_settings, amo_install_table_cashboxes, users_cboxes_relation, amo_install_groups
 from functions.helpers import gen_token
-from jobs import scheduler
 from ws_manager import manager
 
 router = APIRouter(tags=["amocrm"])
