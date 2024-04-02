@@ -699,7 +699,7 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id"))
 )
 
-amo_install_groups = sqlalchemy.Column(
+amo_install_groups = sqlalchemy.Table(
     "amo_install_groups",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
