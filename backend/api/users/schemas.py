@@ -19,6 +19,25 @@ class CBUsers(BaseModel):
         orm_mode = True
 
 
+class CBUsersShort(BaseModel):
+    id: int
+    external_id: Optional[str]
+    first_name: str
+    last_name: Optional[str]
+    status: bool
+
+    class Config:
+        orm_mode = True
+
+
+class CBUsersListShort(BaseModel):
+    result: List[CBUsersShort]
+    count: int
+
+    class Config:
+        orm_mode = True
+
+
 class CBUsersList(BaseModel):
     result: List[CBUsers]
     count: int
