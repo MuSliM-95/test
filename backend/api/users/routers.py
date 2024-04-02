@@ -2,7 +2,7 @@ from api.users import schemas as schemas
 from fastapi import APIRouter
 from functions import users as func
 from database.db import database, users, users_cboxes_relation
-from sqlalchemy import select, func as fsql
+from sqlalchemy import select, func as fsql, or_
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -13,9 +13,19 @@ async def get_user_by_token_route(token: str):
 
 
 @router.get("/list/", response_model=schemas.CBUsersListShort)
-async def get_user_list(token: str):
+async def get_user_list(token: str, name: str = None, limit: int = 100, offset: int = 0):
     cashbox_query = select(users_cboxes_relation.c.cashbox_id).\
         where(users_cboxes_relation.c.token == token).subquery('cashbox_query')
+
+    filters = [
+        users_cboxes_relation.c.cashbox_id == cashbox_query.c.cashbox_id
+    ]
+
+    if name:
+        filters.append(or_(
+            users.c.first_name.ilike(f"%{name}%"),
+            users.c.last_name.ilike(f"%{name}%")
+        ))
 
     users_cashbox = select(
         users.c.id,
@@ -24,8 +34,10 @@ async def get_user_list(token: str):
         users.c.last_name,
         users_cboxes_relation.c.status
     ).\
-        where(users_cboxes_relation.c.cashbox_id == cashbox_query.c.cashbox_id).\
-        join(users, users.c.id == users_cboxes_relation.c.user)
+        where(*filters).\
+        join(users, users.c.id == users_cboxes_relation.c.user).\
+        limit(limit).\
+        offset(offset)
 
     users_list = await database.fetch_all(users_cashbox)
     count = await database.fetch_val(select(fsql.count(users_cashbox.c.id)))
