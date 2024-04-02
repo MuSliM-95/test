@@ -696,6 +696,14 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("field_id", Integer),
     sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
     sqlalchemy.Column("is_refresh", Boolean, server_default="false"),
+    sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id"))
+)
+
+amo_install_groups = sqlalchemy.Column(
+    "amo_install_groups",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("referrer", String),
 )
 
 amo_integrations = sqlalchemy.Table(
@@ -714,7 +722,7 @@ amo_install_table_cashboxes = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
-    sqlalchemy.Column("amo_integration_id", Integer, ForeignKey("amo_install.id")),
+    sqlalchemy.Column("amo_integration_id", Integer, ForeignKey("amo_install_groups.id")),
     sqlalchemy.Column("last_token", String),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("additional_info", String),
@@ -1236,8 +1244,8 @@ amo_table_contacts = sqlalchemy.Table(
     "amo_table_contacts",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("amo_id", ForeignKey("amo_contacts.id")),
-    sqlalchemy.Column("table_id", ForeignKey("contragents.id")),
+    sqlalchemy.Column("amo_id", Integer, ForeignKey("amo_contacts.id")),
+    sqlalchemy.Column("table_id", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),

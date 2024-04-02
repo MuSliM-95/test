@@ -714,7 +714,7 @@ async def confirm_broadcast_message(message: types.Message, state: FSMContext):
     """
     if message.photo and message.md_text:
         # Здесь берем оригинал картинки и переводим в str
-        BroadcastMessageStore.picture = str(message.photo[-1])
+        BroadcastMessageStore.picture = str(message.photo[-1].file_id)
         BroadcastMessageStore.text = message.md_text.replace("\\", "")
         BroadcastMessageStore.tg_message_id = message.message_id
         BroadcastMessageStore.tg_user_or_chat = str(message.chat.id)
