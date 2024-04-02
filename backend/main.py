@@ -61,6 +61,7 @@ from api.templates.routers import router as templates_router
 from api.docs_generate.routers import router as doc_generate_router
 from api.webapp.routers import router as webapp_router
 from apps.tochka_bank.routes import router as tochka_router
+from api.reports.routers import router as reports_router
 
 
 sentry_sdk.init(
@@ -134,6 +135,7 @@ app.include_router(doc_generate_router)
 app.include_router(webapp_router)
 
 app.include_router(tochka_router)
+app.include_router(reports_router)
 
 
 @app.middleware("http")
