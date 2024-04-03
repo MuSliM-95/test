@@ -9,7 +9,7 @@ router = APIRouter(tags=["reports"])
 
 
 @router.get("/reports/sales/")
-async def get_sales_report(token: str):
+async def get_sales_report(token: str, report_data: schemas.ReportData):
     user = await get_user_by_token(token)
     pass
 
@@ -55,7 +55,7 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
         report_db_in = [dict(item) for item in await database.fetch_all(query_incoming)]
         report_db_out = [dict(item) for item in await database.fetch_all(query_outgoing)]
 
-        query = select(pboxes.c.name).where(pboxes.c.id == paybox)
+        query = select(pboxes.c.name, pboxes.c.balance).where(pboxes.c.id == paybox)
         report_db = dict(await database.fetch_one(query))
         report_db['incoming'] = report_db_in[0]['incoming'] if len(report_db_in) > 0 else 0
         report_db['outgoing'] = report_db_out[0]['outgoing'] if len(report_db_out) > 0 else 0
