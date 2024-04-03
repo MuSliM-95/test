@@ -14,18 +14,18 @@ async def get_sales_report(token: str):
     pass
 
 
-@router.get("/reports/balances/")
-async def get_balances_report(token: str, paybox: list[int], datefrom: int, dateto: int, user: int = None):
+@router.post("/reports/balances/")
+async def get_balances_report(token: str, report_data: schemas.ReportData):
     await get_user_by_token(token)
 
     filters = [
-        payments.c.paybox == paybox,
-        and_(datefrom <= payments.c.date, payments.c.date <= dateto),
+        payments.c.paybox == report_data.paybox,
+        and_(report_data.datefrom <= payments.c.date, payments.c.date <= report_data.dateto),
         payments.c.is_deleted.is_not(True)
     ]
 
-    if user:
-        filters.append(payments.c.account == user)
+    if report_data.user:
+        filters.append(payments.c.account == report_data.user)
 
     query_incoming = select(
         payments.c.paybox,
@@ -47,7 +47,7 @@ async def get_balances_report(token: str, paybox: list[int], datefrom: int, date
         join(pboxes, pboxes.c.id == payments.c.paybox).\
         group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_outgoing')
 
-    query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == paybox)
+    query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == report_data.paybox)
 
     report = await database.fetch_all(query)
     return report
