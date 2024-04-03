@@ -21,7 +21,8 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
     for paybox in report_data.paybox:
         filters = [
             payments.c.paybox == paybox,
-            text(f'(payments.date BETWEEN {report_data.datefrom-1} AND {report_data.dateto+1})'),
+            text(f'(payments.date >= {report_data.datefrom}'),
+            text(f'(payments.date <= {report_data.dateto}'),
             payments.c.is_deleted.is_not(True)
         ]
 
