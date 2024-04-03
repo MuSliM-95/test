@@ -21,7 +21,7 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
     for paybox in report_data.paybox:
         filters = [
             payments.c.paybox == paybox,
-            text(f'payments.date BETWEEN {report_data.datefrom} AND {report_data.dateto}'),
+            text(f'(payments.date BETWEEN {report_data.datefrom-1} AND {report_data.dateto+1})'),
             payments.c.is_deleted.is_not(True)
         ]
 
@@ -49,6 +49,7 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
             group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_outgoing')
 
         query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == paybox)
+        print(query_incoming)
         report_db = await database.fetch_one(query)
         if report_db:
             report.append(report_db)
