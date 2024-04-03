@@ -21,8 +21,6 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
     for paybox in report_data.paybox:
         filters = [
             payments.c.paybox == paybox,
-            text(f'payments.date >= {report_data.datefrom}'),
-            text(f'payments.date <= {report_data.dateto}'),
             payments.c.is_deleted.is_not(True)
         ]
 
@@ -35,7 +33,11 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
             payments.c.type,
             func.sum(payments.c.amount).label('incoming'),
         ).\
-            where(*filters, payments.c.type == 'incoming').\
+            where(*filters,
+                  payments.c.type == 'incoming',
+                  text(f'payments.date >= {report_data.datefrom}'),
+                  text(f'payments.date <= {report_data.dateto}'),
+                  ).\
             join(pboxes, pboxes.c.id == payments.c.paybox).\
             group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_incoming')
 
@@ -45,7 +47,10 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
             payments.c.type,
             func.sum(payments.c.amount).label('outgoing'),
         ).\
-            where(*filters, payments.c.type == 'outgoing').\
+            where(*filters, payments.c.type == 'outgoing',
+                  text(f'payments.date >= {report_data.datefrom}'),
+                  text(f'payments.date <= {report_data.dateto}'),
+                  ).\
             join(pboxes, pboxes.c.id == payments.c.paybox).\
             group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_outgoing')
 
