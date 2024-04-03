@@ -27,15 +27,28 @@ async def get_balances_report(token: str, paybox: int, datefrom: int, dateto: in
     if user:
         filters.append(payments.c.account)
 
-    query = select(
+
+    query_incoming = select(
         payments.c.paybox,
         pboxes.c.name,
         payments.c.type,
-        case([(payments.c.type == 'incoming', func.sum(payments.c.amount))]).label('incoming'),
-        case([(payments.c.type == 'outgoing', func.sum(payments.c.amount))]).label('outgoing')
+        func.sum(payments.c.amount).label('incoming'),
     ).\
-        where(*filters).\
+        where(*filters, payments.c.type == 'incoming').\
         join(pboxes, pboxes.c.id == payments.c.paybox).\
-        group_by(payments.c.paybox, payments.c.type, pboxes.c.name)
+        group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_incoming')
+
+    query_outgoing = select(
+        payments.c.paybox,
+        pboxes.c.name,
+        payments.c.type,
+        func.sum(payments.c.amount).label('outgoing'),
+    ).\
+        where(*filters, payments.c.type == 'outgoing').\
+        join(pboxes, pboxes.c.id == payments.c.paybox).\
+        group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_outgoing')
+
+    query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == paybox)
+
     report = await database.fetch_all(query)
     return report
