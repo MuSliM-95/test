@@ -3,50 +3,9 @@ from datetime import datetime
 
 import aiohttp
 
-from apps.amocrm.tasks.contacts import sync_contacts
-from apps.amocrm.tasks.leads import sync_leads
-from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, amo_settings, \
-    amo_settings_load_types, amo_install_settings
+from database.db import amo_install, database, amo_install_table_cashboxes, cboxes, amo_settings
 from functions.helpers import gen_token
-from jobs import scheduler, add_job_to_sched
 from ws_manager import manager
-
-
-async def add_job_compare(amo_install_id: int, referrer: str):
-    query = amo_install_settings.select().where(amo_install_settings.c.amo_install_id == amo_install_id)
-    amo_install_setting = await database.fetch_one(query)
-
-    if amo_install_setting:
-
-        amo_install_setting_dict = dict(amo_install_setting)
-        amo_install_setting_dict.pop("id")
-        amo_install_setting_dict.pop("amo_install_id")
-
-        for key in amo_install_setting_dict:
-            if amo_install_setting_dict.get(key):
-                if key == "contacts":
-                    if not scheduler.get_job(f"sync_{key}_{referrer}"):
-                        add_job_to_sched(
-                            sync_contacts,
-                            trigger="interval",
-                            seconds=120,
-                            id=f"sync_{key}_{referrer}",
-                            args=[amo_install_id],
-                            max_instances=1
-                        )
-                elif key == "leads":
-                    if not scheduler.get_job(f"sync_{key}_{referrer}"):
-                        add_job_to_sched(
-                            sync_leads,
-                            trigger="interval",
-                            seconds=120,
-                            id=f"sync_{key}_{referrer}",
-                            args=[amo_install_id],
-                            max_instances=1
-                        )
-            else:
-                if scheduler.get_job(f"sync_{key}_{referrer}"):
-                    scheduler.remove_job(f"sync_{key}_{referrer}")
 
 
 async def update_amo_install(amo_post_json, ref, install, code):

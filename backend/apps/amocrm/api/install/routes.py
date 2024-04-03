@@ -6,12 +6,9 @@ from sqlalchemy import and_
 from starlette import status
 
 
-from apps.amocrm.function import refresh_token, add_job_compare
 from apps.amocrm.sdk.oauth import AmoCRMAuthenticator
-from database.db import amo_install, database, amo_settings, amo_install_table_cashboxes, users_cboxes_relation, \
-    amo_install_settings, amo_settings_load_types
+from database.db import amo_install, database, amo_settings, amo_install_table_cashboxes, users_cboxes_relation, amo_install_groups
 from functions.helpers import gen_token
-from jobs import scheduler
 from ws_manager import manager
 
 router = APIRouter(tags=["amocrm"])
@@ -41,71 +38,54 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
 
             field_id = await amo_crm_install.get_custom_contact_phone_field()
             account_info = await amo_crm_install.get_account_info()
-            if install and not install_active:
-                query = amo_install.update().where(amo_install.c.referrer == referer)
-            else:
-                query = amo_install.insert().returning(amo_install.c.id)
-            query = query.values(
-                code=code,
-                referrer=referer,
-                platform=platform,
-                amo_account_id=account_info["id"],
-                client_id=client_id,
-                client_secret=setting_info.client_secret,
-                refresh_token=amo_crm_install.refresh_token,
-                access_token=amo_crm_install.access_token,
-                pair_token=gen_token(),
-                expires_in=int(amo_crm_install.expires_in),
-                field_id=field_id,
-                active=True,
-                from_widget=setting_info.id,
-            )
-            if install and not install_active:
-                await database.execute(query)
-                install_id = install.id
-            else:
-                query = query.returning(amo_install.c.id)
-                amo_install_record = await database.fetch_one(query)
-                install_id = amo_install_record.id
+            values_dict = {
+                "code": code,
+                "referrer": referer,
+                "platform": platform,
+                "amo_account_id": account_info["id"],
+                "client_id": client_id,
+                "client_secret": setting_info.client_secret,
+                "refresh_token": amo_crm_install.refresh_token,
+                "access_token": amo_crm_install.access_token,
+                "expires_in": int(amo_crm_install.expires_in),
+                "field_id": field_id,
+                "active": True,
+                "from_widget": setting_info.id,
+            }
 
-            if not scheduler.get_job(referer):
-                scheduler.add_job(refresh_token, trigger="interval", seconds=int(amo_crm_install.expires_in),
-                                  id=referer,
-                                  args=[referer], max_instances=1)
+            query = amo_install_groups.select().where(amo_install_groups.c.referrer == referer)
+            amo_install_group_info = await database.fetch_one(query)
+
+            if amo_install_group_info:
+                amo_install_group = amo_install_group_info.id
+            else:
+                query = (
+                    amo_install_groups.insert()
+                    .values(
+                        referrer=referer,
+                        pair_token=gen_token(),
+                    )
+                    .returning(amo_install_groups.c.id))
+                amo_install_group_return = await database.fetch_one(query)
+                amo_install_group = amo_install_group_return.id
+
+            if install:
+                query = amo_install.update().where(and_(
+                    amo_install.c.referrer == referer,
+                    amo_install.c.from_widget == setting_info.id
+                ))
+            else:
+                values_dict["install_group_id"] = amo_install_group
+                query = amo_install.insert()
+            query = query.values(values_dict)
+            await database.execute(query)
 
             query = (
                 amo_install_table_cashboxes.update()
-                .where(amo_install_table_cashboxes.c.amo_integration_id == install_id)
+                .where(amo_install_table_cashboxes.c.amo_integration_id == amo_install_group)
                 .values({"status": True})
             )
             await database.execute(query)
-        else:
-            install_id = install.id
-
-        query = amo_install_settings.select().where(amo_install_settings.c.amo_install_id == install_id)
-        amo_install_setting = await database.fetch_one(query)
-
-        query = amo_settings_load_types.select().where(amo_settings_load_types.c.id == setting_info.load_type_id)
-        amo_setting_load_type = await database.fetch_one(query)
-
-        amo_setting_load_type_dict = dict(amo_setting_load_type)
-        amo_setting_load_type_dict.pop("id")
-
-        amo_install_settings_dict_values = {"amo_install_id": install_id}
-
-        for key in amo_setting_load_type_dict:
-            if amo_setting_load_type_dict.get(key):
-                amo_install_settings_dict_values[key] = amo_setting_load_type_dict.get(key)
-
-        if amo_install_setting:
-            query = amo_install_settings.update().where(amo_install_settings.c.amo_install_id == install_id)
-        else:
-            query = amo_install_settings.insert()
-
-        query = query.values(amo_install_settings_dict_values)
-        await database.execute(query)
-
-        await add_job_compare(install_id, referer)
 
 
 @router.get("/amo_disconnect")
@@ -117,57 +97,24 @@ async def sc_l(account_id: int, client_uuid: str):
     if not a_t:
         return {"result": "amo token does not connected!"}
 
-    query = amo_settings.select().where(amo_settings.c.integration_id == client_uuid)
-    setting_info = await database.fetch_one(query)
+    query = amo_install.update().where(amo_install.c.id == a_t.id).values({"active": False})
+    await database.execute(query)
 
-    query = amo_settings_load_types.select().where(amo_settings_load_types.c.id == setting_info.load_type_id)
-    amo_setting_load_type = await database.fetch_one(query)
+    query = amo_install.select().where(amo_install.c.install_group_id == a_t.install_group_id)
+    amo_installs_in_group = await database.fetch_all(query)
 
-    amo_setting_load_type_dict = dict(amo_setting_load_type)
-    amo_setting_load_type_dict.pop("id")
+    flag = False
+    for install_info in amo_installs_in_group:
+        if install_info.active:
+            flag = True
 
-    amo_install_settings_dict_values = {}
-
-    for key in amo_setting_load_type_dict:
-        if amo_setting_load_type_dict.get(key):
-            amo_install_settings_dict_values[key] = not amo_setting_load_type_dict.get(key)
-
-    query = (
-        amo_install_settings.update()
-        .where(amo_install_settings.c.amo_install_id == a_t.id)
-        .values(amo_install_settings_dict_values)
-        .returning(amo_install_settings)
-    )
-    amo_install_setting = await database.fetch_one(query)
-
-    if not amo_install_setting:
-        return {"result": "amo token does not connected!"}
-
-    amo_install_setting_dict = dict(amo_install_setting)
-    amo_install_setting_dict.pop("id")
-    amo_install_setting_dict.pop("amo_install_id")
-
-    flag = True
-
-    for key in amo_install_setting_dict:
-        if amo_install_setting_dict.get(key):  # Если какая-то из выкачек включена
-            flag = False
-
-    if flag:
-
-        db_dict = {"active": False}
-
-        query = amo_install.update().where(amo_install.c.id == a_t.id).values(db_dict)
-        await database.execute(query)
-
-        integration_dict = {"status": False, "updated_at": int(datetime.utcnow().timestamp())}
-
+    if not flag:
         query = amo_install_table_cashboxes.update().where(
-            amo_install_table_cashboxes.c.amo_integration_id == a_t.id).values(integration_dict)
+            amo_install_table_cashboxes.c.amo_integration_id == a_t.install_group_id).values({"status": False, "updated_at": int(datetime.utcnow().timestamp())})
         await database.execute(query)
 
         query = amo_install_table_cashboxes.select().where(
-            amo_install_table_cashboxes.c.amo_integration_id == a_t.id)
+            amo_install_table_cashboxes.c.amo_integration_id == a_t.install_group_id)
         relship = await database.fetch_one(query)
 
         if relship:
@@ -179,10 +126,5 @@ async def sc_l(account_id: int, client_uuid: str):
                 await manager.send_message(cashbox.token,
                                            {"action": "paired", "target": "integrations",
                                             "integration_status": False})
-
-        if scheduler.get_job(a_t.referrer):
-            scheduler.remove_job(a_t.referrer)
-
-    await add_job_compare(a_t.id, a_t.referrer)
 
     return {"status": "amo token disconnected succesfully!"}
