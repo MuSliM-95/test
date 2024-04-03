@@ -55,11 +55,12 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
             group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_outgoing')
         report_db_in = await database.fetch_all(query_incoming)
         print([dict(item) for item in report_db_in])
+        report_db_out = await database.fetch_all(query_outgoing)
+        print([dict(item) for item in report_db_out])
 
         query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == paybox)
 
         report_db = await database.fetch_all(query)
-        print(dict(*report_db))
         if report_db:
             report.append(*report_db)
     return report
