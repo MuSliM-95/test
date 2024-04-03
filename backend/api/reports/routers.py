@@ -47,7 +47,7 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
         join(pboxes, pboxes.c.id == payments.c.paybox).\
         group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_outgoing')
 
-    query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == report_data.paybox)
+    query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id.in_(report_data.paybox))
 
     report = await database.fetch_all(query)
     return report
