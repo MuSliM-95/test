@@ -82,7 +82,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
 
             query = (
                 amo_install_table_cashboxes.update()
-                .where(amo_install_table_cashboxes.c.amo_integration_id == amo_install_group)
+                .where(amo_install_table_cashboxes.c.amo_install_group_id == amo_install_group)
                 .values({"status": True})
             )
             await database.execute(query)
@@ -110,11 +110,11 @@ async def sc_l(account_id: int, client_uuid: str):
 
     if not flag:
         query = amo_install_table_cashboxes.update().where(
-            amo_install_table_cashboxes.c.amo_integration_id == a_t.install_group_id).values({"status": False, "updated_at": int(datetime.utcnow().timestamp())})
+            amo_install_table_cashboxes.c.amo_install_group_id == a_t.install_group_id).values({"status": False, "updated_at": int(datetime.utcnow().timestamp())})
         await database.execute(query)
 
         query = amo_install_table_cashboxes.select().where(
-            amo_install_table_cashboxes.c.amo_integration_id == a_t.install_group_id)
+            amo_install_table_cashboxes.c.amo_install_group_id == a_t.install_group_id)
         relship = await database.fetch_one(query)
 
         if relship:

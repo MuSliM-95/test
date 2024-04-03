@@ -144,7 +144,7 @@ async def get_table_cashbox_id(amo_install_id: int):
     """
     query = (
         select([amo_install_table_cashboxes.c.cashbox_id])
-        .where(amo_install_table_cashboxes.c.amo_integration_id == amo_install_id)
+        .where(amo_install_table_cashboxes.c.amo_install_group_id == amo_install_id)
         .where(amo_install_table_cashboxes.c.status == True)
     )
     amo_table_link = await database.fetch_one(query)

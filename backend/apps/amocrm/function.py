@@ -46,11 +46,11 @@ async def update_amo_install(amo_post_json, ref, install, code):
     integration_dict = {"status": True, "updated_at": timestamp}
 
     query = amo_install_table_cashboxes.update().where(
-        amo_install_table_cashboxes.c.amo_integration_id == install["id"]).values(integration_dict)
+        amo_install_table_cashboxes.c.amo_install_group_id == install["id"]).values(integration_dict)
     await database.execute(query=query)
 
     query = amo_install_table_cashboxes.select().where(
-        amo_install_table_cashboxes.c.amo_integration_id == install["id"])
+        amo_install_table_cashboxes.c.amo_install_group_id == install["id"])
     cashbox_id = await database.fetch_one(query=query)
 
     if cashbox_id:
@@ -133,7 +133,7 @@ async def refresh_token(referer):
                 "redirect_uri": setting_info.redirect_uri
             }
 
-            # q = amo_install_table_cashboxes.select().where(amo_install_table_cashboxes.c.amo_integration_id == amo_db_referer.id)
+            # q = amo_install_table_cashboxes.select().where(amo_install_table_cashboxes.c.amo_install_group_id == amo_db_referer.id)
             # amo_tablecrm_rel = await database.fetch_one(query)
             #
             # q = cboxes.select().where(cboxes.c.id == amo_tablecrm_rel.cashbox_id)

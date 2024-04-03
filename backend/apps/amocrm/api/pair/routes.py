@@ -23,7 +23,7 @@ async def sc_l(token: str, amo_token: str):
 
         if a_t_group:
             query = amo_install_table_cashboxes.select().where(
-                amo_install_table_cashboxes.c.amo_integration_id == a_t_group.id)
+                amo_install_table_cashboxes.c.amo_install_group_id == a_t_group.id)
             amo_pair = await database.fetch_one(query=query)
 
             time = int(datetime.utcnow().timestamp())
@@ -39,7 +39,7 @@ async def sc_l(token: str, amo_token: str):
 
             if not amo_pair:
                 integration_data["cashbox_id"] = user["cashbox_id"]
-                integration_data["amo_integration_id"] = a_t_group.id
+                integration_data["amo_install_group_id"] = a_t_group.id
                 integration_data["last_token"] = amo_token
                 integration_data["status"] = flag
                 integration_data["created_at"] = time
@@ -53,7 +53,7 @@ async def sc_l(token: str, amo_token: str):
                 integration_data["updated_at"] = time
 
                 query = amo_install_table_cashboxes.update().where(
-                    amo_install_table_cashboxes.c.amo_integration_id == a_t_group.id).values(integration_data)
+                    amo_install_table_cashboxes.c.amo_install_group_id == a_t_group.id).values(integration_data)
                 await database.execute(query)
 
             await manager.send_message(user.token,
@@ -95,7 +95,7 @@ async def sc_l(referer: str):
         await database.execute(query)
 
         query = amo_install_table_cashboxes.select().where(
-            amo_install_table_cashboxes.c.amo_integration_id == a_t_group.id)
+            amo_install_table_cashboxes.c.amo_install_group_id == a_t_group.id)
         pair = await database.fetch_one(query)
 
         query = users_cboxes_relation.select().where(users_cboxes_relation.c.cashbox_id == pair['cashbox_id'])
@@ -120,7 +120,7 @@ async def sc_l(token: str):
         pair = await database.fetch_one(query=query)
 
         if pair:
-            query = amo_install_groups.select().where(amo_install_groups.c.id == pair["amo_integration_id"])
+            query = amo_install_groups.select().where(amo_install_groups.c.id == pair["amo_install_group_id"])
             a_t_group = await database.fetch_one(query=query)
 
             if pair["last_token"] != a_t_group["pair_token"]:
@@ -164,7 +164,7 @@ async def sc_l(token: str):
             amo_install_table_cashboxes.c.cashbox_id == user["cashbox_id"])
         pair = await database.fetch_one(query=query)
 
-        query = amo_install.select().where(amo_install.c.install_group_id == pair.amo_integration_id)
+        query = amo_install.select().where(amo_install.c.install_group_id == pair.amo_install_group_id)
         amo_installs_in_group = await database.fetch_all(query)
 
         flag = False

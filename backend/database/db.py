@@ -722,7 +722,7 @@ amo_install_table_cashboxes = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
-    sqlalchemy.Column("amo_integration_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
     sqlalchemy.Column("last_token", String),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("additional_info", String),
