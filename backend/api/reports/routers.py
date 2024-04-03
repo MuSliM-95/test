@@ -15,7 +15,7 @@ async def get_sales_report(token: str):
 
 
 @router.get("/reports/balances/")
-async def get_balances_report(token: str, paybox: int, datefrom: int, dateto: int, user: int = None):
+async def get_balances_report(token: str, paybox: list[int], datefrom: int, dateto: int, user: int = None):
     await get_user_by_token(token)
 
     filters = [
@@ -25,8 +25,7 @@ async def get_balances_report(token: str, paybox: int, datefrom: int, dateto: in
     ]
 
     if user:
-        filters.append(payments.c.account)
-
+        filters.append(payments.c.account == user)
 
     query_incoming = select(
         payments.c.paybox,
