@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from sqlalchemy import select, func, desc, case, and_
+from sqlalchemy import select, func, desc, case, and_, text
 from database.db import database, payments, pboxes
 from . import schemas
 from functions.helpers import get_user_by_token
@@ -21,7 +21,7 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
     for paybox in report_data.paybox:
         filters = [
             payments.c.paybox == paybox,
-            and_(report_data.datefrom <= payments.c.date <= report_data.dateto),
+            text(f'payments.date BETWEEN {report_data.datefrom} AND {report_data.dateto}'),
             payments.c.is_deleted.is_not(True)
         ]
 
