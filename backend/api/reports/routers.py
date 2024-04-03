@@ -19,7 +19,7 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
     await get_user_by_token(token)
 
     filters = [
-        payments.c.paybox == report_data.paybox,
+        payments.c.paybox.in_(report_data.paybox),
         and_(report_data.datefrom <= payments.c.date, payments.c.date <= report_data.dateto),
         payments.c.is_deleted.is_not(True)
     ]
