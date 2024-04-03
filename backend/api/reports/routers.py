@@ -21,6 +21,8 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
     for paybox in report_data.paybox:
         filters = [
             payments.c.paybox == paybox,
+            text(f'payments.date >= {report_data.datefrom}'),
+            text(f'payments.date <= {report_data.dateto}'),
             payments.c.is_deleted.is_not(True)
         ]
 
@@ -35,11 +37,9 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
         ).\
             where(*filters,
                   payments.c.type == 'incoming',
-                  text(f'payments.date >= {report_data.datefrom}'),
-                  text(f'payments.date <= {report_data.dateto}'),
                   ).\
             join(pboxes, pboxes.c.id == payments.c.paybox).\
-            group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_incoming')
+            group_by(payments.c.paybox, payments.c.type, pboxes.c.name)
 
         query_outgoing = select(
             payments.c.paybox,
@@ -48,19 +48,18 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
             func.sum(payments.c.amount).label('outgoing'),
         ).\
             where(*filters, payments.c.type == 'outgoing',
-                  text(f'payments.date >= {report_data.datefrom}'),
-                  text(f'payments.date <= {report_data.dateto}'),
                   ).\
             join(pboxes, pboxes.c.id == payments.c.paybox).\
-            group_by(payments.c.paybox, payments.c.type, pboxes.c.name).subquery('query_outgoing')
-        report_db_in = await database.fetch_all(query_incoming)
-        print([dict(item) for item in report_db_in])
-        report_db_out = await database.fetch_all(query_outgoing)
-        print([dict(item) for item in report_db_out])
+            group_by(payments.c.paybox, payments.c.type, pboxes.c.name)
 
-        query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == paybox)
+        report_db_in = [dict(item) for item in await database.fetch_all(query_incoming)]
+        report_db_out = [dict(item) for item in await database.fetch_all(query_outgoing)]
 
-        report_db = await database.fetch_all(query)
+        query = select(pboxes.c.name).where(pboxes.c.id == paybox)
+        report_db = dict(await database.fetch_one(query))
+        report_db['incoming'] = report_db_in[0]['incoming'] if len(report_db_in) > 0 else 0
+        report_db['outgoing'] = report_db_out[0]['outgoing'] if len(report_db_out) > 0 else 0
+
         if report_db:
-            report.append(*report_db)
+            report.append(report_db)
     return report
