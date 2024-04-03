@@ -8,13 +8,13 @@ from functions.helpers import get_user_by_token
 router = APIRouter(tags=["reports"])
 
 
-@router.get("/sales/")
+@router.get("/reports/sales/")
 async def get_sales_report(token: str):
     user = await get_user_by_token(token)
     pass
 
 
-@router.get("/balances/")
+@router.get("/reports/balances/")
 async def get_balances_report(token: str, paybox: int, datefrom: int, dateto: int, user: int = None):
     await get_user_by_token(token)
 
