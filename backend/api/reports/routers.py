@@ -51,7 +51,7 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
 
         query = select(pboxes.c.name, query_incoming.c.incoming, query_outgoing.c.outgoing).where(pboxes.c.id == paybox)
         print(query_incoming)
-        report_db = await database.fetch_one(query)
+        report_db = await database.fetch_all(query)
         if report_db:
-            report.append(report_db)
+            report.append(*report_db)
     return report
