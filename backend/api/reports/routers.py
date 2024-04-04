@@ -19,8 +19,8 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
         docs_sales.c.is_deleted.is_not(True)
     ]
 
-    if report_data.user:
-        filters_all_sales.append(docs_sales.c.created_by == report_data.user)
+    # if report_data.user:
+    #     filters_all_sales.append(docs_sales.c.created_by == report_data.user)
 
     query_all_sales = select(
         docs_sales_goods.c.nomenclature.label('nom_id'),
@@ -45,6 +45,7 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
     query = select(query_group.c.nom_id, nomenclature.c.name.label('nomenclature_name'), query_group.c.count, query_group.c.sum).\
         join(users_cboxes_relation, users_cboxes_relation.c.id == query_group.c.created_by).\
         join(nomenclature, nomenclature.c.id == query_group.c.nom_id).\
+        where(users_cboxes_relation.c.user == report_data.user).\
         order_by(asc(nomenclature.c.name))
 
     result = await database.fetch_all(query)
