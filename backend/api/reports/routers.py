@@ -55,11 +55,12 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
 @router.post("/reports/balances/")
 async def get_balances_report(token: str, report_data: schemas.ReportData):
     user = await get_user_by_token(token)
-
+    if len(report_data.paybox) < 1:
+        report_data.paybox = await database.fetch_val(
+            select(pboxes.c.id).
+            where(pboxes.c.cashbox == user.cashbox_id))
     report = []
-    for paybox in report_data.paybox if len(report_data.paybox) > 0 else await database.fetch_all(
-            select(pboxes).
-                    where(pboxes.c.cashbox == user.cashbox_id)):
+    for paybox in report_data.paybox:
         filters = [
             payments.c.paybox == paybox,
             text(f'payments.date >= {report_data.datefrom}'),
@@ -97,7 +98,10 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
         report_db_out = [dict(item) for item in await database.fetch_all(query_outgoing)]
 
         query = select(pboxes.c.name, pboxes.c.balance).where(pboxes.c.id == paybox)
-        report_db = dict(await database.fetch_one(query))
+        report_db = await database.fetch_one(query)
+        if not report_db:
+            continue
+        report_db = dict(report_db)
         report_db['incoming'] = report_db_in[0]['incoming'] if len(report_db_in) > 0 else 0
         report_db['outgoing'] = report_db_out[0]['outgoing'] if len(report_db_out) > 0 else 0
 
