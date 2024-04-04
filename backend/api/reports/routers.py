@@ -56,9 +56,9 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
 async def get_balances_report(token: str, report_data: schemas.ReportData):
     user = await get_user_by_token(token)
     if len(report_data.paybox) < 1:
-        report_data.paybox = await database.fetch_val(
+        report_data.paybox = [item.id for item in await database.fetch_all(
             select(pboxes.c.id).
-            where(pboxes.c.cashbox == user.cashbox_id))
+            where(pboxes.c.cashbox == user.cashbox_id))]
     report = []
     for paybox in report_data.paybox:
         filters = [
