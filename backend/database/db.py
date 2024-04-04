@@ -544,6 +544,7 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("email", String),
 )
 
 articles = sqlalchemy.Table(
