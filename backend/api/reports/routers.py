@@ -42,7 +42,7 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
         group_by(query_all_sales.c.nom_id, query_all_sales.c.created_by).\
         subquery('query_group')
 
-    query = select(nomenclature.c.name.label('Nom_name'), query_group.c.count, query_group.c.sum).\
+    query = select(nomenclature.c.name.label('nomenclature_name'), query_group.c.count, query_group.c.sum).\
         join(users_cboxes_relation, users_cboxes_relation.c.id == query_group.c.created_by).\
         join(nomenclature, nomenclature.c.id == query_group.c.nom_id).\
         order_by(asc(nomenclature.c.name))
