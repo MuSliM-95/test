@@ -46,7 +46,6 @@ class Contragent_types(str, ENUM):
     Supplier = "Поставщик"
     Buyer = "Покупатель"
 
-
 metadata = sqlalchemy.MetaData()
 
 tochka_bank_credentials = sqlalchemy.Table(
