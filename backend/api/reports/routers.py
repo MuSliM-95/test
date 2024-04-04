@@ -13,7 +13,7 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
     user = await get_user_by_token(token)
 
     filters_all_sales = [
-        docs_sales_goods.c.cashbox == user.cashbox_id,
+        docs_sales.c.cashbox == user.cashbox_id,
         text(f'docs_sales.dated >= {report_data.datefrom}'),
         text(f'docs_sales.dated <= {report_data.dateto}'),
         docs_sales_goods.c.is_deleted.is_not(True)
