@@ -20,7 +20,7 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
     ]
 
     if report_data.user:
-        filters_all_sales.append(docs_sales.created_by == report_data.user)
+        filters_all_sales.append(docs_sales.c.created_by == report_data.user)
 
     query_all_sales = select(
         docs_sales_goods.c.nomenclature.label('nom_id'),
