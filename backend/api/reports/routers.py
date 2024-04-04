@@ -45,7 +45,7 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
     query = select(nomenclature.c.name.label('Nom_name'), query_group.c.count, query_group.c.sum).\
         join(users_cboxes_relation, users_cboxes_relation.c.id == query_group.c.created_by).\
         join(nomenclature, nomenclature.c.id == query_group.c.nom_id).\
-        order_by(asc(query_group.c.Nom_name))
+        order_by(asc(nomenclature.c.name))
 
     result = await database.fetch_all(query)
 
