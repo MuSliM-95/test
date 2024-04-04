@@ -24,7 +24,7 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
 
     query_all_sales = select(
         docs_sales_goods.c.nomenclature.label('nom_id'),
-        docs_sales.id.c.label('doc_sales_id'),
+        docs_sales.c.id.label('doc_sales_id'),
         docs_sales_goods.c.price,
         docs_sales_goods.c.quantity,
         docs_sales.c.created_by,
