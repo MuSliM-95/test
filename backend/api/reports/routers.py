@@ -16,7 +16,7 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
         docs_sales.c.cashbox == user.cashbox_id,
         text(f'docs_sales.dated >= {report_data.datefrom}'),
         text(f'docs_sales.dated <= {report_data.dateto}'),
-        docs_sales_goods.c.is_deleted.is_not(True)
+        docs_sales.c.is_deleted.is_not(True)
     ]
 
     if report_data.user:
