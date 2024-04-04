@@ -54,9 +54,12 @@ async def get_sales_report(token: str, report_data: schemas.ReportData):
 
 @router.post("/reports/balances/")
 async def get_balances_report(token: str, report_data: schemas.ReportData):
-    await get_user_by_token(token)
+    user = await get_user_by_token(token)
+
     report = []
-    for paybox in report_data.paybox:
+    for paybox in report_data.paybox if len(report_data.paybox) > 0 else await database.fetch_all(
+            select(pboxes).
+                    where(pboxes.c.cashbox == user.cashbox_id)):
         filters = [
             payments.c.paybox == paybox,
             text(f'payments.date >= {report_data.datefrom}'),
