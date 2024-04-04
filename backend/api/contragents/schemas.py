@@ -42,4 +42,5 @@ class ContragentCreate(BaseModel):
 
     contragent_type: Optional[Contragent_types]
     birth_date: Optional[date]
+    email: Optional[str]
     data: Optional[dict]
