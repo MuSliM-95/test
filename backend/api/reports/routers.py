@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from sqlalchemy import select, func, desc, case, and_, text
-from database.db import database, payments, pboxes, docs_sales, docs_sales_goods, nomenclature
+from sqlalchemy import select, func, desc, case, and_, text, asc
+from database.db import database, payments, pboxes, docs_sales, docs_sales_goods, nomenclature, users_cboxes_relation
 from . import schemas
 from functions.helpers import get_user_by_token
 
@@ -12,21 +12,44 @@ router = APIRouter(tags=["reports"])
 async def get_sales_report(token: str, report_data: schemas.ReportData):
     user = await get_user_by_token(token)
 
-    sales = (
-            select(nomenclature.c.id,
-                   payments.c.paybox,
-                   nomenclature.c.name,
-                   func.sum(docs_sales_goods.c.quantity).label('count'),
-                   func.sum(docs_sales_goods.c.quantity)*docs_sales_goods.c.price
-                   ).
-            where(payments.c.paybox == 1).
-            join(payments, payments.c.docs_sales_id == docs_sales_goods.c.docs_sales_id).
-            join(nomenclature, nomenclature.c.id == docs_sales_goods.c.nomenclature).
-            join(docs_sales, docs_sales.c.id == docs_sales_goods.c.docs_sales_id).
-            group_by(nomenclature.c.id,payments.c.paybox,nomenclature.c.name)
-             )
-    print(sales)
-    return {}
+    filters_all_sales = [
+        docs_sales_goods.c.cashbox == user.cashbox_id,
+        text(f'docs_sales.dated >= {report_data.datefrom}'),
+        text(f'docs_sales.dated <= {report_data.dateto}'),
+        docs_sales_goods.c.is_deleted.is_not(True)
+    ]
+
+    if report_data.user:
+        filters_all_sales.append(docs_sales.created_by == report_data.user)
+
+    query_all_sales = select(
+        docs_sales_goods.c.nomenclature.label('nom_id'),
+        docs_sales.id.c.label('doc_sales_id'),
+        docs_sales_goods.c.price,
+        docs_sales_goods.c.quantity,
+        docs_sales.c.created_by,
+        docs_sales.c.cashbox
+    ).\
+        join(docs_sales, docs_sales.c.id == docs_sales_goods.c.docs_sales_id).\
+        where(*filters_all_sales).\
+        subquery('query_all_sales')
+
+    query_group = select(
+        query_all_sales.c.nom_id,
+        query_all_sales.c.created_by,
+        func.sum(query_all_sales.c.quantity).label('count'),
+        func.sum(query_all_sales.c.quantity*query_all_sales.c.price).label('sum')).\
+        group_by(query_all_sales.c.nom_id, query_all_sales.c.created_by).\
+        subquery('query_group')
+
+    query = select(query_group.c.name.label('Nom_name'), query_group.c.count, query_group.c.sum).\
+        join(users_cboxes_relation, users_cboxes_relation.c.id == query_group.c.created_by).\
+        join(nomenclature, nomenclature.c.id == query_group.c.nom_id).\
+        order_by(asc(query_group.c.Nom_name))
+
+    result = await database.fetch_all(query)
+
+    return result
 
 
 @router.post("/reports/balances/")
