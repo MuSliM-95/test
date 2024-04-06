@@ -10,6 +10,8 @@ RUN apt-get update && \
     libjpeg62-turbo \
     libxrender1
 
+RUN mkdir "./tmp/runtime-root"
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
