@@ -203,45 +203,46 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
             )
             nomenclature_info["prices"] = price
         if with_balance:
-            q = case(
-                [
-                    (
-                        warehouse_register_movement.c.type_amount == 'minus',
-                        warehouse_register_movement.c.amount * (-1)
-                    )
-                ],
-                else_=warehouse_register_movement.c.amount
-
-            )
-            query = (
-                select(
-                    nomenclature.c.id,
-                    nomenclature.c.name,
-                    nomenclature.c.category,
-                    warehouses.c.name.label("warehouse_name"),
-                    warehouse_register_movement.c.organization_id,
-                    warehouse_register_movement.c.warehouse_id,
-                    func.sum(q).label("current_amount"))
-                .where(warehouse_register_movement.c.nomenclature_id == nomenclature_info['id'],
-                       warehouse_register_movement.c.warehouse_id == in_warehouse
-                       )
-                .limit(limit)
-                .offset(offset)
-            ).group_by(
-                nomenclature.c.name,
-                nomenclature.c.id,
-                warehouses.c.name,
-                warehouse_register_movement.c.organization_id,
-                warehouse_register_movement.c.warehouse_id
-            ) \
-                .select_from(warehouse_register_movement
-                             .join(nomenclature,
-                                   warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
-                                   )) \
-                .select_from(warehouse_register_movement) \
-                .join(warehouses, warehouses.c.id == warehouse_register_movement.c.warehouse_id)
-            warehouse_balances_db = await database.fetch_all(query)
-            nomenclature_info["balances"] = warehouse_balances_db
+            # q = case(
+            #     [
+            #         (
+            #             warehouse_register_movement.c.type_amount == 'minus',
+            #             warehouse_register_movement.c.amount * (-1)
+            #         )
+            #     ],
+            #     else_=warehouse_register_movement.c.amount
+            #
+            # )
+            # query = (
+            #     select(
+            #         nomenclature.c.id,
+            #         nomenclature.c.name,
+            #         nomenclature.c.category,
+            #         warehouses.c.name.label("warehouse_name"),
+            #         warehouse_register_movement.c.organization_id,
+            #         warehouse_register_movement.c.warehouse_id,
+            #         func.sum(q).label("current_amount"))
+            #     .where(warehouse_register_movement.c.nomenclature_id == nomenclature_info['id'],
+            #            warehouse_register_movement.c.warehouse_id == in_warehouse
+            #            )
+            #     .limit(limit)
+            #     .offset(offset)
+            # ).group_by(
+            #     nomenclature.c.name,
+            #     nomenclature.c.id,
+            #     warehouses.c.name,
+            #     warehouse_register_movement.c.organization_id,
+            #     warehouse_register_movement.c.warehouse_id
+            # ) \
+            #     .select_from(warehouse_register_movement
+            #                  .join(nomenclature,
+            #                        warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+            #                        )) \
+            #     .select_from(warehouse_register_movement) \
+            #     .join(warehouses, warehouses.c.id == warehouse_register_movement.c.warehouse_id)
+            # warehouse_balances_db = await database.fetch_all(query)
+            # nomenclature_info["balances"] = warehouse_balances_db
+            nomenclature_info["balances"] = []
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
     nomenclature_db_count = await database.fetch_val(query)

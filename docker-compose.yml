@@ -21,6 +21,7 @@ services:
       ACCOUNT_INTERVAL: ${ACCOUNT_INTERVAL}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASS: ${POSTGRES_PASS}
+      XDG_RUNTIME_DIR: ./tmp/runtime-root
     networks:
       - nginx-proxy
 
