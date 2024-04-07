@@ -137,7 +137,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
         .where(
             docs_sales.c.is_deleted.is_not(True),
             docs_sales.c.cashbox == user.cashbox_id,
-            docs_sales_settings.c.docs_sales_id == docs_sales.c.id
+            docs_sales_settings.c.id == docs_sales.c.settings
         )
         .limit(limit)
         .outerjoin(docs_sales_settings)
