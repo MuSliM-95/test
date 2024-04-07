@@ -1,7 +1,7 @@
-import enum
+from enum import Enum
 
 
-class Repeatability(enum.StrEnum):
+class Repeatability(str, Enum):
     minutes = "minutes"
     hours = "hours"
     days = "days"
