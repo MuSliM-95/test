@@ -161,6 +161,11 @@ async def get_nomenclature_by_id(token: str, idx: int):
 async def get_nomenclature_test(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
     start_time = time.time()
+    user = await get_user_by_token(token)
+
+    if name and barcode:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Укажите только один из параметров: 'name' или 'barcode'")
     query = (
         select(
             nomenclature,
