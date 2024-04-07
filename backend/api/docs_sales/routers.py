@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import desc, func, and_, select
@@ -20,6 +20,7 @@ from database.db import (
     price_types, warehouse_balances,
     nomenclature,
     docs_warehouse, docs_sales_tags, amo_leads, amo_install_table_cashboxes, amo_leads_docs_sales_mapping,
+    docs_sales_settings,
 
 )
 import datetime
@@ -60,6 +61,45 @@ price_types_cache = set()
 units_cache = set()
 
 
+async def exists_settings_docs_sales(docs_sales_id: int) -> bool:
+    query = (
+        docs_sales
+        .exists()
+        .where(
+            docs_sales.c.id == docs_sales_id,
+            docs_sales.c.settings.is_not(None)
+        )
+    )
+    exists = await database.fetch_val(query)
+    return exists
+
+
+async def add_settings_docs_sales(settings: Optional[dict]) -> int:
+    query = (
+        docs_sales_settings
+        .insert()
+        .values(settings)
+    )
+    docs_sales_settings_id = await database.execute(query)
+    return docs_sales_settings_id
+
+
+async def update_settings_docs_sales(docs_sales_id: int, settings: dict) -> int:
+    subquery = (
+        select(docs_sales.c.settings)
+        .where(docs_sales.c.id == docs_sales_id)
+        .subquery()
+    )
+    query = (
+        docs_sales_settings
+        .update()
+        .where(docs_sales_settings.c.id == subquery)
+        .values(settings)
+    )
+    docs_sales_settings_id = await database.execute(query)
+    return docs_sales_settings_id
+
+
 @router.get("/docs_sales/{idx}/", response_model=schemas.View)
 async def get_by_id(token: str, idx: int):
     """Получение документа по ID"""
@@ -93,10 +133,14 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     """Получение списка документов"""
     user = await get_user_by_token(token)
     query = (
-        docs_sales
-        .select()
-        .where(docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user.cashbox_id)
+        select(docs_sales, docs_sales_settings)
+        .where(
+            docs_sales.c.is_deleted.is_not(True),
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales_settings.c.docs_sales_id == docs_sales.c.id
+        )
         .limit(limit)
+        .outerjoin(docs_sales_settings)
         .offset(offset)
         .order_by(desc(docs_sales.c.id))
     )
@@ -279,6 +323,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             paybox = await database.fetch_one(paybox_q)
             if paybox:
                 paybox = paybox.id
+
+        settings: Optional[Dict[str, Any]] = instance_values.pop("settings", None)
+        instance_values["settings"] = await add_settings_docs_sales(settings)
 
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
@@ -607,6 +654,12 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                 paybox = paybox.id
 
         instance_id_db = instance_values["id"]
+
+        settings: Optional[Dict[str, Any]] = instance_values.pop("settings", None)
+        if await exists_settings_docs_sales(instance_id_db):
+            await update_settings_docs_sales(instance_id_db, settings)
+        else:
+            instance_values["settings"] = await add_settings_docs_sales(settings)
 
         if paid_rubles or paid_lt or lt:
             query = (

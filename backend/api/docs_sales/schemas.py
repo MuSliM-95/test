@@ -3,6 +3,8 @@ from enum import Enum
 from pydantic import BaseModel
 from typing import Optional, List
 
+from database.enums import Repeatability
+
 
 class Item(BaseModel):
     price_type: Optional[int]
@@ -23,6 +25,17 @@ class SaleOperations(str, Enum):
     realization = "Реализация"
 
 
+class Settings(BaseModel):
+    repeatability_type: Repeatability
+    repeatability_value: int
+    date_next_created: Optional[int]
+    transfer_from_weekends: bool = True
+    skip_current_month: bool = True
+    repeatability_count: int = 0
+    default_payment_status: bool = False
+    repeatability_tags: bool = False
+
+
 class Create(BaseModel):
     number: Optional[str]
     dated: Optional[int]
@@ -39,6 +52,7 @@ class Create(BaseModel):
     paybox: Optional[int]
     tax_included: Optional[bool]
     tax_active: Optional[bool]
+    settings: Optional[Settings]
     sales_manager: Optional[int]
     paid_rubles: Optional[float]
     paid_lt: Optional[float]
@@ -90,6 +104,7 @@ class ViewInList(BaseModel):
     organization: int
     warehouse: Optional[int]
     autorepeat: Optional[bool]
+    settings: Optional[Settings]
     sum: Optional[float]
     tax_included: Optional[bool]
     tax_active: Optional[bool]
