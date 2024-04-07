@@ -20,6 +20,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 
+from database.enums import Repeatability
+
 
 class OperationType(str, ENUM):
     plus = "+"
@@ -775,6 +777,8 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("contract", Integer, ForeignKey("contracts.id")),
     sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
     sqlalchemy.Column("warehouse", Integer, ForeignKey("warehouses.id")),
+    sqlalchemy.Column("parent_docs_sales", Integer, ForeignKey("docs_sales.id")),
+    sqlalchemy.Column("autorepeat", Boolean, default=False),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("tax_included", Boolean),
     sqlalchemy.Column("tax_active", Boolean),
@@ -1058,9 +1062,6 @@ warehouse_balances = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-
-
-
 messages = sqlalchemy.Table(
     "messages",
     metadata,
@@ -1313,6 +1314,21 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
     sqlalchemy.Column("lead_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
     extend_existing=True,
+)
+
+docs_sales_settings = sqlalchemy.Table(
+    "docs_sales_settings",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column("repeatability_type", Enum(Repeatability), nullable=False),
+    sqlalchemy.Column("repeatability_value", Integer, nullable=False),
+    sqlalchemy.Column("date_next_created", Integer),
+    sqlalchemy.Column("transfer_from_weekends", Boolean, default=True),
+    sqlalchemy.Column("skip_current_month", Boolean, default=True),
+    sqlalchemy.Column("repeatability_count", Integer, default=0),
+    sqlalchemy.Column("default_payment_status", Boolean, default=False),
+    sqlalchemy.Column("repeatability_tags", Boolean, default=False)
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"

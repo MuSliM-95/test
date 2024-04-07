@@ -28,7 +28,7 @@ class Create(BaseModel):
     dated: Optional[int]
     operation: Optional[SaleOperations]
     tags: Optional[str] = ""
-    # docs_sales: Optional[int]
+    parent_docs_sales: Optional[int]
     comment: Optional[str]
     client: Optional[int]
     contragent: Optional[int]
@@ -89,6 +89,7 @@ class ViewInList(BaseModel):
     contract: Optional[int]
     organization: int
     warehouse: Optional[int]
+    autorepeat: Optional[bool]
     sum: Optional[float]
     tax_included: Optional[bool]
     tax_active: Optional[bool]
@@ -96,6 +97,7 @@ class ViewInList(BaseModel):
     goods: Optional[List[Item]]
     updated_at: int
     created_at: int
+
 
 class ViewInListResult(BaseModel):
     result: List[ViewInList]
