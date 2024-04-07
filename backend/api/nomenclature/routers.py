@@ -208,30 +208,41 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
             )
             nomenclature_info["prices"] = price
         if with_balance:
-            subquery = select([
-                warehouses.c.name.label('warehouse_name'),
-                warehouse_balances.c.current_amount,
-                func.row_number().over(
-                    partition_by=warehouses.c.name,
-                    order_by=warehouse_balances.c.id.desc()
-                ).label('row_num')
-            ]).select_from(
-                warehouse_balances.join(warehouses, warehouses.c.id == warehouse_balances.c.warehouse_id)
-            ).where(
-                warehouse_balances.c.nomenclature_id == 1160
-            ).alias('subquery')
+            subquery = (
+                select([
+                    warehouses.c.name.label('warehouse_name'),
+                    warehouse_balances.c.current_amount,
+                    func.row_number().over(
+                        partition_by=warehouses.c.name,
+                        order_by=warehouse_balances.c.id.desc()
+                    ).label('row_num')
+                ])
+                .select_from(
+                    warehouse_balances.join(warehouses, warehouses.c.id == warehouse_balances.c.warehouse_id)
+                )
+                .where(
+                    warehouse_balances.c.nomenclature_id == nomenclature_info['id'],
+                    warehouse_balances.c.cashbox_id == user.cashbox_id
+                )
+                .alias('subquery')
+            )
 
-            query = select([
-                subquery.c.warehouse_name,
-                subquery.c.current_amount
-            ]).where(
-                subquery.c.row_num == 1
-            ).order_by(
-                subquery.c.warehouse_name
+            query = (
+                select([
+                    subquery.c.warehouse_name,
+                    subquery.c.current_amount
+                ])
+                .where(
+                    subquery.c.row_num == 1
+                )
+                .order_by(
+                    subquery.c.warehouse_name
+                )
             )
 
             balances_list = await database.fetch_all(query)
             nomenclature_info["balances"] = balances_list
+            print(nomenclature_info["balances"])
         print(f"Итерация цикла: {time.time() - time_start_2}")
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
