@@ -186,17 +186,18 @@ async def get_nomenclature_test(token: str, name: Optional[str] = None, barcode:
 
     query = query.where(*filters).limit(limit).offset(offset)
     nomenclature_db = await database.fetch_all(query)
-    nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+    # nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
     for nomenclature_info in nomenclature_db:
         time_start_2 = time.time()
+        if nomenclature_info.get("created_at"):
+            nomenclature_info["created_at"] = int(nomenclature_info["created_at"].timestamp())
+        if nomenclature_info.get("updated_at"):
+            nomenclature_info["updated_at"] = int(nomenclature_info["updated_at"].timestamp())
         barcodes = await database.fetch_all(select(nomenclature_barcodes.c.code).where(nomenclature_barcodes.c.nomenclature_id == nomenclature_info["id"]))
         unit_name = await database.fetch_one(select(units.c.convent_national_view).where(units.c.id == nomenclature_info["unit"]))
         nomenclature_info["barcodes"] = barcodes
         nomenclature_info["unit_name"] = unit_name
-        # if nomenclature_info.get("created_at"):
-        #     nomenclature_info["created_at"] = int(nomenclature_info["created_at"].timestamp())
-        # if nomenclature_info.get("updated_at"):
-        #     nomenclature_info["updated_at"] = int(nomenclature_info["updated_at"].timestamp())
+
         print(f"Итерация цикла: {time.time() - time_start_2}")
 
 
