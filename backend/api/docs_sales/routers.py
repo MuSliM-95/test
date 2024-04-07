@@ -1,4 +1,5 @@
-from databases.backends.postgres import Record
+from typing import Union
+
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import desc, func, and_, select
 
@@ -226,51 +227,6 @@ async def check_foreign_keys(instance_values, user, exceptions) -> bool:
     return True
 
 
-async def add_number_to_docs_sales(user: Record) -> None:
-    q = docs_sales.select().where(
-        docs_sales.c.cashbox == user.cashbox_id,
-        docs_sales.c.is_deleted.is_(False),
-        docs_sales.c.number.is_(None)
-    )
-
-    count_query = (
-        select(func.count(docs_sales.c.id))
-        .where(
-            docs_sales.c.cashbox == user.cashbox_id,
-            docs_sales.c.is_deleted.is_(False),
-            docs_sales.c.number.is_not(None)
-        )
-    )
-
-    count = await database.fetch_val(count_query, column=0)
-    docs_db = await database.fetch_all(q)
-    for i, v in enumerate(docs_db):
-        number = str(count + i + 1)
-        q = docs_sales.update().where(docs_sales.c.id == v.id).values({"number": number})
-        await database.execute(q)
-
-        q = entity_to_entity.select().where(
-            entity_to_entity.c.from_id == v.id
-        )
-        ids = await database.fetch_all(q)
-        for j in ids:
-            if j.type == "docs_sales_payments":
-                q = (
-                    payments
-                    .update()
-                    .where(payments.c.id == j.to_id)
-                    .values({"name": f"Оплата по документу {number}"})
-                )
-            if j.type == "docs_sales_loyality_transactions":
-                q = (
-                    loyality_transactions
-                    .update()
-                    .where(loyality_transactions.c.id == j.to_id)
-                    .values({"name": f"Кешбек по документу {number}"})
-                )
-            await database.execute(q)
-
-
 @router.post("/docs_sales/", response_model=schemas.ListView)
 async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: bool = True):
     """Создание документов"""
@@ -279,19 +235,25 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
     inserted_ids = set()
     exceptions = []
 
-    for instance_values in docs_sales_data.dict()["__root__"]:
+    count_query = (
+        select(func.count(docs_sales.c.id))
+        .where(
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales.c.is_deleted.is_(False)
+        )
+    )
+
+    count_docs_sales = await database.fetch_val(count_query, column=0)
+
+    for index, instance_values in enumerate(docs_sales_data.dict()["__root__"]):
         instance_values["created_by"] = user.id
         instance_values["sales_manager"] = user.id
         instance_values["is_deleted"] = False
         instance_values["cashbox"] = user.cashbox_id
 
-        paid_rubles = instance_values["paid_rubles"]
-        paid_lt = instance_values["paid_lt"]
-        lt = instance_values["loyality_card_id"]
-
-        del instance_values["paid_lt"]
-        del instance_values["paid_rubles"]
-        del instance_values["loyality_card_id"]
+        paid_rubles = instance_values.pop("paid_rubles")
+        paid_lt = instance_values.pop("paid_lt")
+        lt = instance_values.pop("loyality_card_id")
 
         if not await check_period_blocked(
                 instance_values["organization"], instance_values.get("dated"), exceptions
@@ -307,14 +269,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         del instance_values["client"]
 
-        goods: list = instance_values.get("goods")
-        try:
-            del instance_values["goods"]
-        except KeyError:
-            pass
+        if instance_values.get("number") is None:
+            instance_values["number"] = str(count_docs_sales + index + 1)
 
-        paybox = instance_values.get('paybox', None)
-        instance_values.pop('paybox', None)
+        goods: Union[list, None] = instance_values.pop("goods", None)
+        paybox = instance_values.pop('paybox', None)
         if paybox is None:
             paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
             paybox = await database.fetch_one(paybox_q)
@@ -325,7 +284,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         instance_id = await database.execute(query)
 
         # Процесс разделения тегов(в другую таблицу), а также связывание лида с документом продажи при наличии нужного тега
-        tags = instance_values.get("tags", "")
+        tags = instance_values.pop("tags", "")
         if tags:
             tags_insert_list = []
             tags_split = tags.split(",")
@@ -361,11 +320,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                                 await database.execute(query)
             if tags_insert_list:
                 await database.execute(docs_sales_tags.insert(tags_insert_list))
-
-        try:
-            del instance_values["tags"]
-        except KeyError:
-            pass
 
         inserted_ids.add(instance_id)
         items_sum = 0
@@ -554,7 +508,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         await database.execute(query)
 
         if generate_out:
-
             goods_res = []
             for good in goods:
                 nomenclature_db = await database.fetch_one(
@@ -577,7 +530,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "to_warehouse": None,
                 "status": True,
                 "contragent": instance_values['contragent'],
-                "organization":instance_values['organization'],
+                "organization": instance_values['organization'],
                 "operation": "outgoing",
                 "comment": instance_values['comment'],
                 "warehouse": instance_values['warehouse'],
@@ -592,8 +545,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
-
-    await add_number_to_docs_sales(user=user)
 
     await manager.send_message(
         token,
@@ -619,7 +570,18 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
     updated_ids = set()
     exceptions = []
-    for instance_values in docs_sales_data.dict(exclude_unset=True)["__root__"]:
+
+    count_query = (
+        select(func.count(docs_sales.c.id))
+        .where(
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales.c.is_deleted.is_(False)
+        )
+    )
+
+    count_docs_sales = await database.fetch_val(count_query, column=0)
+
+    for index, instance_values in enumerate(docs_sales_data.dict()["__root__"]):
         if not await check_period_blocked(
                 instance_values["organization"], instance_values.get("dated"), exceptions
         ):
@@ -628,30 +590,16 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
         if not await check_foreign_keys(instance_values, user, exceptions):
             continue
 
-        goods: list = instance_values.get("goods")
-        try:
-            del instance_values["goods"]
-        except KeyError:
-            pass
+        if instance_values.get("number") is None:
+            instance_values["number"] = str(count_docs_sales + index + 1)
 
-        paid_rubles = None
-        paid_lt = None
-        lt = None
+        goods: Union[list, None] = instance_values.pop("goods", None)
 
-        if instance_values.get("paid_rubles") is not None:
-            paid_rubles = instance_values["paid_rubles"]
-            del instance_values["paid_rubles"]
+        paid_rubles = instance_values.pop("paid_rubles", None)
+        paid_lt = instance_values.pop("paid_lt", None)
+        lt = instance_values.pop("loyality_card_id", None)
 
-        if instance_values.get("paid_lt") is not None:
-            paid_lt = instance_values["paid_lt"]
-            del instance_values["paid_lt"]
-
-        if instance_values.get("loyality_card_id") is not None:
-            lt = instance_values["loyality_card_id"]
-            del instance_values["loyality_card_id"]
-
-        paybox = instance_values.get('paybox', None)
-        instance_values.pop('paybox', None)
+        paybox = instance_values.pop('paybox', None)
         if paybox is None:
             paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
             paybox = await database.fetch_one(paybox_q)
@@ -661,7 +609,6 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
         instance_id_db = instance_values["id"]
 
         if paid_rubles or paid_lt or lt:
-
             query = (
                 entity_to_entity.select()
                 .where(entity_to_entity.c.cashbox_id == user.cashbox_id,
@@ -910,8 +857,6 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
     query = docs_sales.select().where(docs_sales.c.id.in_(updated_ids))
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
-
-    await add_number_to_docs_sales(user=user)
 
     await manager.send_message(
         token,
