@@ -5,7 +5,7 @@ from starlette import status
 
 import api.nomenclature.schemas as schemas
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
-    warehouse_register_movement, warehouses, units
+    warehouse_register_movement, warehouses, units, warehouse_balances
 from fastapi import APIRouter, HTTPException
 
 from functions.helpers import (
@@ -157,54 +157,6 @@ async def get_nomenclature_by_id(token: str, idx: int):
     return nomenclature_db
 
 
-@router.get("/test/")
-async def get_nomenclature_test(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
-                           offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
-    start_time = time.time()
-    user = await get_user_by_token(token)
-
-    if name and barcode:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Укажите только один из параметров: 'name' или 'barcode'")
-
-    query = nomenclature.select()
-
-    filters = [
-        nomenclature.c.cashbox == user.cashbox_id,
-        nomenclature.c.is_deleted.is_not(True),
-    ]
-
-    if name:
-        filters.append(nomenclature.c.name.ilike(f"%{name}%"))
-    if barcode:
-        query = query.join(
-            nomenclature_barcodes, nomenclature.c.id == nomenclature_barcodes.c.nomenclature_id
-        )
-        filters.append(nomenclature_barcodes.c.code == barcode)
-    if category:
-        filters.append(nomenclature.c.category == category)
-
-    query = query.where(*filters).limit(limit).offset(offset)
-    nomenclature_db = await database.fetch_all(query)
-    # nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
-    for nomenclature_info in nomenclature_db:
-        time_start_2 = time.time()
-        if nomenclature_info.get("created_at"):
-            nomenclature_info["created_at"] = int(nomenclature_info["created_at"].timestamp())
-        if nomenclature_info.get("updated_at"):
-            nomenclature_info["updated_at"] = int(nomenclature_info["updated_at"].timestamp())
-        barcodes = await database.fetch_all(select(nomenclature_barcodes.c.code).where(nomenclature_barcodes.c.nomenclature_id == nomenclature_info["id"]))
-        unit_name = await database.fetch_one(select(units.c.convent_national_view).where(units.c.id == nomenclature_info["unit"]))
-        nomenclature_info["barcodes"] = barcodes
-        nomenclature_info["unit_name"] = unit_name
-
-        print(f"Итерация цикла: {time.time() - time_start_2}")
-
-
-    print(f"Получение номенклатур: {time.time() - start_time}")
-    return nomenclature_db
-
-
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
@@ -256,46 +208,30 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
             )
             nomenclature_info["prices"] = price
         if with_balance:
-            q = case(
-                [
-                    (
-                        warehouse_register_movement.c.type_amount == 'minus',
-                        warehouse_register_movement.c.amount * (-1)
-                    )
-                ],
-                else_=warehouse_register_movement.c.amount
+            subquery = select([
+                warehouses.c.name.label('warehouse_name'),
+                warehouse_balances.c.current_amount,
+                func.row_number().over(
+                    partition_by=warehouses.c.name,
+                    order_by=warehouse_balances.c.id.desc()
+                ).label('row_num')
+            ]).select_from(
+                warehouse_balances.join(warehouses, warehouses.c.id == warehouse_balances.c.warehouse_id)
+            ).where(
+                warehouse_balances.c.nomenclature_id == 1160
+            ).alias('subquery')
 
+            query = select([
+                subquery.c.warehouse_name,
+                subquery.c.current_amount
+            ]).where(
+                subquery.c.row_num == 1
+            ).order_by(
+                subquery.c.warehouse_name
             )
-            query = (
-                select(
-                    nomenclature.c.id,
-                    nomenclature.c.name,
-                    nomenclature.c.category,
-                    warehouses.c.name.label("warehouse_name"),
-                    warehouse_register_movement.c.organization_id,
-                    warehouse_register_movement.c.warehouse_id,
-                    func.sum(q).label("current_amount"))
-                .where(warehouse_register_movement.c.nomenclature_id == nomenclature_info['id'],
-                       warehouse_register_movement.c.warehouse_id == in_warehouse
-                       )
-                .limit(limit)
-                .offset(offset)
-            ).group_by(
-                nomenclature.c.name,
-                nomenclature.c.id,
-                warehouses.c.name,
-                warehouse_register_movement.c.organization_id,
-                warehouse_register_movement.c.warehouse_id
-            ) \
-                .select_from(warehouse_register_movement
-                             .join(nomenclature,
-                                   warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
-                                   )) \
-                .select_from(warehouse_register_movement) \
-                .join(warehouses, warehouses.c.id == warehouse_register_movement.c.warehouse_id)
-            warehouse_balances_db = await database.fetch_all(query)
-            nomenclature_info["balances"] = warehouse_balances_db
-            nomenclature_info["balances"] = []
+
+            balances_list = await database.fetch_all(query)
+            nomenclature_info["balances"] = balances_list
         print(f"Итерация цикла: {time.time() - time_start_2}")
 
     query = select(func.count(nomenclature.c.id)).where(*filters)
