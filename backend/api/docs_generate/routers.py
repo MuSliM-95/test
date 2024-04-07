@@ -57,7 +57,7 @@ def generate_doc(template, *kwargs) -> Any:
 
 
 def convert_html_to_pdf(doc_render):
-    return pdfkit.from_string(doc_render)
+    return pdfkit.from_string(doc_render, options={"enable-local-file-access": ""})
 
 
 @router.post('/docgenerated/')
