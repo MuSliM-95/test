@@ -157,6 +157,41 @@ async def get_nomenclature_by_id(token: str, idx: int):
     return nomenclature_db
 
 
+@router.get("/test/")
+async def get_nomenclature_test(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
+                           offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
+    start_time = time.time()
+    query = (
+        select(
+            nomenclature,
+            units.c.convent_national_view.label("unit_name"),
+            func.array_remove(func.array_agg(func.distinct(nomenclature_barcodes.c.code)), None).label("barcodes")
+        )
+        .select_from(nomenclature)
+        .join(units, units.c.id == nomenclature.c.unit, full=True)
+        .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, full=True)
+    )
+
+    filters = [
+        nomenclature.c.cashbox == user.cashbox_id,
+        nomenclature.c.is_deleted.is_not(True),
+    ]
+
+    if name:
+        filters.append(nomenclature.c.name.ilike(f"%{name}%"))
+    if barcode:
+        filters.append(nomenclature_barcodes.c.code == barcode)
+    if category:
+        filters.append(nomenclature.c.category == category)
+
+    query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id,
+                                                                       units.c.convent_national_view).order_by(
+        asc(nomenclature.c.id))
+    nomenclature_db = await database.fetch_all(query)
+    nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+    print(f"Получение номенклатур: {time.time() - start_time}")
+
+
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
