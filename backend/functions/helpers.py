@@ -23,7 +23,7 @@ from database.db import (
     organizations,
     units,
     entity_or_function,
-    fifo_settings,
+    fifo_settings, docs_sales_settings,
 )
 
 
@@ -75,9 +75,9 @@ def get_filters(table, filters):
         elif filter == "payment_type":
             if value:
                 if value in (
-                    PaymentType.incoming,
-                    PaymentType.outgoing,
-                    PaymentType.transfer,
+                        PaymentType.incoming,
+                        PaymentType.outgoing,
+                        PaymentType.transfer,
                 ):
                     filters_list.append((f"payments.type = '{value}'"))
         elif filter == "external_id":
@@ -169,9 +169,7 @@ def get_filters_analytics(filters) -> str:
     return " ".join(filters_list)
 
 
-
 def get_filters_transactions(table, filters):
-
     filters_list = []
     filters_dict = filters.dict()
 
@@ -186,8 +184,9 @@ def get_filters_transactions(table, filters):
             filters_list.append(table.c.dated <= datetime.fromtimestamp(dateto))
 
         if datefrom and dateto:
-            filters_list.append(and_(table.c.dated >= datetime.fromtimestamp(datefrom), table.c.dated <= datetime.fromtimestamp(dateto)))
-    
+            filters_list.append(and_(table.c.dated >= datetime.fromtimestamp(datefrom),
+                                     table.c.dated <= datetime.fromtimestamp(dateto)))
+
     _periods_filter("dated")
 
     for filter, value in filters_dict.items():
@@ -213,9 +212,7 @@ def get_filters_transactions(table, filters):
     return filters_list
 
 
-
 def get_filters_cards(table, filters):
-
     filters_list = []
     filters_dict = filters.dict()
 
@@ -237,10 +234,12 @@ def get_filters_cards(table, filters):
 
         if datefrom and dateto:
             if period_type == "start_period":
-                filters_list.append(and_(table.c.start_period >= datetime.fromtimestamp(datefrom), table.c.start_period <= datetime.fromtimestamp(dateto)))
+                filters_list.append(and_(table.c.start_period >= datetime.fromtimestamp(datefrom),
+                                         table.c.start_period <= datetime.fromtimestamp(dateto)))
             else:
-                filters_list.append(and_(table.c.end_period >= datetime.fromtimestamp(datefrom), table.c.end_period <= datetime.fromtimestamp(dateto)))
-    
+                filters_list.append(and_(table.c.end_period >= datetime.fromtimestamp(datefrom),
+                                         table.c.end_period <= datetime.fromtimestamp(dateto)))
+
     _periods_filter("start_period")
     _periods_filter("end_period")
 
@@ -382,13 +381,14 @@ async def add_nomenclature_count(instance: Optional[Record]) -> Optional[dict]:
 
         if goods:
             instance["nomenclature_count"] = len(goods)
-            instance["doc_discount"] = round(sum([(0 if not good.sum_discounted else good.sum_discounted) for good in goods]), 2)
+            instance["doc_discount"] = round(
+                sum([(0 if not good.sum_discounted else good.sum_discounted) for good in goods]), 2)
         else:
             instance["nomenclature_count"] = 0
             instance["doc_discount"] = 0
-        
+
         return instance
-    
+
 
 async def add_nomenclature_name_to_goods(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
@@ -408,7 +408,22 @@ async def add_nomenclature_name_to_goods(instance: Optional[Record]) -> Optional
             instance["nomenclature_name"] = nomenclature_db.name
         else:
             instance["nomenclature_name"] = ""
-        
+
+        return instance
+
+
+async def add_docs_sales_settings(instance: Optional[Record]) -> Optional[dict]:
+    if instance is not None:
+        instance = dict(instance)
+
+        settings = await database.fetch_one(
+            docs_sales_settings
+            .select()
+            .where(docs_sales_settings.c.id == instance["settings"])
+        )
+
+        instance["settings"] = settings
+
         return instance
 
 
@@ -416,7 +431,8 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
         instance = dict(instance)
 
-        proxyes_q = entity_to_entity.select().where(entity_to_entity.c.cashbox_id == instance['cashbox'], entity_to_entity.c.from_id == instance['id'])
+        proxyes_q = entity_to_entity.select().where(entity_to_entity.c.cashbox_id == instance['cashbox'],
+                                                    entity_to_entity.c.from_id == instance['id'])
         proxyes = await database.fetch_all(proxyes_q)
 
         paid_rubles = 0
@@ -432,7 +448,7 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
                     q_payment = payments.select().where(
                         payments.c.id == proxy.to_id,
                         payments.c.cashbox == instance['cashbox'],
-                        payments.c.status == True, 
+                        payments.c.status == True,
                         payments.c.is_deleted == False
                     )
                     payment = await database.fetch_one(q_payment)
@@ -444,13 +460,12 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
                     q_trans = loyality_transactions.select().where(
                         loyality_transactions.c.id == proxy.to_id,
                         loyality_transactions.c.cashbox == instance['cashbox'],
-                        loyality_transactions.c.status == True, 
+                        loyality_transactions.c.status == True,
                         loyality_transactions.c.is_deleted == False
                     )
                     trans = await database.fetch_one(q_trans)
                     if trans:
                         paid_loyality += trans.amount
-
 
         paid_rubles = round(paid_rubles, 2)
         paid_loyality = round(paid_loyality, 2)
@@ -458,13 +473,14 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
         instance["paid_rubles"] = paid_rubles
         instance["paid_loyality"] = paid_loyality
         instance["paid_doc"] = paid_loyality + paid_rubles
-        
+
         return instance
+
 
 async def nomenclature_unit_id_to_name(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
         instance = dict(instance)
-        
+
         q = units.select().where(units.c.id == instance.get("unit"))
         unit_db = await database.fetch_one(q)
 
@@ -472,6 +488,7 @@ async def nomenclature_unit_id_to_name(instance: Optional[Record]) -> Optional[d
             instance['unit_name'] = unit_db.convent_national_view
 
         return instance
+
 
 def datetime_to_timestamp(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
@@ -494,7 +511,7 @@ def datetime_to_timestamp(instance: Optional[Record]) -> Optional[dict]:
         if instance.get("updated_at"):
             instance["updated_at"] = int(instance["updated_at"].timestamp())
         return instance
-    
+
 
 def rem_owner_is_deleted(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
@@ -502,7 +519,7 @@ def rem_owner_is_deleted(instance: Optional[Record]) -> Optional[dict]:
         if instance.get("owner") is not None:
             del instance["owner"]
         if instance.get("is_deleted") is not None:
-            del instance["is_deleted"] 
+            del instance["is_deleted"]
 
         return instance
 
@@ -513,7 +530,7 @@ def add_status(instance: Optional[Record]) -> Optional[dict]:
         instance["data"] = {
             "status": "success"
         }
-    
+
         return instance
 
 
@@ -542,6 +559,7 @@ async def get_entity_by_id(entity: Table, idx: int, owner: int) -> Record:
 
     return entity_db
 
+
 async def get_entity_by_id_and_created_by(entity: Table, idx: int, created_by: int) -> Record:
     """Returns entity from db, filtered by owner and is_deleted fields"""
 
@@ -558,6 +576,7 @@ async def get_entity_by_id_and_created_by(entity: Table, idx: int, created_by: i
         )
 
     return entity_db
+
 
 async def get_entity_by_id_cashbox(entity: Table, idx: int, cashbox_id: int) -> Record:
     """Returns entity from db, filtered by cashbox_id and is_deleted fields"""
@@ -660,8 +679,9 @@ def clear_phone_number(phone_number: str) -> Union[int, None]:
 
 async def get_statement(statement_id: str, account_id: str, access_token: str):
     async with aiohttp.ClientSession() as session:
-        async with session.get(f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
-                               headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+        async with session.get(
+                f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
+                headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
             try:
                 init_statement_json = await resp.json()
             except:
@@ -672,7 +692,7 @@ async def get_statement(statement_id: str, account_id: str, access_token: str):
 
 async def init_statement(statement_data: dict, access_token: str):
     async with aiohttp.ClientSession() as session:
-        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json = {
+        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json={
             'Data': {
                 'Statement': {
                     'accountId': statement_data.get('accountId'),
@@ -680,7 +700,7 @@ async def init_statement(statement_data: dict, access_token: str):
                     'endDateTime': statement_data.get('endDateTime'),
                 }
             }
-        }, headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+        }, headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
             try:
                 init_statement_json = await resp.json()
             except:

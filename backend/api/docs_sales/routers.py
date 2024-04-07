@@ -44,7 +44,7 @@ from functions.helpers import (
     check_unit_exists,
     check_period_blocked,
     add_nomenclature_count,
-    raschet_oplat
+    raschet_oplat, add_docs_sales_settings
 )
 from functions.helpers import get_user_by_token
 
@@ -133,14 +133,12 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     """Получение списка документов"""
     user = await get_user_by_token(token)
     query = (
-        select(docs_sales, docs_sales_settings)
+        select(docs_sales)
         .where(
             docs_sales.c.is_deleted.is_not(True),
-            docs_sales.c.cashbox == user.cashbox_id,
-            docs_sales_settings.c.id == docs_sales.c.settings
+            docs_sales.c.cashbox == user.cashbox_id
         )
         .limit(limit)
-        .outerjoin(docs_sales_settings)
         .offset(offset)
         .order_by(desc(docs_sales.c.id))
     )
@@ -185,6 +183,8 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     items_db = [*map(add_nomenclature_count, items_db)]
     items_db = [await instance for instance in items_db]
     items_db = [*map(raschet_oplat, items_db)]
+    items_db = [await instance for instance in items_db]
+    items_db = [*map(add_docs_sales_settings, items_db)]
     items_db = [await instance for instance in items_db]
 
     count = await database.fetch_val(count_query)
