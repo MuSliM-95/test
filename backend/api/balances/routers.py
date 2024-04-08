@@ -35,7 +35,9 @@ async def get_account_info(token: str):
                 )
                 demo_left = demo_expiration - datetime.utcnow().timestamp()
 
-                tg_account_info = users.select().where(users.c.id == user.user)
+                tg_account_info = await database.fetch_one(
+                    users.select().where(users.c.id == user.user)
+                )
 
                 if not tg_account_info:
                     raise HTTPException(status_code=404, detail="Нет доп. информации о вашем телеграм аккаунте")

@@ -74,14 +74,15 @@ async def exists_settings_docs_sales(docs_sales_id: int) -> bool:
     return exists
 
 
-async def add_settings_docs_sales(settings: Optional[dict]) -> int:
-    query = (
-        docs_sales_settings
-        .insert()
-        .values(settings)
-    )
-    docs_sales_settings_id = await database.execute(query)
-    return docs_sales_settings_id
+async def add_settings_docs_sales(settings: Optional[dict]) -> Optional[int]:
+    if settings:
+        query = (
+            docs_sales_settings
+            .insert()
+            .values(settings)
+        )
+        docs_sales_settings_id = await database.execute(query)
+        return docs_sales_settings_id
 
 
 async def update_settings_docs_sales(docs_sales_id: int, settings: dict) -> int:
