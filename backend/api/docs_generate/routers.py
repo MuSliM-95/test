@@ -64,14 +64,16 @@ def convert_html_to_pdf(doc_render):
 async def doc_generate(token: str,
                        template_id: int,
                        variable: Dict,
-                       entity: str,
-                       entity_id: int,
                        type_doc: TypeDoc,
+                       entity: str = None,
+                       entity_id: int = None,
                        tags: str = None):
-    '''Генерирование документа с загрузкой в S3 и фиксацией записи генерации'''
+
+    """ Генерирование документа с загрузкой в S3 и фиксацией записи генерации """
+
     try:
         user = await get_user_by_token(token)
-        query = doc_templates.select().where(doc_templates.c.id == template_id)
+        query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox == user.cashbox_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
 
@@ -83,21 +85,21 @@ async def doc_generate(token: str,
             file_link += ".pdf"
 
         async with s3_session.client(**s3_data) as s3:
-            await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link, ACL="public-read")
+            await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
 
         file_dict = {
-            'cashbox_id': user.cashbox_id,
-            'doc_link': file_link,
-            'created_at': datetime.datetime.now(),
-            'tags': None if not tags else tags.lower(),
-            'template_id': template_id,
-            'entity': entity,
-            'entity_id': entity_id,
-            'type_doc': type_doc
-        }
+                'cashbox': user.cashbox_id,
+                'doc_link': file_link,
+                'created_at': datetime.datetime.now(),
+                'tags': None if not tags else tags.lower(),
+                'template_id': template_id,
+                'entity': entity,
+                'entity_id': entity_id,
+                'type_doc': type_doc
+            }
         query = doc_generated.insert().values(file_dict)
         result_file_dict_id = await database.execute(query)
-        query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id)
+        query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id, doc_generated.c.cashbox == user.cashbox_id)
         result = await database.fetch_one(query)
         return result
     except Exception as error:
@@ -106,38 +108,46 @@ async def doc_generate(token: str,
 
 @router.get('/docgenerated/{idx}', status_code=status.HTTP_200_OK)
 async def get_doc_generate_by_idx(token: str, idx: int):
-    """Получение реквизитов документа по ID"""
+
+    """ Получение реквизитов документа по ID """
+
     user = await get_user_by_token(token)
-    query = doc_generated.select().where(doc_generated.c.id == idx)
+    query = doc_generated.select().where(doc_generated.c.id == idx, doc_generated.c.id == user.cashbox_id)
     result = await database.fetch_one(query)
     return result
 
 
-@router.get("/docgenerated/file/{filename}/")
+@router.get("/docgenerated/file/{filename}")
 async def get_generate_docs_by_filename(filename: str, type_doc: TypeDoc):
-    """Получение документа по имени файла"""
+
+    """ Получение документа по имени файла """
+
     async with s3_session.client(**s3_data) as s3:
         try:
             file_key = f"docsgenerate/{filename}"
+            s3_ob = await s3.get_object(Bucket = bucket_name, Key = file_key)
+            body = await s3_ob['Body'].read()
             if type_doc is TypeDoc.html:
-                s3_ob = await s3.get_object(Bucket=bucket_name, Key=file_key)
-                body = await s3_ob['Body'].read()
+
                 return Response(content=body, media_type="text/html",
-                                headers={'Response-content-disposition': 'attachment'})
+                                headers={'Content-Disposition': f'attachment; filename="{filename}.html"'})
             if type_doc is TypeDoc.pdf:
-                url = await s3.generate_presigned_url(
-                    'get_object',
-                    Params={
-                        'Bucket': bucket_name,
-                        'Key': file_key
-                    },
-                    ExpiresIn=None
-                )
-                return {
-                    "data": {
-                        "url": url
-                    }
-                }
+
+                return Response(content=body, media_type="application/pdf",
+                                headers={'Content-Disposition': f'attachment; filename="{filename}.pdf"'})
+                # url = await s3.generate_presigned_url(
+                #     'get_object',
+                #     Params={
+                #         'Bucket': bucket_name,
+                #         'Key': file_key
+                #     },
+                #     ExpiresIn=None
+                # )
+                # return {
+                #     "data": {
+                #         "url": url
+                #     }
+                # }
         except Exception as err:
             return HTTPException(status_code=404, detail="Такого документа не существует")
 
