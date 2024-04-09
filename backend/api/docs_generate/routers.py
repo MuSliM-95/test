@@ -73,7 +73,7 @@ async def doc_generate(token: str,
 
     try:
         user = await get_user_by_token(token)
-        query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox_id == user.cashbox_id)
+        query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox == user.cashbox_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
 
