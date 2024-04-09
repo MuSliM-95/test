@@ -11,7 +11,7 @@ from io import BytesIO
 import qrcode
 from PIL import Image
 
-from api.docs_generate.schemas import TypeDoc
+from api.docs_generate.schemas import TypeDoc, ReGenerateList
 from database.db import database, doc_generated, doc_templates
 from functions.helpers import get_user_by_token
 import base64
@@ -135,19 +135,7 @@ async def get_generate_docs_by_filename(filename: str, type_doc: TypeDoc):
 
                 return Response(content=body, media_type="application/pdf",
                                 headers={'Content-Disposition': f'attachment; filename="{filename}.pdf"'})
-                # url = await s3.generate_presigned_url(
-                #     'get_object',
-                #     Params={
-                #         'Bucket': bucket_name,
-                #         'Key': file_key
-                #     },
-                #     ExpiresIn=None
-                # )
-                # return {
-                #     "data": {
-                #         "url": url
-                #     }
-                # }
+
         except Exception as err:
             return HTTPException(status_code=404, detail="Такого документа не существует")
 
@@ -168,3 +156,9 @@ async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, 
         query = doc_generated.select().where(doc_generated.c.cashbox_id == user.cashbox_id).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
+
+
+@router.post('/regenerated/', status_code=status.HTTP_200_OK)
+async def regenerated(token: str, generateList: ReGenerateList):
+    pass
+
