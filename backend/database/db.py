@@ -1153,7 +1153,6 @@ doc_generated = sqlalchemy.Table(
     sqlalchemy.Column("tags", String),
     sqlalchemy.Column("template_id", ForeignKey("doc_template.id")),
     sqlalchemy.Column("doc_link", String),
-    sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("entity", String),
     sqlalchemy.Column("entity_id", Integer),
     sqlalchemy.Column("type_doc", String),
