@@ -73,7 +73,7 @@ async def doc_generate(token: str,
 
     try:
         user = await get_user_by_token(token)
-        query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox == user.cashbox_id)
+        query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox_id == user.cashbox_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
 
@@ -88,7 +88,7 @@ async def doc_generate(token: str,
             await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
 
         file_dict = {
-                'cashbox': user.cashbox_id,
+                'cashbox_id': user.cashbox_id,
                 'doc_link': file_link,
                 'created_at': datetime.datetime.now(),
                 'tags': None if not tags else tags.lower(),
@@ -99,7 +99,7 @@ async def doc_generate(token: str,
             }
         query = doc_generated.insert().values(file_dict)
         result_file_dict_id = await database.execute(query)
-        query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id, doc_generated.c.cashbox == user.cashbox_id)
+        query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id, doc_generated.c.cashbox_id == user.cashbox_id)
         result = await database.fetch_one(query)
         return result
     except Exception as error:
@@ -112,7 +112,7 @@ async def get_doc_generate_by_idx(token: str, idx: int):
     """ Получение реквизитов документа по ID """
 
     user = await get_user_by_token(token)
-    query = doc_generated.select().where(doc_generated.c.id == idx, doc_generated.c.id == user.cashbox_id)
+    query = doc_generated.select().where(doc_generated.c.id == idx, doc_generated.c.cashbox_id == user.cashbox_id)
     result = await database.fetch_one(query)
     return result
 
@@ -153,17 +153,18 @@ async def get_generate_docs_by_filename(filename: str, type_doc: TypeDoc):
 
 
 @router.get('/docgenerated/', status_code=status.HTTP_200_OK)
-async def get_doc_generate_list(cashbox: int, tags: str = None, limit: int = 100, offset: int = 0):
+async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, offset: int = 0):
     """Получение списка генераций"""
+    user = await get_user_by_token(token)
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
-        query = doc_generated.select().where(doc_generated.c.cashbox_id == cashbox,
+        query = doc_generated.select().where(doc_generated.c.cashbox_id == user.cashbox_id,
                                              *filter_tags).order_by(desc(doc_generated.c.created_at)).limit(
             limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
     else:
-        query = doc_generated.select().where(doc_generated.c.cashbox_id == cashbox).limit(limit).offset(offset)
+        query = doc_generated.select().where(doc_generated.c.cashbox_id == user.cashbox_id).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
