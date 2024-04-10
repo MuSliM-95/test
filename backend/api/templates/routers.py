@@ -54,7 +54,7 @@ async def get_template(token: str, idx: int):
 
 @database.transaction()
 @router.post("/doctemplates/", response_model=schemas.DocTemplateCreate)
-async def add_template(token: str, name: str, areas_in: List[int] = None, pages_in: List[int] = None,  description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
+async def add_template(token: str, name: str, areas_in: List[Union[int, None]] = None, pages_in: List[Union[int, None]] = None,  description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
 
     """Добавление нового шаблона"""
 
