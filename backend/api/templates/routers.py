@@ -45,9 +45,10 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
                  where(entity_to_entity.c.from_entity == 10,
                        or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
                        pages.c.name.ilike(f'%{page}%'),
-                       areas.c.name.ilike(f'%{area}%'),).
+                       areas.c.name.ilike(f'%{area}%')).
                  limit(limit).
                  offset(offset))
+        print(query)
         result = await database.fetch_all(query)
         return {'result': result, 'tags': ''}
 
