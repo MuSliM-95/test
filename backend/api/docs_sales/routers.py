@@ -64,14 +64,14 @@ units_cache = set()
 async def exists_settings_docs_sales(docs_sales_id: int) -> bool:
     query = (
         docs_sales
-        .exists()
+        .select()
         .where(
             docs_sales.c.id == docs_sales_id,
             docs_sales.c.settings.is_not(None)
         )
     )
-    exists = await database.fetch_val(query)
-    return exists
+    exists = await database.fetch_one(query)
+    return bool(exists)
 
 
 async def add_settings_docs_sales(settings: Optional[dict]) -> Optional[int]:
@@ -629,7 +629,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
     count_docs_sales = await database.fetch_val(count_query, column=0)
 
-    for index, instance_values in enumerate(docs_sales_data.dict()["__root__"]):
+    for index, instance_values in enumerate(docs_sales_data.dict(exclude_unset=True)["__root__"]):
         if not await check_period_blocked(
                 instance_values["organization"], instance_values.get("dated"), exceptions
         ):
@@ -796,6 +796,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
         if instance_values.get("paid_rubles"):
             del instance_values['paid_rubles']
+
+        print(instance_values)
         query = (
             docs_sales.update()
             .where(docs_sales.c.id == instance_values["id"])
