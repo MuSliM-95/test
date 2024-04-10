@@ -38,7 +38,7 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
         return {'result': result, 'tags': ','.join(tags)}
     else:
         # query = select().where(doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
-        query = (select().
+        query = (doc_templates.select().
                  where(
                        doc_templates.c.cashbox == user.cashbox_id,
                        ).
