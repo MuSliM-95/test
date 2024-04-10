@@ -797,7 +797,6 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
         if instance_values.get("paid_rubles"):
             del instance_values['paid_rubles']
 
-        print(instance_values)
         query = (
             docs_sales.update()
             .where(docs_sales.c.id == instance_values["id"])
