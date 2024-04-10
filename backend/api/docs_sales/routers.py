@@ -643,8 +643,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
         goods: Union[list, None] = instance_values.pop("goods", None)
 
-        paid_rubles = instance_values.pop("paid_rubles", None)
-        paid_lt = instance_values.pop("paid_lt", None)
+        paid_rubles = instance_values.pop("paid_rubles", 0)
+        paid_lt = instance_values.pop("paid_lt", 0)
         lt = instance_values.pop("loyality_card_id", None)
 
         paybox = instance_values.pop('paybox', None)
