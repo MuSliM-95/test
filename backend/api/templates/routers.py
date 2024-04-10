@@ -15,16 +15,19 @@ router = APIRouter(tags=["doctemplates"])
 async def get_list_template(token: str, tags: str = None, limit: int = 100, offset: int = 0, page: str = None, area: str = None):
     """Получение списка шаблонов документов"""
     user = await get_user_by_token(token)
+    filter = [doc_templates.c.cashbox == user.cashbox_id]
+    if page:
+        filter.append(pages.c.name == page)
+    if area:
+        filter.append( areas.c.name == area)
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
         query = (select().
                  where(or_(*filter_tags),
-                       doc_templates.c.cashbox == user.cashbox_id,
                        entity_to_entity.c.from_entity == 10,
                        or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
-                       pages.c.name.like(f'%{page}%'),
-                       areas.c.name.like(f'%{area}%'),
+                       *filter
                        ).
                  join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
                  join(pages, entity_to_entity.c.to_id == pages.c.id).
@@ -44,8 +47,8 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
                  join(areas, entity_to_entity.c.to_id == areas.c.id, full=True).
                  where(entity_to_entity.c.from_entity == 10,
                        or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
-                       pages.c.name == page,
-                       areas.c.name == area).
+                       *filter
+                       ).
                  limit(limit).
                  offset(offset))
         print(query)
