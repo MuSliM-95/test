@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from database.db import database, doc_templates
+from database.db import database, doc_templates, entity_to_entity, pages, areas
 import api.templates.schemas as schemas
 from datetime import datetime
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 from typing import Dict, Union
 
 from functions.helpers import get_user_by_token
@@ -12,17 +12,29 @@ router = APIRouter(tags=["doctemplates"])
 
 
 @router.get("/doctemplates/", response_model=schemas.TemplateList)
-async def get_list_template(token: str, tags: str = None, limit: int = 100, offset: int = 0):
+async def get_list_template(token: str, tags: str = None, limit: int = 100, offset: int = 0, page: str = None, area: str = None):
     """Получение списка шаблонов документов"""
     user = await get_user_by_token(token)
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
-        query = doc_templates.select().where(or_(*filter_tags), doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
+        query = (select().
+                 where(or_(*filter_tags),
+                       doc_templates.c.cashbox == user.cashbox_id,
+                       entity_to_entity.c.from_entity == 10,
+                       or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13).
+                       pages.c.name.like(f'%{page}%'),
+                       areas.c.name.like(f'%{area}%'),
+                       ).
+                 join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
+                 join(pages, entity_to_entity.c.to_id == pages.c.id).
+                 join(areas, entity_to_entity.c.to_id == areas.c.id).
+                 limit(limit).
+                 offset(offset))
         result = await database.fetch_all(query)
         return {'result': result, 'tags': ','.join(tags)}
     else:
-        query = doc_templates.select().where(doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
+        query = select().where(doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'result': result, 'tags': ''}
 
@@ -40,8 +52,9 @@ async def get_template(token: str, idx: int):
     return result
 
 
+@database.transaction()
 @router.post("/doctemplates/", response_model=schemas.DocTemplateCreate)
-async def add_template(token: str, name: str, description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
+async def add_template(token: str, name: str, template: schemas.TemplateCreate = None, description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
 
     """Добавление нового шаблона"""
 
@@ -63,12 +76,47 @@ async def add_template(token: str, name: str, description: str = None, tags: str
             'template_data': str(file.file.read().decode('UTF-8')) if file else None,
             'is_deleted': False
         })
+
         template_res["created_at"] = int(datetime.utcnow().timestamp())
         template_res["updated_at"] = int(datetime.utcnow().timestamp())
         query = doc_templates.insert().values(template_res)
         result_id = await database.execute(query)
         query = doc_templates.select().where(doc_templates.c.id == result_id)
         result = await database.fetch_one(query)
+        await database.execute_many(
+            [
+                entity_to_entity.insert(
+                    {
+                        "from_entity": 10,
+                        "to_entity": 12,
+                        "from_id": result['id'],
+                        "to_id": item,
+                        "status": True,
+                        "delinked": False,
+                        "cashbox_id": user.cashbox_id,
+                        "type": "docs_template_pages"
+                    }
+                )
+                for item in template.dict()['areas']
+            ]
+        )
+        await database.execute_many(
+            [
+                entity_to_entity.insert(
+                    {
+                        "from_entity": 10,
+                        "to_entity": 13,
+                        "from_id": result['id'],
+                        "to_id": item,
+                        "status": True,
+                        "delinked": False,
+                        "cashbox_id": user.cashbox_id,
+                        "type": "docs_template_pages"
+                    }
+                )
+                for item in template.dict()['pages']
+            ]
+        )
         return result
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))

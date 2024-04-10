@@ -65,3 +65,8 @@ class TemplateList(BaseModel):
     result: Optional[List[DocTemplate]]
     tags: Optional[str] = None
 
+
+class TemplateCreate(BaseModel):
+    areas: Optional[List[int]] = None
+    pages: Optional[List[int]] = None
+
