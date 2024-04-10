@@ -11,7 +11,7 @@ from functions.helpers import get_user_by_token
 router = APIRouter(tags=["doctemplates"])
 
 
-@router.get("/doctemplates/", response_model=schemas.TemplateList)
+@router.get("/doctemplates/")
 async def get_list_template(token: str, tags: str = None, limit: int = 100, offset: int = 0, page: str = None, area: str = None):
     """Получение списка шаблонов документов"""
     user = await get_user_by_token(token)
