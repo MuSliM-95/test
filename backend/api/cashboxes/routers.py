@@ -120,6 +120,8 @@ async def edit_cashbox_user_status(token: str, user_id: int, status: bool):
                 "username": tg_acc.username,
                 "status": status,
                 "is_admin": owner.is_owner,
+                "created_at": tg_acc.created_at,
+                "updated_at": tg_acc.updated_at,
             }
 
             await manager.send_message(
