@@ -34,7 +34,20 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
         result = await database.fetch_all(query)
         return {'result': result, 'tags': ','.join(tags)}
     else:
-        query = select().where(doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
+        # query = select().where(doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
+        query = (select().
+                 where(
+                       doc_templates.c.cashbox == user.cashbox_id,
+                       entity_to_entity.c.from_entity == 10,
+                       or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
+                       pages.c.name.like(f'%{page}%'),
+                       areas.c.name.like(f'%{area}%'),
+                       ).
+                 join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
+                 join(pages, entity_to_entity.c.to_id == pages.c.id).
+                 join(areas, entity_to_entity.c.to_id == areas.c.id).
+                 limit(limit).
+                 offset(offset))
         result = await database.fetch_all(query)
         return {'result': result, 'tags': ''}
 
