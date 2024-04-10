@@ -46,7 +46,7 @@ class DocTemplateUpdate(BaseModel):
 
 
 class DocTemplate(BaseModel):
-    id: int
+    id: int = None
     name: str= None
     description: Optional[str] = None
     template_data: str = None
