@@ -83,7 +83,7 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
         result_id = await database.execute(query)
         query = doc_templates.select().where(doc_templates.c.id == result_id)
         result = await database.fetch_one(query)
-        await database.execute_many(
+        await database.execute_many(values=
             [
                 entity_to_entity.insert(
                     {
@@ -100,7 +100,7 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
                 for item in areas_in
             ]
         )
-        await database.execute_many(
+        await database.execute_many(values=
             [
                 entity_to_entity.insert(
                     {
