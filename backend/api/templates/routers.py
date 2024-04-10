@@ -22,7 +22,7 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
                  where(or_(*filter_tags),
                        doc_templates.c.cashbox == user.cashbox_id,
                        entity_to_entity.c.from_entity == 10,
-                       or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13).
+                       or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
                        pages.c.name.like(f'%{page}%'),
                        areas.c.name.like(f'%{area}%'),
                        ).
