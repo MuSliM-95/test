@@ -3,7 +3,7 @@ from database.db import database, doc_templates, entity_to_entity, pages, areas
 import api.templates.schemas as schemas
 from datetime import datetime
 from sqlalchemy import or_, select
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 from functions.helpers import get_user_by_token
 
@@ -54,7 +54,7 @@ async def get_template(token: str, idx: int):
 
 @database.transaction()
 @router.post("/doctemplates/", response_model=schemas.DocTemplateCreate)
-async def add_template(token: str, name: str, template: schemas.TemplateCreate = None, description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
+async def add_template(token: str, name: str, areas_in: List[int] = None, pages_in: List[int] = None,  description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
 
     """Добавление нового шаблона"""
 
@@ -97,7 +97,7 @@ async def add_template(token: str, name: str, template: schemas.TemplateCreate =
                         "type": "docs_template_pages"
                     }
                 )
-                for item in template.dict()['areas']
+                for item in areas_in
             ]
         )
         await database.execute_many(
@@ -114,7 +114,7 @@ async def add_template(token: str, name: str, template: schemas.TemplateCreate =
                         "type": "docs_template_pages"
                     }
                 )
-                for item in template.dict()['pages']
+                for item in pages_in
             ]
         )
         return result
