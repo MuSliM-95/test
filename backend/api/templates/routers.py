@@ -40,12 +40,12 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
                        doc_templates.c.cashbox == user.cashbox_id,
                        ).
                  join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
-                 join(pages, entity_to_entity.c.to_id == pages.c.id).
-                 join(areas, entity_to_entity.c.to_id == areas.c.id).
+                 join(pages, entity_to_entity.c.to_id == pages.c.id, full=True).
+                 join(areas, entity_to_entity.c.to_id == areas.c.id, full=True).
                  where(entity_to_entity.c.from_entity == 10,
                        or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
-                       pages.c.name.ilike(f'%{page}%'),
-                       areas.c.name.ilike(f'%{area}%')).
+                       pages.c.name == page,
+                       areas.c.name == area).
                  limit(limit).
                  offset(offset))
         print(query)
