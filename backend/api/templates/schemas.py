@@ -47,13 +47,13 @@ class DocTemplateUpdate(BaseModel):
 
 class DocTemplate(BaseModel):
     id: int
-    name: str
+    name: str= None
     description: Optional[str] = None
     template_data: str = None
     tags: Optional[str] = None
-    user_id: str
-    created_at: int
-    updated_at: int
+    user_id: str = None
+    created_at: int = None
+    updated_at: int = None
     is_deleted: Optional[bool]
     type: int = None
 
