@@ -83,9 +83,8 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
         result_id = await database.execute(query)
         query = doc_templates.select().where(doc_templates.c.id == result_id)
         result = await database.fetch_one(query)
-        await database.execute_many(values=
+        await database.execute_many( entity_to_entity.insert(), values=
             [
-                entity_to_entity.insert(
                     {
                         "from_entity": 10,
                         "to_entity": 12,
@@ -96,14 +95,12 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
                         "cashbox_id": user.cashbox_id,
                         "type": "docs_template_pages"
                     }
-                )
                 for item in areas_in
             ]
         )
-        await database.execute_many(values=
+        await database.execute_many(entity_to_entity.insert(),values=
             [
-                entity_to_entity.insert(
-                    {
+                {
                         "from_entity": 10,
                         "to_entity": 13,
                         "from_id": result['id'],
@@ -112,9 +109,8 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
                         "delinked": False,
                         "cashbox_id": user.cashbox_id,
                         "type": "docs_template_pages"
-                    }
-                )
-                for item in pages_in
+                }
+            for item in pages_in
             ]
         )
         return result
