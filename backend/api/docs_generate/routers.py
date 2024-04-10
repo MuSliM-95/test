@@ -11,7 +11,7 @@ from io import BytesIO
 import qrcode
 from PIL import Image
 
-from api.docs_generate.schemas import TypeDoc
+from api.docs_generate.schemas import TypeDoc, ReGenerateList
 from database.db import database, doc_generated, doc_templates
 from functions.helpers import get_user_by_token
 import base64
@@ -64,14 +64,16 @@ def convert_html_to_pdf(doc_render):
 async def doc_generate(token: str,
                        template_id: int,
                        variable: Dict,
-                       entity: str,
-                       entity_id: int,
                        type_doc: TypeDoc,
+                       entity: str = None,
+                       entity_id: int = None,
                        tags: str = None):
-    '''Генерирование документа с загрузкой в S3 и фиксацией записи генерации'''
+
+    """ Генерирование документа с загрузкой в S3 и фиксацией записи генерации """
+
     try:
         user = await get_user_by_token(token)
-        query = doc_templates.select().where(doc_templates.c.id == template_id)
+        query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox == user.cashbox_id)
         template = await database.fetch_one(query)
         data = generate_doc(template['template_data'], variable)
 
@@ -83,21 +85,21 @@ async def doc_generate(token: str,
             file_link += ".pdf"
 
         async with s3_session.client(**s3_data) as s3:
-            await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link, ACL="public-read")
+            await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
 
         file_dict = {
-            'cashbox_id': user.cashbox_id,
-            'doc_link': file_link,
-            'created_at': datetime.datetime.now(),
-            'tags': None if not tags else tags.lower(),
-            'template_id': template_id,
-            'entity': entity,
-            'entity_id': entity_id,
-            'type_doc': type_doc
-        }
+                'cashbox_id': user.cashbox_id,
+                'doc_link': file_link,
+                'created_at': datetime.datetime.now(),
+                'tags': None if not tags else tags.lower(),
+                'template_id': template_id,
+                'entity': entity,
+                'entity_id': entity_id,
+                'type_doc': type_doc
+            }
         query = doc_generated.insert().values(file_dict)
         result_file_dict_id = await database.execute(query)
-        query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id)
+        query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id, doc_generated.c.cashbox_id == user.cashbox_id)
         result = await database.fetch_one(query)
         return result
     except Exception as error:
@@ -106,54 +108,57 @@ async def doc_generate(token: str,
 
 @router.get('/docgenerated/{idx}', status_code=status.HTTP_200_OK)
 async def get_doc_generate_by_idx(token: str, idx: int):
-    """Получение реквизитов документа по ID"""
+
+    """ Получение реквизитов документа по ID """
+
     user = await get_user_by_token(token)
-    query = doc_generated.select().where(doc_generated.c.id == idx)
+    query = doc_generated.select().where(doc_generated.c.id == idx, doc_generated.c.cashbox_id == user.cashbox_id)
     result = await database.fetch_one(query)
     return result
 
 
-@router.get("/docgenerated/file/{filename}/")
+@router.get("/docgenerated/file/{filename}")
 async def get_generate_docs_by_filename(filename: str, type_doc: TypeDoc):
-    """Получение документа по имени файла"""
+
+    """ Получение документа по имени файла """
+
     async with s3_session.client(**s3_data) as s3:
         try:
             file_key = f"docsgenerate/{filename}"
+            s3_ob = await s3.get_object(Bucket = bucket_name, Key = file_key)
+            body = await s3_ob['Body'].read()
             if type_doc is TypeDoc.html:
-                s3_ob = await s3.get_object(Bucket=bucket_name, Key=file_key)
-                body = await s3_ob['Body'].read()
+
                 return Response(content=body, media_type="text/html",
-                                headers={'Response-content-disposition': 'attachment'})
+                                headers={'Content-Disposition': f'attachment; filename="{filename}.html"'})
             if type_doc is TypeDoc.pdf:
-                url = await s3.generate_presigned_url(
-                    'get_object',
-                    Params={
-                        'Bucket': bucket_name,
-                        'Key': file_key
-                    },
-                    ExpiresIn=None
-                )
-                return {
-                    "data": {
-                        "url": url
-                    }
-                }
+
+                return Response(content=body, media_type="application/pdf",
+                                headers={'Content-Disposition': f'attachment; filename="{filename}.pdf"'})
+
         except Exception as err:
             return HTTPException(status_code=404, detail="Такого документа не существует")
 
 
 @router.get('/docgenerated/', status_code=status.HTTP_200_OK)
-async def get_doc_generate_list(cashbox: int, tags: str = None, limit: int = 100, offset: int = 0):
+async def get_doc_generate_list(token: str, tags: str = None, limit: int = 100, offset: int = 0):
     """Получение списка генераций"""
+    user = await get_user_by_token(token)
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_generated.c.tags.like(f'%{x}%'), tags))
-        query = doc_generated.select().where(doc_generated.c.cashbox_id == cashbox,
+        query = doc_generated.select().where(doc_generated.c.cashbox_id == user.cashbox_id,
                                              *filter_tags).order_by(desc(doc_generated.c.created_at)).limit(
             limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
     else:
-        query = doc_generated.select().where(doc_generated.c.cashbox_id == cashbox).limit(limit).offset(offset)
+        query = doc_generated.select().where(doc_generated.c.cashbox_id == user.cashbox_id).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'results': result}
+
+
+@router.post('/regenerated/', status_code=status.HTTP_200_OK)
+async def regenerated(token: str, generateList: ReGenerateList):
+    pass
+

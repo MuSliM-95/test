@@ -1168,16 +1168,18 @@ doc_templates = sqlalchemy.Table(
     sqlalchemy.Column("template_data", String),
     sqlalchemy.Column("tags", String),
     sqlalchemy.Column("user_id", Integer),
+    sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("type", Integer, ForeignKey("type_template.id")),
+    sqlalchemy.Column("type", Integer, ForeignKey("type_template.id"), nullable=True),
 )
 
 tag_templates = sqlalchemy.Table(
     "tag_template",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("name", String, nullable=False),
 )
 
@@ -1186,6 +1188,30 @@ type_template = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False),
+)
+
+areas = sqlalchemy.Table(
+    "areas",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("description", String),
+    sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
+pages = sqlalchemy.Table(
+    "pages",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("description", String),
+    sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
 )
 
 amo_settings = sqlalchemy.Table(

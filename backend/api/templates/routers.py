@@ -3,7 +3,7 @@ from database.db import database, doc_templates
 import api.templates.schemas as schemas
 from datetime import datetime
 from sqlalchemy import or_
-from typing import Dict
+from typing import Dict, Union
 
 from functions.helpers import get_user_by_token
 
@@ -18,20 +18,22 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
-        query = doc_templates.select().where(or_(*filter_tags)).limit(limit).offset(offset)
+        query = doc_templates.select().where(or_(*filter_tags), doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'result': result, 'tags': ','.join(tags)}
     else:
-        query = doc_templates.select().limit(limit).offset(offset)
+        query = doc_templates.select().where(doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
         result = await database.fetch_all(query)
         return {'result': result, 'tags': ''}
 
 
 @router.get("/doctemplates/{idx}/", response_model=schemas.DocTemplate)
 async def get_template(token: str, idx: int):
+
     """Получение шаблона по ID"""
+
     user = await get_user_by_token(token)
-    query = doc_templates.select().where(doc_templates.c.id == idx)
+    query = doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
     result = await database.fetch_one(query)
     if not result:
         raise HTTPException(status_code=404, detail=f"У вас нет шаблона с таким id")
@@ -39,17 +41,26 @@ async def get_template(token: str, idx: int):
 
 
 @router.post("/doctemplates/", response_model=schemas.DocTemplateCreate)
-async def add_template(token: str, name: str, description: str, tags: str, doc_type: int, file: UploadFile = File(None)):
+async def add_template(token: str, name: str, description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
+
     """Добавление нового шаблона"""
+
     try:
         user = await get_user_by_token(token)
         template_res = dict({
             'name': name,
+            'cashbox': user.cashbox_id,
             'description': description,
             'user_id': user.id,
             'type': doc_type,
-            'tags': ','.join(sorted(list(map(lambda x: x.strip(), tags.strip().split(','))), key=str.lower)),
-            'template_data': str(file.file.read().decode('UTF-8')),
+            'tags': ','.join(
+                sorted(
+                    list(
+                        map(
+                            lambda x:
+                            x.strip(), tags.strip().split(','))), key=str.lower))
+            if tags else None,
+            'template_data': str(file.file.read().decode('UTF-8')) if file else None,
             'is_deleted': False
         })
         template_res["created_at"] = int(datetime.utcnow().timestamp())
@@ -70,10 +81,10 @@ async def delete_template(token: str, idx: int):
     query = \
         doc_templates.\
             update().\
-            where(doc_templates.c.id == idx).\
+            where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id).\
             values(dict(is_deleted=True, updated_at=int(datetime.utcnow().timestamp())))
     result = await database.execute(query)
-    query = doc_templates.select().where(doc_templates.c.id == idx)
+    query = doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
     result = await database.fetch_one(query)
     if not result:
         raise HTTPException(status_code=404, detail=f"У вас нет шаблона с таким id")
@@ -87,9 +98,9 @@ async def update_template(token: str, idx: int, template: Dict):
     template['updated_at'] = int(datetime.utcnow().timestamp())
     query = doc_templates.\
         update().\
-        where(doc_templates.c.id == idx).values(template)
-    result = await database.execute(query)
-    query = doc_templates.select().where(doc_templates.c.id == idx)
+        where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id).values(template)
+    await database.execute(query)
+    query = doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
     result = await database.fetch_one(query)
     if not result:
         raise HTTPException(status_code=404, detail=f"У вас нет шаблона с таким id")
