@@ -13,7 +13,20 @@ router = APIRouter(tags=["doctemplates"])
 
 @router.get("/doctemplates/")
 async def get_list_template(token: str, tags: str = None, limit: int = 100, offset: int = 0, page: str = None, area: str = None):
-    """Получение списка шаблонов документов"""
+
+    """
+    Получение списка шаблонов документов
+
+    tags - строка вида "tags1,tags2,tag". Теги указываются через запятую без пробелов. Поиск по включению и вывод
+    значений по логике ИЛИ (если есть хотя бы один тег, то запись выводим)
+
+    page - строка, название (name) из таблицы pages.
+    area - строка, название (name) из таблицы areas.
+
+    Поиск по area и page происходит по логике И (если есть совпадение по area то выовдим, если есть совпадение по
+    page выводим, если оба значения присутвуют, то выводим
+    """
+
     user = await get_user_by_token(token)
     filter_tags = []
     _filter = []
@@ -77,7 +90,20 @@ async def get_template(token: str, idx: int):
 @router.post("/doctemplates/", response_model=schemas.DocTemplateCreate)
 async def add_template(token: str, name: str, areas_in: list = None, pages_in: list = None,  description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
 
-    """Добавление нового шаблона"""
+    """
+    Добавление нового шаблона
+
+    tags - строка вида "tags1,tags2,tag". Теги указываются через запятую без пробелов
+
+    areas_in - список id из таблицы areas
+    pages_in - список id из таблицы pages
+    Если значение не указвается, то необходимо ставить флаг "Send empty value"
+
+    file - файл с контентом шаблона документа.
+    Если значение не указвается, то необходимо СНЯТЬ флаг "Send empty value"
+
+    doc_type - необязательный параметр
+    """
 
     try:
         user = await get_user_by_token(token)
