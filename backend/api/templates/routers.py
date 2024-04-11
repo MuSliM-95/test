@@ -86,36 +86,40 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
         result_id = await database.execute(query)
         query = doc_templates.select().where(doc_templates.c.id == result_id)
         result = await database.fetch_one(query)
-        await database.execute_many( entity_to_entity.insert(), values=
-            [
+
+        if (sum(areas_in) > 0):
+            await database.execute_many( entity_to_entity.insert(), values=
+                [
+                        {
+                            "from_entity": 10,
+                            "to_entity": 12,
+                            "from_id": result['id'],
+                            "to_id": item,
+                            "status": True,
+                            "delinked": False,
+                            "cashbox_id": user.cashbox_id,
+                            "type": "docs_template_areas"
+                        }
+                    for item in areas_in if item > 0
+                ]
+            )
+
+        if (sum(pages_in) > 0):
+            await database.execute_many(entity_to_entity.insert(),values=
+                [
                     {
-                        "from_entity": 10,
-                        "to_entity": 12,
-                        "from_id": result['id'],
-                        "to_id": item,
-                        "status": True,
-                        "delinked": False,
-                        "cashbox_id": user.cashbox_id,
-                        "type": "docs_template_areas"
+                            "from_entity": 10,
+                            "to_entity": 13,
+                            "from_id": result['id'],
+                            "to_id": item,
+                            "status": True,
+                            "delinked": False,
+                            "cashbox_id": user.cashbox_id,
+                            "type": "docs_template_pages"
                     }
-                for item in areas_in if item > 0
-            ]
-        )
-        await database.execute_many(entity_to_entity.insert(),values=
-            [
-                {
-                        "from_entity": 10,
-                        "to_entity": 13,
-                        "from_id": result['id'],
-                        "to_id": item,
-                        "status": True,
-                        "delinked": False,
-                        "cashbox_id": user.cashbox_id,
-                        "type": "docs_template_pages"
-                }
-            for item in pages_in if item > 0
-            ]
-        )
+                for item in pages_in if item > 0
+                ]
+            )
         return result
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
