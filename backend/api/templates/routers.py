@@ -109,8 +109,8 @@ async def add_template(token: str, name: str, areas_in: list = None, pages_in: l
             await database.execute_many( entity_to_entity.insert(), values=
                 [
                         {
-                            "from_entity": 3,
-                            "to_entity": 4,
+                            "from_entity": 10,
+                            "to_entity": 12,
                             "from_id": result['id'],
                             "to_id": int(item),
                             "status": True,
@@ -126,8 +126,8 @@ async def add_template(token: str, name: str, areas_in: list = None, pages_in: l
             await database.execute_many(entity_to_entity.insert(),values=
                 [
                     {
-                            "from_entity": 3,
-                            "to_entity": 5,
+                            "from_entity": 10,
+                            "to_entity": 13,
                             "from_id": result['id'],
                             "to_id": int(item),
                             "status": True,
