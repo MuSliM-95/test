@@ -1339,7 +1339,7 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
-    sqlalchemy.Column("lead_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False),
     extend_existing=True,
 )
 
