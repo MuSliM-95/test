@@ -24,7 +24,7 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
-    query = (select(doc_templates, pages.c.name, areas.c.name).
+    query = (select(doc_templates, pages.c.name.label('pages'), areas.c.name.label('areas')).
                 where(or_(*filter_tags),
                        entity_to_entity.c.from_entity == 10,
                        or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
@@ -32,6 +32,7 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
                        *_filter
                        ).
                  join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
+                 from_select(entity_to_entity).
                  join(pages, entity_to_entity.c.to_id == pages.c.id).
                  join(areas, entity_to_entity.c.to_id == areas.c.id).
                  limit(limit).
