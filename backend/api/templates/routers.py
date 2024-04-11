@@ -11,7 +11,7 @@ from functions.helpers import get_user_by_token
 router = APIRouter(tags=["doctemplates"])
 
 
-@router.get("/doctemplates/")
+@router.get("/doctemplates/", response_model=schemas.TemplateList)
 async def get_list_template(token: str, tags: str = None, limit: int = 100, offset: int = 0, page: str = None, area: str = None):
 
     """
@@ -58,32 +58,70 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
 
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
-        filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
+        filter_tags = list(map(lambda x: doc_templates.c.tags.ilike(f'%{x}%'), tags))
 
     query = \
         select(
             doc_templates
         ).\
         where(
+            doc_templates.c.is_deleted.is_not(True),
             doc_templates.c.cashbox == user.cashbox_id,
             *_filter,
             *filter_tags
-        )
+        ).\
+        limit(limit).\
+        offset(offset)
+
     result = await database.fetch_all(query)
     return {'result': result, 'tags': ','.join(tags) if tags else ''}
 
 
-@router.get("/doctemplates/{idx}/", response_model=schemas.DocTemplate)
+@router.get("/doctemplates/{idx}/", response_model=schemas.DocTemplateFull)
 async def get_template(token: str, idx: int):
 
     """Получение шаблона по ID"""
 
     user = await get_user_by_token(token)
-    query = doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
+    query_pages = select(pages.c.name, pages.c.id).\
+        join(pages, pages.c.id == entity_to_entity.c.to_id).\
+        where(
+            entity_to_entity.c.from_entity == 10,
+            entity_to_entity.c.cashbox_id == user.cashbox_id,
+            entity_to_entity.c.to_entity == 13,
+            entity_to_entity.c.from_id == idx,
+            pages.c.is_deleted.is_not(True),
+            )
+    pages_db = await database.fetch_all(query_pages)
+
+    query_areas = select(areas.c.name, areas.c.id).\
+        join(areas, areas.c.id == entity_to_entity.c.to_id).\
+        where(
+            entity_to_entity.c.from_entity == 10,
+            entity_to_entity.c.cashbox_id == user.cashbox_id,
+            entity_to_entity.c.to_entity == 12,
+            entity_to_entity.c.from_id == idx,
+            areas.c.is_deleted.is_not(True),
+
+            )
+    areas_db = await database.fetch_all(query_areas)
+
+    query = doc_templates.\
+        select().\
+        where(
+            doc_templates.c.is_deleted.is_not(True),
+            doc_templates.c.id == idx,
+            doc_templates.c.cashbox == user.cashbox_id
+        )
     result = await database.fetch_one(query)
+
     if not result:
         raise HTTPException(status_code=404, detail=f"У вас нет шаблона с таким id")
-    return result
+    else:
+        result = dict(result)
+        result['pages'] = pages_db
+        result['areas'] = areas_db
+        return result
 
 
 @database.transaction()
@@ -169,21 +207,25 @@ async def add_template(token: str, name: str, areas_in: list = None, pages_in: l
         raise HTTPException(status_code=433, detail=str(error))
 
 
+@database.transaction()
 @router.delete("/doctemplates/{idx}/", response_model=schemas.DocTemplate)
 async def delete_template(token: str, idx: int):
     """Удаление шаблона по ID"""
-    user = await get_user_by_token(token)
-    query = \
-        doc_templates.\
-            update().\
-            where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id).\
-            values(dict(is_deleted=True, updated_at=int(datetime.utcnow().timestamp())))
-    result = await database.execute(query)
-    query = doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
-    result = await database.fetch_one(query)
-    if not result:
-        raise HTTPException(status_code=404, detail=f"У вас нет шаблона с таким id")
-    return result
+    try:
+        user = await get_user_by_token(token)
+        query = \
+            doc_templates.\
+                update().\
+                where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id).\
+                values(dict(is_deleted=True, updated_at=int(datetime.utcnow().timestamp())))
+        result = await database.execute(query)
+        query = doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
+        result = await database.fetch_one(query)
+        if not result:
+            raise HTTPException(status_code=404, detail=f"У вас нет шаблона с таким id")
+        return result
+    except Exception as error:
+        raise HTTPException(status_code=433, detail=str(error))
 
 
 @router.patch("/doctemplates/{idx}/", response_model=schemas.DocTemplateUpdate)
