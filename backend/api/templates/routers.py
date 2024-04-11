@@ -3,7 +3,7 @@ from database.db import database, doc_templates, entity_to_entity, pages, areas
 import api.templates.schemas as schemas
 from datetime import datetime
 from sqlalchemy import or_, select
-from typing import Dict, Union, List
+from typing import Dict, Union
 
 from functions.helpers import get_user_by_token
 
@@ -16,33 +16,48 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
     """Получение списка шаблонов документов"""
     user = await get_user_by_token(token)
     filter_tags = []
-    _filter = [doc_templates.c.cashbox == user.cashbox_id]
+    _filter = []
     if page:
-        _filter.append(pages.c.name == page)
+        query_pages = \
+            select(
+                entity_to_entity.c.from_id).\
+            join(
+                pages, pages.c.id == entity_to_entity.c.to_id).\
+            where(
+                pages.c.name == page,
+                entity_to_entity.c.cashbox_id == user.cashbox_id,
+                or_(entity_to_entity.c.to_entity == 5)).\
+            subquery('query_pages')
+        _filter.append(doc_templates.c.id.in_(query_pages))
+
     if area:
-        _filter.append( areas.c.name == area)
+        query_areas = \
+            select(
+                entity_to_entity.c.from_id).\
+            join(
+                areas, areas.c.id == entity_to_entity.c.to_id).\
+            where(
+                areas.c.name == area,
+                entity_to_entity.c.cashbox_id == user.cashbox_id,
+                or_(entity_to_entity.c.to_entity == 4)).\
+            subquery('query_areas')
+        _filter.append(doc_templates.c.id.in_(query_areas))
+
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
-    query = (select(doc_templates, pages.c.name.label('pages'), areas.c.name.label('areas')).
-                where(or_(*filter_tags),
-                       entity_to_entity.c.from_entity == 10,
-                       or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
-                       entity_to_entity.c.from_id == doc_templates.c.id,
-                       *_filter
-                       ).
-                 select_from(doc_templates).
-                 join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
-                 select_from(entity_to_entity).
-                 join(pages, entity_to_entity.c.to_id == pages.c.id).
-                 select_from(entity_to_entity).
-                 join(areas, entity_to_entity.c.to_id == areas.c.id).
-                 limit(limit).
-                 offset(offset))
 
-    print(query)
+    query = \
+        select(
+            doc_templates
+        ).\
+        where(
+            doc_templates.c.cashbox == user.cashbox_id,
+            *_filter,
+            *filter_tags
+        )
     result = await database.fetch_all(query)
-    return {'result': result, 'tags': ','.join(tags) if tags else '' }
+    return {'result': result, 'tags': ','.join(tags) if tags else ''}
 
 
 @router.get("/doctemplates/{idx}/", response_model=schemas.DocTemplate)
@@ -60,7 +75,7 @@ async def get_template(token: str, idx: int):
 
 @database.transaction()
 @router.post("/doctemplates/", response_model=schemas.DocTemplateCreate)
-async def add_template(token: str, name: str, areas_in: List[Union[int, None]] = None, pages_in: List[Union[int, None]] = None,  description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
+async def add_template(token: str, name: str, areas_in: list = None, pages_in: list = None,  description: str = None, tags: str = None, doc_type: int = None, file: Union[UploadFile, None] = None):
 
     """Добавление нового шаблона"""
 
@@ -90,37 +105,37 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
         query = doc_templates.select().where(doc_templates.c.id == result_id)
         result = await database.fetch_one(query)
 
-        if (sum(areas_in) > 0):
+        if areas_in[0] != '':
             await database.execute_many( entity_to_entity.insert(), values=
                 [
                         {
-                            "from_entity": 10,
-                            "to_entity": 12,
+                            "from_entity": 3,
+                            "to_entity": 4,
                             "from_id": result['id'],
-                            "to_id": item,
+                            "to_id": int(item),
                             "status": True,
                             "delinked": False,
                             "cashbox_id": user.cashbox_id,
                             "type": "docs_template_areas"
                         }
-                    for item in areas_in if item > 0
+                    for item in areas_in[0].split(",") if int(item) > 0
                 ]
             )
 
-        if (sum(pages_in) > 0):
+        if pages_in[0] != '':
             await database.execute_many(entity_to_entity.insert(),values=
                 [
                     {
-                            "from_entity": 10,
-                            "to_entity": 13,
+                            "from_entity": 3,
+                            "to_entity": 5,
                             "from_id": result['id'],
-                            "to_id": item,
+                            "to_id": int(item),
                             "status": True,
                             "delinked": False,
                             "cashbox_id": user.cashbox_id,
                             "type": "docs_template_pages"
                     }
-                for item in pages_in if item > 0
+                for item in pages_in[0].split(",") if int(item) > 0
                 ]
             )
         return result
