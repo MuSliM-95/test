@@ -15,45 +15,31 @@ router = APIRouter(tags=["doctemplates"])
 async def get_list_template(token: str, tags: str = None, limit: int = 100, offset: int = 0, page: str = None, area: str = None):
     """Получение списка шаблонов документов"""
     user = await get_user_by_token(token)
-    filter = [doc_templates.c.cashbox == user.cashbox_id]
+    filter_tags = []
+    _filter = [doc_templates.c.cashbox == user.cashbox_id]
     if page:
-        filter.append(pages.c.name == page)
+        _filter.append(pages.c.name == page)
     if area:
-        filter.append( areas.c.name == area)
+        _filter.append( areas.c.name == area)
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
-        query = (select().
-                 where(or_(*filter_tags),
+    query = (select().
+                where(or_(*filter_tags),
                        entity_to_entity.c.from_entity == 10,
                        or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
-                       *filter
+                       entity_to_entity.c.from_id == doc_templates.c.id,
+                       *_filter
                        ).
                  join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
                  join(pages, entity_to_entity.c.to_id == pages.c.id).
                  join(areas, entity_to_entity.c.to_id == areas.c.id).
                  limit(limit).
                  offset(offset))
-        result = await database.fetch_all(query)
-        return {'result': result, 'tags': ','.join(tags)}
-    else:
-        # query = select().where(doc_templates.c.cashbox == user.cashbox_id).limit(limit).offset(offset)
-        query = (doc_templates.select().
-                 where(
-                       doc_templates.c.cashbox == user.cashbox_id,
-                       ).
-                 join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
-                 join(pages, entity_to_entity.c.to_id == pages.c.id).
-                 join(areas, entity_to_entity.c.to_id == areas.c.id).
-                 where(entity_to_entity.c.from_entity == 10,
-                       or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
-                       *filter
-                       ).
-                 limit(limit).
-                 offset(offset))
-        print(query)
-        result = await database.fetch_all(query)
-        return {'result': result, 'tags': ''}
+
+    print(query)
+    result = await database.fetch_all(query)
+    return {'result': result, 'tags': ','.join(tags) if tags else '' }
 
 
 @router.get("/doctemplates/{idx}/", response_model=schemas.DocTemplate)
@@ -110,9 +96,9 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
                         "status": True,
                         "delinked": False,
                         "cashbox_id": user.cashbox_id,
-                        "type": "docs_template_pages"
+                        "type": "docs_template_areas"
                     }
-                for item in areas_in
+                for item in areas_in if item > 0
             ]
         )
         await database.execute_many(entity_to_entity.insert(),values=
@@ -127,7 +113,7 @@ async def add_template(token: str, name: str, areas_in: List[Union[int, None]] =
                         "cashbox_id": user.cashbox_id,
                         "type": "docs_template_pages"
                 }
-            for item in pages_in
+            for item in pages_in if item > 0
             ]
         )
         return result
