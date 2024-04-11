@@ -1357,6 +1357,15 @@ docs_sales_settings = sqlalchemy.Table(
     sqlalchemy.Column("repeatability_tags", Boolean, default=False)
 )
 
+amo_refresh_tokens_stats = sqlalchemy.Table(
+    "amo_refresh_tokens_stats",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True),
+    sqlalchemy.Column("success_refresh_count", Integer),
+    sqlalchemy.Column("failed_refresh_count", Integer),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"
 SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_job_store"
 database = databases.Database(SQLALCHEMY_DATABASE_URL)
