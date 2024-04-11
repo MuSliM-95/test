@@ -31,9 +31,11 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
                        entity_to_entity.c.from_id == doc_templates.c.id,
                        *_filter
                        ).
+                 select_from(doc_templates).
                  join(entity_to_entity, entity_to_entity.c.from_id == doc_templates.c.id).
-                 from_select(entity_to_entity).
+                 select_from(entity_to_entity).
                  join(pages, entity_to_entity.c.to_id == pages.c.id).
+                 select_from(entity_to_entity).
                  join(areas, entity_to_entity.c.to_id == areas.c.id).
                  limit(limit).
                  offset(offset))
