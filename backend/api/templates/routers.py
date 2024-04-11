@@ -24,7 +24,7 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
     if tags:
         tags = list(map(lambda x: x.strip().lower(), tags.replace(' ', '').strip().split(',')))
         filter_tags = list(map(lambda x: doc_templates.c.tags.like(f'%{x}%'), tags))
-    query = (select().
+    query = (select(doc_templates).
                 where(or_(*filter_tags),
                        entity_to_entity.c.from_entity == 10,
                        or_(entity_to_entity.c.to_entity == 12, entity_to_entity.c.to_entity == 13),
