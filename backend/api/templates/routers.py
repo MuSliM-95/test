@@ -26,7 +26,7 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
             where(
                 pages.c.name == page,
                 entity_to_entity.c.cashbox_id == user.cashbox_id,
-                or_(entity_to_entity.c.to_entity == 5)).\
+                or_(entity_to_entity.c.to_entity == 13)).\
             subquery('query_pages')
         _filter.append(doc_templates.c.id.in_(query_pages))
 
@@ -39,7 +39,7 @@ async def get_list_template(token: str, tags: str = None, limit: int = 100, offs
             where(
                 areas.c.name == area,
                 entity_to_entity.c.cashbox_id == user.cashbox_id,
-                or_(entity_to_entity.c.to_entity == 4)).\
+                or_(entity_to_entity.c.to_entity == 12)).\
             subquery('query_areas')
         _filter.append(doc_templates.c.id.in_(query_areas))
 
