@@ -64,7 +64,7 @@ def convert_html_to_pdf(doc_render):
 async def doc_generate(token: str,
                        template_id: int,
                        variable: Dict,
-                       type_doc: TypeDoc = None,
+                       type_doc: TypeDoc,
                        entity: str = None,
                        entity_id: int = None,
                        tags: str = None):
