@@ -6,8 +6,8 @@ import api.loyality_transactions.schemas as schemas
 from typing import Optional, Dict, Any
 from sqlalchemy import desc, func, select, case
 
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_filters_transactions, \
-    get_entity_by_id_cashbox, clear_phone_number
+from functions.helpers import datetime_to_timestamp, get_filters_transactions, \
+    get_entity_by_id_cashbox, clear_phone_number, get_entity_by_id_and_created_by
 
 from ws_manager import manager
 from functions.helpers import get_user_by_token
@@ -49,7 +49,7 @@ async def raschet_bonuses(card_id: int) -> None:
 async def get_loyality_transaction_by_id(token: str, idx: int):
     """Получение транзакции по ID"""
     user = await get_user_by_token(token)
-    loyality_transactions_db = await get_entity_by_id(loyality_transactions, idx, user.id)
+    loyality_transactions_db = await get_entity_by_id_and_created_by(loyality_transactions, idx, user.id)
     loyality_transactions_db = datetime_to_timestamp(loyality_transactions_db)
 
     return loyality_transactions_db
