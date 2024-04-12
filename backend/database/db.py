@@ -1339,7 +1339,7 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
-    sqlalchemy.Column("lead_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False),
     extend_existing=True,
 )
 
@@ -1355,6 +1355,21 @@ docs_sales_settings = sqlalchemy.Table(
     sqlalchemy.Column("repeatability_count", Integer, default=0),
     sqlalchemy.Column("default_payment_status", Boolean, default=False),
     sqlalchemy.Column("repeatability_tags", Boolean, default=False)
+)
+
+amo_users = sqlalchemy.Table(
+    "amo_users",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("email", String),
+    sqlalchemy.Column("is_admin", Boolean),
+    sqlalchemy.Column("is_active", Boolean),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("ext_id", Integer),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    extend_existing=True
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@db/cash_2"
