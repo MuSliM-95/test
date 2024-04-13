@@ -16,7 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
+    UniqueConstraint, SmallInteger,
 )
 from sqlalchemy.sql import func
 
@@ -1340,6 +1340,8 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
     sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False),
+    sqlalchemy.Column("table_status", SmallInteger),
+    sqlalchemy.Column("is_sync", Boolean),
     extend_existing=True,
 )
 
