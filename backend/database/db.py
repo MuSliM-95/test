@@ -1342,6 +1342,8 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
     sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False),
     sqlalchemy.Column("table_status", SmallInteger),
     sqlalchemy.Column("is_sync", Boolean),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     extend_existing=True,
 )
 
