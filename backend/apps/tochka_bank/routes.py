@@ -236,7 +236,7 @@ async def check(token: str, id_integration: int):
     )))
     print(check)
     if check is None:
-        HTTPException(status_code = 204, detail = "integration not installed by chashbox")
+        raise HTTPException(status_code = 204, detail = "integration not installed by chashbox")
 
     message = {
         "action": "check",
