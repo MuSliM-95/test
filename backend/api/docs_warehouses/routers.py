@@ -389,8 +389,8 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
     return docs_warehouse_db
 
 
-@router.delete("/docs_warehouse/")
 @database.transaction()
+@router.delete("/docs_warehouse/")
 async def delete(token: str, ids: list[int]):
     """Удаление документов"""
     await get_user_by_token(token)
@@ -510,7 +510,6 @@ async def delete_docs_warehouse_route(token: str, idx: int):
     item_db = await database.fetch_one(query)
     item_db = datetime_to_timestamp(item_db)
 
-    print(item_db)
     if item_db:
         query = (
             docs_warehouse.update()
