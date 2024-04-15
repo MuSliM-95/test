@@ -157,6 +157,7 @@ async def get_price_by_id(token: str, idx: int):
 @router.get("/prices/", response_model=schemas.PriceListGet)
 async def get_prices(
     token: str,
+    page: int = 1,
     limit: int = 100,
     offset: int = 0,
     filters: PricesFiltersQuery = Depends(),
@@ -208,7 +209,7 @@ async def get_prices(
             .where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
             .order_by(desc(prices.c.id))
             .limit(limit)
-            .offset(offset)
+            .offset((page - 1) * limit)
         )
         prices_db = await database.fetch_all(q)
 
