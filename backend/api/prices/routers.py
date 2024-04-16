@@ -217,6 +217,7 @@ async def get_prices(
 
     for price_db in prices_db:
         response_body = {**dict(price_db)}
+        print(response_body)
 
         response_body["id"] = price_db.id
         response_body["price"] = price_db.price
@@ -273,6 +274,8 @@ async def get_prices(
 
         response_body = datetime_to_timestamp(response_body)
         response_body_list.append(response_body)
+
+
 
     q = select(func.count(prices.c.id)).where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
     prices_db_count = await database.fetch_one(q)
