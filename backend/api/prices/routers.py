@@ -209,7 +209,7 @@ async def get_prices(
                 prices.c.id,
                 nomenclature.c.id.label("nomenclature_id"),
                 nomenclature.c.name.label("nomenclature_name"),
-                prices.c.price_type,
+                price_types.c.name.label("price_type"),
                 nomenclature.c.description_short,
                 nomenclature.c.description_long,
                 nomenclature.c.code,
@@ -227,6 +227,7 @@ async def get_prices(
             .join(units, units.c.id == nomenclature.c.unit, full=True)
             .join(categories, categories.c.id == nomenclature.c.category, full=True)
             .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, full=True)
+            .join(price_types, price_types.c.id == prices.c.price_type, full=True)
             .where(
                 prices.c.owner == user.id,
                 prices.c.is_deleted == False,
