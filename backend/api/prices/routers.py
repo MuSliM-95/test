@@ -205,34 +205,34 @@ async def get_prices(
         prices_db = await database.fetch_all(q)
     else:
         q = (
-            select(
-                prices.c.id,
-                nomenclature.c.id,
-                nomenclature.c.name.label("nomenclature_name"),
-                prices.c.price_type,
-                nomenclature.c.description_short,
-                nomenclature.c.description_long,
-                nomenclature.c.code,
-                nomenclature.c.unit,
-                units.c.name.label("unit_name"),
-                nomenclature.c.category,
-                categories.c.name.label("category_name"),
-                nomenclature.c.manufacturer,
-                manufacturers.c.name.label("manufacturer_name"),
-                prices.c.price,
-                prices.c.date_to,
-                prices.c.date_from
+            prices.select(
+                # prices.c.id,
+                # nomenclature.c.id,
+                # nomenclature.c.name.label("nomenclature_name"),
+                # prices.c.price_type,
+                # nomenclature.c.description_short,
+                # nomenclature.c.description_long,
+                # nomenclature.c.code,
+                # nomenclature.c.unit,
+                # units.c.name.label("unit_name"),
+                # nomenclature.c.category,
+                # categories.c.name.label("category_name"),
+                # nomenclature.c.manufacturer,
+                # manufacturers.c.name.label("manufacturer_name"),
+                # prices.c.price,
+                # prices.c.date_to,
+                # prices.c.date_from
             )
-            .join(nomenclature, nomenclature.c.id == prices.c.nomenclature)
-            .join(units, units.c.id == nomenclature.c.unit)
-            .join(categories, categories.c.id == nomenclature.c.category)
-            .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer)
+            # .join(nomenclature, nomenclature.c.id == prices.c.nomenclature)
+            # .join(units, units.c.id == nomenclature.c.unit)
+            # .join(categories, categories.c.id == nomenclature.c.category)
+            # .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer)
             .where(
                 prices.c.owner == user.id,
                 prices.c.is_deleted == False,
-                nomenclature.c.is_deleted == False,
+                # nomenclature.c.is_deleted == False,
                 *filters_price,
-                *filters_nom
+                # *filters_nom
                 )
             .order_by(desc(prices.c.id))
             .limit(limit)
@@ -240,68 +240,68 @@ async def get_prices(
         )
         prices_db = await database.fetch_all(q)
 
-    # response_body_list = []
-    #
-    # for price_db in prices_db:
-    #     response_body = {**dict(price_db)}
-    #
-    #     response_body["id"] = price_db.id
-    #     response_body["price"] = price_db.price
-    #     response_body["date_to"] = price_db.date_to
-    #     response_body["date_from"] = price_db.date_from
-    #     response_body["updated_at"] = price_db.updated_at
-    #     response_body["created_at"] = price_db.created_at
-    #
-    #     q = nomenclature.select().where(
-    #         nomenclature.c.id == price_db.nomenclature,
-    #         nomenclature.c.owner == user.id,
-    #         nomenclature.c.is_deleted == False,
-    #         *filters_nom,
-    #     )
-    #     nom_db = await database.fetch_one(q)
-    #
-    #     if price_db.price_type:
-    #         q = price_types.select().where(price_types.c.id == price_db.price_type)
-    #         price_type = await database.fetch_one(q)
-    #
-    #         if price_type:
-    #             response_body["price_type"] = price_type.name
-    #
-    #     if nom_db:
-    #         response_body["nomenclature_id"] = nom_db.id
-    #         response_body["nomenclature_name"] = nom_db.name
-    #
-    #         if nom_db.unit:
-    #             q = units.select().where(units.c.id == nom_db.unit)
-    #             unit = await database.fetch_one(q)
-    #
-    #             if unit:
-    #                 response_body["unit"] = unit.id
-    #                 response_body["unit_name"] = unit.name
-    #
-    #             if nom_db.category:
-    #                 q = categories.select().where(categories.c.id == nom_db.category)
-    #                 category = await database.fetch_one(q)
-    #
-    #                 if category:
-    #                     response_body["category"] = category.id
-    #                     response_body["category_name"] = category.name
-    #
-    #             if nom_db.manufacturer:
-    #                 q = manufacturers.select().where(manufacturers.c.id == nom_db.manufacturer)
-    #                 manufacturer = await database.fetch_one(q)
-    #
-    #                 if manufacturer:
-    #                     response_body["manufacturer"] = manufacturer.id
-    #                     response_body["manufacturer_name"] = manufacturer.name
-    #
-    #     else:
-    #         continue
-    #
-    #     response_body = datetime_to_timestamp(response_body)
-    #     response_body_list.append(response_body)
-    #
-    # print(response_body_list)
+    response_body_list = []
+
+    for price_db in prices_db:
+        response_body = {**dict(price_db)}
+
+        response_body["id"] = price_db.id
+        response_body["price"] = price_db.price
+        response_body["date_to"] = price_db.date_to
+        response_body["date_from"] = price_db.date_from
+        response_body["updated_at"] = price_db.updated_at
+        response_body["created_at"] = price_db.created_at
+
+        q = nomenclature.select().where(
+            nomenclature.c.id == price_db.nomenclature,
+            nomenclature.c.owner == user.id,
+            nomenclature.c.is_deleted == False,
+            *filters_nom,
+        )
+        nom_db = await database.fetch_one(q)
+
+        if price_db.price_type:
+            q = price_types.select().where(price_types.c.id == price_db.price_type)
+            price_type = await database.fetch_one(q)
+
+            if price_type:
+                response_body["price_type"] = price_type.name
+
+        if nom_db:
+            response_body["nomenclature_id"] = nom_db.id
+            response_body["nomenclature_name"] = nom_db.name
+
+            if nom_db.unit:
+                q = units.select().where(units.c.id == nom_db.unit)
+                unit = await database.fetch_one(q)
+
+                if unit:
+                    response_body["unit"] = unit.id
+                    response_body["unit_name"] = unit.name
+
+                if nom_db.category:
+                    q = categories.select().where(categories.c.id == nom_db.category)
+                    category = await database.fetch_one(q)
+
+                    if category:
+                        response_body["category"] = category.id
+                        response_body["category_name"] = category.name
+
+                if nom_db.manufacturer:
+                    q = manufacturers.select().where(manufacturers.c.id == nom_db.manufacturer)
+                    manufacturer = await database.fetch_one(q)
+
+                    if manufacturer:
+                        response_body["manufacturer"] = manufacturer.id
+                        response_body["manufacturer_name"] = manufacturer.name
+
+        else:
+            continue
+
+        response_body = datetime_to_timestamp(response_body)
+        response_body_list.append(response_body)
+
+    print(response_body_list)
 
     q = select(
         func.count(prices.c.id).label("count_prices")).\
@@ -315,7 +315,7 @@ async def get_prices(
     )
     prices_db_count = await database.fetch_one(q)
 
-    return {"result": prices_db, "count": prices_db_count.count_prices}
+    return {"result": response_body_list, "count": prices_db_count.count_prices}
 
 
 @router.post("/prices/", response_model=schemas.PriceList)
