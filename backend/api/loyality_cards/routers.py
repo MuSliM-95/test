@@ -170,6 +170,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
         else:
             q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
             loyality_card_contr = await database.fetch_one(q)
+            print(loyality_card_contr)
             if not loyality_card_contr:
                 time = int(datetime.now().timestamp())
                 q = contragents.insert().values(
@@ -273,7 +274,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
             query = loyality_cards.insert().values(loyality_cards_values)
             loyality_card_id = await database.execute(query)
             inserted_ids.add(loyality_card_id)
-
+    print(inserted_ids)
     query = (
         loyality_cards
         .select()
@@ -284,6 +285,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
     )
 
     loyality_cards_db = await database.fetch_all(query)
+    print(*map(dict, loyality_cards_db))
     loyality_cards_db = [*map(datetime_to_timestamp, loyality_cards_db)]
     loyality_cards_db = [*map(add_status, loyality_cards_db)]
 
