@@ -158,6 +158,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
 
         if contr_id:
             loyality_card_contr = await get_entity_by_id_cashbox(contragents, loyality_cards_values["contragent_id"], user.cashbox_id)
+            print( loyality_card_contr )
             if loyality_cards_values["card_number"]:
                 loyality_cards_values["card_number"] = clear_phone_number(
                     phone_number=loyality_cards_values["card_number"]
@@ -170,7 +171,6 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
         else:
             q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
             loyality_card_contr = await database.fetch_one(q)
-            print(loyality_card_contr)
             if not loyality_card_contr:
                 time = int(datetime.now().timestamp())
                 q = contragents.insert().values(
