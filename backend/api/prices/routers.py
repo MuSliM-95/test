@@ -276,7 +276,7 @@ async def get_prices(
 
     print(response_body_list)
 
-    q = select(func.count(prices.c.id)).where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price).limit(limit).offset((page - 1) * limit)
+    q = select(func.count(prices.c.id)).where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price).group_by(prices.c.id).limit(limit).offset((page - 1) * limit)
     prices_db_count = await database.fetch_val(q)
 
     return {"result": response_body_list, "count": prices_db_count}
