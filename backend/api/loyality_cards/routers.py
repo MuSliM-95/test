@@ -280,7 +280,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
         .select()
         .where(
             loyality_cards.c.cashbox_id == user.cashbox_id,
-            loyality_cards.c.id.in_(inserted_ids)
+            loyality_cards.c.id.in_(list(inserted_ids))
         )
     )
 
