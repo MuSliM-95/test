@@ -241,69 +241,6 @@ async def get_prices(
         print(q)
         prices_db = await database.fetch_all(q)
 
-    response_body_list = []
-
-    # for price_db in prices_db:
-    #     response_body = {**dict(price_db)}
-    #
-    #     response_body["id"] = price_db.id
-    #     response_body["price"] = price_db.price
-    #     response_body["date_to"] = price_db.date_to
-    #     response_body["date_from"] = price_db.date_from
-    #     response_body["updated_at"] = price_db.updated_at
-    #     response_body["created_at"] = price_db.created_at
-    #
-    #     q = nomenclature.select().where(
-    #         nomenclature.c.id == price_db.nomenclature,
-    #         nomenclature.c.owner == user.id,
-    #         nomenclature.c.is_deleted == False,
-    #         *filters_nom,
-    #     )
-    #     nom_db = await database.fetch_one(q)
-    #
-    #     if price_db.price_type:
-    #         q = price_types.select().where(price_types.c.id == price_db.price_type)
-    #         price_type = await database.fetch_one(q)
-    #
-    #         if price_type:
-    #             response_body["price_type"] = price_type.name
-    #
-    #     if nom_db:
-    #         response_body["nomenclature_id"] = nom_db.id
-    #         response_body["nomenclature_name"] = nom_db.name
-    #
-    #         if nom_db.unit:
-    #             q = units.select().where(units.c.id == nom_db.unit)
-    #             unit = await database.fetch_one(q)
-    #
-    #             if unit:
-    #                 response_body["unit"] = unit.id
-    #                 response_body["unit_name"] = unit.name
-    #
-    #             if nom_db.category:
-    #                 q = categories.select().where(categories.c.id == nom_db.category)
-    #                 category = await database.fetch_one(q)
-    #
-    #                 if category:
-    #                     response_body["category"] = category.id
-    #                     response_body["category_name"] = category.name
-    #
-    #             if nom_db.manufacturer:
-    #                 q = manufacturers.select().where(manufacturers.c.id == nom_db.manufacturer)
-    #                 manufacturer = await database.fetch_one(q)
-    #
-    #                 if manufacturer:
-    #                     response_body["manufacturer"] = manufacturer.id
-    #                     response_body["manufacturer_name"] = manufacturer.name
-    #
-    #     else:
-    #         continue
-    #
-    #     response_body = datetime_to_timestamp(response_body)
-    #     response_body_list.append(response_body)
-    #
-    # print(response_body_list)
-
     q = select(
         func.count(prices.c.id).label("count_prices")).\
         join(nomenclature, nomenclature.c.id == prices.c.nomenclature).\
