@@ -1331,6 +1331,7 @@ amo_leads = sqlalchemy.Table(
     sqlalchemy.Column("amo_id", BigInteger),
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
+    sqlalchemy.Column("contact_amo_id", BigInteger),
     extend_existing=True
 )
 
