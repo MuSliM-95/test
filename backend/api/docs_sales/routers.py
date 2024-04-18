@@ -115,6 +115,7 @@ async def get_by_id(token: str, idx: int):
 
     instance_db = datetime_to_timestamp(instance_db)
     instance_db = await raschet_oplat(instance_db)
+    instance_db = await add_docs_sales_settings(instance_db)
 
     query = docs_sales_goods.select().where(docs_sales_goods.c.docs_sales_id == idx)
     goods_db = await database.fetch_all(query)
