@@ -1351,7 +1351,7 @@ docs_sales_settings = sqlalchemy.Table(
     "docs_sales_settings",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("repeatability_type", Enum(Repeatability), nullable=False),
+    sqlalchemy.Column("repeatability_period", Enum(Repeatability), nullable=False),
     sqlalchemy.Column("repeatability_value", Integer, nullable=False),
     sqlalchemy.Column("date_next_created", Integer),
     sqlalchemy.Column("transfer_from_weekends", Boolean, default=True),

@@ -26,7 +26,7 @@ class SaleOperations(str, Enum):
 
 
 class Settings(BaseModel):
-    repeatability_type: Repeatability
+    repeatability_period: Repeatability
     repeatability_value: int
     date_next_created: Optional[int]
     transfer_from_weekends: bool = True
