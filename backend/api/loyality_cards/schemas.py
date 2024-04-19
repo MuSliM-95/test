@@ -43,12 +43,12 @@ class LoyalityCardCreate(BaseModel):
     contragent_id: Optional[int]
     contragent_name: Optional[str]
     organization_id: Optional[int]
-    # cashback_percent: Optional[int]
-    # minimal_checque_amount: Optional[int]
-    # max_withdraw_percentage: Optional[int]
-    # start_period: Optional[int]
-    # end_period: Optional[int]
-    # max_percentage: Optional[int]
+    cashback_percent: Optional[int] = None
+    minimal_checque_amount: Optional[int] = None
+    max_withdraw_percentage: Optional[int] = None
+    start_period: Optional[int] = None
+    end_period: Optional[int] = None
+    max_percentage: Optional[int] = None
 
     lifetime: Optional[int] # lifetime in seconds
 
