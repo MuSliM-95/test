@@ -12,7 +12,7 @@ router = APIRouter(tags=["organizations"])
 async def get_organization_by_id(token: str, idx: int):
     """Получение организации по ID"""
     user = await get_user_by_token(token)
-    organization_db = await get_entity_by_id(organizations, idx, user.id)
+    organization_db = await get_entity_by_id(organizations, idx, user.cashbox_id)
     organization_db = datetime_to_timestamp(organization_db)
     return organization_db
 
