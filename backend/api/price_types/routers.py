@@ -17,7 +17,7 @@ router = APIRouter(tags=["price_types"])
 async def get_price_type_by_id(token: str, idx: int):
     """Получение типа цен по ID"""
     user = await get_user_by_token(token)
-    price_type_db = await get_entity_by_id(price_types, idx, user.id)
+    price_type_db = await get_entity_by_id(price_types, idx, user.cashbox_id)
     price_type_db = datetime_to_timestamp(price_type_db)
     return price_type_db
 
@@ -29,7 +29,7 @@ async def get_price_types(token: str, limit: int = 100, offset: int = 0):
     query = (
         price_types.select()
         .where(
-            price_types.c.owner == user.id,
+            price_types.c.cashbox == user.cashbox_id,
             price_types.c.is_deleted.is_not(True),
         )
         .limit(limit)
@@ -42,7 +42,7 @@ async def get_price_types(token: str, limit: int = 100, offset: int = 0):
     query = (
         select(func.count(price_types.c.id))
         .where(
-            price_types.c.owner == user.id,
+            price_types.c.cashbox == user.cashbox_id,
             price_types.c.is_deleted.is_not(True),
         )
     )
@@ -86,13 +86,13 @@ async def edit_price_type(
 ):
     """Редактирование типа цен"""
     user = await get_user_by_token(token)
-    price_type_db = await get_entity_by_id(price_types, idx, user.id)
+    price_type_db = await get_entity_by_id(price_types, idx, user.cashbox_id)
     price_type_values = price_type.dict(exclude_unset=True)
 
     if price_type_values:
         query = (
             price_types.update()
-            .where(price_types.c.id == idx, price_types.c.owner == user.id)
+            .where(price_types.c.id == idx, price_types.c.cashbox == user.cashbox_id)
             .values(price_type_values)
         )
         await database.execute(query)
@@ -113,17 +113,17 @@ async def delete_price_type(token: str, idx: int):
     """Удаление типа цен"""
     user = await get_user_by_token(token)
 
-    await get_entity_by_id(price_types, idx, user.id)
+    await get_entity_by_id(price_types, idx, user.cashbox_id)
 
     query = (
         price_types.update()
-        .where(price_types.c.id == idx, price_types.c.owner == user.id)
+        .where(price_types.c.id == idx, price_types.c.cashbox == user.cashbox_id)
         .values({"is_deleted": True})
     )
     await database.execute(query)
 
     query = price_types.select().where(
-        price_types.c.id == idx, price_types.c.owner == user.id
+        price_types.c.id == idx, price_types.c.cashbox == user.cashbox_id
     )
     price_type_db = await database.fetch_one(query)
     price_type_db = datetime_to_timestamp(price_type_db)
