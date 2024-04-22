@@ -150,6 +150,7 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
         else:
             q = organizations.select().where(organizations.c.cashbox == user.cashbox_id, organizations.c.is_deleted == False)
             loyality_card_org = await database.fetch_one(q)
+            print(loyality_cards_values)
             loyality_cards_values["organization_id"] = loyality_card_org.id
 
         contr_id = loyality_cards_values.get("contragent_id")
