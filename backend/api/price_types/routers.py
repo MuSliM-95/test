@@ -59,6 +59,7 @@ async def new_price_type(token: str, price_type: schemas.PriceTypeCreate):
 
     price_type_values = price_type.dict()
     price_type_values["owner"] = user.id
+    price_type_values["cashbox"] = user.cashbox_id
 
     query = price_types.insert().values(price_type_values)
     price_type_id = await database.execute(query)
