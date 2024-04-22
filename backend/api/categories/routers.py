@@ -30,7 +30,7 @@ async def get_categories(token: str, limit: int = 100, offset: int = 0):
     query = (
         categories.select()
         .where(
-            categories.c.owner == user.id,
+            categories.c.cashbox == user.cashbox_id,
             categories.c.is_deleted.is_not(True),
         )
         .limit(limit)
@@ -91,7 +91,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     query = (
         categories.select()
         .where(
-            categories.c.owner == user.id,
+            categories.c.cashbox == user.cashbox_id,
             categories.c.is_deleted.is_not(True),
             categories.c.parent == None
         )
@@ -157,7 +157,7 @@ async def get_categories(token: str, nomenclature_name: Optional[str] = None):
     categories_db = [*map(datetime_to_timestamp, result)]
 
     query = select(func.count(categories.c.id)).where(
-        categories.c.owner == user.id,
+        categories.c.cashbox == user.cashbox_id,
         categories.c.is_deleted.is_not(True),
     )
 
@@ -224,7 +224,7 @@ async def edit_category(
         if category_values.get("parent") is not None:
             await check_entity_exists(categories, category_values["parent"], user.id)
 
-        query = categories.update().where(categories.c.id == idx, categories.c.owner == user.id).values(category_values)
+        query = categories.update().where(categories.c.id == idx, categories.c.cashbox == user.cashbox_id).values(category_values)
         await database.execute(query)
         category_db = await get_entity_by_id(categories, idx, user.id)
 
@@ -246,11 +246,11 @@ async def delete_category(token: str, idx: int):
     await get_entity_by_id(categories, idx, user.id)
 
     query = (
-        categories.update().where(categories.c.id == idx, categories.c.owner == user.id).values({"is_deleted": True})
+        categories.update().where(categories.c.id == idx, categories.c.cashbox == user.cashbox_id).values({"is_deleted": True})
     )
     await database.execute(query)
 
-    query = categories.select().where(categories.c.id == idx, categories.c.owner == user.id)
+    query = categories.select().where(categories.c.id == idx, categories.c.cashbox == user.cashbox_id)
     category_db = await database.fetch_one(query)
     category_db = datetime_to_timestamp(category_db)
 
