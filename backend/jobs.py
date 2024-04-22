@@ -49,6 +49,10 @@ try:
     except JobLookupError:
         pass
     try:
+        jobstore.remove_job("autorepeat")
+    except JobLookupError:
+        pass
+    try:
         jobstore.remove_job("repeat_payments")
     except JobLookupError:
         pass
