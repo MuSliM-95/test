@@ -93,14 +93,14 @@ async def get_price_by_id(token: str, idx: int):
 
     q = nomenclature.select().where(
             nomenclature.c.id == idx,
-            nomenclature.c.owner == user.id,
+            nomenclature.c.cashbox == user.cashbox_id,
             nomenclature.c.is_deleted == False,
         )
     nom_db = await database.fetch_one(q)
 
     if nom_db:
 
-        q = prices.select().where(prices.c.nomenclature == nom_db.id, prices.c.owner == user.id, prices.c.is_deleted == False)
+        q = prices.select().where(prices.c.nomenclature == nom_db.id, prices.c.cashbox == user.cashbox_id, prices.c.is_deleted == False)
         price_db = await database.fetch_one(q)
 
         if price_db:
@@ -199,7 +199,7 @@ async def get_prices(
     if limit == -1:
         q = (
             prices.select()
-            .where(prices.c.owner == user.id, prices.c.is_deleted == False, *filters_price)
+            .where(prices.c.cashbox == user.cashbox_id, prices.c.is_deleted == False, *filters_price)
             .order_by(desc(prices.c.id))
         )
         prices_db = await database.fetch_all(q)
@@ -246,7 +246,7 @@ async def get_prices(
         func.count(prices.c.id).label("count_prices")).\
         join(nomenclature, nomenclature.c.id == prices.c.nomenclature).\
         where(
-        prices.c.owner == user.id,
+        prices.c.cashbox == user.cashbox_id,
         prices.c.is_deleted == False,
         nomenclature.c.is_deleted == False,
         *filters_price,
