@@ -64,7 +64,7 @@ async def new_price_type(token: str, price_type: schemas.PriceTypeCreate):
     query = price_types.insert().values(price_type_values)
     price_type_id = await database.execute(query)
 
-    price_type_db = await get_entity_by_id(price_types, price_type_id, user.id)
+    price_type_db = await get_entity_by_id(price_types, price_type_id, user.cashbox_id)
     price_type_db = datetime_to_timestamp(price_type_db)
 
     await manager.send_message(
