@@ -24,7 +24,7 @@ async def get_price_by_id(token: str, idx: int):
     """Получение цены по ID"""
     user = await get_user_by_token(token)
 
-    q = prices.select().where(prices.c.id == idx, prices.c.owner == user.id, prices.c.is_deleted == False)
+    q = prices.select().where(prices.c.id == idx, prices.c.cashbox == user.cashbox_id, prices.c.is_deleted == False)
     price_db = await database.fetch_one(q)
 
     if price_db:
@@ -39,7 +39,7 @@ async def get_price_by_id(token: str, idx: int):
 
         q = nomenclature.select().where(
             nomenclature.c.id == price_db.nomenclature,
-            nomenclature.c.owner == user.id,
+            nomenclature.c.cashbox == user.cashbox_id,
             nomenclature.c.is_deleted == False,
         )
         nom_db = await database.fetch_one(q)
@@ -229,7 +229,7 @@ async def get_prices(
             .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, full=True)
             .join(price_types, price_types.c.id == prices.c.price_type, full=True)
             .where(
-                prices.c.owner == user.id,
+                prices.c.cashbox == user.cashbox_id,
                 prices.c.is_deleted == False,
                 nomenclature.c.is_deleted == False,
                 *filters_price,
@@ -299,7 +299,7 @@ async def new_price(token: str, prices_data: schemas.PriceCreateMass):
         price_id = await database.execute(query)
         inserted_ids.add(price_id)
 
-    query = prices.select().where(prices.c.owner == user.id, prices.c.id.in_(inserted_ids))
+    query = prices.select().where(prices.c.cashbox == user.cashbox_id, prices.c.id.in_(inserted_ids))
     prices_db = await database.fetch_all(query)
     # prices_db = [*map(datetime_to_timestamp, prices_db)]
     # prices_db = [*map(rem_owner_is_deleted, prices_db)]
@@ -318,7 +318,7 @@ async def new_price(token: str, prices_data: schemas.PriceCreateMass):
 
         q = nomenclature.select().where(
             nomenclature.c.id == price_db.nomenclature,
-            nomenclature.c.owner == user.id,
+            nomenclature.c.cashbox == user.cashbox_id,
             nomenclature.c.is_deleted == False,
         )
         nom_db = await database.fetch_one(q)
@@ -414,7 +414,7 @@ async def edit_price(
         if price_values.get("price_type") is not None:
             await get_entity_by_id(price_types, price_values["price_type"], user.cashbox_id)
 
-        query = prices.update().where(prices.c.id == idx, prices.c.cashbox_id == user.cashbox_id).values(price_values)
+        query = prices.update().where(prices.c.id == idx, prices.c.cashbox == user.cashbox_id).values(price_values)
         await database.execute(query)
         price_db = await get_entity_by_id(prices, price_db.id, user.cashbox_id)
 
