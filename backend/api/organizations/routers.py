@@ -82,7 +82,7 @@ async def edit_organization(
 ):
     """Редактирование организации"""
     user = await get_user_by_token(token)
-    organization_db = await get_entity_by_id(organizations, idx, user.id)
+    organization_db = await get_entity_by_id(organizations, idx, user.cashbox_id)
     organization_values = organization.dict(exclude_unset=True)
 
     if organization_values:
@@ -92,7 +92,7 @@ async def edit_organization(
             .values(organization_values)
         )
         await database.execute(query)
-        organization_db = await get_entity_by_id(organizations, idx, user.id)
+        organization_db = await get_entity_by_id(organizations, idx, user.cashbox_id)
 
     organization_db = datetime_to_timestamp(organization_db)
 
@@ -109,7 +109,7 @@ async def delete_organization(token: str, idx: int):
     """Удаление организации"""
     user = await get_user_by_token(token)
 
-    await get_entity_by_id(organizations, idx, user.id)
+    await get_entity_by_id(organizations, idx, user.cashbox_id)
 
     query = (
         organizations.update()
