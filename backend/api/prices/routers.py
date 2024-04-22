@@ -690,14 +690,14 @@ async def delete_price_mass(token: str, ids: str, date_from: Optional[int] = Non
         if date_from and date_to:
             dates_filters.append(prices.c.date_from <= date_from, prices.c.date_to <= date_to)
 
-        await get_entity_by_id(prices, int(price_id), user.id)
+        await get_entity_by_id(prices, int(price_id), user.cashbox_id)
 
         query = (
-            prices.update().where(prices.c.id == int(price_id), prices.c.owner == user.id).values({"is_deleted": True})
+            prices.update().where(prices.c.id == int(price_id), prices.c.cashbox == user.cashbox_id).values({"is_deleted": True})
         )
         await database.execute(query)
 
-        query = prices.select().where(prices.c.id == int(price_id), prices.c.owner == user.id)
+        query = prices.select().where(prices.c.id == int(price_id), prices.c.cashbox == user.cashbox_id)
         price_db = await database.fetch_one(query)
 
         response_body = {**dict(price_db)}
@@ -711,7 +711,7 @@ async def delete_price_mass(token: str, ids: str, date_from: Optional[int] = Non
 
         q = nomenclature.select().where(
             nomenclature.c.id == price_db.nomenclature,
-            nomenclature.c.owner == user.id,
+            nomenclature.c.cashbox == user.cashbox_id,
             nomenclature.c.is_deleted == False,
         )
         nom_db = await database.fetch_one(q)
