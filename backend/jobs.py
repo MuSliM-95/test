@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime, timedelta
 from time import sleep
@@ -15,6 +16,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 
 from api.contracts.schemas import PaymentType
+from api.docs_warehouses.utils import create_warehouse_docs
 from api.payments.routers import read_payments_list, create_payment
 from api.payments.schemas import PaymentCreate
 from apps.tochka_bank.schemas import StatementData
@@ -22,13 +24,16 @@ from apps.tochka_bank.schemas import StatementData
 from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
-    entity_to_entity, tochka_bank_payments, contragents
+    entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
+    docs_sales_goods, docs_sales_tags, docs_warehouse
+from database.enums import Repeatability
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
 from functions.goods_distribution import process_distribution
 from functions.gross_profit import process_gross_profit_report
 from functions.helpers import init_statement, get_statement
 from functions.payments import clear_repeats, repeat_payment
+from functions.users import raschet
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
@@ -123,7 +128,7 @@ async def autoburn():
                     loyality_transactions.c.type == "accrual",
                     loyality_transactions.c.amount > 0,
                     loyality_transactions.c.autoburned.is_not(True),
-                    loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.now(),
+                    loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.utcnow(),
                     loyality_transactions.c.card_balance == 0
                 )
                 .order_by(asc(loyality_transactions.c.id))
@@ -261,6 +266,254 @@ async def autoburn():
     card_list = await AutoBurn.get_cards()
     for card in card_list:
         await AutoBurn(card=card).start()
+
+
+@scheduler.scheduled_job("interval", seconds=5, id="autorepeat")
+async def autorepeat():
+    await database.connect()
+
+    date_now = datetime.utcnow()
+    timestamp_now = int(date_now.strftime("%s"))
+
+    class AutoRepeat:
+        def __init__(self, doc: Record) -> None:
+            self.doc: Record = doc
+            self.last_created_at: Union[datetime, None] = None
+
+        @staticmethod
+        async def get_docs_sales_list() -> List[Record]:
+            query = (
+                select(docs_sales, docs_sales_settings)
+                .where(
+                    docs_sales_settings.c.repeatability_status.is_(True)
+                )
+                .join(docs_sales_settings, docs_sales.c.settings == docs_sales_settings.c.id)
+            )
+
+            return await database.fetch_all(query)
+
+        async def get_last_created_at(self) -> None:
+            query = (
+                select(docs_sales.c.created_at)
+                .where(docs_sales.c.parent_docs_sales == self.doc.id)
+                .order_by(asc(docs_sales.c.id))
+            )
+            self.last_created_at = await database.fetch_val(query)
+
+        def _check_start_date(self) -> bool:
+            if self.doc.repeatability_period is Repeatability.months:
+                if self.doc.skip_current_month or (date_now.weekday() >= 5 and self.doc.transfer_from_weekends):
+                    return False
+            return self.last_created_at + timedelta(
+                **{self.doc.repeatability_period: self.doc.repeatability_value}
+            ) >= date_now
+
+        @database.transaction()
+        async def _repeat(self):
+            token_query = (
+                select(users_cboxes_relation.c.token)
+                .where(
+                    users_cboxes_relation.c.user == doc.created_by
+                )
+            )
+            token = await database.fetch_val(token_query)
+
+            goods_query = (
+                docs_sales_goods
+                .select()
+                .where(
+                    docs_sales_goods.c.docs_sales_id == doc.id
+                )
+            )
+            docs_sales_goods_list = await database.fetch_all(goods_query)
+
+            payment_query = (
+                payments
+                .select()
+                .where(
+                    payments.c.docs_sales_id == doc.id
+                )
+            )
+            payment_list = await database.fetch_all(payment_query)
+
+            docs_warehouses_query = (
+                docs_warehouse
+                .select()
+                .where(
+                    docs_warehouse.c.docs_sales_id == doc.id
+                )
+            )
+            docs_warehouse_list = await database.fetch_all(docs_warehouses_query)
+
+            count_query = (
+                select(func.count(docs_sales.c.id))
+                .where(
+                    docs_sales.c.cashbox == doc.cashbox,
+                    docs_sales.c.is_deleted.is_(False)
+                )
+            )
+            count_docs_sales = await database.fetch_val(count_query, column=0)
+
+            query = (
+                docs_sales
+                .insert()
+                .values({
+                    "number": count_docs_sales + 1,
+                    "dated": timestamp_now,
+                    "operation": doc.operation,
+                    "tags": doc.tags if doc.repeatability_tags else "",
+                    "comment": doc.comment,
+                    "cashbox": doc.cashbox,
+                    "contragent": doc.contragent,
+                    "contract": doc.contract,
+                    "organization": doc.organization,
+                    "warehouse": doc.warehouse,
+                    "parent_docs_sales": doc.id,
+                    "autorepeat": True,
+                    "status": doc.status,
+                    "tax_included": doc.tax_included,
+                    "tax_active": doc.tax_active,
+                    "sales_manager": doc.sales_manager,
+                    "sum": doc.sum,
+                    "created_by": doc.created_by,
+                })
+            )
+            created_doc_id = await database.execute(query)
+
+            if doc.repeatability_tags and doc.tags:
+                tags_insert_list = [
+                    {"docs_sales_id": created_doc_id, "name": tag_name}
+                    for tag_name in doc.tags.split(",")
+                ]
+                if tags_insert_list:
+                    await database.execute(docs_sales_tags.insert(tags_insert_list))
+
+            items_sum = 0
+            for item in docs_sales_goods_list:
+                item["docs_sales_id"] = created_doc_id
+                del item["nomenclature_name"]
+                del item["unit_name"]
+
+                query = docs_sales_goods.insert().values(item)
+                await database.execute(query)
+                items_sum += item["price"] * item["quantity"]
+                if doc.warehouse is not None:
+                    query = (
+                        warehouse_balances.select()
+                        .where(
+                            warehouse_balances.c.warehouse_id == doc.warehouse,
+                            warehouse_balances.c.nomenclature_id == item["nomenclature"]
+                        )
+                        .order_by(desc(warehouse_balances.c.created_at))
+                    )
+                    last_warehouse_balance = await database.fetch_one(query)
+                    warehouse_amount = (
+                        last_warehouse_balance.current_amount
+                        if last_warehouse_balance
+                        else 0
+                    )
+
+                    query = warehouse_balances.insert().values(
+                        {
+                            "organization_id": doc.organization,
+                            "warehouse_id": doc.warehouse,
+                            "nomenclature_id": item["nomenclature"],
+                            "document_sale_id": created_doc_id,
+                            "outgoing_amount": item["quantity"],
+                            "current_amount": warehouse_amount - item["quantity"],
+                            "cashbox_id": doc.cashbox,
+                        }
+                    )
+                    await database.execute(query)
+
+            for item in payment_list:
+                payment_id = await database.execute(payments.insert().values({
+                    "contragent": item.contragent,
+                    "type": item.type,
+                    "name": item.name,
+                    "amount_without_tax": item.amount_without_tax,
+                    "tags": item.tags,
+                    "amount": item.amount,
+                    "tax": item.tax,
+                    "tax_type": item.tax_type,
+                    "article_id": item.article_id,
+                    "article": item.article,
+                    "paybox": item.paybox,
+                    "date": timestamp_now,
+                    "account": item.account,
+                    "cashbox": item.cashbox,
+                    "is_deleted": False,
+                    "created_at": timestamp_now,
+                    "updated_at": timestamp_now,
+                    "status": doc.default_payment_status,
+                    "stopped": True,
+                }))
+
+                if doc.default_payment_status:
+                    await database.execute(
+                        pboxes.update().where(pboxes.c.id == item.paybox).values(
+                            {"balance": pboxes.c.balance - item.amount})
+                    )
+
+                await database.execute(entity_to_entity.insert().values(
+                    {
+                        "from_entity": 7,
+                        "to_entity": 5,
+                        "cashbox_id": doc.cashbox,
+                        "type": "docs_sales_payments",
+                        "from_id": created_doc_id,
+                        "to_id": payment_id,
+                        "status": True,
+                        "delinked": False,
+                    }
+                ))
+            await asyncio.gather(asyncio.create_task(raschet(doc.created_by, token)))
+
+            query = (
+                docs_sales.update()
+                .where(docs_sales.c.id == created_doc_id)
+                .values({"sum": items_sum})
+            )
+            await database.execute(query)
+
+            for item in docs_warehouse_list:
+                body = {
+                    "number": item.number,
+                    "dated": timestamp_now,
+                    "docs_purchases": item.docs_purchases,
+                    "to_warehouse": item.to_warehouse,
+                    "status": item.status,
+                    "contragent": item.contragent,
+                    "organization": item.organization,
+                    "operation": item.operation,
+                    "comment": item.comment,
+                    "warehouse": item.warehouse,
+                    "docs_sales_id": created_doc_id,
+                    "goods": item.goods
+                }
+                await create_warehouse_docs(token, body, doc.cashbox)
+
+            update_settings_query = (
+                docs_sales_settings
+                .update()
+                .where(docs_sales_settings.c.id == doc.id_1)
+                .values({
+                    "date_next_created": 0,
+                    "repeatability_count": doc.repeatability_count - 1
+                })
+            )
+            await database.execute(update_settings_query)
+
+        async def start(self):
+            if (doc.date_next_created != 0 and datetime.fromtimestamp(doc.date_next_created) <= date_now) or \
+                    (self.last_created_at and self._check_start_date()):
+                return await self._repeat(doc)
+
+    docs_sales_list = await AutoRepeat.get_docs_sales_list()
+    for doc in docs_sales_list:
+        autorepeat_doc = AutoRepeat(doc=doc)
+        await autorepeat_doc.get_last_created_at()
+        await autorepeat_doc.start()
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")

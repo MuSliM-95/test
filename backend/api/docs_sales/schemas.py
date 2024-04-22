@@ -28,12 +28,13 @@ class SaleOperations(str, Enum):
 class Settings(BaseModel):
     repeatability_period: Optional[Repeatability]
     repeatability_value: Optional[int]
-    date_next_created: Optional[int]
+    date_next_created: Optional[int] = 0
     transfer_from_weekends: bool = True
     skip_current_month: bool = True
     repeatability_count: int = 0
     default_payment_status: bool = False
     repeatability_tags: bool = False
+    repeatability_status: bool = True
 
     class Config:
         orm_mode = True

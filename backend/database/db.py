@@ -1353,12 +1353,13 @@ docs_sales_settings = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("repeatability_period", Enum(Repeatability), nullable=False),
     sqlalchemy.Column("repeatability_value", Integer, nullable=False),
-    sqlalchemy.Column("date_next_created", Integer),
+    sqlalchemy.Column("date_next_created", Integer, default=0),
     sqlalchemy.Column("transfer_from_weekends", Boolean, default=True),
     sqlalchemy.Column("skip_current_month", Boolean, default=True),
     sqlalchemy.Column("repeatability_count", Integer, default=0),
     sqlalchemy.Column("default_payment_status", Boolean, default=False),
-    sqlalchemy.Column("repeatability_tags", Boolean, default=False)
+    sqlalchemy.Column("repeatability_tags", Boolean, default=False),
+    sqlalchemy.Column("repeatability_status", Boolean, default=True),
 )
 
 amo_users = sqlalchemy.Table(
