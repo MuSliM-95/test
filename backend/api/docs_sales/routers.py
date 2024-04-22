@@ -527,7 +527,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         query = (
             docs_sales.update()
             .where(docs_sales.c.id == instance_id)
-            .values({"sum": items_sum})
+            .values({"sum": round(items_sum, 2)})
         )
         await database.execute(query)
 
@@ -843,7 +843,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
             query = (
                 docs_sales.update()
                 .where(docs_sales.c.id == instance_id)
-                .values({"sum": items_sum})
+                .values({"sum": round(items_sum, 2)})
             )
             await database.execute(query)
 
