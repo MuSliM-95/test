@@ -35,7 +35,7 @@ async def patch_nomenclature_barcodes(token: str, barcodes: List[schemas.Nomencl
     for barcode in barcodes:
         query = nomenclature.select().where(
             nomenclature.c.id == barcode.idx,
-            nomenclature.c.owner == user.id,
+            nomenclature.c.cashbox == user.cashbox_id,
             nomenclature.c.is_deleted.is_not(True),
         )
         nomenclature_db = await database.fetch_one(query)
@@ -104,7 +104,7 @@ async def get_nomenclature_barcodes(token: str, idx: int):
     """Получение штрихкодов категории по ID"""
     user = await get_user_by_token(token)
 
-    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
 
     query = nomenclature_barcodes.select().where(nomenclature_barcodes.c.nomenclature_id == idx)
     barcodes_list = await database.fetch_all(query)
@@ -117,7 +117,7 @@ async def add_barcode_to_nomenclature(token: str, idx: int, barcode: schemas.Nom
     """Добавление штрихкода к категории по ID"""
     user = await get_user_by_token(token)
 
-    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
     query = nomenclature_barcodes.select().where(and_(
         nomenclature_barcodes.c.nomenclature_id == idx,
         nomenclature_barcodes.c.code == barcode.barcode
@@ -139,7 +139,7 @@ async def delete_barcode_to_nomenclature(token: str, idx: int, barcode: schemas.
     """Добавление штрихкода к категории по ID"""
     user = await get_user_by_token(token)
 
-    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
     query = nomenclature_barcodes.delete().where(and_(
         nomenclature_barcodes.c.nomenclature_id == idx,
         nomenclature_barcodes.c.code == barcode.barcode
@@ -151,7 +151,7 @@ async def delete_barcode_to_nomenclature(token: str, idx: int, barcode: schemas.
 async def get_nomenclature_by_id(token: str, idx: int):
     """Получение категории по ID"""
     user = await get_user_by_token(token)
-    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
     nomenclature_db = await nomenclature_unit_id_to_name(nomenclature_db)
     return nomenclature_db
@@ -325,7 +325,7 @@ async def edit_nomenclature(
 ):
     """Редактирование категории"""
     user = await get_user_by_token(token)
-    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
     nomenclature_values = nomenclature_data.dict(exclude_unset=True)
 
     if nomenclature_values:
@@ -342,7 +342,7 @@ async def edit_nomenclature(
             .values(nomenclature_values)
         )
         await database.execute(query)
-        nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+        nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
 
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
@@ -364,7 +364,7 @@ async def edit_nomenclature_mass(
     response_body = []
     for nomenclature_in_list in nomenclature_data:
         idx = nomenclature_in_list.id
-        nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+        nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
         nomenclature_values = nomenclature_in_list.dict(exclude_unset=True)
 
         del nomenclature_values["id"]
@@ -383,7 +383,7 @@ async def edit_nomenclature_mass(
                 .values(nomenclature_values)
             )
             await database.execute(query)
-            nomenclature_db = await get_entity_by_id(nomenclature, idx, user.id)
+            nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
 
         nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
@@ -435,7 +435,7 @@ async def delete_nomenclature_mass(token: str, nomenclature_data: List[int]):
     response_body = []
 
     for idx in nomenclature_data:
-        await get_entity_by_id(nomenclature, idx, user.id)
+        await get_entity_by_id(nomenclature, idx, user.cashbox_id)
 
         query = (
             nomenclature.update()

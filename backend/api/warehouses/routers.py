@@ -14,7 +14,7 @@ router = APIRouter(tags=["warehouses"])
 async def get_warehouse_by_id(token: str, idx: int):
     """Получение склада по ID"""
     user = await get_user_by_token(token)
-    warehouse_db = await get_entity_by_id(warehouses, idx, user.id)
+    warehouse_db = await get_entity_by_id(warehouses, idx, user.cashbox_id)
     warehouse_db = datetime_to_timestamp(warehouse_db)
     return warehouse_db
 
@@ -97,7 +97,7 @@ async def edit_warehouse(
 ):
     """Редактирование склада"""
     user = await get_user_by_token(token)
-    warehouse_db = await get_entity_by_id(warehouses, idx, user.id)
+    warehouse_db = await get_entity_by_id(warehouses, idx, user.cashbox_id)
     warehouse_values = warehouse.dict(exclude_unset=True)
 
     if warehouse_values:
@@ -108,7 +108,7 @@ async def edit_warehouse(
             warehouses.update().where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id).values(warehouse_values)
         )
         await database.execute(query)
-        warehouse_db = await get_entity_by_id(warehouses, idx, user.id)
+        warehouse_db = await get_entity_by_id(warehouses, idx,user.cashbox_id)
 
     warehouse_db = datetime_to_timestamp(warehouse_db)
 

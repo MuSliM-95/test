@@ -542,12 +542,12 @@ async def get_user_by_token(token: str) -> Record:
     return user
 
 
-async def get_entity_by_id(entity: Table, idx: int, owner: int) -> Record:
+async def get_entity_by_id(entity: Table, idx: int, cashbox: int) -> Record:
     """Returns entity from db, filtered by owner and is_deleted fields"""
 
     query = entity.select().where(
         entity.c.id == idx,
-        entity.c.owner == owner,
+        entity.c.cashbox == cashbox,
         entity.c.is_deleted.is_not(True),
     )
     entity_db = await database.fetch_one(query)
