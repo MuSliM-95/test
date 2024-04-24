@@ -302,7 +302,8 @@ async def autorepeat():
                 .where(docs_sales.c.parent_docs_sales == self.doc.id)
                 .order_by(asc(docs_sales.c.id))
             )
-            self.last_created_at = await database.fetch_val(query)
+            last_created_at = await database.fetch_val(query)
+            self.last_created_at = last_created_at if last_created_at else date_now
 
         def _check_start_date(self) -> bool:
             if self.doc.repeatability_period is Repeatability.months:
