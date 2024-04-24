@@ -276,8 +276,6 @@ async def autoburn():
     for card in card_list:
         await AutoBurn(card=card).start()
 
-    await database.disconnect()
-
 
 @scheduler.scheduled_job("interval", minutes=1, id="autorepeat")
 async def autorepeat():
@@ -307,17 +305,9 @@ async def autorepeat():
 
         @staticmethod
         async def get_count_docs_sales(cashbox_id: int) -> int:
-            # async with db.acquire() as con:
-            #     query = "SELECT COUNT(*) FROM docs_sales WHERE cashbox = $1 AND is_deleted IS NOT TRUE"
-            #     return await con.fetchval(query, cashbox_id)
-            query = (
-                select(func.count(docs_sales.c.id))
-                .where(
-                    docs_sales.c.cashbox == cashbox_id,
-                    docs_sales.c.is_deleted.is_(False)
-                )
-            )
-            return await database.fetch_val(query)
+            async with db.acquire() as con:
+                query = "SELECT COUNT(*) FROM docs_sales WHERE cashbox = $1 AND is_deleted IS NOT TRUE"
+                return await con.fetchval(query, cashbox_id)
 
         async def get_last_created_at(self) -> None:
             query = (
@@ -563,7 +553,6 @@ async def autorepeat():
         await autorepeat_doc.start()
 
     await db.close()
-    await database.disconnect()
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
