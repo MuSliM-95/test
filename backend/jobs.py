@@ -511,7 +511,7 @@ async def autorepeat():
                     "comment": item.comment,
                     "warehouse": item.warehouse,
                     "docs_sales_id": created_doc_id,
-                    "goods": item.goods
+                    "goods": goods_res
                 }
                 await create_warehouse_docs(token, body, doc.cashbox)
 
