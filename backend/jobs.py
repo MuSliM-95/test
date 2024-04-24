@@ -25,7 +25,7 @@ from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
-    docs_sales_goods, docs_sales_tags, docs_warehouse, nomenclature
+    docs_sales_goods, docs_sales_tags, docs_warehouse, users
 from database.enums import Repeatability
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
@@ -323,6 +323,13 @@ async def autorepeat():
             )
             token = await database.fetch_val(token_query)
 
+            user_query = (
+                users
+                .select()
+                .where(users.c.id == doc.created_by)
+            )
+            user = await database.fetch_one(user_query)
+
             goods_query = (
                 docs_sales_goods
                 .select()
@@ -363,7 +370,7 @@ async def autorepeat():
                 docs_sales
                 .insert()
                 .values({
-                    "number": count_docs_sales + 1,
+                    "number": str(count_docs_sales + 1),
                     "dated": timestamp_now,
                     "operation": doc.operation,
                     "tags": doc.tags if doc.repeatability_tags else "",
@@ -472,7 +479,7 @@ async def autorepeat():
                         "delinked": False,
                     }
                 ))
-            await asyncio.gather(asyncio.create_task(raschet(doc.created_by, token)))
+            await asyncio.gather(asyncio.create_task(raschet(user, token)))
 
             query = (
                 docs_sales.update()
@@ -512,10 +519,11 @@ async def autorepeat():
         async def start(self):
             if (doc.date_next_created not in [None, 0] and datetime.fromtimestamp(doc.date_next_created) <= date_now) or \
                     (self.last_created_at and self._check_start_date()):
-                return await self._repeat(doc)
+                return await self._repeat()
 
     docs_sales_list = await AutoRepeat.get_docs_sales_list()
     for doc in docs_sales_list:
+        print(dict(doc))
         autorepeat_doc = AutoRepeat(doc=doc)
         await autorepeat_doc.get_last_created_at()
         await autorepeat_doc.start()
