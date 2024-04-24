@@ -29,12 +29,12 @@ class Settings(BaseModel):
     repeatability_period: Optional[Repeatability] = Repeatability.minutes.value
     repeatability_value: Optional[int] = 0
     date_next_created: Optional[int] = 0
-    transfer_from_weekends: bool = True
-    skip_current_month: bool = True
-    repeatability_count: int = 0
-    default_payment_status: bool = False
-    repeatability_tags: bool = False
-    repeatability_status: bool = True
+    transfer_from_weekends: Optional[bool] = True
+    skip_current_month: Optional[bool] = True
+    repeatability_count: Optional[int] = 0
+    default_payment_status: Optional[bool] = False
+    repeatability_tags: Optional[bool] = False
+    repeatability_status: Optional[bool] = True
 
     class Config:
         orm_mode = True

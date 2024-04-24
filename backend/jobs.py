@@ -25,7 +25,7 @@ from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
-    docs_sales_goods, docs_sales_tags, docs_warehouse
+    docs_sales_goods, docs_sales_tags, docs_warehouse, nomenclature
 from database.enums import Repeatability
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
@@ -509,7 +509,7 @@ async def autorepeat():
             await database.execute(update_settings_query)
 
         async def start(self):
-            if (doc.date_next_created != 0 and datetime.fromtimestamp(doc.date_next_created) <= date_now) or \
+            if (doc.date_next_created not in [None, 0] and datetime.fromtimestamp(doc.date_next_created) <= date_now) or \
                     (self.last_created_at and self._check_start_date()):
                 return await self._repeat(doc)
 
