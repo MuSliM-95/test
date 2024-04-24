@@ -294,7 +294,7 @@ async def autorepeat():
                 select(docs_sales, docs_sales_settings)
                 .where(
                     docs_sales_settings.c.repeatability_status.is_(True),
-                    docs_sales_settings.c.repeatability_count > 0
+                    docs_sales_settings.c.repeatability_count >= 0
                 )
                 .join(docs_sales_settings, docs_sales.c.settings == docs_sales_settings.c.id)
             )
@@ -313,9 +313,11 @@ async def autorepeat():
 
         def _check_start_date(self) -> bool:
             if self.doc.repeatability_period is Repeatability.months:
-                if self.doc.skip_current_month or (date_now.weekday() >= 5 and self.doc.transfer_from_weekends):
+                if date_now.weekday() >= 5 and self.doc.transfer_from_weekends:
                     return False
-                return self.last_created_at + relativedelta(months=self.doc.repeatability_value) >= date_now
+                return self.last_created_at + relativedelta(
+                    months=self.doc.repeatability_value + 1 if self.doc.skip_current_month else 0
+                ) >= date_now
             return self.last_created_at + timedelta(
                 **{self.doc.repeatability_period: self.doc.repeatability_value}
             ) >= date_now

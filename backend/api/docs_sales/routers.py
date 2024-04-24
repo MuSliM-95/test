@@ -439,6 +439,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "updated_at": int(datetime.datetime.now().timestamp()),
                 "status": True,
                 "stopped": True,
+                "docs_sales_id": instance_id
             }))
             await database.execute(
                 pboxes.update().where(pboxes.c.id == paybox).values({"balance": pboxes.c.balance - paid_rubles})
@@ -692,6 +693,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                     "updated_at": int(datetime.datetime.now().timestamp()),
                     "status": True,
                     "stopped": True,
+                    "docs_sales_id": instance_id_db
                 }
                 payment_id = await database.execute(payments.insert().values(rubles_body))
 
