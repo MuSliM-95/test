@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import List, Union, Any, Dict
 from itertools import zip_longest
+from asyncpg import create_pool
 
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
@@ -27,7 +28,7 @@ from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
-    docs_sales_goods, docs_sales_tags, docs_warehouse, users, nomenclature
+    docs_sales_goods, docs_sales_tags, docs_warehouse, users, nomenclature, SQLALCHEMY_DATABASE_URL
 from database.enums import Repeatability
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
@@ -279,6 +280,7 @@ async def autoburn():
 @scheduler.scheduled_job("interval", minutes=1, id="autorepeat")
 async def autorepeat():
     await database.connect()
+    db = await create_pool(SQLALCHEMY_DATABASE_URL)
 
     date_now = datetime.now(timezone(timedelta(hours=0)))
     timestamp_now = int(date_now.strftime("%s"))
@@ -294,7 +296,7 @@ async def autorepeat():
                 select(docs_sales, docs_sales_settings)
                 .where(
                     docs_sales_settings.c.repeatability_status.is_(True),
-                    docs_sales_settings.c.repeatability_count >= 0
+                    docs_sales_settings.c.repeatability_count > 0
                 )
                 .join(docs_sales_settings, docs_sales.c.settings == docs_sales_settings.c.id)
             )
@@ -303,14 +305,9 @@ async def autorepeat():
 
         @staticmethod
         async def get_count_docs_sales(cashbox_id: int) -> int:
-            query = (
-                select(func.count(docs_sales.c.id))
-                .where(
-                    docs_sales.c.cashbox == cashbox_id,
-                    docs_sales.c.is_deleted.is_(False)
-                )
-            )
-            return await database.fetch_val(query)
+            async with db.acquire() as con:
+                query = "SELECT COUNT(*) FROM docs_sales WHERE cashbox = $1 AND is_deleted IS NOT TRUE"
+                return await con.fetchval(query, cashbox_id)
 
         async def get_last_created_at(self) -> None:
             query = (

@@ -87,15 +87,15 @@ async def add_settings_docs_sales(settings: Optional[dict]) -> Optional[int]:
 
 async def update_settings_docs_sales(docs_sales_id: int, settings: Optional[dict]) -> None:
     if settings:
-        subquery = (
+        docs_sales_ids = (
             select(docs_sales.c.settings)
             .where(docs_sales.c.id == docs_sales_id)
-            .subquery()
+            .subquery("docs_sales_ids")
         )
         query = (
             docs_sales_settings
             .update()
-            .where(docs_sales_settings.c.id.in_(subquery))
+            .where(docs_sales_settings.c.id.in_(docs_sales_ids))
             .values(settings)
         )
         await database.execute(query)
