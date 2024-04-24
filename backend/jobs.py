@@ -14,12 +14,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 
-from api.docs_warehouses.func_warehouse import call_type_movement
+from api.docs_sales.schemas import Item as goods_schema
+from api.docs_warehouses.utils import create_warehouse_docs
 
 from database.db import database, payments, loyality_transactions, loyality_cards, \
     engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
-    docs_sales_goods, docs_sales_tags, docs_warehouse, users
+    docs_sales_goods, docs_sales_tags, docs_warehouse, users, nomenclature
 from database.enums import Repeatability
 from functions.helpers import init_statement, get_statement
 from functions.users import raschet
@@ -392,8 +393,9 @@ async def autorepeat():
                     await database.execute(docs_sales_tags.insert(tags_insert_list))
 
             items_sum = 0
+            goods_res = []
             for item in docs_sales_goods_list:
-                item = dict(item)
+                item = goods_schema.parse_obj(item).dict()
                 item["docs_sales_id"] = created_doc_id
                 item.pop("id", None)
                 item.pop("nomenclature_name", None)
@@ -430,6 +432,20 @@ async def autorepeat():
                         }
                     )
                     await database.execute(query)
+
+                    nomenclature_db = await database.fetch_one(
+                        nomenclature.select().where(nomenclature.c.id == item["nomenclature"])
+                    )
+                    if nomenclature_db.type == "product":
+                        goods_res.append(
+                            {
+                                "price_type": 1,
+                                "price": 0,
+                                "quantity": item["quantity"],
+                                "unit": item["unit"],
+                                "nomenclature": item["nomenclature"]
+                            }
+                        )
 
             for item in payment_list:
                 payment_id = await database.execute(payments.insert().values({
@@ -482,6 +498,7 @@ async def autorepeat():
             await database.execute(query)
 
             for item in docs_warehouse_list:
+
                 body = {
                     "number": item.number,
                     "dated": timestamp_now,
@@ -496,7 +513,7 @@ async def autorepeat():
                     "docs_sales_id": created_doc_id,
                     "goods": item.goods
                 }
-                await call_type_movement(item.operation, token, body, doc.cashbox)
+                await create_warehouse_docs(token, body, doc.cashbox)
 
             update_settings_query = (
                 docs_sales_settings
