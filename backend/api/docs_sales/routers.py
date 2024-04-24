@@ -85,20 +85,20 @@ async def add_settings_docs_sales(settings: Optional[dict]) -> Optional[int]:
         return docs_sales_settings_id
 
 
-async def update_settings_docs_sales(docs_sales_id: int, settings: dict) -> int:
-    subquery = (
-        select(docs_sales.c.settings)
-        .where(docs_sales.c.id == docs_sales_id)
-        .subquery()
-    )
-    query = (
-        docs_sales_settings
-        .update()
-        .where(docs_sales_settings.c.id.in_(subquery))
-        .values(settings)
-    )
-    docs_sales_settings_id = await database.execute(query)
-    return docs_sales_settings_id
+async def update_settings_docs_sales(docs_sales_id: int, settings: Optional[dict]) -> None:
+    if settings:
+        subquery = (
+            select(docs_sales.c.settings)
+            .where(docs_sales.c.id == docs_sales_id)
+            .subquery()
+        )
+        query = (
+            docs_sales_settings
+            .update()
+            .where(docs_sales_settings.c.id.in_(subquery))
+            .values(settings)
+        )
+        await database.execute(query)
 
 
 @router.get("/docs_sales/{idx}/", response_model=schemas.View)

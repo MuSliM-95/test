@@ -301,6 +301,17 @@ async def autorepeat():
 
             return await database.fetch_all(query)
 
+        @staticmethod
+        async def get_count_docs_sales(cashbox_id: int) -> int:
+            query = (
+                select(func.count(docs_sales.c.id))
+                .where(
+                    docs_sales.c.cashbox == cashbox_id,
+                    docs_sales.c.is_deleted.is_(False)
+                )
+            )
+            return await database.fetch_val(query)
+
         async def get_last_created_at(self) -> None:
             query = (
                 select(docs_sales.c.created_at)
@@ -366,14 +377,7 @@ async def autorepeat():
             )
             docs_warehouse_list = await database.fetch_all(docs_warehouses_query)
 
-            count_query = (
-                select(func.count(docs_sales.c.id))
-                .where(
-                    docs_sales.c.cashbox == doc.cashbox,
-                    docs_sales.c.is_deleted.is_(False)
-                )
-            )
-            count_docs_sales = await database.fetch_val(count_query, column=0)
+            count_docs_sales = await self.get_count_docs_sales(cashbox_id=doc.cashbox)
 
             query = (
                 docs_sales
@@ -485,6 +489,7 @@ async def autorepeat():
                     "updated_at": timestamp_now,
                     "status": doc.default_payment_status,
                     "stopped": True,
+                    "docs_sales_id": created_doc_id,
                 }))
 
                 if doc.default_payment_status:
