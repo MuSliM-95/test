@@ -498,7 +498,6 @@ async def autorepeat():
             await database.execute(query)
 
             for item in docs_warehouse_list:
-
                 body = {
                     "number": item.number,
                     "dated": timestamp_now,
