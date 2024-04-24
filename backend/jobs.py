@@ -262,7 +262,7 @@ async def autoburn():
         await AutoBurn(card=card).start()
 
 
-@scheduler.scheduled_job("interval", seconds=5, id="autorepeat")
+@scheduler.scheduled_job("interval", minutes=1, id="autorepeat")
 async def autorepeat():
     await database.connect()
 
