@@ -3,37 +3,25 @@ import os
 from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import List, Union, Any, Dict
-from itertools import zip_longest
 
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
 from databases.backends.postgres import Record
 from dateutil.relativedelta import relativedelta
-from fastapi.exceptions import HTTPException
-from sqlalchemy import desc, select, or_, and_, alias, func, asc
+from sqlalchemy import desc, select, and_, func, asc
 from sqlalchemy.exc import DatabaseError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 
-from api.contracts.schemas import PaymentType
-from api.docs_warehouses.utils import create_warehouse_docs
-from api.payments.routers import read_payments_list, create_payment
-from api.payments.schemas import PaymentCreate
-from apps.tochka_bank.schemas import StatementData
+from api.docs_warehouses.func_warehouse import call_type_movement
 
-from const import PAID, DEMO, RepeatPeriod
-from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
-    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
+from database.db import database, payments, loyality_transactions, loyality_cards, \
+    engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
     docs_sales_goods, docs_sales_tags, docs_warehouse, users
 from database.enums import Repeatability
-from functions.account import make_account
-from functions.filter_schemas import PaymentFiltersQuery
-from functions.goods_distribution import process_distribution
-from functions.gross_profit import process_gross_profit_report
 from functions.helpers import init_statement, get_statement
-from functions.payments import clear_repeats, repeat_payment
 from functions.users import raschet
 
 scheduler = AsyncIOScheduler(
@@ -405,9 +393,11 @@ async def autorepeat():
 
             items_sum = 0
             for item in docs_sales_goods_list:
+                item = dict(item)
                 item["docs_sales_id"] = created_doc_id
-                del item["nomenclature_name"]
-                del item["unit_name"]
+                item.pop("id", None)
+                item.pop("nomenclature_name", None)
+                item.pop("unit_name", None)
 
                 query = docs_sales_goods.insert().values(item)
                 await database.execute(query)
@@ -506,7 +496,7 @@ async def autorepeat():
                     "docs_sales_id": created_doc_id,
                     "goods": item.goods
                 }
-                await create_warehouse_docs(token, body, doc.cashbox)
+                await call_type_movement(item.operation, token, body, doc.cashbox)
 
             update_settings_query = (
                 docs_sales_settings
