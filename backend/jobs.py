@@ -293,7 +293,8 @@ async def autorepeat():
             query = (
                 select(docs_sales, docs_sales_settings)
                 .where(
-                    docs_sales_settings.c.repeatability_status.is_(True)
+                    docs_sales_settings.c.repeatability_status.is_(True),
+                    docs_sales_settings.c.repeatability_count > 0
                 )
                 .join(docs_sales_settings, docs_sales.c.settings == docs_sales_settings.c.id)
             )
