@@ -3,27 +3,41 @@ import os
 from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import List, Union, Any, Dict
+from itertools import zip_longest
 
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
 from databases.backends.postgres import Record
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import desc, select, and_, func, asc
+from fastapi.exceptions import HTTPException
+from api.docs_sales.schemas import Item as goods_schema
+from sqlalchemy import desc, select, or_, and_, alias, func, asc
 from sqlalchemy.exc import DatabaseError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 
-from api.docs_sales.schemas import Item as goods_schema
+from api.contracts.schemas import PaymentType
 from api.docs_warehouses.utils import create_warehouse_docs
+from api.payments.routers import read_payments_list, create_payment
+from api.payments.schemas import PaymentCreate
+from apps.tochka_bank.schemas import StatementData
 
-from database.db import database, payments, loyality_transactions, loyality_cards, \
-    engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
+from const import PAID, DEMO, RepeatPeriod
+from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
+    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
     docs_sales_goods, docs_sales_tags, docs_warehouse, users, nomenclature
 from database.enums import Repeatability
+from functions.account import make_account
+from functions.filter_schemas import PaymentFiltersQuery
+from functions.goods_distribution import process_distribution
+from functions.gross_profit import process_gross_profit_report
 from functions.helpers import init_statement, get_statement
+from functions.payments import clear_repeats, repeat_payment
 from functions.users import raschet
+
+
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
