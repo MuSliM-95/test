@@ -94,7 +94,7 @@ async def update_settings_docs_sales(docs_sales_id: int, settings: dict) -> int:
     query = (
         docs_sales_settings
         .update()
-        .where(docs_sales_settings.c.id == subquery)
+        .where(docs_sales_settings.c.id.in_(subquery))
         .values(settings)
     )
     docs_sales_settings_id = await database.execute(query)
