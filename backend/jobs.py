@@ -277,7 +277,7 @@ async def autoburn():
 async def autorepeat():
     await database.connect()
 
-    date_now = datetime.utcnow()
+    date_now = datetime.now(timezone(timedelta(hours=0)))
     timestamp_now = int(date_now.strftime("%s"))
 
     class AutoRepeat:
@@ -526,7 +526,6 @@ async def autorepeat():
 
     docs_sales_list = await AutoRepeat.get_docs_sales_list()
     for doc in docs_sales_list:
-        print(dict(doc))
         autorepeat_doc = AutoRepeat(doc=doc)
         await autorepeat_doc.get_last_created_at()
         await autorepeat_doc.start()
