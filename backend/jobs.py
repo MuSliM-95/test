@@ -323,10 +323,7 @@ async def autorepeat():
             if self.doc.repeatability_period is Repeatability.months:
                 if date_now.weekday() >= 5 and self.doc.transfer_from_weekends:
                     return False
-                return self.last_created_at + relativedelta(
-                    months=self.doc.repeatability_value + 1 if self.doc.skip_current_month else 0
-                ) <= date_now
-            return self.last_created_at + timedelta(
+            return self.last_created_at + relativedelta(
                 **{self.doc.repeatability_period: self.doc.repeatability_value}
             ) <= date_now
 
@@ -554,6 +551,8 @@ async def autorepeat():
         autorepeat_doc = AutoRepeat(doc=doc)
         await autorepeat_doc.get_last_created_at()
         await autorepeat_doc.start()
+
+    await db.close()
 
 
 # @scheduler.scheduled_job("interval", seconds=amo_interval, id="amo_import")
