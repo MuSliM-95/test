@@ -325,10 +325,10 @@ async def autorepeat():
                     return False
                 return self.last_created_at + relativedelta(
                     months=self.doc.repeatability_value + 1 if self.doc.skip_current_month else 0
-                ) >= date_now
+                ) <= date_now
             return self.last_created_at + timedelta(
                 **{self.doc.repeatability_period: self.doc.repeatability_value}
-            ) >= date_now
+            ) <= date_now
 
         @database.transaction()
         async def _repeat(self):
