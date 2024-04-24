@@ -8,6 +8,7 @@ from itertools import zip_longest
 import aiohttp
 from apscheduler.jobstores.base import JobLookupError
 from databases.backends.postgres import Record
+from dateutil.relativedelta import relativedelta
 from fastapi.exceptions import HTTPException
 from sqlalchemy import desc, select, or_, and_, alias, func, asc
 from sqlalchemy.exc import DatabaseError
@@ -282,7 +283,7 @@ async def autorepeat():
     class AutoRepeat:
         def __init__(self, doc: Record) -> None:
             self.doc: Record = doc
-            self.last_created_at: Union[datetime, None] = None
+            self.last_created_at: datetime = date_now
 
         @staticmethod
         async def get_docs_sales_list() -> List[Record]:
@@ -303,12 +304,14 @@ async def autorepeat():
                 .order_by(asc(docs_sales.c.id))
             )
             last_created_at = await database.fetch_val(query)
-            self.last_created_at = last_created_at if last_created_at else date_now
+            if last_created_at:
+                self.last_created_at = last_created_at
 
         def _check_start_date(self) -> bool:
             if self.doc.repeatability_period is Repeatability.months:
                 if self.doc.skip_current_month or (date_now.weekday() >= 5 and self.doc.transfer_from_weekends):
                     return False
+                return self.last_created_at + relativedelta(months=self.doc.repeatability_value) >= date_now
             return self.last_created_at + timedelta(
                 **{self.doc.repeatability_period: self.doc.repeatability_value}
             ) >= date_now

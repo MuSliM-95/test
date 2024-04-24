@@ -77,3 +77,4 @@ httpx
 pytest-asyncio
 pillow
 memoization
+python-dateutil
