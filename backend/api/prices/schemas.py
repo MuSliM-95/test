@@ -41,7 +41,7 @@ class PriceInList(BaseModel):
     type: Optional[str]
     description_short: Optional[str]
     description_long: Optional[str]
-    code: Optional[int]
+    code: Optional[str]
     unit: Optional[int]
     unit_name: Optional[str]
     category: Optional[int]
