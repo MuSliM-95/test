@@ -19,7 +19,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 
 from api.contracts.schemas import PaymentType
-from api.docs_warehouses.utils import create_warehouse_docs
+from api.docs_warehouses.func_warehouse import call_type_movement
 from api.payments.routers import read_payments_list, create_payment
 from api.payments.schemas import PaymentCreate
 from apps.tochka_bank.schemas import StatementData
@@ -37,8 +37,6 @@ from functions.gross_profit import process_gross_profit_report
 from functions.helpers import init_statement, get_statement
 from functions.payments import clear_repeats, repeat_payment
 from functions.users import raschet
-
-
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
@@ -309,6 +307,12 @@ async def autorepeat():
                 query = "SELECT COUNT(*) FROM docs_sales WHERE cashbox = $1 AND is_deleted IS NOT TRUE"
                 return await con.fetchval(query, cashbox_id)
 
+        @staticmethod
+        async def get_count_docs_warehouses(cashbox_id: int) -> int:
+            async with db.acquire() as con:
+                query = "SELECT COUNT(*) FROM docs_warehouse WHERE cashbox = $1 AND is_deleted IS NOT TRUE"
+                return await con.fetchval(query, cashbox_id)
+
         async def get_last_created_at(self) -> None:
             query = (
                 select(docs_sales.c.created_at)
@@ -316,8 +320,7 @@ async def autorepeat():
                 .order_by(asc(docs_sales.c.id))
             )
             last_created_at = await database.fetch_val(query)
-            if last_created_at:
-                self.last_created_at = last_created_at
+            self.last_created_at = last_created_at
 
         def _check_start_date(self) -> bool:
             if self.doc.repeatability_period is Repeatability.months:
@@ -374,6 +377,7 @@ async def autorepeat():
             docs_warehouse_list = await database.fetch_all(docs_warehouses_query)
 
             count_docs_sales = await self.get_count_docs_sales(cashbox_id=doc.cashbox)
+            count_docs_warehouses = await self.get_count_docs_warehouses(cashbox_id=doc.cashbox)
 
             query = (
                 docs_sales
@@ -517,7 +521,7 @@ async def autorepeat():
 
             for item in docs_warehouse_list:
                 body = {
-                    "number": item.number,
+                    "number": str(count_docs_warehouses + 1),
                     "dated": timestamp_now,
                     "docs_purchases": item.docs_purchases,
                     "to_warehouse": item.to_warehouse,
@@ -528,9 +532,9 @@ async def autorepeat():
                     "comment": item.comment,
                     "warehouse": item.warehouse,
                     "docs_sales_id": created_doc_id,
-                    "goods": goods_res
+                    "goods": goods_res,
                 }
-                await create_warehouse_docs(token, body, doc.cashbox)
+                await call_type_movement(item.operation, entity_values=body, token=token)
 
             update_settings_query = (
                 docs_sales_settings
@@ -544,8 +548,8 @@ async def autorepeat():
             await database.execute(update_settings_query)
 
         async def start(self):
-            if (doc.date_next_created not in [None, 0] and datetime.fromtimestamp(doc.date_next_created) <= date_now) or \
-                    (self.last_created_at and self._check_start_date()):
+            if (doc.date_next_created not in [None, 0] and datetime.fromtimestamp(doc.date_next_created) <= date_now) \
+                    or self._check_start_date():
                 return await self._repeat()
 
     docs_sales_list = await AutoRepeat.get_docs_sales_list()
