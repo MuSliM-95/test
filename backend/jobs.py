@@ -288,7 +288,7 @@ async def autorepeat():
     class AutoRepeat:
         def __init__(self, doc: Record) -> None:
             self.doc: Record = doc
-            self.last_created_at: datetime = date_now
+            self.last_created_at: Union[datetime, None] = None
 
         @staticmethod
         async def get_docs_sales_list() -> List[Record]:
@@ -323,6 +323,8 @@ async def autorepeat():
             if self.doc.repeatability_period is Repeatability.months:
                 if date_now.weekday() >= 5 and self.doc.transfer_from_weekends:
                     return False
+            if self.last_created_at is None:
+                return True
             return self.last_created_at + relativedelta(
                 **{self.doc.repeatability_period: self.doc.repeatability_value}
             ) <= date_now
