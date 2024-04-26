@@ -472,7 +472,7 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
 
         instance["paid_rubles"] = paid_rubles
         instance["paid_loyality"] = paid_loyality
-        instance["paid_doc"] = paid_loyality + paid_rubles
+        instance["paid_doc"] = round(paid_loyality + paid_rubles, 2)
 
         return instance
 
