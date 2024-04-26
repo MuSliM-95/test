@@ -201,8 +201,8 @@ async def alt_get_warehouse_balances(
                 plus_amount += reg_event.amount
             else:
                 minus_amount += reg_event.amount
-        
 
+        print(current)
         balance_dict['now_ost'] = current[0].current_amount
         balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
         balance_dict['plus_amount'] = plus_amount
