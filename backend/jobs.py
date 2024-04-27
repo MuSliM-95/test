@@ -337,7 +337,7 @@ async def autorepeat():
             user_query = (
                 users_cboxes_relation
                 .select()
-                .where(users_cboxes_relation.c.id == doc.created_by)
+                .where(users_cboxes_relation.c.user == doc.created_by)
             )
             user = await database.fetch_one(user_query)
 
