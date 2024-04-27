@@ -286,7 +286,7 @@ async def autorepeat():
     class AutoRepeat:
         def __init__(self, doc: Record) -> None:
             self.doc: Record = doc
-            self.last_created_at: Union[datetime, None] = None
+            self.last_created_at: datetime = doc.updated_at_1
 
         @staticmethod
         async def get_docs_sales_list() -> List[Record]:
@@ -320,14 +320,13 @@ async def autorepeat():
                 .order_by(asc(docs_sales.c.id))
             )
             last_created_at = await database.fetch_val(query)
-            self.last_created_at = last_created_at
+            if last_created_at:
+                self.last_created_at = last_created_at
 
         def _check_start_date(self) -> bool:
             if self.doc.repeatability_period is Repeatability.months:
                 if date_now.weekday() >= 5 and self.doc.transfer_from_weekends:
                     return False
-            if self.last_created_at is None:
-                return True
             return self.last_created_at + relativedelta(
                 **{self.doc.repeatability_period: self.doc.repeatability_value}
             ) <= date_now
