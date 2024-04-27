@@ -28,7 +28,7 @@ from const import PAID, DEMO, RepeatPeriod
 from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
-    docs_sales_goods, docs_sales_tags, docs_warehouse, users, nomenclature, SQLALCHEMY_DATABASE_URL
+    docs_sales_goods, docs_sales_tags, docs_warehouse, nomenclature, SQLALCHEMY_DATABASE_URL
 from database.enums import Repeatability
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
@@ -334,18 +334,10 @@ async def autorepeat():
 
         @database.transaction()
         async def _repeat(self):
-            token_query = (
-                select(users_cboxes_relation.c.token)
-                .where(
-                    users_cboxes_relation.c.user == doc.created_by
-                )
-            )
-            token = await database.fetch_val(token_query)
-
             user_query = (
-                users
+                users_cboxes_relation
                 .select()
-                .where(users.c.id == doc.created_by)
+                .where(users_cboxes_relation.c.id == doc.created_by)
             )
             user = await database.fetch_one(user_query)
 
@@ -379,29 +371,30 @@ async def autorepeat():
             count_docs_sales = await self.get_count_docs_sales(cashbox_id=doc.cashbox)
             count_docs_warehouses = await self.get_count_docs_warehouses(cashbox_id=doc.cashbox)
 
+            docs_sales_body = {
+                "number": str(count_docs_sales + 1),
+                "dated": timestamp_now,
+                "operation": doc.operation,
+                "tags": doc.tags if doc.repeatability_tags else "",
+                "comment": doc.comment,
+                "cashbox": doc.cashbox,
+                "contragent": doc.contragent,
+                "contract": doc.contract,
+                "organization": doc.organization,
+                "warehouse": doc.warehouse,
+                "parent_docs_sales": doc.id,
+                "autorepeat": True,
+                "status": doc.status,
+                "tax_included": doc.tax_included,
+                "tax_active": doc.tax_active,
+                "sales_manager": doc.sales_manager,
+                "sum": doc.sum,
+                "created_by": doc.created_by,
+            }
             query = (
                 docs_sales
                 .insert()
-                .values({
-                    "number": str(count_docs_sales + 1),
-                    "dated": timestamp_now,
-                    "operation": doc.operation,
-                    "tags": doc.tags if doc.repeatability_tags else "",
-                    "comment": doc.comment,
-                    "cashbox": doc.cashbox,
-                    "contragent": doc.contragent,
-                    "contract": doc.contract,
-                    "organization": doc.organization,
-                    "warehouse": doc.warehouse,
-                    "parent_docs_sales": doc.id,
-                    "autorepeat": True,
-                    "status": doc.status,
-                    "tax_included": doc.tax_included,
-                    "tax_active": doc.tax_active,
-                    "sales_manager": doc.sales_manager,
-                    "sum": doc.sum,
-                    "created_by": doc.created_by,
-                })
+                .values(docs_sales_body)
             )
             created_doc_id = await database.execute(query)
 
@@ -472,7 +465,7 @@ async def autorepeat():
                 payment_id = await database.execute(payments.insert().values({
                     "contragent": item.contragent,
                     "type": item.type,
-                    "name": item.name,
+                    "name": f"Оплата по документу {docs_sales_body['number']}",
                     "amount_without_tax": item.amount_without_tax,
                     "tags": item.tags,
                     "amount": item.amount,
@@ -510,7 +503,7 @@ async def autorepeat():
                         "delinked": False,
                     }
                 ))
-            await asyncio.gather(asyncio.create_task(raschet(user, token)))
+            await asyncio.gather(asyncio.create_task(raschet(user, user.token)))
 
             query = (
                 docs_sales.update()
@@ -534,7 +527,7 @@ async def autorepeat():
                     "docs_sales_id": created_doc_id,
                     "goods": goods_res,
                 }
-                await call_type_movement(item.operation, entity_values=body, token=token)
+                await call_type_movement(item.operation, entity_values=body, token=user.token)
 
             update_settings_query = (
                 docs_sales_settings
