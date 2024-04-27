@@ -1361,6 +1361,8 @@ docs_sales_settings = sqlalchemy.Table(
     sqlalchemy.Column("default_payment_status", Boolean, default=False),
     sqlalchemy.Column("repeatability_tags", Boolean, default=False),
     sqlalchemy.Column("repeatability_status", Boolean, default=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 amo_users = sqlalchemy.Table(
