@@ -62,6 +62,30 @@ async def get_picture_by_id(filename: str):
             raise HTTPException(status_code=404, detail="Такой картинки не существует")
 
 
+@router.get("/photos/link/{filename}/")
+async def get_picture_link_by_id(filename: str):
+    """Получение картинки по ID"""
+    async with s3_session.client(**s3_data) as s3:
+        try:
+            file_key = f"photos/{filename}"
+            url = await s3.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': bucket_name,
+                    'Key': file_key
+                },
+                ExpiresIn=None
+            )
+            return {
+                "data": {
+                    "url": url
+                }
+            }
+        except Exception as err:
+            print(err)
+            raise HTTPException(status_code=404, detail="Такой картинки не существует")
+
+
 @router.get("/pictures/", response_model=schemas.PictureListGet)
 async def get_pictures(
     token: str,
