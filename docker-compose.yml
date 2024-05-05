@@ -107,11 +107,12 @@ services:
     image: postgres:14.2
     container_name: postgres_container
     restart: always
-    command: postgres -c 'max_connections=300'
+    command: postgres -c 'config_file=/etc/postgresql.conf'
     ports:
       - "48425:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgresql.conf:/etc/postgresql.conf:ro
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
