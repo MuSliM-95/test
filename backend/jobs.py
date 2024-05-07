@@ -705,14 +705,14 @@ async def tochka_update_transaction():
                 status_info = ''
                 info_statement = None
                 while status_info != 'Ready':
-                    sleep(2)
+                    await asyncio.sleep(2)
                     info_statement = await get_statement(
                         statement.get('Data')['Statement'].get('statementId'),
                         statement.get('Data')['Statement'].get('accountId'),
                         account.get('access_token'))
                     status_info = info_statement.get('Data')['Statement'][0].get('status')
                 tochka_payments_db = await database.fetch_all(
-                    select(*payments.columns, tochka_bank_payments.c.paymentId).
+                    select(*payments.columns, tochka_bank_payments.c.payment_id).
                     where(and_(payments.c.paybox == account.get('pbox_id'),
                                payments.c.cashbox == account.get('cashbox_id'))). \
                     select_from(payments). \
@@ -747,7 +747,7 @@ async def tochka_update_transaction():
                             'transactionTypeCode': payment.get('transactionTypeCode'),
                             'transactionId': payment.get('transactionId'),
                             'status': payment.get('status'),
-                            'paymentId': payment.get('paymentId'),
+                            'payment_id': payment.get('paymentId'),
                             'documentProcessDate': payment.get('documentProcessDate'),
                             'documentNumber': payment.get('documentNumber'),
                             'description': payment.get('description'),
@@ -836,7 +836,7 @@ async def tochka_update_transaction():
                 else:
                     set_tochka_payments_statement = set(
                         [item.get('paymentId') for item in info_statement.get('Data')['Statement'][0]['Transaction']])
-                    set_tochka_payments_db = set([item.get('paymentId') for item in tochka_payments_db])
+                    set_tochka_payments_db = set([item.get('payment_id') for item in tochka_payments_db])
                     new_paymentsId = list(set_tochka_payments_statement - set_tochka_payments_db)
                     for payment in [item for item in info_statement.get('Data')['Statement'][0]['Transaction'] if
                                     item.get('paymentId') in new_paymentsId]:
@@ -867,7 +867,7 @@ async def tochka_update_transaction():
                             'transactionTypeCode': payment.get('transactionTypeCode'),
                             'transactionId': payment.get('transactionId'),
                             'status': payment.get('status'),
-                            'paymentId': payment.get('paymentId'),
+                            'payment_id': payment.get('paymentId'),
                             'documentProcessDate': payment.get('documentProcessDate'),
                             'documentNumber': payment.get('documentNumber'),
                             'description': payment.get('description'),
@@ -960,7 +960,7 @@ async def tochka_update_transaction():
                             'transactionTypeCode': payment.get('transactionTypeCode'),
                             'transactionId': payment.get('transactionId'),
                             'status': payment.get('status'),
-                            'paymentId': payment.get('paymentId'),
+                            'payment_id': payment.get('paymentId'),
                             'documentProcessDate': payment.get('documentProcessDate'),
                             'documentNumber': payment.get('documentNumber'),
                             'description': payment.get('description'),
@@ -999,9 +999,9 @@ async def tochka_update_transaction():
                             raise Exception('не вилидный формат транзакции от Точка банка')
 
                         await database.execute(tochka_bank_payments.update().where(
-                            tochka_bank_payments.c.paymentId == payment.get('paymentId')).values(payment_data))
+                            tochka_bank_payments.c.payment_id == payment.get('paymentId')).values(payment_data))
                         payment_update = await database.fetch_one(tochka_bank_payments.select().where(
-                            tochka_bank_payments.c.paymentId == payment.get('paymentId')))
+                            tochka_bank_payments.c.payment_id == payment.get('paymentId')))
                         await database.execute(
                             payments.update().where(payments.c.id == payment_update.get('payment_crm_id')).values({
                                 'name': payment.get('transactionTypeCode'),

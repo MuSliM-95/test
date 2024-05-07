@@ -74,7 +74,7 @@ tochka_bank_payments = sqlalchemy.Table(
     sqlalchemy.Column('transactionTypeCode', String),
     sqlalchemy.Column('transactionId', String),
     sqlalchemy.Column('status', String),
-    sqlalchemy.Column('paymentId', String),
+    sqlalchemy.Column('payment_id', String),
     sqlalchemy.Column('documentProcessDate', String),
     sqlalchemy.Column('documentNumber', String),
     sqlalchemy.Column('description', String),
