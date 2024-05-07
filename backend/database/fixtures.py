@@ -22,5 +22,3 @@ def prepopulate_functions(target, connection, **kwargs):
 def init_db():
     event.listen(units, "after_create", prepopulate_units)
     event.listen(entity_or_function, "after_create", prepopulate_functions)
-
-    # metadata.create_all(engine)
