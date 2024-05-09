@@ -772,7 +772,7 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("operation", String),
     sqlalchemy.Column("tags", String),
     sqlalchemy.Column("comment", String),
-    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), index=True),
     sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("contract", Integer, ForeignKey("contracts.id")),
     sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
@@ -786,7 +786,7 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("sales_manager", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("sum", Float),
     sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
-    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("is_deleted", Boolean, index=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -796,7 +796,7 @@ docs_sales_tags = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
-    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("name", String, index=True),
 )
 
 docs_sales_goods = sqlalchemy.Table(
