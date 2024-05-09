@@ -1243,9 +1243,9 @@ amo_contacts = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("phone", String),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True),
     sqlalchemy.Column("formatted_phone", String),
-    sqlalchemy.Column("ext_id", Integer),
+    sqlalchemy.Column("ext_id", Integer, index=True),
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
     extend_existing=True
