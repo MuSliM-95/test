@@ -288,17 +288,24 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             docs_sales.c.is_deleted.is_(False)
         )
     )
-
     count_docs_sales = await database.fetch_val(count_query, column=0)
+
+    paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
+    paybox = await database.fetch_one(paybox_q)
+    paybox_id = None if not paybox else paybox.id
+
+    article_q = articles.select().where(articles.c.cashbox == user.cashbox_id, articles.c.name == "Продажи")
+    article_db = await database.fetch_one(article_q)
 
     for index, instance_values in enumerate(docs_sales_data.dict()["__root__"]):
         instance_values["created_by"] = user.id
         instance_values["sales_manager"] = user.id
         instance_values["is_deleted"] = False
         instance_values["cashbox"] = user.cashbox_id
+        instance_values["settings"] = await add_settings_docs_sales(instance_values.pop("settings", None))
 
-        paid_rubles = instance_values.pop("paid_rubles")
-        paid_lt = instance_values.pop("paid_lt")
+        paid_rubles = instance_values.pop("paid_rubles") if instance_values.pop("paid_rubles") else 0
+        paid_lt = instance_values.pop("paid_lt") if instance_values.pop("paid_lt") else 0
         lt = instance_values.pop("loyality_card_id")
 
         if not await check_period_blocked(
@@ -315,24 +322,18 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         del instance_values["client"]
 
-        if instance_values.get("number") is None:
+        if not instance_values.get("number"):
             instance_values["number"] = str(count_docs_sales + index + 1)
 
-        goods: Union[list, None] = instance_values.pop("goods", None)
         paybox = instance_values.pop('paybox', None)
-        if paybox is None:
-            paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
-            paybox = await database.fetch_one(paybox_q)
-            if paybox:
-                paybox = paybox.id
-
-        settings: Optional[Dict[str, Any]] = instance_values.pop("settings", None)
-        instance_values["settings"] = await add_settings_docs_sales(settings)
+        if not paybox:
+            if paybox_id:
+                paybox = paybox_id
 
         query = docs_sales.insert().values(instance_values)
         instance_id = await database.execute(query)
 
-        # Процесс разделения тегов(в другую таблицу), а также связывание лида с документом продажи при наличии нужного тега
+        # Процесс разделения тегов(в другую таблицу)
         tags = instance_values.pop("tags", "")
         if tags:
             tags_insert_list = []
@@ -347,6 +348,15 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         inserted_ids.add(instance_id)
         items_sum = 0
+
+        cashback_sum = 0
+
+        lcard = None
+        if lt:
+            lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
+            lcard = await database.fetch_one(lcard_q)
+
+        goods: Union[list, None] = instance_values.pop("goods", None)
         for item in goods:
             item["docs_sales_id"] = instance_id
             del item["nomenclature_name"]
@@ -372,7 +382,20 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                         continue
             query = docs_sales_goods.insert().values(item)
             await database.execute(query)
+
             items_sum += item["price"] * item["quantity"]
+
+            if lcard:
+                nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == item['nomenclature']))
+                if nomenclature_db:
+                    if nomenclature_db.cashback_percent:
+                        if nomenclature_db.cashback_percent != 0:
+                            cashback_sum += item["price"] * item["quantity"] * (nomenclature_db.cashback_percent / 100)
+                    else:
+                        cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                else:
+                    cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+
             if instance_values.get("warehouse") is not None:
                 query = (
                     warehouse_balances.select()
@@ -403,9 +426,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 await database.execute(query)
 
         if paid_rubles > 0:
-            article_q = articles.select().where(articles.c.cashbox == user.cashbox_id, articles.c.name == "Продажи")
-            article_db = await database.fetch_one(article_q)
-
             if article_db:
                 article_id = article_db.id
             else:
@@ -458,27 +478,30 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 }
             ))
 
-            if lt:
-                lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
-                lcard = await database.fetch_one(lcard_q)
-                rubles_body = {
-                    "loyality_card_id": lt,
-                    "loyality_card_number": lcard.card_number,
-                    "type": "accrual",
-                    "name": f"Кешбек по документу {instance_values['number']}",
-                    "amount": round((paid_rubles * (lcard.cashback_percent / 100)), 2),
-                    "created_by_id": user.id,
-                    "tags": tags,
-                    "card_balance": lcard.balance,
-                    "dated": datetime.datetime.now(),
-                    "cashbox": user.cashbox_id,
-                    "is_deleted": False,
-                    "created_at": datetime.datetime.now(),
-                    "updated_at": datetime.datetime.now(),
-                    "status": True,
-                }
-                lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-                await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
+            if lcard:
+                if cashback_sum > 0:
+                    calculated_share = paid_rubles / (paid_rubles + paid_lt)
+                    calculated_cashback_sum = round((calculated_share * cashback_sum), 2)
+
+                    if calculated_cashback_sum > 0:
+                        rubles_body = {
+                            "loyality_card_id": lt,
+                            "loyality_card_number": lcard.card_number,
+                            "type": "accrual",
+                            "name": f"Кешбек по документу {instance_values['number']}",
+                            "amount": calculated_cashback_sum,
+                            "created_by_id": user.id,
+                            "tags": tags,
+                            "card_balance": lcard.balance,
+                            "dated": datetime.datetime.now(),
+                            "cashbox": user.cashbox_id,
+                            "is_deleted": False,
+                            "created_at": datetime.datetime.now(),
+                            "updated_at": datetime.datetime.now(),
+                            "status": True,
+                        }
+                        lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
+                        await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
 
             await asyncio.gather(asyncio.create_task(raschet(user, token)))
 
