@@ -390,12 +390,17 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             if lcard:
                 nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == item['nomenclature']))
                 if nomenclature_db:
+                    print("1 ВАРИАНТ")
                     if nomenclature_db.cashback_percent:
+                        print("3 ВАРИАНТ")
                         if nomenclature_db.cashback_percent != 0:
+                            print("5 ВАРИАНТ")
                             cashback_sum += item["price"] * item["quantity"] * (nomenclature_db.cashback_percent / 100)
                     else:
+                        print("4 ВАРИАНТ")
                         cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
                 else:
+                    print("2 ВАРИАНТ")
                     cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
 
             if instance_values.get("warehouse") is not None:
