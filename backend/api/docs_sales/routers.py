@@ -328,8 +328,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             instance_values["number"] = str(count_docs_sales + index + 1)
 
         paybox = instance_values.pop('paybox', None)
-        if not paybox:
-            if paybox_id:
+        if paybox is None:
+            if paybox_id is not None:
                 paybox = paybox_id
 
         query = docs_sales.insert().values(instance_values)
@@ -390,8 +390,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             if lcard:
                 nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == item['nomenclature']))
                 if nomenclature_db:
-                    print(nomenclature_db.cashback_percent)
-                    if nomenclature_db.cashback_percent:
+                    if nomenclature_db.cashback_percent is not None:
                         if nomenclature_db.cashback_percent != 0:
                             cashback_sum += item["price"] * item["quantity"] * (nomenclature_db.cashback_percent / 100)
                     else:
