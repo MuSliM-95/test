@@ -304,6 +304,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         instance_values["cashbox"] = user.cashbox_id
         instance_values["settings"] = await add_settings_docs_sales(instance_values.pop("settings", None))
 
+        goods: Union[list, None] = instance_values.pop("goods", None)
+
         paid_rubles = instance_values.pop("paid_rubles")
         paid_lt = instance_values.pop("paid_lt")
         lt = instance_values.pop("loyality_card_id")
@@ -356,7 +358,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
             lcard = await database.fetch_one(lcard_q)
 
-        goods: Union[list, None] = instance_values.pop("goods", None)
+
         for item in goods:
             item["docs_sales_id"] = instance_id
             del item["nomenclature_name"]
