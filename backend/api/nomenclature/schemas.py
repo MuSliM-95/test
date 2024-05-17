@@ -18,6 +18,7 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
+    cashback_percent: Optional[int]
 
     class Config:
         orm_mode = True
