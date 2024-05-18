@@ -340,11 +340,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                         number_int = int(prev_number_docs_sales.number)
                     except:
                         number_int = 0
-                    instance_values["number"] = number_int + 1
+                    instance_values["number"] = str(number_int + 1)
                 else:
-                    instance_values["number"] = 1
+                    instance_values["number"] = "1"
             else:
-                instance_values["number"] = 1
+                instance_values["number"] = "1"
 
         paybox = instance_values.pop('paybox', None)
         if paybox is None:
