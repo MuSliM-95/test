@@ -336,7 +336,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             prev_number_docs_sales = await database.fetch_one(query)
             if prev_number_docs_sales:
                 if prev_number_docs_sales.number:
-                    instance_values["number"] = prev_number_docs_sales.number + 1
+                    try:
+                        number_int = int(prev_number_docs_sales.number)
+                    except:
+                        number_int = 0
+                    instance_values["number"] = number_int + 1
                 else:
                     instance_values["number"] = 1
             else:
