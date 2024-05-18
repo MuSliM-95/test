@@ -698,7 +698,8 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("field_id", Integer),
     sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
     sqlalchemy.Column("is_refresh", Boolean, server_default="false"),
-    sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id"))
+    sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("setup_custom_fields", Boolean, server_default="false")
 )
 
 amo_install_groups = sqlalchemy.Table(
@@ -1341,7 +1342,7 @@ amo_leads_docs_sales_mapping = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
-    sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False),
+    sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False, index=True),
     sqlalchemy.Column("table_status", SmallInteger),
     sqlalchemy.Column("is_sync", Boolean),
     sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
