@@ -328,8 +328,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             query = (
                 select(docs_sales.c.number)
                 .where(
-                    docs_sales.is_deleted == False,
-                    docs_sales.organization == instance_values["organization"]
+                    docs_sales.c.is_deleted == False,
+                    docs_sales.c.organization == instance_values["organization"]
                 )
                 .order_by(desc(docs_sales.c.created_at))
             )
