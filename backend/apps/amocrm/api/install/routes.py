@@ -38,6 +38,15 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
 
             field_id = await amo_crm_install.get_custom_contact_phone_field()
             account_info = await amo_crm_install.get_account_info()
+
+            setup_custom_fields = False
+            try:
+                await amo_crm_install.create_custom_fields_leads()
+                await amo_crm_install.create_custom_fields_contacts()
+                setup_custom_fields = True
+            except Exception as error:
+                print(f"{referer}: ОШИБКА ПРИ СОЗДАНИИ КАСТОМНЫХ ПОЛЕЙ {error}")
+
             values_dict = {
                 "code": code,
                 "referrer": referer,
@@ -51,6 +60,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
                 "field_id": field_id,
                 "active": True,
                 "from_widget": setting_info.id,
+                "setup_custom_fields": setup_custom_fields
             }
 
             query = amo_install_groups.select().where(amo_install_groups.c.referrer == referer)
