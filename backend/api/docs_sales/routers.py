@@ -325,7 +325,19 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         del instance_values["client"]
 
         if not instance_values.get("number"):
-            instance_values["number"] = str(count_docs_sales + index + 1)
+            query = (
+                select(docs_sales.c.number)
+                .where(
+                    docs_sales.is_deleted == False,
+                    docs_sales.organization == instance_values["organization"]
+                )
+                .order_by(desc(docs_sales.c.created_at))
+            )
+            prev_number_docs_sales = await database.fetch_one(query)
+            if prev_number_docs_sales:
+                instance_values["number"] = prev_number_docs_sales + 1
+            else:
+                instance_values["number"] = 1
 
         paybox = instance_values.pop('paybox', None)
         if paybox is None:
