@@ -699,7 +699,6 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
     sqlalchemy.Column("is_refresh", Boolean, server_default="false"),
     sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id")),
-    sqlalchemy.Column("setup_custom_fields", Boolean, server_default="false")
 )
 
 amo_install_groups = sqlalchemy.Table(
@@ -708,6 +707,7 @@ amo_install_groups = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("referrer", String),
     sqlalchemy.Column("pair_token", String),
+    sqlalchemy.Column("setup_custom_fields", Boolean, server_default="false")
 )
 
 amo_integrations = sqlalchemy.Table(

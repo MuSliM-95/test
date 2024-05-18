@@ -68,12 +68,21 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
 
             if amo_install_group_info:
                 amo_install_group = amo_install_group_info.id
+                query = (
+                    amo_install_groups.update()
+                    .where(amo_install_groups.c.id == amo_install_group_info.id)
+                    .values(
+                        setup_custom_fields=setup_custom_fields
+                    )
+                )
+                await database.execute(query)
             else:
                 query = (
                     amo_install_groups.insert()
                     .values(
                         referrer=referer,
                         pair_token=gen_token(),
+                        setup_custom_fields=setup_custom_fields
                     )
                     .returning(amo_install_groups.c.id))
                 amo_install_group_return = await database.fetch_one(query)
