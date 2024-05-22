@@ -130,11 +130,11 @@ async def get_generate_docs_by_filename(filename: str, type_doc: TypeDoc):
             if type_doc is TypeDoc.html:
 
                 return Response(content=body, media_type="text/html",
-                                headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+                                headers={'Content-Disposition': f'inline; filename="{filename}"'})
             if type_doc is TypeDoc.pdf:
 
                 return Response(content=body, media_type="application/pdf",
-                                headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+                                headers={'Content-Disposition': f'inline; filename="{filename}"'})
 
         except Exception as err:
             return HTTPException(status_code=404, detail="Такого документа не существует")
