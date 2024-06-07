@@ -48,7 +48,22 @@ class Contragent_types(str, ENUM):
     Supplier = "Поставщик"
     Buyer = "Покупатель"
 
+
 metadata = sqlalchemy.MetaData()
+
+
+evotor_credentials = sqlalchemy.Table(
+    "evotor_credentials",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key = True, index = True),
+    sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id"), nullable=True),
+    sqlalchemy.Column('evotor_token', String),
+    sqlalchemy.Column("userId", String),
+    sqlalchemy.Column("status", Boolean),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
 
 tochka_bank_credentials = sqlalchemy.Table(
     "tochka_bank_credentials",

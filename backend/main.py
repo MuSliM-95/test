@@ -1,7 +1,7 @@
 import json
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -14,6 +14,8 @@ from functions.users import get_user_id_cashbox_id_by_token
 from functions.events import write_event
 
 from starlette.types import Message
+
+from apps.evotor.routes import has_access
 
 from api.cashboxes.routers import router as cboxes_router
 from api.contragents.routers import router as contragents_router
@@ -62,6 +64,8 @@ from api.docs_generate.routers import router as doc_generate_router
 from api.webapp.routers import router as webapp_router
 from apps.tochka_bank.routes import router as tochka_router
 from api.reports.routers import router as reports_router
+from apps.evotor.routes import router_auth as evotor_router_auth
+from apps.evotor.routes import router as evotor_router
 
 
 sentry_sdk.init(
@@ -88,7 +92,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+app.include_router(evotor_router)
+app.include_router(evotor_router_auth)
 app.include_router(analytics_router)
 app.include_router(cboxes_router)
 app.include_router(contragents_router)
@@ -136,6 +141,7 @@ app.include_router(webapp_router)
 
 app.include_router(tochka_router)
 app.include_router(reports_router)
+
 
 
 @app.middleware("http")
