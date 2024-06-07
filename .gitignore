@@ -1,3 +1,10 @@
 /backend/photos/**
 /backend/.venv/**
 /backend/**/__pycache__
+/nginx/nginx.conf
+docker-compose.yml
+/nginx/localhost-key.pem
+/nginx/localhost.pem
+/nginx/Dockerfile
+docker-compose.dev.yml
+/backend/database/alembic/versions
