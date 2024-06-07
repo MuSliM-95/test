@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from database.db import database, loyality_cards, contragents, organizations, loyality_settings, users, users_cboxes_relation
 import api.loyality_cards.schemas as schemas
 from sqlalchemy import desc, or_
@@ -29,8 +29,9 @@ async def get_loyality_card_by_id(token: str, idx: int):
 
 
 @router.get("/loyality_cards/", response_model=schemas.CountRes)
-async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: schemas.LoyalityCardFilters = Depends()):
+async def get_cards(req: Request, token: str, limit: int = 100, offset: int = 0, filters_q: schemas.LoyalityCardFilters = Depends()):
     """Получение списка карт"""
+    print(req.headers)
     user = await get_user_by_token(token)
 
     filters = get_filters_cards(loyality_cards, filters_q)
