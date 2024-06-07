@@ -3,8 +3,9 @@
 /backend/**/__pycache__
 /nginx/nginx.conf
 docker-compose.yml
-/nginx/localhost-key.pem
-/nginx/localhost.pem
+/ssl/localhost-key.pem
+/ssl/localhost.pem
 /nginx/Dockerfile
 docker-compose.dev.yml
 /backend/database/alembic/versions
+/nginx/nginx.conf

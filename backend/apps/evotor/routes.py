@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from .schemas import EvotorInstallEvent, EvotorUserToken
+from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from database.db import database, integrations, integrations_to_cashbox, evotor_credentials
 from functions.helpers import get_user_by_token
@@ -25,6 +25,11 @@ async def has_access(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 router_auth = APIRouter(tags=["Evotor hook"], dependencies = [Depends(has_access)])
 router = APIRouter(tags=["Evotor hook"])
+
+
+@router_auth.post("/evotor/nomenclature")
+async def events(data: ListEvotorNomenclature, req: Request):
+    print(data, req.headers)
 
 
 @router_auth.post("/evotor/events")
@@ -163,3 +168,5 @@ async def check(token: str, id_integration: int):
         message.update({'integration_isAuth': False})
     await manager.send_message(user.token, message)
     return {"isAuth": message.get('integration_isAuth')}
+
+
