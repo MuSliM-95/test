@@ -200,19 +200,23 @@ async def install(token: str, evotor_token: str, id_integration: int):
 
 @router.get("/evotor/stores")
 async def stores(token: str, id_integration: int):
-    user = await get_user_by_token(token)
-    token = await get_token_evotor(cashbox_id = user.get("id"), integration_id=id_integration)
-    async with aiohttp.ClientSession(trust_env=True) as session:
-        async with session.get(
-                f'https://api.evotor.ru/stores',
-                headers={
-                    'Authorization': f'{token}',
-                    # "Accept": "application/vnd.evotor.v2+json",
-                    "Content-Type": "application/vnd.evotor.v2+json",
-                }) as resp:
-            stores =  resp.status
-        await session.close()
-    return stores
+    try:
+        user = await get_user_by_token(token)
+        token = await get_token_evotor(cashbox_id = user.get("id"), integration_id=id_integration)
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            async with session.get(
+                    f'https://api.evotor.ru/stores',
+                    headers={
+                        'Authorization': f'{token}',
+                        # "Accept": "application/vnd.evotor.v2+json",
+                        "Content-Type": "application/vnd.evotor.v2+json",
+                    }) as resp:
+                stores =  await resp.json()
+            await session.close()
+        return stores
+    except Exception as e:
+        raise HTTPException(status_code=432, detail=str(e))
+
 
 
 @router.get("/evotor/integration/check")
