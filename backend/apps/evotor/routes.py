@@ -8,9 +8,28 @@ from functions.helpers import get_user_by_token
 from ws_manager import manager
 from sqlalchemy import or_, and_, select
 from api.loyality_cards.schemas import LoyalityCardFilters
+import aiohttp
 
 
 security = HTTPBearer()
+
+
+async def get_token_evotor(cashbox_id: int, integration_id: int ):
+    query = (select(integrations_to_cashbox.c.id, evotor_credentials.c.evotor_token).
+             where(
+        and_(
+            integrations_to_cashbox.c.installed_by == cashbox_id,
+            integrations_to_cashbox.c.integration_id == integration_id
+            )).
+            select_from(integrations_to_cashbox).
+            join(evotor_credentials, evotor_credentials.c.integration_cashboxes == integrations_to_cashbox.c.id)
+    )
+    result = await database.fetch_one(query)
+    if result:
+        return result.get("evotor_token")
+    else:
+        raise HTTPException(status_code=432, detail="у пользователя нет токена Эвотор")
+
 
 
 async def has_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -162,7 +181,7 @@ async def install(token: str, evotor_token: str, id_integration: int):
             integrations_to_cashbox.c.integration_id == id_integration,
             integrations_to_cashbox.c.installed_by == user.id)))
 
-        await database.execute(evotor_credentials.
+        status = await database.execute(evotor_credentials.
                                update().
                                where(evotor_credentials.c.evotor_token == evotor_token).
                                values(
@@ -171,8 +190,29 @@ async def install(token: str, evotor_token: str, id_integration: int):
                 "status": True
             }
         ))
+        if status:
+            print(status)
+        else:
+            raise HTTPException(status_code=422, detail="приложение не установлено в Эвотор")
     except:
         raise HTTPException(status_code=422, detail = "приложение не установлено в Эвотор")
+
+
+@router.get("/evotor/stores")
+async def stores(token: str, id_integration: int):
+    user = await get_user_by_token(token)
+    token = await get_token_evotor(cashbox_id = user.get("id"), integration_id=id_integration)
+    async with aiohttp.ClientSession(trust_env=True) as session:
+        async with session.get(
+                f'https://api.evotor.ru/stores',
+                headers={
+                    'Authorization': f'{token}',
+                    # "Accept": "application/vnd.evotor.v2+json",
+                    "Content-Type": "application/vnd.evotor.v2+json",
+                }) as resp:
+            stores =  resp.status
+        await session.close()
+    return stores
 
 
 @router.get("/evotor/integration/check")
