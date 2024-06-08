@@ -1,10 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
+
+from api.loyality_cards.routers import get_cards
 from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from database.db import database, integrations, integrations_to_cashbox, evotor_credentials
+from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, users_cboxes_relation
 from functions.helpers import get_user_by_token
 from ws_manager import manager
 from sqlalchemy import or_, and_, select
+from api.loyality_cards.schemas import LoyalityCardFilters
 
 
 security = HTTPBearer()
@@ -21,6 +24,25 @@ async def has_access(credentials: HTTPAuthorizationCredentials = Depends(securit
     except AssertionError as e:
         raise HTTPException(
             status_code=401, detail=str(e))
+
+
+async def has_user(req: Request):
+    try:
+        evotor_user_id = req.headers.get("x-evotor-user-id")
+
+        user_cashbox = await database.fetch_one(
+            select(evotor_credentials.c.userId,integrations_to_cashbox.c.token).
+            select_from(evotor_credentials).
+            join(integrations_to_cashbox, evotor_credentials.c.integration_cashboxes == integrations_to_cashbox.c.id).
+            where(evotor_credentials.c.userId == evotor_user_id)
+        )
+        print(user_cashbox)
+        if user_cashbox:
+            return user_cashbox.get("token")
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=432, detail="ошибка аутентификации пользователя Эвотор (неверный userId)")
+
 
 
 router_auth = APIRouter(tags=["Evotor hook"], dependencies = [Depends(has_access)])
@@ -51,6 +73,15 @@ async def user_token(data: EvotorUserToken, req: Request):
                                update().
                                where(evotor_credentials.c.id == credential_check.get("id")).
                                values({"evotor_token": data.evotor_token}))
+
+
+@router_auth.post("/evotor/loyality_cards/")
+async def loyality_cards(
+        limit: int = 100,
+        offset: int = 0,
+        filters_q: LoyalityCardFilters = Depends(),
+        token: str = Depends(has_user)):
+    return await get_cards(token=token, limit=limit, offset=offset, filters_q=filters_q)
 
 
 @router.get("/evotor/integration/on")
@@ -88,14 +119,20 @@ async def integration_on(token: str, id_integration: int):
     except:
         raise HTTPException(status_code = 422, detail = "ошибка установки связи аккаунта пользователя и интеграции")
 
-
+@database.transaction()
 @router.get("/evotor/integration/off")
 async def integration_off(token: str, id_integration: int):
 
     """Удаление связи аккаунта пользователя и интеграции"""
 
     user = await get_user_by_token(token)
+
     try:
+        integration_cashbox = await database.fetch_one(integrations_to_cashbox.select().where(and_(
+            integrations_to_cashbox.c.integration_id == id_integration,
+            integrations_to_cashbox.c.installed_by == user.id
+        )))
+
         await database.execute(integrations_to_cashbox.update().where(and_(
             integrations_to_cashbox.c.integration_id == id_integration,
             integrations_to_cashbox.c.installed_by == user.id
@@ -103,11 +140,17 @@ async def integration_off(token: str, id_integration: int):
             'status': False
         }))
 
+        await database.execute(evotor_credentials.
+                               update().
+                               where(evotor_credentials.c.integration_cashboxes == integration_cashbox.get("id")).
+                               values({"status": False}))
+
         await manager.send_message(user.token,
                                     {"action": "off", "target": "IntegrationEvotor", "integration_status": False})
 
         return {'isAuth': False}
-    except:
+    except Exception as e:
+        print(e)
         raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")
 
 @database.transaction()
