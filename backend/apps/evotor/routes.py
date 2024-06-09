@@ -78,6 +78,11 @@ async def events(data: EvotorInstallEvent, req: Request):
     print(data, req.headers)
 
 
+@router.put("/evotor/events")
+async def events(req: Request):
+    print(await req.json(), req.headers)
+
+
 @router_auth.post("/evotor/user/token")
 async def user_token(data: EvotorUserToken, req: Request):
     credential_check = await database.fetch_one(evotor_credentials.
@@ -94,7 +99,7 @@ async def user_token(data: EvotorUserToken, req: Request):
                                values({"evotor_token": data.evotor_token}))
 
 
-@router_auth.post("/evotor/loyality_cards/")
+@router_auth.get("/evotor/loyality_cards/")
 async def loyality_cards(
         limit: int = 100,
         offset: int = 0,
