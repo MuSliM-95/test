@@ -1129,7 +1129,7 @@ loyality_transactions = sqlalchemy.Table(
     sqlalchemy.Column("dated", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("amount", Float),
     sqlalchemy.Column("loyality_card_id", ForeignKey("loyality_cards.id"), index=True),
-    sqlalchemy.Column("loyality_card_number", Integer),
+    sqlalchemy.Column("loyality_card_number", BigInteger),
     sqlalchemy.Column("created_by_id", ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("card_balance", Float),
     sqlalchemy.Column("docs_sales_id", ForeignKey("docs_sales.id")),

@@ -376,6 +376,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         if lt:
             lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
             lcard = await database.fetch_one(lcard_q)
+            print(dict(lcard))
 
 
         for item in goods:
@@ -498,7 +499,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "delinked": False,
                 }
             ))
-
             if lcard:
                 if cashback_sum > 0:
                     calculated_share = paid_rubles / (paid_rubles + paid_lt)
@@ -521,16 +521,17 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                             "updated_at": datetime.datetime.now(),
                             "status": True,
                         }
+
                         lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
+
                         await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
 
             await asyncio.gather(asyncio.create_task(raschet(user, token)))
-
         if lt:
             if paid_lt > 0:
                 paybox_q = loyality_cards.select().where(loyality_cards.c.id == lt)
                 payboxes = await database.fetch_one(paybox_q)
-
+                print("loyality_transactions insert")
                 rubles_body = {
                     "loyality_card_id": lt,
                     "loyality_card_number": payboxes.card_number,
@@ -547,13 +548,15 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                     "updated_at": datetime.datetime.now(),
                     "status": True,
                 }
+                print("loyality_transactions insert")
                 lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
+                print("loyality_transactions insert")
                 await database.execute(
                     loyality_cards.update() \
                         .where(loyality_cards.c.card_number == payboxes.card_number) \
                         .values({"balance": loyality_cards.c.balance - paid_lt})
                 )
-
+                print("loyality_transactions update")
                 await database.execute(entity_to_entity.insert().values(
                     {
                         "from_entity": 7,
