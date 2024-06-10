@@ -1,13 +1,16 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from api.loyality_cards.routers import get_cards
+from api.docs_sales.routers import create as createDocSales
+from api.nomenclature.routers import new_nomenclature
 from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, users_cboxes_relation
+from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, warehouses, users_cboxes_relation, nomenclature
 from functions.helpers import get_user_by_token
 from ws_manager import manager
 from sqlalchemy import or_, and_, select
 from api.loyality_cards.schemas import LoyalityCardFilters
+from api.docs_sales.schemas import CreateMass as CreateMassDocSales, Create
 import aiohttp
 
 
@@ -31,13 +34,13 @@ async def get_token_evotor(cashbox_id: int, integration_id: int ):
         raise HTTPException(status_code=432, detail="у пользователя нет токена Эвотор")
 
 
-
 async def has_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     try:
         token_db = await database.fetch_one(integrations.select().where(integrations.c.id == 2))
         if token_db:
-            assert token == token_db.get("client_secret")
+            if token != token_db.get("client_secret"):
+                raise AssertionError("not found integration")
         else:
             raise AssertionError("not found integration")
     except AssertionError as e:
@@ -47,21 +50,48 @@ async def has_access(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 async def has_user(req: Request):
     try:
+        await database.connect()
         evotor_user_id = req.headers.get("x-evotor-user-id")
-
         user_cashbox = await database.fetch_one(
-            select(evotor_credentials.c.userId,integrations_to_cashbox.c.token).
+            select(evotor_credentials.c.userId, users_cboxes_relation.c.token).
             select_from(evotor_credentials).
             join(integrations_to_cashbox, evotor_credentials.c.integration_cashboxes == integrations_to_cashbox.c.id).
+            join(users_cboxes_relation, integrations_to_cashbox.c.installed_by == users_cboxes_relation.c.id).
             where(evotor_credentials.c.userId == evotor_user_id)
         )
-        print(user_cashbox)
         if user_cashbox:
             return user_cashbox.get("token")
+        else:
+            raise Exception("not found")
     except Exception as e:
-        print(e)
-        raise HTTPException(status_code=432, detail="ошибка аутентификации пользователя Эвотор (неверный userId)")
+        raise HTTPException(status_code=432, detail=f"ошибка аутентификации пользователя Эвотор (неверный userId) {e}")
 
+
+async def has_store(req: Request):
+    try:
+        evotor_store_id = req.headers.get("x-evotor-store-uuid")
+        token = req.query_params.get("token")
+        if evotor_store_id:
+            warehouse_db = await database.fetch_one(
+                warehouses.select().where(warehouses.c.external_id == evotor_store_id)
+            )
+            if warehouse_db:
+                return warehouse_db.get("id")
+            else:
+                user = await get_user_by_token(token)
+                warehouse_id = await database.execute(
+                    warehouses.insert().values(
+                        {
+                            "owner": user.get("id"),
+                            "external_id": evotor_store_id,
+                            "status": True,
+                            "name": evotor_store_id
+                        }
+                    )
+                )
+                return warehouse_id
+    except Exception as e:
+        raise HTTPException(status_code=432, detail=f"ошибка: {str(e)}")
 
 
 router_auth = APIRouter(tags=["Evotor hook"], dependencies = [Depends(has_access)])
@@ -99,13 +129,44 @@ async def user_token(data: EvotorUserToken, req: Request):
                                values({"evotor_token": data.evotor_token}))
 
 
-@router_auth.get("/evotor/loyality_cards/")
+@router_auth.get("/evotor/loyality_cards/", dependencies = [Depends(has_store)])
 async def loyality_cards(
         limit: int = 100,
         offset: int = 0,
         filters_q: LoyalityCardFilters = Depends(),
         token: str = Depends(has_user)):
     return await get_cards(token=token, limit=limit, offset=offset, filters_q=filters_q)
+
+
+@router_auth.post("/evotor/docs_sales/")
+async def create_doc_sales(
+        docs_sales_data: CreateMassDocSales,
+        generate_out: bool = True,
+        token: str = Depends(has_user),
+        warehouse_id: int = Depends(has_store)):
+    try:
+        docs_data = []
+        doc_goods_data = []
+        for item in docs_sales_data.__getattribute__("__root__"):
+            item = dict(item)
+            # for good in item.get("goods"):
+            #     if good.get("nomenclature"):
+            #         good_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.external_id == good.get("nomenclature")))
+            #         if good_db:
+            #             doc_goods_data.append(good)
+            #         else:
+            #             good_id = await new_nomenclature(token, nomenclature_data = [])
+            item.update({"goods": doc_goods_data})
+            item.update({"warehouse": warehouse_id})
+            docs_data.append(Create(**item))
+
+        return await createDocSales(
+            token=token,
+            docs_sales_data = CreateMassDocSales(
+                __root__ = docs_data),
+            generate_out = generate_out)
+    except Exception as e:
+        raise HTTPException(status_code = 432, detail = f"ошибка создания документы продажи")
 
 
 @router.get("/evotor/integration/on")
@@ -143,6 +204,7 @@ async def integration_on(token: str, id_integration: int):
     except:
         raise HTTPException(status_code = 422, detail = "ошибка установки связи аккаунта пользователя и интеграции")
 
+
 @database.transaction()
 @router.get("/evotor/integration/off")
 async def integration_off(token: str, id_integration: int):
@@ -176,6 +238,7 @@ async def integration_off(token: str, id_integration: int):
     except Exception as e:
         print(e)
         raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")
+
 
 @database.transaction()
 @router.get("/evotor/integration/install")
@@ -213,15 +276,14 @@ async def stores(token: str, id_integration: int):
                     f'https://api.evotor.ru/stores',
                     headers={
                         'Authorization': f'{token}',
-                        # "Accept": "application/vnd.evotor.v2+json",
+                        "Accept": "application/vnd.evotor.v2+json",
                         "Content-Type": "application/vnd.evotor.v2+json",
                     }) as resp:
-                stores =  await resp.json()
+                stores = await resp.json()
             await session.close()
         return stores
     except Exception as e:
         raise HTTPException(status_code=432, detail=str(e))
-
 
 
 @router.get("/evotor/integration/check")

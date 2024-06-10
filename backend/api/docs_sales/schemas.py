@@ -105,7 +105,7 @@ class ViewInList(BaseModel):
     client: Optional[int]
     contragent: Optional[int]
     contract: Optional[int]
-    organization: int
+    organization: Optional[int]
     warehouse: Optional[int]
     autorepeat: Optional[bool]
     settings: Optional[Settings]
