@@ -36,6 +36,7 @@ async def get_token_evotor(cashbox_id: int, integration_id: int ):
 
 async def has_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
+    print(token, credentials)
     try:
         token_db = await database.fetch_one(integrations.select().where(integrations.c.id == 2))
         if token_db:
@@ -67,10 +68,9 @@ async def has_user(req: Request):
         raise HTTPException(status_code=432, detail=f"ошибка аутентификации пользователя Эвотор (неверный userId) {e}")
 
 
-async def has_store(req: Request):
+async def has_store(req: Request, token: str = Depends(has_user)):
     try:
         evotor_store_id = req.headers.get("x-evotor-store-uuid")
-        token = req.query_params.get("token")
         if evotor_store_id:
             warehouse_db = await database.fetch_one(
                 warehouses.select().where(warehouses.c.external_id == evotor_store_id)
@@ -135,6 +135,7 @@ async def loyality_cards(
         offset: int = 0,
         filters_q: LoyalityCardFilters = Depends(),
         token: str = Depends(has_user)):
+
     return await get_cards(token=token, limit=limit, offset=offset, filters_q=filters_q)
 
 
@@ -166,6 +167,7 @@ async def create_doc_sales(
                 __root__ = docs_data),
             generate_out = generate_out)
     except Exception as e:
+        print(e)
         raise HTTPException(status_code = 432, detail = f"ошибка создания документы продажи")
 
 
