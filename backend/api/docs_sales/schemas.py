@@ -1,7 +1,7 @@
 from enum import Enum
 
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from database.enums import Repeatability
 
@@ -16,7 +16,7 @@ class Item(BaseModel):
     discount: Optional[float]
     sum_discounted: Optional[float]
     status: Optional[str]
-    nomenclature: int
+    nomenclature: Optional[Union[int, str]]
     nomenclature_name: Optional[str]
 
 
