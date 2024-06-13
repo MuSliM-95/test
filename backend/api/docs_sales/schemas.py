@@ -16,7 +16,7 @@ class Item(BaseModel):
     discount: Optional[float]
     sum_discounted: Optional[float]
     status: Optional[str]
-    nomenclature: Optional[Union[int, str]]
+    nomenclature: Union[str, int]
     nomenclature_name: Optional[str]
 
 

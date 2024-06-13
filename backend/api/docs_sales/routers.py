@@ -376,8 +376,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         if lt:
             lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
             lcard = await database.fetch_one(lcard_q)
-            print(dict(lcard))
-
 
         for item in goods:
             item["docs_sales_id"] = instance_id

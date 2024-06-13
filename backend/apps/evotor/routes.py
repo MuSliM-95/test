@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from api.loyality_cards.routers import get_cards
 from api.docs_sales.routers import create as createDocSales
 from api.nomenclature.routers import new_nomenclature
+from api.nomenclature.schemas import NomenclatureCreateMass
 from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, warehouses, users_cboxes_relation, nomenclature
@@ -141,22 +142,49 @@ async def loyality_cards(
 
 @router_auth.post("/evotor/docs_sales/")
 async def create_doc_sales(
+        req: Request,
         docs_sales_data: CreateMassDocSales,
         generate_out: bool = True,
         token: str = Depends(has_user),
-        warehouse_id: int = Depends(has_store)):
+        warehouse_id: int = Depends(has_store),
+        ):
     try:
         docs_data = []
         doc_goods_data = []
         for item in docs_sales_data.__getattribute__("__root__"):
             item = dict(item)
-            # for good in item.get("goods"):
-            #     if good.get("nomenclature"):
-            #         good_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.external_id == good.get("nomenclature")))
-            #         if good_db:
-            #             doc_goods_data.append(good)
-            #         else:
-            #             good_id = await new_nomenclature(token, nomenclature_data = [])
+            for good in item.get("goods"):
+                print(good)
+                if good.nomenclature:
+                    good_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.external_id == good.nomenclature))
+                    if good_db:
+                        print(good_db)
+                        good.nomenclature = good_db.get("id")
+                        doc_goods_data.append(good)
+                    else:
+                        user = await get_user_by_token(token)
+                        token_evotor = await get_token_evotor(cashbox_id = user.get("id"), integration_id = 2)
+                        async with aiohttp.ClientSession(trust_env = True) as session:
+                            async with session.get(
+                                    f'https://api.evotor.ru/stores/'
+                                    f'{req.headers.get("x-evotor-store-uuid")}'
+                                    f'/products/'
+                                    f'{good.nomenclature}',
+                                    headers = {
+                                        'Authorization': f'{token_evotor}',
+                                        "Accept": "application/vnd.evotor.v2+json",
+                                        "Content-Type": "application/vnd.evotor.v2+json",
+                                    }) as resp:
+                                product = await resp.json()
+                            await session.close()
+                        print(product)
+                        good_id = await new_nomenclature(token, nomenclature_data = NomenclatureCreateMass(
+                            __root__ = [
+                                {"name": product.get("name"), "unit": 116, "external_id": good.nomenclature}
+                            ]))
+                        good.nomenclature = good_id[0].get("id")
+                        doc_goods_data.append(good)
+
             item.update({"goods": doc_goods_data})
             item.update({"warehouse": warehouse_id})
             docs_data.append(Create(**item))
