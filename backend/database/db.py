@@ -1410,4 +1410,4 @@ engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
 engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)
 
 async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL_ASYNC)
-async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session_maker = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
