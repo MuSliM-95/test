@@ -504,14 +504,14 @@ class AutoRepeat:
             query = (
                 entity_to_entity.insert()
                 .values({
-                        "from_entity": 7,
-                        "to_entity": 5,
-                        "cashbox_id": self.doc.cashbox,
-                        "type": "docs_sales_payments",
-                        "from_id": created_doc_id,
-                        "to_id": payment_id,
-                        "status": True,
-                        "delinked": False,
+                    "from_entity": 7,
+                    "to_entity": 5,
+                    "cashbox_id": self.doc.cashbox,
+                    "type": "docs_sales_payments",
+                    "from_id": created_doc_id,
+                    "to_id": payment_id,
+                    "status": True,
+                    "delinked": False,
                 })
             )
             await self.session.execute(query)

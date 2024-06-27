@@ -2,6 +2,7 @@ from typing import Union, Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import desc, func, and_, select
+from sqlalchemy.dialects import postgresql
 
 from database.db import (
     database,
@@ -178,6 +179,10 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
 
     query = query.filter(and_(*filter_list))
+
+    compiled_query = query.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
+    print(str(compiled_query))
+
     count_query = count_query.filter(and_(*filter_list))
 
     items_db = await database.fetch_all(query)
