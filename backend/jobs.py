@@ -402,6 +402,7 @@ class AutoRepeat:
         for item in docs_sales_goods_list:
             item = goods_schema.parse_obj(item).dict()
             item["docs_sales_id"] = created_doc_id
+            item["nomenclature"] = int(item["nomenclature"])
             item.pop("id", None)
             item.pop("nomenclature_name", None)
             item.pop("unit_name", None)
