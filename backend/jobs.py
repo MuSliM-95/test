@@ -578,7 +578,7 @@ async def autorepeat():
         docs_sales_list = result.fetchall()
         print(docs_sales_list)
     for doc in docs_sales_list:
-        print(doc)
+        print(doc.id)
         async with async_session_maker() as session:
             autorepeat_doc = AutoRepeat(doc=doc, session=session, date_now=date_now)
             await autorepeat_doc.get_last_created_at()
