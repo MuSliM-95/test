@@ -338,21 +338,21 @@ class AutoRepeat:
             .where(docs_sales_goods.c.docs_sales_id == self.doc.id)
         )
         result = await self.session.execute(goods_query)
-        docs_sales_goods_list = result.scalars().fetchall()
+        docs_sales_goods_list = result.fetchall()
 
         payment_query = (
             payments.select()
             .where(payments.c.docs_sales_id == self.doc.id)
         )
         result = await self.session.execute(payment_query)
-        payment_list = result.scalars().fetchall()
+        payment_list = result.fetchall()
 
         docs_warehouses_query = (
             docs_warehouse.select()
             .where(docs_warehouse.c.docs_sales_id == self.doc.id)
         )
         result = await self.session.execute(docs_warehouses_query)
-        docs_warehouse_list = result.scalars().fetchall()
+        docs_warehouse_list = result.fetchall()
 
         count_docs_sales = await self.get_count_docs_sales(cashbox_id=self.doc.cashbox)
         count_docs_warehouses = await self.get_count_docs_warehouses(cashbox_id=self.doc.cashbox)
