@@ -575,7 +575,7 @@ async def autorepeat():
             .join(docs_sales_settings, docs_sales.c.settings == docs_sales_settings.c.id)
         )
         result = await session.execute(query)
-        docs_sales_list = result.scalars().fetchall()
+        docs_sales_list = result.fetchall()
         print(docs_sales_list)
     for doc in docs_sales_list:
         print(doc)
