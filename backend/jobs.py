@@ -331,7 +331,7 @@ class AutoRepeat:
             .where(users_cboxes_relation.c.id == self.doc.created_by)
         )
         result = await self.session.execute(user_query)
-        user = result.scalar()
+        user = result.fetchone()
 
         goods_query = (
             docs_sales_goods.select()
@@ -421,7 +421,7 @@ class AutoRepeat:
                     .order_by(desc(warehouse_balances.c.created_at))
                 )
                 result = await self.session.execute(query)
-                last_warehouse_balance = result.scalar()
+                last_warehouse_balance = result.fetchone()
                 warehouse_amount = (
                     last_warehouse_balance.current_amount
                     if last_warehouse_balance
@@ -447,7 +447,7 @@ class AutoRepeat:
                     .where(nomenclature.c.id == item["nomenclature"])
                 )
                 result = await self.session.execute(query)
-                nomenclature_db = result.scalar()
+                nomenclature_db = result.fetchone()
 
                 if nomenclature_db.type == "product":
                     goods_res.append(
