@@ -861,6 +861,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         except HTTPException as e:
                             exceptions.append(str(item) + " " + e.detail)
                             continue
+                item["nomenclature"] = int(item["nomenclature"])
                 query = docs_sales_goods.insert().values(item)
                 await database.execute(query)
                 items_sum += item["price"] * item["quantity"]
