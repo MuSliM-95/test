@@ -12,6 +12,7 @@ from ws_manager import manager
 from sqlalchemy import or_, and_, select
 from api.loyality_cards.schemas import LoyalityCardFilters
 from api.docs_sales.schemas import CreateMass as CreateMassDocSales, Create
+from api.loyality_settings.routers import get_loyality_settings
 import aiohttp
 
 
@@ -138,6 +139,13 @@ async def loyality_cards(
         token: str = Depends(has_user)):
 
     return await get_cards(token=token, limit=limit, offset=offset, filters_q=filters_q)
+
+
+@router_auth.get("/evotor/loyality_settings/")
+async def loyality_cards(
+        token: str = Depends(has_user)):
+
+    return await get_loyality_settings(token=token)
 
 
 @router_auth.post("/evotor/docs_sales/")
