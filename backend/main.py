@@ -66,6 +66,7 @@ from apps.tochka_bank.routes import router as tochka_router
 from api.reports.routers import router as reports_router
 from apps.evotor.routes import router_auth as evotor_router_auth
 from apps.evotor.routes import router as evotor_router
+from apps.module_bank.routes import router as module_bank_router
 
 
 sentry_sdk.init(
@@ -141,6 +142,8 @@ app.include_router(webapp_router)
 
 app.include_router(tochka_router)
 app.include_router(reports_router)
+
+app.include_router(module_bank_router)
 
 
 

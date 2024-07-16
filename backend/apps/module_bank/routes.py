@@ -2,11 +2,13 @@ from datetime import datetime
 
 import aiohttp
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import and_
 from starlette.responses import RedirectResponse
 
 from apps.tochka_bank.routes import integration_info
-from database.db import database, pboxes, module_bank_credentials, module_bank_accounts
+from database.db import database, pboxes, module_bank_credentials, module_bank_accounts, integrations_to_cashbox
 from functions.helpers import get_user_by_token
+from ws_manager import manager
 
 router = APIRouter(tags=["Module bank"])
 
@@ -136,3 +138,63 @@ async def get_token_for_scope(token: str, id_integration: int):
            f'state={user.get("cashbox_id")}'
 
     return {'link': link}
+
+
+@router.get("/module_bank/integration_on")
+async def integration_on(token: str, id_integration: int):
+
+    """Установка связи аккаунта пользователя и интеграции"""
+
+    user = await get_user_by_token(token)
+
+    try:
+        check = await database.fetch_one(integrations_to_cashbox.select().where(and_(
+            integrations_to_cashbox.c.integration_id == id_integration,
+            integrations_to_cashbox.c.installed_by == user.id
+        )))
+        if check:
+            await database.execute(integrations_to_cashbox.update().where(and_(
+                integrations_to_cashbox.c.integration_id == id_integration,
+                integrations_to_cashbox.c.installed_by == user.id
+            )).values({'status': True}))
+        else:
+            await database.execute(integrations_to_cashbox.insert().values({
+                'integration_id': id_integration,
+                'installed_by': user.get('id'),
+                'deactivated_by': user.get('id'),
+                'status': True,
+            }))
+
+        await manager.send_message(user.token,
+                                    {"action": "on",
+                                     "target": "IntegrationModuleBank",
+                                     "integration_status": True,
+                                     "integration_isAuth": True
+                                     })
+        return {'result': 'ok'}
+    except:
+        raise HTTPException(status_code = 422, detail = "ошибка установки связи аккаунта пользователя и интеграции")
+
+
+@router.get("/module_bank/integration_off")
+async def integration_off(token: str, id_integration: int):
+
+    """Удаление связи аккаунта пользователя и интеграции"""
+
+    user = await get_user_by_token(token)
+    try:
+        await database.execute(integrations_to_cashbox.update().where(and_(
+            integrations_to_cashbox.c.integration_id == id_integration,
+            integrations_to_cashbox.c.installed_by == user.id
+        )).values({
+            'status': False
+        }))
+
+        await manager.send_message(user.token,
+                                    {"action": "off",
+                                     "target": "IntegrationTochkaBank",
+                                     "integration_status": False})
+
+        return {'isAuth': False}
+    except:
+        raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")

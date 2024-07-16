@@ -31,7 +31,7 @@ from database.db import engine, accounts_balances, database, tariffs, payments, 
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
     docs_sales_goods, docs_sales_tags, docs_warehouse, nomenclature, SQLALCHEMY_DATABASE_URL, async_session_maker, \
-    module_bank_operations
+    module_bank_operations, module_bank_accounts, module_bank_credentials
 from database.enums import Repeatability
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
@@ -1057,23 +1057,23 @@ async def tochka_update_transaction():
 # async def module_bank_update_transaction():
 #     async with async_session_maker() as session:
 #         query = (
-#             select(tochka_bank_accounts.c.accountId,
-#                    tochka_bank_accounts.c.registrationDate,
-#                    tochka_bank_credentials.c.access_token,
+#             select(module_bank_accounts.c.accountId,
+#                    module_bank_accounts.c.beginDate,
+#                    module_bank_credentials.c.access_token,
 #                    pboxes.c.id.label("pbox_id"),
 #                    users_cboxes_relation.c.token,
 #                    pboxes.c.cashbox.label("cashbox_id")
 #                    ).
 #             where(
 #                 and_(
-#                     tochka_bank_accounts.c.is_active == True,
-#                     tochka_bank_accounts.c.is_deleted == False
+#                     module_bank_accounts.c.is_active == True,
+#                     module_bank_accounts.c.is_deleted == False
 #                 )
 #             ).
-#             select_from(tochka_bank_accounts).
-#             join(tochka_bank_credentials,
-#                  tochka_bank_credentials.c.id == tochka_bank_accounts.c.tochka_bank_credential_id).
-#             join(pboxes, pboxes.c.id == tochka_bank_accounts.c.payboxes_id).
+#             select_from(module_bank_accounts).
+#             join(module_bank_credentials,
+#                  module_bank_credentials.c.id == module_bank_accounts.c.module_bank_credential_id).
+#             join(pboxes, pboxes.c.id == module_bank_accounts.c.payboxes_id).
 #             join(users_cboxes_relation, users_cboxes_relation.c.id == pboxes.c.cashbox)
 #         )
 #     result = await session.execute(query)
@@ -1081,9 +1081,9 @@ async def tochka_update_transaction():
 #     for account in active_accounts_with_credentials:
 #         async with aiohttp.ClientSession(trust_env=True) as http_session:
 #             async with http_session.get(
-#                     f'https://api.modulbank.ru/v1/account-info/balance/{account.get("accountId")}',
+#                     f'https://api.modulbank.ru/v1/account-info/balance/{account.accountId}',
 #                     headers={
-#                         'Authorization': f'Bearer {account.get("access_token")}',
+#                         'Authorization': f'Bearer {account.access_token}',
 #                         'Content-type': 'application/json'
 #                     }) as resp:
 #                 balance_json = await resp.json()
@@ -1093,7 +1093,7 @@ async def tochka_update_transaction():
 #
 #         query = (
 #             pboxes.update()
-#             .where(pboxes.c.id == account.get('pbox_id'))
+#             .where(pboxes.c.id == account.pbox_id)
 #             .values(
 #                 {
 #                     'balance': balance_json,
@@ -1109,14 +1109,14 @@ async def tochka_update_transaction():
 #         while True:
 #             async with aiohttp.ClientSession(trust_env=True) as http_session:
 #                 async with http_session.post(
-#                         f'https://api.modulbank.ru/v1/operation-history/{account.get("accountId")}',
+#                         f'https://api.modulbank.ru/v1/operation-history/{account.accountId}',
 #                         headers={
-#                             'Authorization': f'Bearer {account.get("access_token")}',
+#                             'Authorization': f'Bearer {account.access_token}',
 #                             'Content-type': 'application/json'
 #                         },
 #                         json={
 #                         "statuses": ["Executed"],
-#                         "from": f"{account.get('beginDate')}Z",
+#                         "from": f"{account.beginDate}Z",
 #                         "till": (datetime.now().date() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'),
 #                         "skip": 50 * (page - 1),
 #                         "records": (50 * page)
@@ -1130,8 +1130,8 @@ async def tochka_update_transaction():
 #
 #             query = (
 #                 select(*payments.columns, module_bank_operations.c.payment_id)
-#                 .where(and_(payments.c.paybox == account.get('pbox_id'),
-#                            payments.c.cashbox == account.get('cashbox_id')))
+#                 .where(and_(payments.c.paybox == account.pbox_id,
+#                            payments.c.cashbox == account.cashbox_id))
 #                 .select_from(payments)
 #                 .join(module_bank_operations, module_bank_operations.c.payment_crm_id == payments.c.id)
 #             )
@@ -1146,10 +1146,10 @@ async def tochka_update_transaction():
 #                             'name': operation.get('paymentPurpose'),
 #                             'description': operation.get('paymentPurpose'),
 #                             'type': 'outgoing' if operation.get('category') == 'Debet' else 'incoming',
-#                             'tags': f"ModuleBank,{account.get('accountId')}",
+#                             'tags': f"ModuleBank,{account.accountId}",
 #                             'amount': operation.get('amount'),
-#                             'cashbox': account.get('cashbox_id'),
-#                             'paybox': account.get('pbox_id'),
+#                             'cashbox': account.cashbox_id,
+#                             'paybox': account.pbox_id,
 #                             'date': datetime.strptime(operation.get('executed'), "%Y-%m-%d").timestamp(),
 #                             'created_at': int(datetime.utcnow().timestamp()),
 #                             'updated_at': int(datetime.utcnow().timestamp()),
@@ -1163,7 +1163,7 @@ async def tochka_update_transaction():
 #                     result = await session.execute(query)
 #                     payment_create_id = result.scalar()
 #                     payment_data = {
-#                         'accountId': account.get('accountId'),
+#                         'accountId': account.accountId,
 #                         'payment_crm_id': payment_create_id,
 #                         'operationId': operation.get("id"),
 #                         'cardId': operation.get("cardId"),
@@ -1198,7 +1198,7 @@ async def tochka_update_transaction():
 #                         contragents.select()
 #                         .where(
 #                             and_(contragents.c.inn == operation.get('contragentInn')),
-#                             contragents.c.cashbox == account.get('cashbox_id')
+#                             contragents.c.cashbox == account.cashbox_id
 #                         )
 #                     )
 #                     result = await session.execute(query)
@@ -1209,7 +1209,7 @@ async def tochka_update_transaction():
 #                             .values({
 #                                 'name': operation.get('contragentName'),
 #                                 'inn': operation.get('contragentInn'),
-#                                 'cashbox': account.get('cashbox_id'),
+#                                 'cashbox': account.cashbox_id,
 #                                 'is_deleted': False,
 #                                 'created_at': int(datetime.utcnow().timestamp()),
 #                                 'updated_at': int(datetime.utcnow().timestamp()),
@@ -1224,7 +1224,7 @@ async def tochka_update_transaction():
 #                             .where(payments.c.id == payment_create_id)
 #                             .values(
 #                                 {
-#                                     'contragent': result
+#                                     'contragent': result.scalar()
 #                                 }
 #                             )
 #                         )
@@ -1236,7 +1236,7 @@ async def tochka_update_transaction():
 #                             .where(payments.c.id == payment_create_id)
 #                             .values(
 #                                 {
-#                                     'contragent': contragent_db.get('id')
+#                                     'contragent': contragent_db.id
 #                                 }
 #                             )
 #                         )
@@ -1251,7 +1251,7 @@ async def tochka_update_transaction():
 #
 #             else:
 #                 set_module_payments = set([item.get('id') for item in operations_json])
-#                 set_module_payments_db = set([item.get('operationId') for item in module_operations_db])
+#                 set_module_payments_db = set([item.operationId for item in module_operations_db])
 #                 new_paymentsId = list(set_module_payments - set_module_payments_db)
 #                 for operation in [item for item in operations_json if item.get('id') in new_paymentsId]:
 #                     query = (
@@ -1260,10 +1260,10 @@ async def tochka_update_transaction():
 #                             'name': operation.get('paymentPurpose'),
 #                             'description': operation.get('paymentPurpose'),
 #                             'type': 'outgoing' if operation.get('category') == 'Debet' else 'incoming',
-#                             'tags': f"ModuleBank,{account.get('accountId')}",
+#                             'tags': f"ModuleBank,{account.accountId}",
 #                             'amount': operation.get('amount'),
-#                             'cashbox': account.get('cashbox_id'),
-#                             'paybox': account.get('pbox_id'),
+#                             'cashbox': account.cashbox_id,
+#                             'paybox': account.pbox_id,
 #                             'date': datetime.strptime(operation.get('executed'), "%Y-%m-%d").timestamp(),
 #                             'created_at': int(datetime.utcnow().timestamp()),
 #                             'updated_at': int(datetime.utcnow().timestamp()),
@@ -1277,7 +1277,7 @@ async def tochka_update_transaction():
 #                     result = await session.execute(query)
 #                     payment_create_id = result.scalar()
 #                     payment_data = {
-#                         'accountId': account.get('accountId'),
+#                         'accountId': account.accountId,
 #                         'payment_crm_id': payment_create_id,
 #                         'operationId': operation.get("id"),
 #                         'cardId': operation.get("cardId"),
@@ -1312,7 +1312,7 @@ async def tochka_update_transaction():
 #                         contragents.select()
 #                         .where(
 #                             and_(contragents.c.inn == operation.get('contragentInn')),
-#                             contragents.c.cashbox == account.get('cashbox_id')
+#                             contragents.c.cashbox == account.cashbox_id
 #                         )
 #                     )
 #                     result = await session.execute(query)
@@ -1323,7 +1323,7 @@ async def tochka_update_transaction():
 #                             .values({
 #                                 'name': operation.get('contragentName'),
 #                                 'inn': operation.get('contragentInn'),
-#                                 'cashbox': account.get('cashbox_id'),
+#                                 'cashbox': account.cashbox_id,
 #                                 'is_deleted': False,
 #                                 'created_at': int(datetime.utcnow().timestamp()),
 #                                 'updated_at': int(datetime.utcnow().timestamp()),
@@ -1338,7 +1338,7 @@ async def tochka_update_transaction():
 #                             .where(payments.c.id == payment_create_id)
 #                             .values(
 #                                 {
-#                                     'contragent': result
+#                                     'contragent': result.scalar()
 #                                 }
 #                             )
 #                         )
@@ -1350,7 +1350,7 @@ async def tochka_update_transaction():
 #                             .where(payments.c.id == payment_create_id)
 #                             .values(
 #                                 {
-#                                     'contragent': contragent_db.get('id')
+#                                     'contragent': contragent_db.id
 #                                 }
 #                             )
 #                         )
@@ -1365,7 +1365,7 @@ async def tochka_update_transaction():
 #
 #                 for operation in operations_json:
 #                     payment_data = {
-#                         'accountId': account.get('accountId'),
+#                         'accountId': account.accountId,
 #                         'operationId': operation.get("id"),
 #                         'cardId': operation.get("cardId"),
 #                         'companyId': operation.get("companyId"),
@@ -1416,15 +1416,15 @@ async def tochka_update_transaction():
 #
 #                     query = (
 #                         payments.update()
-#                         .where(payments.c.id == payment_update.get('payment_crm_id'))
+#                         .where(payments.c.id == payment_update.payment_crm_id)
 #                         .values({
 #                             'name': operation.get('paymentPurpose'),
 #                             'description': operation.get('paymentPurpose'),
 #                             'type': 'outgoing' if operation.get('category') == 'Debet' else 'incoming',
-#                             'tags': f"ModuleBank,{account.get('accountId')}",
+#                             'tags': f"ModuleBank,{account.accountId}",
 #                             'amount': operation.get('amount'),
-#                             'cashbox': account.get('cashbox_id'),
-#                             'paybox': account.get('pbox_id'),
+#                             'cashbox': account.cashbox_id,
+#                             'paybox': account.pbox_id,
 #                             'date': datetime.strptime(operation.get('executed'), "%Y-%m-%d").timestamp(),
 #                             'updated_at': int(datetime.utcnow().timestamp()),
 #                             'is_deleted': False,
