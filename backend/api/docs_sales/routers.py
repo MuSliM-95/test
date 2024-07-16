@@ -169,7 +169,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
             filter_list.append(
                 and_(*list(
                     map(
-                        lambda x: eval(f"docs_sales.c.{k}.ilike(f'%{x.strip()}%')"),
+                        lambda x: eval(f"docs_sales.c.{k}.ilike(f'%{x.strip().lower()}%')"),
                         v.strip().split(',')
                     )
                 ))

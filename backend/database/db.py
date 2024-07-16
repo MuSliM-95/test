@@ -54,6 +54,78 @@ class Contragent_types(str, ENUM):
 metadata = sqlalchemy.MetaData()
 
 
+module_bank_credentials = sqlalchemy.Table(
+    "module_bank_credentials",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id")),
+    sqlalchemy.Column('access_token', String),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+module_bank_accounts = sqlalchemy.Table(
+    "module_bank_accounts",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("payboxes_id", ForeignKey("payboxes.id"), index=True),
+    sqlalchemy.Column("module_bank_credential_id", ForeignKey("module_bank_credentials.id"), index=True),
+    sqlalchemy.Column("accountName", String),
+    sqlalchemy.Column("bankBic", String),
+    sqlalchemy.Column("bankInn", String),
+    sqlalchemy.Column("bankKpp", String),
+    sqlalchemy.Column("bankCorrespondentAccount", String),
+    sqlalchemy.Column("bankName", String),
+    sqlalchemy.Column("beginDate", String),
+    sqlalchemy.Column("category", String),
+    sqlalchemy.Column("currency", String),
+    sqlalchemy.Column("accountId", String, nullable=False, unique=True),
+    sqlalchemy.Column("number", String),
+    sqlalchemy.Column("status", String),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("is_active", Boolean, default=False),
+)
+
+module_bank_operations = sqlalchemy.Table(
+    "module_bank_operations",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("accountId", String),
+    sqlalchemy.Column("payment_crm_id", ForeignKey("payments.id"), index=True),
+    sqlalchemy.Column("contragent_crm_id", ForeignKey("contragents.id")),
+    sqlalchemy.Column('operationId', String),
+    sqlalchemy.Column('cardId', String),
+    sqlalchemy.Column('companyId', String),
+    sqlalchemy.Column('status', String),
+    sqlalchemy.Column('category', String),
+    sqlalchemy.Column('contragentName', String),
+    sqlalchemy.Column('contragentInn', String),
+    sqlalchemy.Column('contragentKpp', String),
+    sqlalchemy.Column('contragentBankAccountNumber', String),
+    sqlalchemy.Column('contragentBankName', String),
+    sqlalchemy.Column('contragentBankBic', String),
+    sqlalchemy.Column('amount', String),
+    sqlalchemy.Column('bankAccountNumber', String),
+    sqlalchemy.Column('paymentPurpose', Float),
+    sqlalchemy.Column('executed', Float),
+    sqlalchemy.Column('created', String),
+    sqlalchemy.Column('absId', String),
+    sqlalchemy.Column('ibsoId', String),
+    sqlalchemy.Column('kbk', String),
+    sqlalchemy.Column('oktmo', String),
+    sqlalchemy.Column('paymentBasis', String),
+    sqlalchemy.Column('taxCode', String),
+    sqlalchemy.Column('taxDocNum', String),
+    sqlalchemy.Column('taxDocDate', String),
+    sqlalchemy.Column('payerStatus', String),
+    sqlalchemy.Column('uin', String),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+
 evotor_credentials = sqlalchemy.Table(
     "evotor_credentials",
     metadata,
