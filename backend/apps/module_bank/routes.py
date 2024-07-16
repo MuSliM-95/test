@@ -123,7 +123,7 @@ async def moduloauth(code: str, state: int):
     return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}')
 
 
-@router.get("/bank/get_oauth_link/")
+@router.get("/module_bank/get_oauth_link/")
 async def get_token_for_scope(token: str, id_integration: int):
 
     """Получение токена для работы с разрешениями"""
