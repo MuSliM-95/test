@@ -67,6 +67,7 @@ from api.reports.routers import router as reports_router
 from apps.evotor.routes import router_auth as evotor_router_auth
 from apps.evotor.routes import router as evotor_router
 from apps.module_bank.routes import router as module_bank_router
+from apps.booking.routers import router as booking_router
 
 
 sentry_sdk.init(
@@ -93,6 +94,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(booking_router)
 app.include_router(evotor_router)
 app.include_router(evotor_router_auth)
 app.include_router(analytics_router)

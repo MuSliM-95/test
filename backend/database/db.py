@@ -1,6 +1,6 @@
 import os
 from enum import Enum as ENUM
-
+# from geoalchemy2.types import Geometry
 import databases
 import sqlalchemy
 from sqlalchemy import (
@@ -51,7 +51,63 @@ class Contragent_types(str, ENUM):
     Buyer = "Покупатель"
 
 
+class BookingStatus(str, ENUM):
+    new = "Новый"
+    confirmed = "Подтвержден"
+    paid = "Оплачен"
+    taken = "Забран"
+    delivered = "Доставлен"
+    uploaded = "Выгружен"
+    extended = "Пролонгирован"
+    completed = "Завершен"
+
+
+class DocSalesStatus(str, ENUM):
+    partially_paid = "Частично оплачен"
+    not_paid = "Не оплачен"
+    paid = "Оплачен"
+
+
+class Tariff(str, ENUM):
+    month = "Месяц"
+    day = "День"
+    week = "Неделя"
+
+
 metadata = sqlalchemy.MetaData()
+
+
+booking = sqlalchemy.Table(
+    "bookikng",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("tariff", Enum(Tariff), nullable = False),
+    sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
+    sqlalchemy.Column("contragent_accept", Integer, ForeignKey("contragents.id")),
+    sqlalchemy.Column("address", String),
+    sqlalchemy.Column("date_booking", Integer, index=True),
+    sqlalchemy.Column("start_booking", Integer, index=True),
+    sqlalchemy.Column("end_booking", Integer, index=True),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable = True),
+    sqlalchemy.Column("status_doc_sales", Enum(DocSalesStatus), nullable = False),
+    sqlalchemy.Column("status_booking", Enum(BookingStatus), nullable = False),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("comment", String),
+    sqlalchemy.Column("is_deleted", Boolean),
+)
+
+
+booking_nomenclature = sqlalchemy.Table(
+    "booking_nomenclature",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("booking_id", Integer, ForeignKey("bookikng.id")),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
+    # sqlalchemy.Column("geolocation", Geometry(geometry_type = "POINT", srid=4326, spatial_index=True)),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
 
 
 module_bank_credentials = sqlalchemy.Table(
