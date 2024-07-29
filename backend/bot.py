@@ -781,7 +781,9 @@ async def create_balance(cashbox_id, message, tariff=None):
             tax=tariff.price,
             for_user=" за пользователя" if tariff.per_user else "",
             link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
-        ),
+        ), reply_markup=types.ReplyKeyboardRemove(), # Удаляем клавиатуру с кнопками "отправить номер телефона, отменить регистрацию"
+        # Чтобы скрыть предпросмотр ссылки на бота для оплаты
+        # link_preview_is_disabled=True
     )
     await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.you_got_demo.format(
         n=tariff.demo_days,
