@@ -24,6 +24,9 @@ from api.payments.schemas import PaymentCreate
 from api.pboxes.routers import create_paybox
 from api.pboxes.schemas import PayboxesCreate
 from const import DEMO, cheque_service_url
+import re
+
+
 from database.db import database, cboxes, users, users_cboxes_relation, accounts_balances, tariffs, pboxes, payments, \
     articles, cheques, contragents, messages
 from functions.cboxes import create_cbox, join_cbox
@@ -272,7 +275,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 
     if user and not command_args:
         users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
-
         if users_cbox:
             # Если у юзера есть cashbox - генерируем новый токен для него
             token = await generate_new_user_access_token_for_cashbox(user_id=user.id, cashbox_id=users_cbox.id)
@@ -337,7 +339,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
     if not user and command_args:
         if "referral" in str(command_args):
             ref_id = command_args.split("referral_")[-1]
-
             query = users.select().where(and_(users.c.chat_id == ref_id, users.c.owner_id == ref_id))
             users_ref_exist = await database.fetch_one(query)
 
@@ -371,7 +372,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             cbox_by_invite = await database.fetch_one(cboxes.select().where(cboxes.c.invite_token == command_args))
 
             if not cbox_by_invite:
-                # Если пригласительный токен - невалидный - возвращаем ошибку
+                # Если пригласительный токен - невалидный - пропускаем регистрацию как обычную
                 answer = texts.bad_token
                 await message.answer(text=answer, reply_markup=types.ReplyKeyboardRemove())
                 await store_bot_message(
@@ -380,6 +381,8 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                     from_or_to=str(bot.id),
                     body=answer
                 )
+                await welcome_and_share_number(message)
+                await state.set_state(Form.start)
                 return
             # Приглашаем юзера присоединиться в систему и сохраняем информацию о приглашении
             await welcome_and_share_number(message)
@@ -919,6 +922,14 @@ async def group_to_supegroup_migration(message: types.Message):
     query = users.update().where(users.c.chat_id == str(message.chat.id)).values(
         {"chat_id": str(message.migrate_to_chat_id)})
     await database.execute(query)
+
+
+@router_comm.message(lambda message: re.fullmatch(r"(\+7|8)", message.text), state="*")
+async def handle_phone_number(message: types.Message, state: FSMContext):
+    await store_user_message(message)
+    await message.reply(texts.get_phone_by_btn)
+    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, "Вы указали номер телефона. Нажмите на кнопку, чтобы отправить его.")
+
 
 
 async def main():
