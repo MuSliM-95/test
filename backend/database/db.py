@@ -1,6 +1,5 @@
 import os
 from enum import Enum as ENUM
-# from geoalchemy2.types import Geometry
 import databases
 import sqlalchemy
 from sqlalchemy import (
@@ -74,6 +73,11 @@ class Tariff(str, ENUM):
     week = "Неделя"
 
 
+class BookingEventStatus(str, ENUM):
+    give = "Забрал"
+    take = "Привез"
+
+
 metadata = sqlalchemy.MetaData()
 
 
@@ -81,7 +85,6 @@ booking = sqlalchemy.Table(
     "bookikng",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("tariff", Enum(Tariff), nullable = False),
     sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("contragent_accept", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("address", String),
@@ -104,9 +107,27 @@ booking_nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("booking_id", Integer, ForeignKey("bookikng.id")),
     sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
-    # sqlalchemy.Column("geolocation", Geometry(geometry_type = "POINT", srid=4326, spatial_index=True)),
+    sqlalchemy.Column("tariff", Enum(Tariff), nullable = False),
     sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("is_deleted", Boolean),
+)
+
+
+booking_events = sqlalchemy.Table(
+    "booking_events",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("booking_nomenclature_id", Integer, ForeignKey("booking_nomenclature.id")),
+    sqlalchemy.Column("type", Enum(BookingEventStatus), index=True, nullable = False),
+    sqlalchemy.Column("value", String),
+    sqlalchemy.Column("latitude", String),
+    sqlalchemy.Column("longitude", String),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("is_deleted", Boolean),
 )
 
 
