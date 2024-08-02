@@ -1,37 +1,147 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
-from database.db import database, booking
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from database.db import database, booking, booking_nomenclature
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
-from apps.booking.schemas import BookingCreate, BookingList, Booking, BookingCreateList
+from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate
+from typing import List
 
 
 router = APIRouter(tags=["booking"])
 
 
-@router.get("/booking/list")
+@router.get("/booking/list", response_model = BookingList)
 async def get_list_booking(token: str):
     user = await get_user_by_token(token)
-    result = await database.fetch_all(booking.select().where(booking.c.cashbox == user.cashbox_id))
-    return result
+    try:
+        list_db = await database.fetch_all(booking.select().where(booking.c.cashbox == user.cashbox_id))
+        list_result = []
+        for item in list(map(dict, list_db)):
+            goods = await database.fetch_all(
+                booking_nomenclature.select().where(booking_nomenclature.c.booking_id == item.get("id")))
+            list_result.append({**item, "goods": goods})
+        return list_result
+    except Exception as e:
+        raise HTTPException(status_code = 432, detail = str(e))
 
 
-@router.get("/booking/{idx}")
+@router.get("/booking/{idx}", response_model = Booking)
 async def get_booking_by_idx(token: str, idx: int):
     user = await get_user_by_token(token)
     result = await database.fetch_one(booking.select().where(and_(booking.c.cashbox == user.cashbox_id, booking.c.id == idx)))
-    return result
+    if result:
+        goods = await database.fetch_all(
+                    booking_nomenclature.select().where(booking_nomenclature.c.booking_id == idx))
+        dict_result = dict(result)
+        dict_result['goods'] = list(map(dict, goods))
+        print(dict_result)
+        return dict_result
+    else:
+        raise HTTPException(status_code = 404, detail = "not found")
 
 
-@router.post("/booking/create")
+@database.transaction()
+@router.post("/booking/create",
+             status_code=201,
+             response_model = ResponseCreate,
+             responses={201: {"model": ResponseCreate}}
+             )
 async def create_booking(token: str, bookings: BookingCreateList):
     user = await get_user_by_token(token)
+    create_ids = []
+    try:
+        for bookingItem in bookings.dict()["__root__"]:
+                    goods = bookingItem["goods"]
+                    del bookingItem["goods"]
+                    create_booking_id = await database.execute(
+                        booking.insert().values(
+                            {**bookingItem, "cashbox": user.get("cashbox_id"), "is_deleted": False}))
+                    create_ids.append(create_booking_id)
+                    [
+                        await database.execute(booking_nomenclature.insert().values(
+                            {**good, "booking_id": create_booking_id, "is_deleted": False}))
+                     for good in goods
+                    ]
+        return JSONResponse(status_code = 201, content = jsonable_encoder(
+                {
+                    "status": "success created",
+                    "data": [
+                        await get_booking_by_idx(
+                            token=token,
+                            idx = booking_id) for booking_id in create_ids
+                    ]
+                 }))
+    except Exception as e:
+        raise HTTPException(status_code = 432, detail = str(e))
 
-    for bookingItem in bookings:
-        bookingItem = dict(bookingItem)
-        goods = booking.get("goods")
-        create_booking_id = await database.execute(booking.insert(bookingItem))
 
+@database.transaction()
+@router.patch("/booking/edit",
+              description =
+              '''
+              <p><div style="color:red">Важно!</div> 
+              <ul>
+              <li>Если товары не редактируются то в запросе ключ goods не отправляется.</li>
+              <li>Если отправить goods: [] - из бронирования будут удалены все товары товары.</li>
+              <li>Добавление товаров без ID ведет к их добавлению в бронирование.</li>
+              <li>Если отправить goods с изменным полем - произойдет изменение поля. Для этого в элементе goods 
+              указывается id и с ним те поля которые хотите изменить в бронировании товара</li>
+              </ul>
+              </p>
+              
+              ''')
+async def create_booking(token: str, bookings: BookingEditList):
+    user = await get_user_by_token(token)
 
+    try:
+        bookings = bookings.dict(exclude_unset = True)
+        for bookingItem in bookings["__root__"]:
+            if not bookingItem.get('id'):
+                raise Exception("не указан id бронирования")
+            goods = None
+            if bookingItem.get("goods"):
+                goods = bookingItem.get("goods")
+                del bookingItem["goods"]
 
+            bookingItem_db = await database.fetch_one(booking.select().where(booking.c.id == bookingItem.get("id")))
+            bookingItem_db_model = BookingEdit(**bookingItem_db)
+            update_data = bookingItem
+            updated_item = bookingItem_db_model.copy(update = update_data)
+            await database.execute(booking.update().where(
+                booking.c.id == bookingItem_db.get("id")).values(updated_item.dict()))
+            if goods is not None:
+                goods_db = await database.fetch_all(
+                    booking_nomenclature.select().where(booking_nomenclature.c.booking_id == bookingItem.get("id")))
+                for good in goods:
+                    if good.get('id'):
+                        goodItem_db = await database.fetch_one(
+                                booking_nomenclature.select().where(booking_nomenclature.c.id == good.get("id")))
+                        goodItem_db_model = NomenclatureBookingEdit(**goodItem_db)
+                        updated_goodItem = goodItem_db_model.copy(update = good)
+                        await database.execute(
+                                booking_nomenclature.update().where(
+                                    booking_nomenclature.c.id == good.get("id")).values(updated_goodItem.dict()))
+                    else:
+                        await database.execute(booking_nomenclature.insert().values(
+                            {**NomenclatureBookingCreate(**good).dict(), "booking_id":bookingItem.get("id"),
+                             "is_deleted": False}))
+                for good_db in goods_db:
+                    if good_db.get('id') not in [good.get('id') for good in goods]:
+                        print(good_db.get('id'), [good.get('id') for good in goods])
+                        await database.execute(booking_nomenclature.delete().where(booking_nomenclature.c.id == good_db.get('id')))
 
+        return JSONResponse(status_code = 200,
+                            content = jsonable_encoder(
+                                {
+                                    "status": "success updated",
+                                    "data": [
+                                        await get_booking_by_idx(
+                                            token=token,
+                                            idx = bookingItem.get('id')) for bookingItem in bookings["__root__"]
+                                    ]
+                                 })
+                            )
 
+    except Exception as e:
+        raise HTTPException(status_code = 432, detail = str(e))
