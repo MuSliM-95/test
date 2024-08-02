@@ -4,7 +4,8 @@ from fastapi.responses import JSONResponse
 from database.db import database, booking, booking_nomenclature
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
-from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate
+from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
+    BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate
 from typing import List
 
 
@@ -105,6 +106,8 @@ async def create_booking(token: str, bookings: BookingEditList):
                 del bookingItem["goods"]
 
             bookingItem_db = await database.fetch_one(booking.select().where(booking.c.id == bookingItem.get("id")))
+            if not bookingItem_db:
+                raise Exception("не найден id бронирования")
             bookingItem_db_model = BookingEdit(**bookingItem_db)
             update_data = bookingItem
             updated_item = bookingItem_db_model.copy(update = update_data)
