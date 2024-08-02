@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
-from database.db import Tariff, DocSalesStatus, BookingStatus
+from database.db import Tariff, DocSalesStatus, BookingStatus, BookingEventStatus
+from api.nomenclature.schemas import NomenclatureCreate
 
 
 class NomenclatureBookingCreate(BaseModel):
@@ -13,7 +14,7 @@ class NomenclatureBookingEdit(NomenclatureBookingCreate):
     is_deleted: bool = None
 
 
-class NomenclatureBookingPatch(BaseModel):
+class NomenclatureBookingPatch(NomenclatureCreate):
     id: Optional[int] = None
     is_deleted: Optional[bool] = None
     nomenclature_id: Optional[int] = None
@@ -73,6 +74,40 @@ class BookingList(BaseModel):
 class ResponseCreate(BaseModel):
     status: str
     data: List[BookingCreate]
+
+
+class BookingEventCreate(BaseModel):
+    booking_nomenclature_id: Optional[int]
+    type: Optional[BookingEventStatus] = None
+    value: Optional[str] = None
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    is_deleted: Optional[bool] = False
+
+
+class BookingEventView(BookingEventCreate):
+    id: int
+
+
+class BookingEventPatch(BookingEventCreate):
+    id: int
+
+
+class BookingEventViewList(BaseModel):
+    __root__: Optional[List[BookingEventView]]
+
+
+class BookingEventCreateList(BaseModel):
+    __root__: Optional[List[BookingEventCreate]]
+
+
+class BookingEventPathList(BaseModel):
+    __root__: Optional[List[BookingEventPatch]]
+
+
+class ResponseBookingEventCreateList(BaseModel):
+    status: str
+    data: Optional[List[BookingEventCreate]]
 
 
 

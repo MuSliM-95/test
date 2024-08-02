@@ -125,8 +125,6 @@ booking_events = sqlalchemy.Table(
     sqlalchemy.Column("longitude", String),
     sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
     sqlalchemy.Column("is_deleted", Boolean),
 )
 

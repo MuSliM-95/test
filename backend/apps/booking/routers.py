@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from database.db import database, booking, booking_nomenclature
+from database.db import database, booking, booking_nomenclature, nomenclature
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
@@ -20,8 +20,20 @@ async def get_list_booking(token: str):
         list_result = []
         for item in list(map(dict, list_db)):
             goods = await database.fetch_all(
-                booking_nomenclature.select().where(booking_nomenclature.c.booking_id == item.get("id")))
-            list_result.append({**item, "goods": goods})
+                select(
+                    booking_nomenclature.c.id,
+                    booking_nomenclature.c.is_deleted,
+                    booking_nomenclature.c.nomenclature_id,
+                    booking_nomenclature.c.tariff,
+                    nomenclature.c.name,
+                    nomenclature.c.category
+                )
+                .where(booking_nomenclature.c.booking_id == item.get("id"))
+                .select_from(booking_nomenclature)
+                .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
+            list_result.append({**item, "goods": list(map(dict,goods))})
+
+        print(list_result)
         return list_result
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
@@ -32,8 +44,17 @@ async def get_booking_by_idx(token: str, idx: int):
     user = await get_user_by_token(token)
     result = await database.fetch_one(booking.select().where(and_(booking.c.cashbox == user.cashbox_id, booking.c.id == idx)))
     if result:
-        goods = await database.fetch_all(
-                    booking_nomenclature.select().where(booking_nomenclature.c.booking_id == idx))
+        goods = await database.fetch_all(  select(
+                    booking_nomenclature.c.id,
+                    booking_nomenclature.c.is_deleted,
+                    booking_nomenclature.c.nomenclature_id,
+                    booking_nomenclature.c.tariff,
+                    nomenclature.c.name,
+                    nomenclature.c.category
+                )
+                .where(booking_nomenclature.c.booking_id == idx)
+                .select_from(booking_nomenclature)
+                .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
         dict_result = dict(result)
         dict_result['goods'] = list(map(dict, goods))
         print(dict_result)
@@ -154,7 +175,7 @@ async def create_booking(token: str, bookings: BookingEditList):
 @router.post("/booking/events/create",
              status_code=201,
              )
-async def create_events(token: str, bookings: BookingCreateList):
+async def create_events(token: str):
     pass
 
 
