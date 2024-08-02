@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from fastapi.responses import HTMLResponse
 from database.db import database, doc_templates, entity_to_entity, pages, areas
 import api.templates.schemas as schemas
 from datetime import datetime
@@ -229,16 +230,30 @@ async def delete_template(token: str, idx: int):
 
 
 @router.patch("/doctemplates/{idx}/", response_model=schemas.DocTemplateUpdate)
-async def update_template(token: str, idx: int, template: Dict):
+async def update_template(token: str, idx: int, template: schemas.TemptalePatchBody = Depends(), file:Union[UploadFile, None] = None):
     """Обновление шаблона по ID"""
     user = await get_user_by_token(token)
+    template = template.dict(exclude_unset=True, exclude_none=True)
+    template['template_data'] = str(file.file.read().decode('UTF-8')) if file else None
     template['updated_at'] = int(datetime.utcnow().timestamp())
+    template_db = await database.fetch_one(doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id))
+    template_db_model = schemas.DocTemplateCreate(**template_db)
+    template_item = template_db_model.copy(update=template)
     query = doc_templates.\
         update().\
-        where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id).values(template)
+        where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id).values(template_item.dict())
     await database.execute(query)
     query = doc_templates.select().where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
     result = await database.fetch_one(query)
     if not result:
         raise HTTPException(status_code=404, detail=f"У вас нет шаблона с таким id")
     return result
+
+
+@router.get("/doctemplates/{idx}/template")
+async def get_template_data(token: str, idx: int):
+    """Получение HTML-шаблона по ID шаблона"""
+    user = await get_user_by_token(token)
+    query = select(doc_templates.c.template_data).where(doc_templates.c.id == idx, doc_templates.c.cashbox == user.cashbox_id)
+    result = await database.fetch_val(query)
+    return HTMLResponse(content=result, media_type="text/html")

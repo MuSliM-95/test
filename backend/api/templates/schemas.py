@@ -89,3 +89,11 @@ class TemplateCreate(BaseModel):
     areas: Optional[List[int]] = None
     pages: Optional[List[int]] = None
 
+
+class TemptalePatchBody(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[str] = None
+    user_id: Optional[int] = None
+    is_deleted: Optional[bool] = None
+    type: Optional[int] = None
