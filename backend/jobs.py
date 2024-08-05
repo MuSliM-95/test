@@ -558,7 +558,7 @@ class AutoRepeat:
 
     async def start(self):
         if (self.doc.date_next_created not in [None, 0] and datetime.fromtimestamp(
-                self.doc.date_next_created) <= self.date_now) \
+                self.doc.date_next_created).timestamp() <= self.date_now.timestamp()) \
                 or self._check_start_date():
             return await self._repeat()
 
