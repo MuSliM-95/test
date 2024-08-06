@@ -16,17 +16,16 @@ async def moduloauth(code: str, state: int):
     """Hook для oauth банка"""
 
     user_integration = await integration_info(state, 3)
-    print(user_integration)
     if not user_integration:
         raise HTTPException(status_code=432, detail=f"user not found with integration")
 
     async with aiohttp.ClientSession(trust_env=True) as session:
         async with session.post(
                 f'https://api.modulbank.ru/v1/oauth/token',
-                data={
-                    'code': code,
-                    'clientId': user_integration.get('client_app_id'),
-                    'clientSecret': user_integration.get('client_secret'),
+                json={
+                    'code': str(code),
+                    'clientId': str(user_integration.get('client_app_id')),
+                    'clientSecret': str(user_integration.get('client_secret')),
                 },
                 headers={
                     'Content-type': 'application/json'
