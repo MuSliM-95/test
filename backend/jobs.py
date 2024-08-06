@@ -31,7 +31,7 @@ from database.db import engine, accounts_balances, database, tariffs, payments, 
     cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
     entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
     docs_sales_goods, docs_sales_tags, docs_warehouse, nomenclature, SQLALCHEMY_DATABASE_URL, async_session_maker, \
-    module_bank_operations, module_bank_accounts, module_bank_credentials
+    module_bank_operations, module_bank_accounts, module_bank_credentials, integrations_to_cashbox
 from database.enums import Repeatability
 from functions.account import make_account
 from functions.filter_schemas import PaymentFiltersQuery
@@ -1053,8 +1053,93 @@ async def tochka_update_transaction():
     await _tochka_update()
 
 
-# @scheduler.scheduled_job('interval', minutes=5, id="module_bank_update_transaction")
-# async def module_bank_update_transaction():
+@scheduler.scheduled_job('interval', minutes=5, id="module_bank_update_transaction")
+async def module_bank_update_transaction():
+    async with async_session_maker() as session:
+        query = (
+            select
+            (
+                module_bank_credentials.c.id,
+                module_bank_credentials.c.access_token,
+                users_cboxes_relation.c.cashbox_id
+            )
+            .select_from(module_bank_credentials)
+            .join(integrations_to_cashbox, integrations_to_cashbox.c.id == module_bank_credentials.c.integration_cashboxes)
+            .join(users_cboxes_relation, users_cboxes_relation.c.id == integrations_to_cashbox.c.installed_by)
+        )
+        result = await session.execute(query)
+        accounts_credentials = result.fetchall()
+    for account in accounts_credentials:
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            async with session.post(f'https://api.modulbank.ru/v1/account-info',
+                                   headers={
+                                       'Authorization': f'Bearer {account.access_token}',
+                                       'Content-type': 'application/json'
+                                   }) as resp:
+                companies_json = await resp.json()
+        for company in companies_json:
+            for bank_account in company.get("bankAccounts"):
+                data = {
+                    'name': f"{bank_account.get('accountName', 'Счёт')} банк Модуль №{bank_account.get('id')}",
+                    'start_balance': 0,
+                    'cashbox': account.cashbox_id,
+                    'balance': bank_account.get("balance"),
+                    'update_start_balance': int(datetime.utcnow().timestamp()),
+                    'update_start_balance_date': int(datetime.utcnow().timestamp()),
+                    'created_at': int(datetime.utcnow().timestamp()),
+                    'updated_at': int(datetime.utcnow().timestamp()),
+                    'balance_date': 0
+                }
+                account_db = await database.fetch_one(
+                    module_bank_accounts.select().where(module_bank_accounts.c.accountId == bank_account.get('id')))
+                if not account_db:
+                    id_paybox = await database.execute(pboxes.insert().values(data))
+                    await database.execute(module_bank_accounts.insert().values(
+                        {
+                            'payboxes_id': id_paybox,
+                            'module_bank_credential_id': account.id,
+                            'accountName': bank_account.get('accountName'),
+                            'bankBic': bank_account.get('bankBic'),
+                            'bankInn': bank_account.get('bankInn'),
+                            'bankKpp': bank_account.get('bankKpp'),
+                            'bankCorrespondentAccount': bank_account.get('bankCorrespondentAccount'),
+                            'bankName': bank_account.get('bankName'),
+                            'beginDate': bank_account.get('beginDate'),
+                            'category': bank_account.get('category'),
+                            'currency': bank_account.get('currency'),
+                            'accountId': bank_account.get('id'),
+                            'number': bank_account.get('number'),
+                            'status': bank_account.get('status'),
+                            'is_deleted': False,
+                            'is_active': False
+                        }
+                    ))
+                else:
+                    del data['created_at']
+                    id_paybox = await database.execute(
+                        pboxes.update().where(pboxes.c.id == account_db.get('payboxes_id')).values(data))
+                    await database.execute(
+                        module_bank_accounts.update().where(module_bank_accounts.c.id == account_db.get('id')).values(
+                            {
+                                'payboxes_id': id_paybox,
+                                'module_bank_credential_id': account.id,
+                                'accountName': bank_account.get('accountName'),
+                                'bankBic': bank_account.get('bankBic'),
+                                'bankInn': bank_account.get('bankInn'),
+                                'bankKpp': bank_account.get('bankKpp'),
+                                'bankCorrespondentAccount': bank_account.get('bankCorrespondentAccount'),
+                                'bankName': bank_account.get('bankName'),
+                                'beginDate': bank_account.get('beginDate'),
+                                'category': bank_account.get('category'),
+                                'currency': bank_account.get('currency'),
+                                'accountId': bank_account.get('id'),
+                                'number': bank_account.get('number'),
+                                'status': bank_account.get('status'),
+                                'is_deleted': False,
+                                'is_active': False
+                            }
+                        ))
+
 #     async with async_session_maker() as session:
 #         query = (
 #             select(module_bank_accounts.c.accountId,
