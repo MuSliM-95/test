@@ -666,8 +666,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
         if not await check_foreign_keys(instance_values, user, exceptions):
             continue
 
-        if instance_values.get("number") is None:
-            instance_values["number"] = str(count_docs_sales + index + 1)
+        # if instance_values.get("number") is None:
+        #     instance_values["number"] = str(count_docs_sales + index + 1)
 
         goods: Union[list, None] = instance_values.pop("goods", None)
 
