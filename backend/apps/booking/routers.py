@@ -6,7 +6,7 @@ from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
     BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate
-from typing import List
+from ws_manager import manager
 
 
 router = APIRouter(tags=["booking"])
@@ -85,15 +85,24 @@ async def create_booking(token: str, bookings: BookingCreateList):
                             {**good, "booking_id": create_booking_id, "is_deleted": False}))
                      for good in goods
                     ]
-        return JSONResponse(status_code = 201, content = jsonable_encoder(
-                {
+        response = {
                     "status": "success created",
                     "data": [
                         await get_booking_by_idx(
                             token=token,
                             idx = booking_id) for booking_id in create_ids
                     ]
-                 }))
+                 }
+        await manager.send_message(
+            token,
+            {
+                "action": "create",
+                "target": "booking",
+                "result": jsonable_encoder(response),
+            },
+        )
+        return JSONResponse(status_code = 201, content = jsonable_encoder(
+                response))
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
 
@@ -154,17 +163,18 @@ async def create_booking(token: str, bookings: BookingEditList):
                     if good_db.get('id') not in [good.get('id') for good in goods]:
                         print(good_db.get('id'), [good.get('id') for good in goods])
                         await database.execute(booking_nomenclature.delete().where(booking_nomenclature.c.id == good_db.get('id')))
-
+        response = {"status": "success updated", "data": [await get_booking_by_idx( token=token,
+                                                                                    idx = bookingItem.get('id'))
+                                                          for bookingItem in bookings["__root__"]]}
+        await manager.send_message(
+            token,  {
+                "action": "edit",
+                "target": "booking",
+                "result": jsonable_encoder(response),
+            })
         return JSONResponse(status_code = 200,
                             content = jsonable_encoder(
-                                {
-                                    "status": "success updated",
-                                    "data": [
-                                        await get_booking_by_idx(
-                                            token=token,
-                                            idx = bookingItem.get('id')) for bookingItem in bookings["__root__"]
-                                    ]
-                                 })
+                                response)
                             )
 
     except Exception as e:
