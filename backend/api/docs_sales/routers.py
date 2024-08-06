@@ -924,7 +924,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                 {
                     "id": doc_warehouse.id,
                     "number": None,
-                    "dated": instance_values['dated'],
+                    "dated": instance_values.get('dated'),
                     "docs_purchases": None,
                     "to_warehouse": None,
                     "status": True,
