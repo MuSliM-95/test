@@ -15,7 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger,
+    UniqueConstraint, SmallInteger, NullPool,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -1556,5 +1556,5 @@ database = databases.Database(SQLALCHEMY_DATABASE_URL)
 engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
 engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)
 
-async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL_ASYNC)
+async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL_ASYNC, pool_pre_ping=True, poolclass=NullPool)
 async_session_maker = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
