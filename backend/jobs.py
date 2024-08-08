@@ -1070,8 +1070,8 @@ async def module_bank_update_transaction():
         result = await session.execute(query)
         accounts_credentials = result.fetchall()
         for account in accounts_credentials:
-            async with aiohttp.ClientSession(trust_env=True) as session:
-                async with session.post(f'https://api.modulbank.ru/v1/account-info',
+            async with aiohttp.ClientSession(trust_env=True) as session_http:
+                async with session_http.post(f'https://api.modulbank.ru/v1/account-info',
                                        headers={
                                            'Authorization': f'Bearer {account.access_token}',
                                            'Content-type': 'application/json'
@@ -1090,36 +1090,24 @@ async def module_bank_update_transaction():
                         'updated_at': int(datetime.utcnow().timestamp()),
                         'balance_date': 0
                     }
-                    account_db = await database.fetch_one(
-                        module_bank_accounts.select().where(module_bank_accounts.c.accountId == bank_account.get('id')))
+                    query = (
+                        module_bank_accounts.select()
+                        .where(module_bank_accounts.c.accountId == bank_account.get('id'))
+                    )
+                    result = await session.execute(query)
+                    account_db = result.fetchone()
                     if not account_db:
-                        id_paybox = await database.execute(pboxes.insert().values(data))
-                        await database.execute(module_bank_accounts.insert().values(
-                            {
-                                'payboxes_id': id_paybox,
-                                'module_bank_credential_id': account.id,
-                                'accountName': bank_account.get('accountName'),
-                                'bankBic': bank_account.get('bankBic'),
-                                'bankInn': bank_account.get('bankInn'),
-                                'bankKpp': bank_account.get('bankKpp'),
-                                'bankCorrespondentAccount': bank_account.get('bankCorrespondentAccount'),
-                                'bankName': bank_account.get('bankName'),
-                                'beginDate': bank_account.get('beginDate'),
-                                'category': bank_account.get('category'),
-                                'currency': bank_account.get('currency'),
-                                'accountId': bank_account.get('id'),
-                                'number': bank_account.get('number'),
-                                'status': bank_account.get('status'),
-                                'is_deleted': False,
-                                'is_active': True
-                            }
-                        ))
-                    else:
-                        del data['created_at']
-                        id_paybox = await database.execute(
-                            pboxes.update().where(pboxes.c.id == account_db.get('payboxes_id')).values(data))
-                        await database.execute(
-                            module_bank_accounts.update().where(module_bank_accounts.c.id == account_db.get('id')).values(
+                        query = (
+                            pboxes.insert()
+                            .values(data)
+                            .returning(pboxes.c.id)
+                        )
+                        result = await session.execute(query)
+                        id_paybox = result.scalar()
+
+                        query = (
+                            module_bank_accounts.insert()
+                            .values(
                                 {
                                     'payboxes_id': id_paybox,
                                     'module_bank_credential_id': account.id,
@@ -1138,7 +1126,47 @@ async def module_bank_update_transaction():
                                     'is_deleted': False,
                                     'is_active': True
                                 }
-                            ))
+                            )
+                        )
+                        await session.execute(query)
+                        await session.commit()
+                    else:
+                        del data['created_at']
+                        query = (
+                            pboxes.update()
+                            .where(pboxes.c.id == account_db.get('payboxes_id'))
+                            .values(data)
+                            .returning(pboxes.c.id)
+                        )
+                        result = await session.execute(query)
+                        id_paybox = result.scalar()
+
+                        query = (
+                            module_bank_accounts.update()
+                            .where(module_bank_accounts.c.id == account_db.get('id'))
+                            .values(
+                                {
+                                    'payboxes_id': id_paybox,
+                                    'module_bank_credential_id': account.id,
+                                    'accountName': bank_account.get('accountName'),
+                                    'bankBic': bank_account.get('bankBic'),
+                                    'bankInn': bank_account.get('bankInn'),
+                                    'bankKpp': bank_account.get('bankKpp'),
+                                    'bankCorrespondentAccount': bank_account.get('bankCorrespondentAccount'),
+                                    'bankName': bank_account.get('bankName'),
+                                    'beginDate': bank_account.get('beginDate'),
+                                    'category': bank_account.get('category'),
+                                    'currency': bank_account.get('currency'),
+                                    'accountId': bank_account.get('id'),
+                                    'number': bank_account.get('number'),
+                                    'status': bank_account.get('status'),
+                                    'is_deleted': False,
+                                    'is_active': True
+                                }
+                            )
+                        )
+                        await session.execute(query)
+                        await session.commit()
 
     async with async_session_maker() as session:
         query = (
