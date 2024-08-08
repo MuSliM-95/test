@@ -2,6 +2,7 @@ import os
 from enum import Enum as ENUM
 import databases
 import sqlalchemy
+from sqlalchemy.pool import NullPool
 from sqlalchemy import (
     ARRAY,
     JSON,
@@ -15,7 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger, NullPool,
+    UniqueConstraint, SmallInteger,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
