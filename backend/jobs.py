@@ -1242,7 +1242,7 @@ async def module_bank_update_transaction():
                 page += 1
 
                 query = (
-                    select(*payments.columns, module_bank_operations.c.payment_id)
+                    select(*payments.columns, module_bank_operations.c.operationId)
                     .where(and_(payments.c.paybox == account.pbox_id,
                                payments.c.cashbox == account.cashbox_id))
                     .select_from(payments)
