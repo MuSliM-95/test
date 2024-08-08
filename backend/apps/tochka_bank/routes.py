@@ -234,7 +234,6 @@ async def check(token: str, id_integration: int):
         integrations_to_cashbox.c.integration_id == id_integration,
         integrations_to_cashbox.c.installed_by == user.id
     )))
-    print(check)
     if check is None:
         raise HTTPException(status_code = 204, detail = "integration not installed by chashbox")
 

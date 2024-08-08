@@ -121,9 +121,41 @@ async def integration_off(token: str, id_integration: int):
 
         await manager.send_message(user.token,
                                     {"action": "off",
-                                     "target": "IntegrationTochkaBank",
+                                     "target": "IntegrationModuleBank",
                                      "integration_status": False})
 
         return {'isAuth': False}
     except:
         raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")
+
+
+@router.get("/module_bank/check")
+async def check(token: str, id_integration: int):
+
+    """Проверка установлена или нет интеграция у клиента"""
+
+    user = await get_user_by_token(token)
+
+    check = await database.fetch_one(integrations_to_cashbox.select().where(and_(
+        integrations_to_cashbox.c.integration_id == id_integration,
+        integrations_to_cashbox.c.installed_by == user.id
+    )))
+    if check is None:
+        raise HTTPException(status_code = 204, detail = "integration not installed by chashbox")
+
+    message = {
+        "action": "check",
+        "target": "IntegrationModuleBank",
+        "integration_status": check.get('status'),
+    }
+
+    isAuth = await database.fetch_one(
+        module_bank_credentials.select().where(module_bank_credentials.c.integration_cashboxes == check.get("id"))
+    )
+
+    if isAuth:
+        message.update({'integration_isAuth': True})
+    else:
+        message.update({'integration_isAuth': False})
+    await manager.send_message(user.token, message)
+    return {"isAuth": message.get('integration_isAuth')}
