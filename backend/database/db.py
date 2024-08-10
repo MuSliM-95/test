@@ -197,6 +197,7 @@ module_bank_operations = sqlalchemy.Table(
     sqlalchemy.Column('taxDocDate', String),
     sqlalchemy.Column('payerStatus', String),
     sqlalchemy.Column('uin', String),
+    sqlalchemy.Column("currency", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
