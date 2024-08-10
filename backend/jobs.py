@@ -1315,7 +1315,7 @@ async def module_bank_update_transaction():
                             )
                         )
                         result = await session.execute(query)
-                        contragent_db = result.scalar()
+                        contragent_db = result.fetchone()
                         if not contragent_db:
                             query = (
                                 contragents.insert()
@@ -1429,7 +1429,7 @@ async def module_bank_update_transaction():
                             )
                         )
                         result = await session.execute(query)
-                        contragent_db = result.scalar()
+                        contragent_db = result.fetchone()
                         if not contragent_db:
                             query = (
                                 contragents.insert()
