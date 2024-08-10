@@ -1134,7 +1134,7 @@ async def module_bank_update_transaction():
                         del data['created_at']
                         query = (
                             pboxes.update()
-                            .where(pboxes.c.id == account_db.get('payboxes_id'))
+                            .where(pboxes.c.id == account_db.payboxes_id)
                             .values(data)
                             .returning(pboxes.c.id)
                         )
@@ -1143,7 +1143,7 @@ async def module_bank_update_transaction():
 
                         query = (
                             module_bank_accounts.update()
-                            .where(module_bank_accounts.c.id == account_db.get('id'))
+                            .where(module_bank_accounts.c.id == account_db.id)
                             .values(
                                 {
                                     'payboxes_id': id_paybox,
