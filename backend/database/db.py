@@ -182,7 +182,7 @@ module_bank_operations = sqlalchemy.Table(
     sqlalchemy.Column('contragentBankAccountNumber', String),
     sqlalchemy.Column('contragentBankName', String),
     sqlalchemy.Column('contragentBankBic', String),
-    sqlalchemy.Column('amount', String),
+    sqlalchemy.Column('amount', Float),
     sqlalchemy.Column('bankAccountNumber', String),
     sqlalchemy.Column('paymentPurpose', Float),
     sqlalchemy.Column('executed', Float),
