@@ -1,6 +1,6 @@
 aio-pika==9.0.2
 aiofiles>=0.8.0
-aiogram
+aiogram>=3.0.0
 aiohttp
 aiosignal
 amqp==5.0.9
