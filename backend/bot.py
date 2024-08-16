@@ -1,8 +1,6 @@
 import asyncio
-import json
 import logging
 import os
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -10,11 +8,10 @@ from typing import Optional
 
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.client.session import aiohttp
-from aiogram.filters.command import CommandObject
-from aiogram.filters.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
+from aiogram.dispatcher.filters.command import CommandObject
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.dispatcher.fsm.context import FSMContext
 from aiogram.types import PhotoSize, ContentType
-from aiogram.types.web_app_info import WebAppInfo
 from sqlalchemy import and_
 
 import texts
@@ -27,6 +24,9 @@ from api.payments.schemas import PaymentCreate
 from api.pboxes.routers import create_paybox
 from api.pboxes.schemas import PayboxesCreate
 from const import DEMO, cheque_service_url
+import re
+
+
 from database.db import database, cboxes, users, users_cboxes_relation, accounts_balances, tariffs, pboxes, payments, \
     articles, cheques, contragents, messages
 from functions.cboxes import create_cbox, join_cbox
@@ -398,13 +398,7 @@ async def new_cheque(message: types.Message, state: FSMContext):
     """
     await store_user_message(message)
     await state.set_state(Form.cheque_picture)
-    await message.answer(texts.send_cheque, reply_markup=types.ReplyKeyboardMarkup(
-        keyboard=[[types.KeyboardButton(text="Отмена"),
-                   types.KeyboardButton(text="📸 Сканер QR сканер", web_app=WebAppInfo(url="https://test-prod.akarmain.ru"))
-                   ]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    ))
+    await message.answer(texts.send_cheque, reply_markup=cancel_keyboard)
     await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.send_cheque)
 
 
@@ -416,23 +410,6 @@ async def get_cheque_info(photo: PhotoSize) -> Optional[dict]:
         req_data = {
             "token": os.getenv("CHEQUES_TOKEN"),
             "qrfile": file,
-        }
-        async with session.post(
-                cheque_service_url,
-                data=req_data,
-        ) as resp:
-            data = await resp.json()
-            if data["code"] != 1:
-                return None
-            else:
-                return data["data"]["json"]
-
-
-async def get_cheque_info_raw(qrraw: str) -> Optional[dict]:
-    async with aiohttp.ClientSession() as session:
-        req_data = {
-            "token": os.getenv("CHEQUES_TOKEN"),
-            "qrraw": qrraw,
         }
         async with session.post(
                 cheque_service_url,
@@ -547,51 +524,6 @@ async def new_cheque_pic(message: types.Message, state: FSMContext):
 
         if cbox:
             cheque_info = await get_cheque_info(message.photo[-1])
-            if not cheque_info:
-                await message.answer(
-                    texts.cheque_not_detected,
-                    reply_markup=cancel_keyboard,
-                )
-                await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.cheque_not_detected)
-                return
-            payment = await create_payment_from_cheque(cheque_info, cbox)
-            await state.set_state(Form.cheque_paybox)
-            await state.set_data(
-                {"payment": payment, "cheque": cheque_info}
-            )
-            query = pboxes.select().where(pboxes.c.cashbox == cbox.id)
-            payboxes = await database.fetch_all(query)
-            buttons = []
-            for paybox in payboxes:
-                if buttons and len(buttons[-1]) < 2:
-                    buttons[-1].append(types.InlineKeyboardButton(text=paybox.name, callback_data=paybox.id))
-                else:
-                    buttons.append([types.InlineKeyboardButton(text=paybox.name, callback_data=paybox.id)])
-            keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
-            await message.answer(
-                texts.select_paybox,
-                reply_markup=keyboard,
-            )
-            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.select_paybox)
-
-
-@router_comm.message(content_types=["web_app_data"], state=Form.cheque_picture)
-async def new_cheque_web_qr(message: types.Message, state: FSMContext):
-    """
-    New cheque picture from web scanner
-    :param message: Telegram message instance
-    """
-    await store_user_message(message)
-    query = users.select().where(users.c.chat_id == str(message.chat.id))
-    user = await database.fetch_one(query)
-
-    if user:
-        query = cboxes.select().where(cboxes.c.admin == user.id)
-        cbox = await database.fetch_one(query)
-
-        if cbox:
-            qr_data = json.loads(message.web_app_data.data)["data"]
-            cheque_info = await get_cheque_info_raw(qr_data)
             if not cheque_info:
                 await message.answer(
                     texts.cheque_not_detected,
@@ -852,7 +784,7 @@ async def create_balance(cashbox_id, message, tariff=None):
             tax=tariff.price,
             for_user=" за пользователя" if tariff.per_user else "",
             link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
-        ), reply_markup=types.ReplyKeyboardRemove(),  # Удаляем клавиатуру с кнопками "отправить номер телефона, отменить регистрацию"
+        ), reply_markup=types.ReplyKeyboardRemove(), # Удаляем клавиатуру с кнопками "отправить номер телефона, отменить регистрацию"
         # Чтобы скрыть предпросмотр ссылки на бота для оплаты
         # link_preview_is_disabled=True
     )
@@ -997,6 +929,7 @@ async def handle_phone_number(message: types.Message, state: FSMContext):
     await store_user_message(message)
     await message.reply(texts.get_phone_by_btn)
     await store_bot_message(message.message_id + 1, message.chat.id, bot.id, "Вы указали номер телефона. Нажмите на кнопку, чтобы отправить его.")
+
 
 
 async def main():
