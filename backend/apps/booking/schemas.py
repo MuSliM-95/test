@@ -9,9 +9,13 @@ class NomenclatureBookingCreate(BaseModel):
     tariff: Optional[Tariff] = None
 
 
-class NomenclatureBookingEdit(NomenclatureBookingCreate):
-    id: int
+class NomenclatureBookingEditView(NomenclatureBookingCreate):
     is_deleted: bool = None
+
+
+class NomenclatureBookingEdit(NomenclatureBookingEditView):
+    id: int
+
 
 
 class NomenclatureBookingPatch(NomenclatureCreate):
@@ -22,12 +26,15 @@ class NomenclatureBookingPatch(NomenclatureCreate):
 
 
 class BookingView(BaseModel):
+    title: Optional[str] = None
     contragent: Optional[int] = None
     contragent_accept: Optional[int] = None
     address: Optional[str] = None
     date_booking: Optional[int] = None
     start_booking: Optional[int] = None
     end_booking: Optional[int] = None
+    booking_user_id: Optional[int] = None
+    docs_sales_id: Optional[int] = None
     status_doc_sales: Optional[DocSalesStatus] = None
     status_booking: Optional[BookingStatus] = None
     comment: Optional[str] = None
@@ -46,7 +53,7 @@ class BookingEdit(BookingView):
 
 
 class BookingEditGoods(BookingEdit):
-    goods: Optional[List[NomenclatureBookingPatch]]
+    goods: Optional[List[NomenclatureBookingEditView]]
 
 
 class BookingEditList(BaseModel):
@@ -108,6 +115,19 @@ class BookingEventPathList(BaseModel):
 class ResponseBookingEventCreateList(BaseModel):
     status: str
     data: Optional[List[BookingEventCreate]]
+
+
+class BookingFiltersList(BaseModel):
+    title: Optional[str] = Field(default = None)
+    # good_category: Optional[int] = None
+    contragent: Optional[int] = None
+    start_booking: Optional[int] = None
+    end_booking: Optional[int] = None
+    status_doc_sales: Optional[DocSalesStatus] = None
+    status_booking: Optional[BookingStatus] = None
+
+
+
 
 
 

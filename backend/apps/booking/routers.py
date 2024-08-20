@@ -5,18 +5,60 @@ from database.db import database, booking, booking_nomenclature, nomenclature
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
-    BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate
+    BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate, BookingFiltersList
 from ws_manager import manager
 
 
 router = APIRouter(tags=["booking"])
 
 
+async def create_filters_list(filters: BookingFiltersList):
+    result = []
+
+    if filters.dict().get("title"):
+        result.append(booking.c.title.ilike(f'%{filters.dict().get("title").strip().lower()}%'))
+
+    if filters.dict().get("contragent"):
+        result.append(booking.c.contragent == filters.dict().get("contragent"))
+
+    if filters.dict().get("start_booking") and filters.dict().get("end_booking"):
+        result.append(and_(booking.c.start_booking >= filters.dict().get("start_booking"),
+                           booking.c.end_booking <= filters.dict().get("end_booking")))
+    elif filters.dict().get("start_booking") and not filters.dict().get("end_booking"):
+        result.append(booking.c.start_booking >= filters.dict().get("start_booking"))
+    elif filters.dict().get("end_booking") and not filters.dict().get("start_booking"):
+        result.append(booking.c.end_booking <= filters.dict().get("end_booking"))
+
+    if filters.dict().get("status_doc_sales"):
+        result.append(booking.c.status_doc_sales == filters.dict().get("status_doc_sales"))
+
+    if filters.dict().get("status_booking"):
+        result.append(booking.c.status_booking == filters.dict().get("status_booking"))
+
+    if filters.dict().get("status_booking") and filters.dict().get("status_doc_sales"):
+        result.append(or_(booking.c.status_booking == filters.dict().get("status_booking"),
+                          booking.c.status_doc_sales == filters.dict().get("status_doc_sales")))
+
+    if filters.dict().get("status_booking") and not filters.dict().get("status_doc_sales"):
+        result.append(booking.c.status_booking == filters.dict().get("status_booking"))
+
+    if not filters.dict().get("status_booking") and filters.dict().get("status_doc_sales"):
+        result.append(booking.c.status_doc_sales == filters.dict().get("status_doc_sales"))
+
+    return result
+
+
 @router.get("/booking/list", response_model = BookingList)
-async def get_list_booking(token: str):
+async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
+    filter_result = await create_filters_list(filters)
+    print(filter_result)
     user = await get_user_by_token(token)
     try:
-        list_db = await database.fetch_all(booking.select().where(booking.c.cashbox == user.cashbox_id))
+        list_db = await database.fetch_all(select(booking).
+                                           where(
+            booking.c.cashbox == user.cashbox_id, *filter_result
+        ))
+        print(list(map(dict, list_db)))
         list_result = []
         for item in list(map(dict, list_db)):
             goods = await database.fetch_all(
@@ -28,10 +70,12 @@ async def get_list_booking(token: str):
                     nomenclature.c.name,
                     nomenclature.c.category
                 )
-                .where(booking_nomenclature.c.booking_id == item.get("id"))
+                .where(and_(
+                    booking_nomenclature.c.booking_id == item.get("id")
+                ))
                 .select_from(booking_nomenclature)
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
-            list_result.append({**item, "goods": list(map(dict,goods))})
+            list_result.append({**item, "goods": list(map(dict, goods))})
 
         print(list_result)
         return list_result
@@ -42,9 +86,13 @@ async def get_list_booking(token: str):
 @router.get("/booking/{idx}", response_model = Booking)
 async def get_booking_by_idx(token: str, idx: int):
     user = await get_user_by_token(token)
-    result = await database.fetch_one(booking.select().where(and_(booking.c.cashbox == user.cashbox_id, booking.c.id == idx)))
+    result = await database.fetch_one(booking.select().where(and_(
+        booking.c.cashbox == user.cashbox_id,
+        booking.c.id == idx,
+        booking.c.is_deleted.is_not(True)
+    )))
     if result:
-        goods = await database.fetch_all(  select(
+        goods = await database.fetch_all(select(
                     booking_nomenclature.c.id,
                     booking_nomenclature.c.is_deleted,
                     booking_nomenclature.c.nomenclature_id,
@@ -52,7 +100,7 @@ async def get_booking_by_idx(token: str, idx: int):
                     nomenclature.c.name,
                     nomenclature.c.category
                 )
-                .where(booking_nomenclature.c.booking_id == idx)
+                .where(and_(booking_nomenclature.c.booking_id == idx))
                 .select_from(booking_nomenclature)
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
         dict_result = dict(result)
