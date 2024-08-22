@@ -92,8 +92,6 @@ services:
     command: python3 message_consumer.py
     volumes:
       - ./backend:/backend
-    depends_on:
-      - rabbitmq
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASS: ${POSTGRES_PASS}
