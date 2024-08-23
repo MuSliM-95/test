@@ -71,6 +71,7 @@ services:
       - /photos:/nginx/photos
     networks:
       - nginx-proxy
+      - infrastructure
     depends_on:
       - backend
       - adminer
@@ -117,6 +118,7 @@ services:
       POSTGRES_DB: cash_2
     networks:
       - nginx-proxy
+      - infrastructure
 
   backup:
     # image: eeshugerman/postgres-backup-s3:15
@@ -221,3 +223,6 @@ volumes:
 
 networks:
   nginx-proxy:
+  infrastructure:
+    name: infrastructure
+    external: true
