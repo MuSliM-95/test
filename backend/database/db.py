@@ -16,7 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger,
+    UniqueConstraint, SmallInteger, BIGINT,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -1551,6 +1551,16 @@ amo_users = sqlalchemy.Table(
     sqlalchemy.Column("ext_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    extend_existing=True
+)
+
+amo_custom_fields_comparison = sqlalchemy.Table(
+    "amo_custom_fields_comparison",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("field_amo_id", BIGINT),
+    sqlalchemy.Column("field_detection_name", String),
     extend_existing=True
 )
 
