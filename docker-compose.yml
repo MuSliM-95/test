@@ -72,6 +72,7 @@ services:
     networks:
       - nginx-proxy
       - infrastructure
+      - shared_services
     depends_on:
       - backend
       - adminer
@@ -225,4 +226,6 @@ networks:
   nginx-proxy:
   infrastructure:
     name: infrastructure
+    external: true
+  shared_services:
     external: true
