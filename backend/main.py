@@ -7,7 +7,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from database.db import database
 from database.fixtures import init_db
-from jobs import scheduler
 # import sentry_sdk
 
 from functions.users import get_user_id_cashbox_id_by_token
