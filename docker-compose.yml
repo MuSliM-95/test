@@ -32,8 +32,6 @@ services:
     volumes:
       - ./backend:/backend
       - /migrations:/backend/database/alembic/versions
-    ports:
-      - "8000:8000"
     depends_on:
       - db
     environment:
