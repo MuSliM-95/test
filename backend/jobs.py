@@ -40,7 +40,6 @@ from functions.gross_profit import process_gross_profit_report
 from functions.helpers import init_statement, get_statement
 from functions.payments import clear_repeats, repeat_payment
 from functions.users import raschet
-from start_jobs import logger
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
@@ -681,7 +680,6 @@ async def autorepeat():
 @scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction")
 async def tochka_update_transaction():
     await database.connect()
-    logger.debug("START TOCHKABANK")
     print("START TOCHKABANK")
     @database.transaction()
     async def _tochka_update():
