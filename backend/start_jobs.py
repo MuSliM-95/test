@@ -1,6 +1,11 @@
 import atexit
+import logging
+
 from jobs import scheduler
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Message-Consumer")
+logger.setLevel(logging.INFO)
 
 IS_RUN_STATE = True
 

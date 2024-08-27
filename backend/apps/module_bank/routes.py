@@ -1,6 +1,6 @@
 import aiohttp
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import and_
+from sqlalchemy import and_, select
 from starlette.responses import RedirectResponse
 
 from apps.tochka_bank.routes import integration_info
@@ -159,3 +159,22 @@ async def check(token: str, id_integration: int):
         message.update({'integration_isAuth': False})
     await manager.send_message(user.token, message)
     return {"isAuth": message.get('integration_isAuth')}
+
+@router.get("/module_bank/accounts/")
+async def accounts(token: str, id_integration: int):
+
+    """Получение списка счетов аккаунта банка"""
+
+    user = await get_user_by_token(token)
+
+    query = (select(
+        module_bank_accounts.c.id,
+        pboxes.c.name,
+        module_bank_accounts.c.currency,
+        module_bank_accounts.c.is_active).
+             where(pboxes.c.cashbox == user.get('cashbox_id')).
+             select_from(pboxes).
+             join(module_bank_accounts, module_bank_accounts.c.payboxes_id == pboxes.c.id).order_by(pboxes.c.name)
+             )
+    accounts = await database.fetch_all(query)
+    return {'result': accounts}
