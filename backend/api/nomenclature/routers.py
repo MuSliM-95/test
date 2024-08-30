@@ -157,6 +157,92 @@ async def get_nomenclature_by_id(token: str, idx: int):
     return nomenclature_db
 
 
+@router.post("/nomenclatures/", response_model=schemas.NomenclatureListGetRes)
+async def get_nomenclature_by_ids(token: str, ids: List[int], with_prices: bool = False, with_balance: bool = False):
+    """Получение списка номенклатур по списку ID"""
+    user = await get_user_by_token(token)
+
+    # Проверяем, что список ID не пустой
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Список ID не должен быть пустым")
+
+    query = (
+        select(
+            nomenclature,
+            units.c.convent_national_view.label("unit_name"),
+            func.array_remove(func.array_agg(func.distinct(nomenclature_barcodes.c.code)), None).label("barcodes")
+        )
+        .select_from(nomenclature)
+        .join(units, units.c.id == nomenclature.c.unit, full=True)
+        .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, full=True)
+        .where(
+            nomenclature.c.cashbox == user.cashbox_id,
+            nomenclature.c.is_deleted.is_not(True),
+            nomenclature.c.id.in_(ids)
+        )
+        .group_by(nomenclature.c.id, units.c.convent_national_view)
+        .order_by(asc(nomenclature.c.id))
+    )
+
+    nomenclature_db = await database.fetch_all(query)
+    nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+
+    for nomenclature_info in nomenclature_db:
+        if with_prices:
+            price = await database.fetch_all(
+                select(prices.c.price, price_types.c.name.label('price_type')).
+                where(prices.c.nomenclature == nomenclature_info['id']).
+                select_from(prices).
+                join(price_types, price_types.c.id == prices.c.price_type)
+            )
+            nomenclature_info["prices"] = price
+
+        if with_balance:
+            subquery = (
+                select([
+                    warehouses.c.name.label('warehouse_name'),
+                    warehouse_balances.c.current_amount,
+                    func.row_number().over(
+                        partition_by=warehouses.c.name,
+                        order_by=warehouse_balances.c.id.desc()
+                    ).label('row_num')
+                ])
+                .select_from(
+                    warehouse_balances.join(warehouses, warehouses.c.id == warehouse_balances.c.warehouse_id)
+                )
+                .where(
+                    warehouse_balances.c.nomenclature_id == nomenclature_info['id'],
+                    warehouse_balances.c.cashbox_id == user.cashbox_id
+                )
+                .alias('subquery')
+            )
+
+            query = (
+                select([
+                    subquery.c.warehouse_name,
+                    subquery.c.current_amount
+                ])
+                .where(
+                    subquery.c.row_num == 1
+                )
+                .order_by(
+                    subquery.c.warehouse_name
+                )
+            )
+
+            balances_list = await database.fetch_all(query)
+            nomenclature_info["balances"] = balances_list
+
+    query = select(func.count(nomenclature.c.id)).where(
+        nomenclature.c.cashbox == user.cashbox_id,
+        nomenclature.c.is_deleted.is_not(True),
+        nomenclature.c.id.in_(ids)
+    )
+    nomenclature_db_count = await database.fetch_val(query)
+
+    return {"result": nomenclature_db, "count": nomenclature_db_count}
+
+
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
                            offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
