@@ -39,6 +39,7 @@ class BookingView(BaseModel):
     status_booking: Optional[BookingStatus] = None
     comment: Optional[str] = None
     is_deleted: Optional[bool] = None
+    sale_payload: Optional[dict] = None
 
     class Config:
         orm_mode = True
