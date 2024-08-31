@@ -1,9 +1,29 @@
-ARG ALPINE_VERSION
-FROM alpine:3.16
+FROM debian:bullseye-slim
+
 ARG TARGETARCH
 
-ADD src/install.sh install.sh
-RUN sh install.sh && rm install.sh
+WORKDIR /root
+COPY src/* .
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    awscli \
+    openssl \
+    && update-ca-certificates \
+    && curl -L https://github.com/ivoronin/go-cron/releases/download/v0.0.5/go-cron_0.0.5_linux_${TARGETARCH}.tar.gz -o /usr/local/bin/go-cron.tar.gz \
+    && tar -xzvf /usr/local/bin/go-cron.tar.gz -C /usr/local/bin \
+    && rm /usr/local/bin/go-cron.tar.gz \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y postgresql-client-14 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN chmod +x ./*.sh /usr/local/bin/go-cron
 
 ENV POSTGRES_DATABASE ''
 ENV POSTGRES_HOST ''
@@ -22,9 +42,4 @@ ENV SCHEDULE ''
 ENV PASSPHRASE ''
 ENV BACKUP_KEEP_DAYS ''
 
-ADD src/run.sh run.sh
-ADD src/env.sh env.sh
-ADD src/backup.sh backup.sh
-ADD src/restore.sh restore.sh
-
-CMD ["sh", "run.sh"]
+ENTRYPOINT ["./run.sh"]
