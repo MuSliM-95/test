@@ -102,6 +102,7 @@ booking = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
     sqlalchemy.Column("comment", String),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("sale_payload", JSON)
 )
 
 
