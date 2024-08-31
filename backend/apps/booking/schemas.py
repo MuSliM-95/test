@@ -34,6 +34,7 @@ class BookingView(BaseModel):
     start_booking: Optional[int] = None
     end_booking: Optional[int] = None
     booking_user_id: Optional[int] = None
+    booking_driver_id: Optional[int] = None
     docs_sales_id: Optional[int] = None
     status_doc_sales: Optional[DocSalesStatus] = None
     status_booking: Optional[BookingStatus] = None
