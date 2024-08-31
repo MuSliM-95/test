@@ -96,6 +96,7 @@ booking = sqlalchemy.Table(
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable = True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable = True),
     sqlalchemy.Column("booking_user_id", Integer, ForeignKey("tg_accounts.id")),
+    sqlalchemy.Column("booking_driver_id", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("status_doc_sales", Enum(DocSalesStatus), nullable = False),
     sqlalchemy.Column("status_booking", Enum(BookingStatus), nullable = False),
     sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
