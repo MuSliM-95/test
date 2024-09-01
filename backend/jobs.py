@@ -1258,7 +1258,7 @@ async def module_bank_update_transaction():
                             .values({
                                 'name': operation.get('paymentPurpose'),
                                 'description': operation.get('paymentPurpose'),
-                                'type': 'outgoing' if operation.get('category') == 'Debet' else 'incoming',
+                                'type': 'outgoing' if operation.get('category') == 'Credit' else 'incoming',
                                 'tags': f"ModuleBank,{account.accountId}",
                                 'amount': operation.get('amount'),
                                 'cashbox': account.cashbox_id,
@@ -1372,7 +1372,7 @@ async def module_bank_update_transaction():
                             .values({
                                 'name': operation.get('paymentPurpose'),
                                 'description': operation.get('paymentPurpose'),
-                                'type': 'outgoing' if operation.get('category') == 'Debet' else 'incoming',
+                                'type': 'outgoing' if operation.get('category') == 'Credit' else 'incoming',
                                 'tags': f"ModuleBank,{account.accountId}",
                                 'amount': operation.get('amount'),
                                 'cashbox': account.cashbox_id,
@@ -1533,7 +1533,7 @@ async def module_bank_update_transaction():
                             .values({
                                 'name': operation.get('paymentPurpose'),
                                 'description': operation.get('paymentPurpose'),
-                                'type': 'outgoing' if operation.get('category') == 'Debet' else 'incoming',
+                                'type': 'outgoing' if operation.get('category') == 'Credit' else 'incoming',
                                 'tags': f"ModuleBank,{account.accountId}",
                                 'amount': operation.get('amount'),
                                 'cashbox': account.cashbox_id,
