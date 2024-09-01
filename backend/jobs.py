@@ -103,7 +103,7 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 #             await make_account(balance)
 
 
-@scheduler.scheduled_job("interval", seconds=5, id="autoburn")
+@scheduler.scheduled_job("interval", seconds=5, id="autoburn", max_instances=1)
 async def autoburn():
     await database.connect()
 
@@ -677,7 +677,7 @@ async def autorepeat():
 #     await process_gross_profit_report()
 
 
-@scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction")
+@scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction", max_instances=1)
 async def tochka_update_transaction():
     await database.connect()
     print("START TOCHKABANK")
@@ -1053,7 +1053,7 @@ async def tochka_update_transaction():
     await _tochka_update()
 
 
-@scheduler.scheduled_job('interval', minutes=5, id="module_bank_update_transaction")
+@scheduler.scheduled_job('interval', minutes=5, id="module_bank_update_transaction", max_instances=1)
 async def module_bank_update_transaction():
     async with async_session_maker() as session:
         query = (
