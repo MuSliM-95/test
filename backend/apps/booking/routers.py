@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from database.db import database, booking, booking_nomenclature, nomenclature
+from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
+    amo_leads
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \

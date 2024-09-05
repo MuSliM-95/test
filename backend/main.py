@@ -1,10 +1,16 @@
 import json
+import os
 import time
 
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
+from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.impl.RabbitFactory import RabbitFactory
+from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
+from common.utils.ioc.ioc import ioc
 from database.db import database
 from database.fixtures import init_db
 # import sentry_sdk
@@ -201,6 +207,18 @@ async def write_event_middleware(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup():
+    rabbit_factory = RabbitFactory(settings=RabbitMqSettings(
+        rabbitmq_host=os.getenv('RABBITMQ_HOST'),
+        rabbitmq_user=os.getenv('RABBITMQ_USER'),
+        rabbitmq_pass=os.getenv('RABBITMQ_PASS'),
+        rabbitmq_port=os.getenv('RABBITMQ_PORT'),
+        rabbitmq_vhost=os.getenv('RABBITMQ_VHOST')
+    ))
+
+    ioc.set(IRabbitFactory, await rabbit_factory())
+
+    InstallBookingRepeatWeb()(app=app)
+
     init_db()
     await database.connect()
 
