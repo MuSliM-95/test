@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from jobs import scheduler
 from database.db import database
 from database.fixtures import init_db
 # import sentry_sdk
@@ -203,8 +204,10 @@ async def write_event_middleware(request: Request, call_next):
 async def startup():
     init_db()
     await database.connect()
+    scheduler.start()
 
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
+    scheduler.shutdown()
