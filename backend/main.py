@@ -148,7 +148,6 @@ app.include_router(reports_router)
 app.include_router(module_bank_router)
 
 
-
 @app.middleware("http")
 async def write_event_middleware(request: Request, call_next):
     async def set_body(request: Request, body: bytes):
@@ -204,10 +203,10 @@ async def write_event_middleware(request: Request, call_next):
 async def startup():
     init_db()
     await database.connect()
-    scheduler.start()
+    # scheduler.start()
 
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
-    scheduler.shutdown()
+    # scheduler.shutdown()
