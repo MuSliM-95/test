@@ -25,27 +25,27 @@ services:
     networks:
       - nginx-proxy
 
-#  backend_jobs:
-#    build: ./backend
-#    restart: always
-#    command: bash -c "python3 start_jobs.py"
-#    volumes:
-#      - ./backend:/backend
-#      - /migrations:/backend/database/alembic/versions
-#    depends_on:
-#      - db
-#    environment:
-#      APP_URL: ${APP_URL}
-#      S3_ACCESS: ${S3_ACCESS}
-#      S3_SECRET: ${S3_SECRET}
-#      TG_TOKEN: ${TG_TOKEN}
-#      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
-#      ACCOUNT_INTERVAL: ${ACCOUNT_INTERVAL}
-#      POSTGRES_USER: ${POSTGRES_USER}
-#      POSTGRES_PASS: ${POSTGRES_PASS}
-#      XDG_RUNTIME_DIR: ./tmp
-#    networks:
-#      - nginx-proxy
+  backend_jobs:
+    build: ./backend
+    restart: always
+    command: bash -c "python3 start_jobs.py"
+    volumes:
+      - ./backend:/backend
+      - /migrations:/backend/database/alembic/versions
+    depends_on:
+      - db
+    environment:
+      APP_URL: ${APP_URL}
+      S3_ACCESS: ${S3_ACCESS}
+      S3_SECRET: ${S3_SECRET}
+      TG_TOKEN: ${TG_TOKEN}
+      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
+      ACCOUNT_INTERVAL: ${ACCOUNT_INTERVAL}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASS: ${POSTGRES_PASS}
+      XDG_RUNTIME_DIR: ./tmp
+    networks:
+      - nginx-proxy
 
   teleg_bot:
     build: ./backend
