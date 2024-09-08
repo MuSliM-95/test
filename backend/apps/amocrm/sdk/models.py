@@ -164,7 +164,7 @@ class AmoCRMAuthenticationResult:
                     {
                         "code": f"NOMENCLATURE_LIST",
                         "name": "Номенклатура",
-                        "type": "select",
+                        "type": "text",
                         "group_id": group_id
                     },
                     {
