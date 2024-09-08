@@ -1228,7 +1228,7 @@ async def module_bank_update_transaction():
                                 'Content-type': 'application/json'
                             },
                             json={
-                            "statuses": ["Executed"],
+                            "statuses": ["Executed", "Received"],
                             "from": f"{account.beginDate}Z",
                             "till": (datetime.now().date() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'),
                             "skip": 50 * (page - 1),
