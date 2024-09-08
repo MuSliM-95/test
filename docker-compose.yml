@@ -31,6 +31,7 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
     networks:
       - nginx-proxy
+      - infrastructure
 
   repeat_worker:
     image: tablecrm_backend:latest
@@ -57,6 +58,7 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
     networks:
       - nginx-proxy
+      - infrastructure
 
   post_amo_lead_worker:
     build: ./backend
@@ -84,6 +86,7 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
     networks:
       - nginx-proxy
+      - infrastructure
 
   backend_jobs:
     image: tablecrm_backend:latest
@@ -125,6 +128,7 @@ services:
       POSTGRES_PASS: ${POSTGRES_PASS}
     networks:
       - nginx-proxy
+      - infrastructure
 
   docasaurus:
     build: ./submodule-docurus
