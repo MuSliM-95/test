@@ -146,6 +146,36 @@ class AmoCRMAuthenticationResult:
                         "name": f"Оплачено рублями",
                         "type": "numeric",
                         "group_id": group_id
+                    },
+                    {
+                        "code": f"ACCOUNT_LINK",
+                        "name": "Ссылка на счет",
+                        "type": "url",
+                        "group_id": group_id
+                    },
+                    {
+                        "code": f"ACT_LINK",
+                        "name": "Ссылка на акт",
+                        "type": "url",
+                        "group_id": group_id
+                    },
+                    {
+                        "code": f"NOMENCLATURE_LIST",
+                        "name": "Номенклатура",
+                        "type": "select",
+                        "group_id": group_id
+                    },
+                    {
+                        "code": f"START_PERIOD",
+                        "name": "Начало периода",
+                        "type": "date",
+                        "group_id": group_id
+                    },
+                    {
+                        "code": f"END_PERIOD",
+                        "name": "Конец периода",
+                        "type": "date",
+                        "group_id": group_id
                     }
                 ]
                 field_ids = await self.post_custom_fields_leads(fields_predata)

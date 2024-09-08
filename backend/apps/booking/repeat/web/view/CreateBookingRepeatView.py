@@ -27,7 +27,8 @@ class CreateBookingRepeatView:
         amqp_messaging = await self.__amqp_messaging_factory()
 
         query = (
-            select(docs_sales.c.id)
+            select(docs_sales.c.id, amo_leads.c.id)
+            .select_from(docs_sales)
             .join(amo_leads_docs_sales_mapping, docs_sales.c.id == amo_leads_docs_sales_mapping.c.docs_sales_id)
             .join(amo_leads, amo_leads_docs_sales_mapping.c.lead_id == amo_leads.c.id)
             .where(and_(
@@ -62,7 +63,9 @@ class CreateBookingRepeatView:
                 cashbox_id=user.cashbox_id,
                 booking_id=booking_info.id,
                 start_booking=booking_info.start_booking,
-                end_booking=booking_info.end_booking
+                end_booking=booking_info.end_booking,
+                token=token,
+                lead_id=docs_sales_id.id_1
             ),
             routing_key="booking_repeat_tasks"
         )

@@ -17,8 +17,9 @@ class InstallBookingRepeatWeb:
         )
 
         app.add_api_route(
-            path="/amobooking",
+            path="/booking/amo/repeat",
             endpoint=create_booking_repeat_view.__call__,
             methods=["GET"],
-            status_code=status.HTTP_201_CREATED
+            status_code=status.HTTP_201_CREATED,
+            tags=["booking"]
         )

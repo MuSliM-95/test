@@ -1,3 +1,5 @@
+from typing import AsyncIterable
+
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
 
 
@@ -10,6 +12,9 @@ class IRabbitMessaging:
     ):
         raise NotImplementedError()
 
-    async def subscribe(self):
+    async def subscribe(
+        self,
+        queue_name: str,
+    ) -> AsyncIterable[bytes]:
         raise NotImplementedError()
 

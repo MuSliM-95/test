@@ -2,9 +2,10 @@ from json import loads
 
 from pydantic import ValidationError
 
-from apps.booking.repeat.handlers.impl.BookingRepeatEvent import BookingRepeatEvent
+from apps.booking.repeat.handlers.events.impl.BookingRepeatEvent import BookingRepeatEvent
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
 from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.core.IRabbitMessaging import IRabbitMessaging
 
 
 class RepeatBookingWorker:
@@ -18,18 +19,17 @@ class RepeatBookingWorker:
     async def start(
         self
     ):
-        print("TEST0")
-        rabbitmq_messaging = await self.__rabbitmq_messaging_factory()
-        print("TEST1")
-        async for data_bytes in rabbitmq_messaging.subscribe():
-            print("TEST2")
+        rabbitmq_messaging: IRabbitMessaging = await self.__rabbitmq_messaging_factory()
+        async for data_bytes in rabbitmq_messaging.subscribe(queue_name="booking_repeat_tasks"):
             message_json = loads(data_bytes)
             try:
                 validated_message = BaseBookingRepeatMessage(**message_json)
-                print("TEST3")
-                booking_repeat_event = BookingRepeatEvent(booking_repeat_message=validated_message)
+                booking_repeat_event = BookingRepeatEvent(
+                    booking_repeat_message=validated_message,
+                    rabbitmq_messaging_factory=self.__rabbitmq_messaging_factory
+                )
                 await booking_repeat_event()
-            except ValidationError:
-                print("Ошибка валидации")
+            except ValidationError as error:
+                print(f"Ошибка валидации {error}")
 
 

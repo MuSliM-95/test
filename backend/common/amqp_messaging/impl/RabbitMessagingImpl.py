@@ -24,6 +24,12 @@ class RabbitMessagingImpl(IRabbitMessaging):
 
         print(message.json().encode("utf-8"))
 
+        queue: aio_pika.abc.AbstractQueue = await publication_channel.declare_queue(
+            "booking_repeat_tasks",
+            auto_delete=False,
+            durable=True
+        )
+
         aio_pika_message = aio_pika.Message(
             body=message.json().encode("utf-8"),
             content_type="application/json",
@@ -38,12 +44,13 @@ class RabbitMessagingImpl(IRabbitMessaging):
         )
 
     async def subscribe(
-        self
+        self,
+        queue_name: str,
     ) -> AsyncIterable[bytes]:
         consumption_channel = await self.__channel.get_consumption_channel()
 
         queue: aio_pika.abc.AbstractQueue = await consumption_channel.declare_queue(
-            "booking_repeat_tasks",
+            queue_name,
             auto_delete=False,
             durable=True
         )

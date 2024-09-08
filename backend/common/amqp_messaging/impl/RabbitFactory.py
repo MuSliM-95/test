@@ -9,7 +9,6 @@ from common.amqp_messaging.core.IRabbitMessaging import IRabbitMessaging
 from common.amqp_messaging.impl.RabbitChannel import RabbitChannel
 from common.amqp_messaging.impl.RabbitMessagingImpl import RabbitMessagingImpl
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
-from common.amqp_messaging.models.RabbitTypeChannelEnum import RabbitTypeChannelEnum
 
 
 class RabbitFactory(IRabbitFactory):
@@ -33,19 +32,14 @@ class RabbitFactory(IRabbitFactory):
         )
         await connection.connect()
 
-        channels: Dict[RabbitTypeChannelEnum, AbstractRobustChannel] = {}
-        channels[RabbitTypeChannelEnum.PUBLICATION] = aio_pika.abc.AbstractChannel = await connection.channel(
-            channel_number=1)
-        channels[RabbitTypeChannelEnum.CONSUMPTION] = aio_pika.abc.AbstractChannel = await connection.channel(
-            channel_number=2)
+        channels: Dict[str, AbstractRobustChannel] = {}
+        channels[f"publication"] = aio_pika.abc.AbstractChannel = await connection.channel(
+            channel_number=len(channels) + 1)
 
-        queue: aio_pika.abc.AbstractQueue = await channels[RabbitTypeChannelEnum.PUBLICATION].declare_queue(
-            "booking_repeat_tasks",
-            auto_delete=False,
-            durable=True
+        rabbit_channel = RabbitChannel(
+            channels=channels,
+            connection=connection
         )
-
-        rabbit_channel = RabbitChannel(channels=channels)
         rabbit_messaging = RabbitMessagingImpl(channel=rabbit_channel)
 
         class RabbitMessageImpl(IRabbitFactory):
@@ -54,4 +48,3 @@ class RabbitFactory(IRabbitFactory):
                 return rabbit_messaging
 
         return RabbitMessageImpl()
-
