@@ -67,7 +67,6 @@ class PostLeadEvent(IPostLeadEvent):
                 ]
             ),
         ]
-        return
         if self.__post_amo_lead_message.contact_ext_id:
             create_lead_model = CreateLeadModel(
                 name=self.__post_amo_lead_message.lead_name,

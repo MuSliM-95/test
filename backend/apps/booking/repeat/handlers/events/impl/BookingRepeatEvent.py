@@ -12,7 +12,7 @@ from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBooking
 from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.core.IRabbitMessaging import IRabbitMessaging
 from database.db import booking, booking_nomenclature, database, nomenclature, docs_sales, docs_sales_goods, \
-    entity_to_entity, payments, loyality_transactions, amo_leads, amo_contacts
+    entity_to_entity, payments, loyality_transactions, amo_leads, amo_contacts, amo_lead_statuses
 
 
 class BookingRepeatEvent(IBookingRepeatEvent):
@@ -228,12 +228,18 @@ class BookingRepeatEvent(IBookingRepeatEvent):
                 )
                 await database.execute(query)
 
+            query = (
+                select(amo_lead_statuses.amo_id)
+                .where(amo_lead_statuses.c.id == lead_info.status_id)
+            )
+            status_id = await database.fetch_one(query)
+
             await rabbitmq_messaging_instance.publish(
                 message=NewLeadBaseModelMessage(
                     message_id=uuid.uuid4(),
                     lead_name=lead_info.name,
                     price=lead_info.price,
-                    status_id=lead_info.status_id,
+                    status_id=status_id.amo_id,
                     contact_ext_id=amo_contact_ext_id,
                     contact_id=lead_info.contact_id,
                     account_link="https://www.drom.ru",
