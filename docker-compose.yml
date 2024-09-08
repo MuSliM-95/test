@@ -23,6 +23,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASS: ${POSTGRES_PASS}
       POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
       XDG_RUNTIME_DIR: ./tmp
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASS: ${RABBITMQ_PASS}
@@ -107,6 +108,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASS: ${POSTGRES_PASS}
       POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
       XDG_RUNTIME_DIR: ./tmp
     networks:
       - nginx-proxy
@@ -124,8 +126,10 @@ services:
       APP_URL: ${APP_URL}
       TG_TOKEN: ${TG_TOKEN}
       CHEQUES_TOKEN: ${CHEQUES_TOKEN}
+      POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASS: ${POSTGRES_PASS}
+      POSTGRES_PORT: ${POSTGRES_PORT}
     networks:
       - nginx-proxy
       - infrastructure
