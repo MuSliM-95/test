@@ -229,7 +229,7 @@ class BookingRepeatEvent(IBookingRepeatEvent):
                 await database.execute(query)
 
             query = (
-                select(amo_lead_statuses.amo_id)
+                select(amo_lead_statuses.c.amo_id)
                 .where(amo_lead_statuses.c.id == lead_info.status_id)
             )
             status_id = await database.fetch_one(query)
