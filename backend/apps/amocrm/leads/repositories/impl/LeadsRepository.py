@@ -18,6 +18,9 @@ class LeadsRepository(ILeadsRepository):
                     'Authorization': f'Bearer {access_token}',
                     'Content-type': 'application/json'
             }) as resp:
-                resp.raise_for_status()
                 if resp.status == 200:
                     return await resp.json()
+                else:
+                    print(resp.status)
+                    print(await resp.text())
+                    resp.raise_for_status()
