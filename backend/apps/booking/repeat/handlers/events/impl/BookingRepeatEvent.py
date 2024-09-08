@@ -228,30 +228,30 @@ class BookingRepeatEvent(IBookingRepeatEvent):
                 )
                 await database.execute(query)
 
-            query = (
-                select(amo_lead_statuses.c.amo_id)
-                .where(amo_lead_statuses.c.id == lead_info.status_id)
-            )
-            status_id = await database.fetch_one(query)
+                query = (
+                    select(amo_lead_statuses.c.amo_id)
+                    .where(amo_lead_statuses.c.id == lead_info.status_id)
+                )
+                status_id = await database.fetch_one(query)
 
-            await rabbitmq_messaging_instance.publish(
-                message=NewLeadBaseModelMessage(
-                    message_id=uuid.uuid4(),
-                    lead_name=lead_info.name,
-                    price=lead_info.price,
-                    status_id=status_id.amo_id,
-                    contact_ext_id=amo_contact_ext_id,
-                    contact_id=lead_info.contact_id,
-                    account_link="https://www.drom.ru",
-                    act_link="https://www.drom.ru",
-                    nomenclature=nomenclature_name,
-                    start_period=booking_info_dict["start_booking"],
-                    end_period=booking_info_dict["end_booking"],
-                    docs_sales_id=result[0]["id"],
-                    cashbox_id=booking_repeat_message.cashbox_id,
-                ),
-                routing_key="post_amo_lead"
-            )
+                await rabbitmq_messaging_instance.publish(
+                    message=NewLeadBaseModelMessage(
+                        message_id=uuid.uuid4(),
+                        lead_name=lead_info.name,
+                        price=lead_info.price,
+                        status_id=status_id.amo_id,
+                        contact_ext_id=amo_contact_ext_id,
+                        contact_id=lead_info.contact_id,
+                        account_link="https://www.drom.ru",
+                        act_link="https://www.drom.ru",
+                        nomenclature=nomenclature_name,
+                        start_period=booking_info_dict["start_booking"],
+                        end_period=booking_info_dict["end_booking"],
+                        docs_sales_id=result[0]["id"],
+                        cashbox_id=booking_repeat_message.cashbox_id,
+                    ),
+                    routing_key="post_amo_lead"
+                )
 
         if booking_nomenclature_info:
             booking_start_next_month = self.__booking_repeat_message.start_booking + timedelta(days=30).total_seconds() + 1

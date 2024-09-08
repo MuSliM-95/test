@@ -89,7 +89,6 @@ class PostLeadEvent(IPostLeadEvent):
                 custom_fields_values=custom_fields,
             )
 
-
         created_leads = await self.__leads_repository.create_lead(
             access_token=install_info.access_token,
             amo_lead_model=create_lead_model,
@@ -132,7 +131,7 @@ class PostLeadEvent(IPostLeadEvent):
             await database.execute(query)
 
             query = (
-                select(docs_sales.tags)
+                select(docs_sales.c.tags)
                 .where(docs_sales.c.id == self.__post_amo_lead_message.docs_sales_id)
             )
             doc_sale_tags_info = await database.fetch_one(query)
