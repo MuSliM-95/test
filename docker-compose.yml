@@ -206,11 +206,10 @@ services:
       - infrastructure
 
   backup:
-    # image: eeshugerman/postgres-backup-s3:15
     build: ./backup
     restart: always
     environment:
-      SCHEDULE: '@daily'
+      SCHEDULE: '@hourly'
       BACKUP_KEEP_DAYS: 14
       S3_ENDPOINT: https://storage.clo.ru/
       S3_REGION: eu-north-1

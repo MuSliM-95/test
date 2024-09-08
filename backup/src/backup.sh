@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 set -eu
 set -o pipefail
@@ -34,17 +34,16 @@ rm "$local_file"
 
 echo "Backup complete."
 
-if [ -n "$BACKUP_KEEP_DAYS" ]; then
-  sec=$((86400*BACKUP_KEEP_DAYS))
-  date_from_remove=$(date -d "@$(($(date +%s) - sec))" +%Y-%m-%d)
-  backups_query="Contents[?LastModified<='${date_from_remove} 00:00:00'].{Key: Key}"
+sec=$((86400*${BACKUP_KEEP_DAYS:-14}))
+date_from_remove=$(date -d "@$(($(date +%s) - sec))" +%Y-%m-%d)
+previous_day=$(date -d "yesterday" +"%Y-%m-%d")
+backups_query="Contents[?((LastModified<'${date_from_remove}T00:00:00Z') || (LastModified>='${previous_day}T00:00:00Z' && LastModified<'${previous_day}T22:01:00Z'))].{Key: Key}"
 
-  echo "Removing old backups from $S3_BUCKET..."
-  aws $aws_args s3api list-objects \
-    --bucket "${S3_BUCKET}" \
-    --prefix "${S3_PREFIX}" \
-    --query "${backups_query}" \
-    --output text \
-    | xargs -n1 -t -I 'KEY' aws $aws_args s3 rm s3://"${S3_BUCKET}"/'KEY'
-  echo "Removal complete."
-fi
+echo "Removing old backups from $S3_BUCKET..."
+aws $aws_args s3api list-objects \
+  --bucket "${S3_BUCKET}" \
+  --prefix "${S3_PREFIX}" \
+  --query "${backups_query}" \
+  --output text \
+  | xargs --no-run-if-empty -t -I 'KEY' aws $aws_args s3 rm s3://"${S3_BUCKET}"/'KEY'
+echo "Removal complete."

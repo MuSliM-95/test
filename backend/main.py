@@ -11,6 +11,7 @@ from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
 from common.utils.ioc.ioc import ioc
+
 from database.db import database
 from database.fixtures import init_db
 # import sentry_sdk
@@ -153,7 +154,6 @@ app.include_router(reports_router)
 app.include_router(module_bank_router)
 
 
-
 @app.middleware("http")
 async def write_event_middleware(request: Request, call_next):
     async def set_body(request: Request, body: bytes):
@@ -221,8 +221,10 @@ async def startup():
 
     init_db()
     await database.connect()
+    # scheduler.start()
 
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
+    # scheduler.shutdown()
