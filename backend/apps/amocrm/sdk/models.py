@@ -36,7 +36,9 @@ class AmoCRMAuthenticationResult:
 
     async def get_amo_codes_leads(self):
         return [
-            "manager", "paid_loyalty", "paid_rubles"
+            "manager", "paid_loyalty", "paid_rubles", "account_link",
+            "act_link", "nomenclature_list", "start_period",
+            "end_period"
         ]
 
     async def get_amo_codes_contacts(self):

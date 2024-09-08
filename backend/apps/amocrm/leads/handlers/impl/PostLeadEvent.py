@@ -71,7 +71,7 @@ class PostLeadEvent(IPostLeadEvent):
         if self.__post_amo_lead_message.contact_ext_id:
             create_lead_model = CreateLeadModel(
                 name=self.__post_amo_lead_message.lead_name,
-                price=self.__post_amo_lead_message.price,
+                price=0 if not self.__post_amo_lead_message.price else self.__post_amo_lead_message.price,
                 status_id=self.__post_amo_lead_message.status_id,
                 custom_fields_values=custom_fields,
                 _embedded=EmveddedModel(
@@ -85,7 +85,7 @@ class PostLeadEvent(IPostLeadEvent):
         else:
             create_lead_model = CreateLeadModel(
                 name=self.__post_amo_lead_message.lead_name,
-                price=self.__post_amo_lead_message.price,
+                price=0 if not self.__post_amo_lead_message.price else self.__post_amo_lead_message.price,
                 status_id=self.__post_amo_lead_message.status_id,
                 custom_fields_values=custom_fields,
             )
