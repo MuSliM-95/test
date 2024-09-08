@@ -36,7 +36,6 @@ services:
     image: tablecrm_backend:latest
     restart: always
     command: bash -c "python3 run_repeat_worker.py"
-    network_mode: host
     volumes:
       - ./backend:/backend
     environment:
