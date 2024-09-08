@@ -17,6 +17,7 @@ section = config.config_ini_section
 
 config.set_section_option(section, "POSTGRES_USER", os.environ.get("POSTGRES_USER"))
 config.set_section_option(section, "POSTGRES_PASS", os.environ.get("POSTGRES_PASS"))
+config.set_section_option(section, "POSTGRES_HOST", os.environ.get("POSTGRES_HOST"))
 
 
 # add your model's MetaData object here
@@ -46,6 +47,7 @@ def run_migrations_offline() -> None:
 
     """
     url = config.get_main_option("sqlalchemy.url")
+    print(url)
     context.configure(
         url=url,
         target_metadata=target_metadata,

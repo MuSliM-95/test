@@ -1,0 +1,3 @@
+class IBookingRepeatEvent:
+
+    pass

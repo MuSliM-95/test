@@ -9,3 +9,4 @@ docker-compose.yml
 docker-compose.dev.yml
 /backend/database/alembic/versions
 /nginx/nginx.conf
+.env
