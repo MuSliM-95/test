@@ -68,21 +68,28 @@ class PostLeadEvent(IPostLeadEvent):
             ),
         ]
 
-        create_lead_model = CreateLeadModel(
+        if self.__post_amo_lead_message.contact_ext_id:
+            create_lead_model = CreateLeadModel(
                 name=self.__post_amo_lead_message.lead_name,
                 price=self.__post_amo_lead_message.price,
                 status_id=self.__post_amo_lead_message.status_id,
                 custom_fields_values=custom_fields,
-            )
-
-        if self.__post_amo_lead_message.contact_ext_id:
-            create_lead_model._embedded = EmveddedModel(
+                _embedded=EmveddedModel(
                     contacts=[
                         EmveddedContactModel(
                             id=self.__post_amo_lead_message.contact_ext_id
                         )
                     ]
                 )
+            )
+        else:
+            create_lead_model = CreateLeadModel(
+                name=self.__post_amo_lead_message.lead_name,
+                price=self.__post_amo_lead_message.price,
+                status_id=self.__post_amo_lead_message.status_id,
+                custom_fields_values=custom_fields,
+            )
+
 
         created_leads = await self.__leads_repository.create_lead(
             access_token=install_info.access_token,
