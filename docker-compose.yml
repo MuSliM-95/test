@@ -56,6 +56,8 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+    networks:
+      - nginx-proxy
 
   post_amo_lead_worker:
     build: ./backend
@@ -81,6 +83,8 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+    networks:
+      - nginx-proxy
 
   backend_jobs:
     image: tablecrm_backend:latest
