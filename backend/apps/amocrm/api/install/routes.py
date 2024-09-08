@@ -113,6 +113,8 @@ async def sc_l(account_id: int, client_uuid: str):
         amo_install.c.amo_account_id == account_id and amo_install.c.client_id == client_uuid)
     a_t = await database.fetch_one(query)
 
+    print(a_t)
+
     if not a_t:
         return {"result": "amo token does not connected!"}
 

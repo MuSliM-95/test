@@ -27,7 +27,7 @@ class PostLeadEvent(IPostLeadEvent):
 
         custom_fields = [
             CustomFieldValue(
-                field_code="ACCOUNT_LINK",
+                field_code="ACC_LINK",
                 values=[
                     CustomFieldValueElement(
                         value=self.__post_amo_lead_message.account_link
@@ -43,7 +43,7 @@ class PostLeadEvent(IPostLeadEvent):
                 ]
             ),
             CustomFieldValue(
-                field_code="NOMENCLATURE_LIST",
+                field_code="NOMEN_INFO",
                 values=[
                     CustomFieldValueElement(
                         value=self.__post_amo_lead_message.nomenclature
@@ -51,7 +51,7 @@ class PostLeadEvent(IPostLeadEvent):
                 ]
             ),
             CustomFieldValue(
-                field_code="START_PERIOD",
+                field_code="AREND_START",
                 values=[
                     CustomFieldValueElement(
                         value=self.__post_amo_lead_message.start_period
@@ -59,7 +59,7 @@ class PostLeadEvent(IPostLeadEvent):
                 ]
             ),
             CustomFieldValue(
-                field_code="END_PERIOD",
+                field_code="AREND_END",
                 values=[
                     CustomFieldValueElement(
                         value=self.__post_amo_lead_message.end_period

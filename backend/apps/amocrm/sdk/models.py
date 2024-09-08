@@ -150,7 +150,7 @@ class AmoCRMAuthenticationResult:
                         "group_id": group_id
                     },
                     {
-                        "code": f"ACCOUNT_LINK",
+                        "code": f"ACC_LINK",
                         "name": "Ссылка на счет",
                         "type": "url",
                         "group_id": group_id
@@ -162,19 +162,19 @@ class AmoCRMAuthenticationResult:
                         "group_id": group_id
                     },
                     {
-                        "code": f"NOMENCLATURE_LIST",
+                        "code": f"NOMEN_INFO",
                         "name": "Номенклатура",
                         "type": "text",
                         "group_id": group_id
                     },
                     {
-                        "code": f"START_PERIOD",
+                        "code": f"AREND_START",
                         "name": "Начало периода",
                         "type": "date",
                         "group_id": group_id
                     },
                     {
-                        "code": f"END_PERIOD",
+                        "code": f"AREND_END",
                         "name": "Конец периода",
                         "type": "date",
                         "group_id": group_id
