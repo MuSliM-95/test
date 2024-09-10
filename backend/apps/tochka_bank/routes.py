@@ -1,5 +1,5 @@
 import aiohttp
-from jobs import scheduler, tochka_update_transaction
+from jobs.jobs import scheduler, tochka_update_transaction
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database, tochka_bank_credentials, pboxes, tochka_bank_accounts

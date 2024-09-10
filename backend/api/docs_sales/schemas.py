@@ -60,7 +60,7 @@ class Create(BaseModel):
     sales_manager: Optional[int]
     paid_rubles: Optional[float]
     paid_lt: Optional[float]
-    status: Optional[bool]
+    status: bool
     goods: Optional[List[Item]]
 
     class Config:

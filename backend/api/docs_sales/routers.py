@@ -483,7 +483,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 "is_deleted": False,
                 "created_at": int(datetime.datetime.now().timestamp()),
                 "updated_at": int(datetime.datetime.now().timestamp()),
-                "status": True,
+                "status": instance_values['status'],
                 "stopped": True,
                 "docs_sales_id": instance_id
             }))

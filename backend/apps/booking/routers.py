@@ -1,3 +1,5 @@
+from logging import exception
+
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -120,28 +122,100 @@ async def get_booking_by_idx(token: str, idx: int):
              )
 async def create_booking(token: str, bookings: BookingCreateList):
     user = await get_user_by_token(token)
-    create_ids = []
+
+    insert_booking_list = []
+    prepare_booking_goods_list = []
+    exception_list = []
+    request_id = 0
+
     try:
         for bookingItem in bookings.dict()["__root__"]:
-                    goods = bookingItem["goods"]
-                    del bookingItem["goods"]
-                    create_booking_id = await database.execute(
-                        booking.insert().values(
-                            {**bookingItem, "cashbox": user.get("cashbox_id"), "is_deleted": False}))
-                    create_ids.append(create_booking_id)
-                    [
-                        await database.execute(booking_nomenclature.insert().values(
-                            {**good, "booking_id": create_booking_id, "is_deleted": False}))
-                     for good in goods
-                    ]
+            request_id += 1
+
+            skip_iteration_outer = False
+
+            good_info_list = []
+
+            exception = {}
+
+            for good_info in bookingItem.pop("goods"):
+                query = (
+                    select(
+                        nomenclature.c.id
+                    )
+                    .where(and_(
+                        nomenclature.c.id == good_info["nomenclature_id"],
+                        nomenclature.c.cashbox == user.get("cashbox_id")
+                    ))
+                )
+                nomenclature_info = await database.fetch_one(query)
+
+                if not nomenclature_info:
+                    skip_iteration_outer = True
+                    exception["request_id"] = request_id
+                    exception["error"] = "Nomenclature not found"
+                    break
+
+                query = (
+                    select(booking.c.id)
+                    .join(booking_nomenclature, booking.c.id == booking_nomenclature.c.booking_id)
+                    .where(
+                        and_(
+                            booking_nomenclature.c.nomenclature_id == good_info.nomenclature_id,
+                            booking.c.cashbox == user.get("cashbox_id"),
+                            booking.c.start_booking <= bookingItem.get("start_booking"),
+                            bookingItem.get("start_booking") <= booking.c.end_booking
+                        )
+                    )
+                )
+                booking_find = await database.fetch_one(query)
+                if booking_find:
+                    exception["request_id"] = request_id
+                    exception["error"] = "Conflict booking date with another booking"
+                    break
+
+                good_info_list.append(
+                {
+                    **good_info,
+                    "is_deleted": False,
+                })
+
+            if skip_iteration_outer:
+                exception_list.append(exception)
+                continue
+
+            prepare_booking_goods_list.append(good_info_list)
+            insert_booking_list.append(
+                {**bookingItem, "cashbox": user.get("cashbox_id"), "is_deleted": False}
+            )
+
+        query = (
+            booking.insert()
+            .values(insert_booking_list)
+            .returning(booking.c.id)
+        )
+        create_booking_ids = await database.fetch_all(query)
+
+        booking_goods_insert = []
+
+        for index, create_booking_id in enumerate(create_booking_ids):
+
+            booking_goods = prepare_booking_goods_list[index]
+
+            for booking_good_info in booking_goods:
+                booking_good_info["booking_id"] = create_booking_id.id
+                booking_goods_insert.append(booking_good_info)
+
+        await database.execute(booking_nomenclature.insert().values(booking_goods_insert))
+
         response = {
-                    "status": "success created",
-                    "data": [
-                        await get_booking_by_idx(
-                            token=token,
-                            idx = booking_id) for booking_id in create_ids
-                    ]
-                 }
+            "status": "success created",
+            "data": [
+                await get_booking_by_idx(
+                    token=token,
+                    idx = booking_id) for booking_id in [booking_create.id for booking_create in create_booking_ids]
+            ]
+        }
         await manager.send_message(
             token,
             {

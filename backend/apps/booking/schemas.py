@@ -63,7 +63,7 @@ class BookingEditList(BaseModel):
 
 
 class BookingCreate(BookingView):
-    goods: Optional[List[NomenclatureBookingCreate]]
+    goods: List[NomenclatureBookingCreate]
 
 
 class BookingCreateList(BaseModel):

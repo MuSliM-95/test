@@ -4,7 +4,7 @@ from apps.amocrm.function import refresh_token
 from ws_manager import manager
 
 from datetime import datetime
-from jobs import scheduler
+from jobs.jobs import scheduler
 from functions.helpers import gen_token
 
 

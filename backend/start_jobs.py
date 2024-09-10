@@ -1,7 +1,7 @@
 import asyncio
 import atexit
 
-from jobs import scheduler
+from jobs.jobs import scheduler
 
 IS_RUN_STATE = True
 
