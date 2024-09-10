@@ -7,6 +7,7 @@ import api.nomenclature.schemas as schemas
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
     warehouse_register_movement, warehouses, units, warehouse_balances
 from fastapi import APIRouter, HTTPException
+from fastapi.params import Body
 
 from functions.helpers import (
     check_entity_exists,
@@ -158,11 +159,10 @@ async def get_nomenclature_by_id(token: str, idx: int):
 
 
 @router.post("/nomenclatures/", response_model=schemas.NomenclatureListGetRes)
-async def get_nomenclature_by_ids(token: str, ids: List[int], with_prices: bool = False, with_balance: bool = False):
+async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example=[1, 2, 3]), with_prices: bool = False, with_balance: bool = False):
     """Получение списка номенклатур по списку ID"""
     user = await get_user_by_token(token)
 
-    # Проверяем, что список ID не пустой
     if not ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Список ID не должен быть пустым")
 
