@@ -4,8 +4,8 @@ from fastapi import HTTPException
 from sqlalchemy import select, and_
 
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
-from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
-from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import docs_sales, amo_leads_docs_sales_mapping, amo_leads, database, booking
 from functions.helpers import get_user_by_token
 
@@ -24,7 +24,7 @@ class CreateBookingRepeatView:
     ):
         user = await get_user_by_token(token)
 
-        amqp_messaging = await self.__amqp_messaging_factory()
+        amqp_messaging: IRabbitMessaging = await self.__amqp_messaging_factory()
 
         query = (
             select(docs_sales.c.id, amo_leads.c.id)

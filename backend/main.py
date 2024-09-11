@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
-from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
-from common.amqp_messaging.impl.RabbitFactory import RabbitFactory
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
 from common.utils.ioc.ioc import ioc
 
@@ -20,8 +20,6 @@ from functions.users import get_user_id_cashbox_id_by_token
 from functions.events import write_event
 
 from starlette.types import Message
-
-from apps.evotor.routes import has_access
 
 from api.cashboxes.routers import router as cboxes_router
 from api.contragents.routers import router as contragents_router

@@ -161,7 +161,7 @@ async def create_booking(token: str, bookings: BookingCreateList):
                     .join(booking_nomenclature, booking.c.id == booking_nomenclature.c.booking_id)
                     .where(
                         and_(
-                            booking_nomenclature.c.nomenclature_id == good_info.nomenclature_id,
+                            booking_nomenclature.c.nomenclature_id == good_info["nomenclature_id"],
                             booking.c.cashbox == user.get("cashbox_id"),
                             booking.c.start_booking <= bookingItem.get("start_booking"),
                             bookingItem.get("start_booking") <= booking.c.end_booking

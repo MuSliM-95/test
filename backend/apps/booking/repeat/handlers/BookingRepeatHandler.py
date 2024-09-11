@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Mapping, Any
 
 from pydantic.validators import timedelta
 from sqlalchemy import select, and_, insert
@@ -7,32 +8,30 @@ from sqlalchemy import select, and_, insert
 from api.docs_sales.routers import create
 from api.docs_sales.schemas import CreateMass, Create, Item
 from apps.amocrm.leads.models.NewLeadBaseModelMessage import NewLeadBaseModelMessage
-from apps.booking.repeat.handlers.events.core.IBookingRepeatEvent import IBookingRepeatEvent
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
-from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
-from common.amqp_messaging.core.IRabbitMessaging import IRabbitMessaging
+from common.amqp_messaging.common.core.EventHandler import IEventHandler
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import booking, booking_nomenclature, database, nomenclature, docs_sales, docs_sales_goods, \
     entity_to_entity, payments, loyality_transactions, amo_leads, amo_contacts, amo_lead_statuses
 
 
-class BookingRepeatEvent(IBookingRepeatEvent):
+class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
 
     def __init__(
         self,
-        booking_repeat_message: BaseBookingRepeatMessage,
         rabbitmq_messaging_factory: IRabbitFactory
     ):
-        self.__booking_repeat_message = booking_repeat_message
         self.__rabbitmq_messaging_factory = rabbitmq_messaging_factory
 
-    async def __call__(self):
+    async def __call__(self, event: Mapping[str, Any]):
         rabbitmq_messaging: IRabbitMessaging = await self.__rabbitmq_messaging_factory()
-
+        booking_repeat_message = BaseBookingRepeatMessage(**event)
         query = (
             select(booking_nomenclature)
             .where(
                 and_(
-                    booking_nomenclature.c.booking_id == self.__booking_repeat_message.booking_id,
+                    booking_nomenclature.c.booking_id == booking_repeat_message.booking_id,
                     booking_nomenclature.c.is_deleted == False
                 )
             )
@@ -41,7 +40,7 @@ class BookingRepeatEvent(IBookingRepeatEvent):
 
         query = (
             select(amo_leads)
-            .where(amo_leads.c.id == self.__booking_repeat_message.lead_id)
+            .where(amo_leads.c.id == booking_repeat_message.lead_id)
         )
         lead_info = await database.fetch_one(query)
 
@@ -254,7 +253,7 @@ class BookingRepeatEvent(IBookingRepeatEvent):
                 )
 
         if booking_nomenclature_info:
-            booking_start_next_month = self.__booking_repeat_message.start_booking + timedelta(days=30).total_seconds() + 1
+            booking_start_next_month = booking_repeat_message.start_booking + timedelta(days=30).total_seconds() + 1
             query = (
                 select(booking)
                 .join(
@@ -262,7 +261,7 @@ class BookingRepeatEvent(IBookingRepeatEvent):
                 )
                 .where(
                     and_(
-                        booking.c.cashbox == self.__booking_repeat_message.cashbox_id,
+                        booking.c.cashbox == booking_repeat_message.cashbox_id,
                         booking_nomenclature.c.nomenclature_id == booking_nomenclature_info.nomenclature_id,
                         booking_nomenclature.c.is_deleted == False
                     )
@@ -278,13 +277,13 @@ class BookingRepeatEvent(IBookingRepeatEvent):
 
             if not find_booking:
                 await booking_repeat(
-                    booking_repeat_message=self.__booking_repeat_message,
+                    booking_repeat_message=booking_repeat_message,
                     rabbitmq_messaging_instance=rabbitmq_messaging
                 )
             else:
                 print("REPEAT DENIED")
         else:
             await booking_repeat(
-                booking_repeat_message=self.__booking_repeat_message,
+                booking_repeat_message=booking_repeat_message,
                 rabbitmq_messaging_instance=rabbitmq_messaging
             )

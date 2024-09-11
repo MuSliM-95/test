@@ -2,7 +2,7 @@ import asyncio
 import os
 
 from apps.booking.repeat.worker.impl.RepeatBookingWorker import RepeatBookingWorker
-from common.amqp_messaging.impl.RabbitFactory import RabbitFactory
+from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
 from database.db import database
 

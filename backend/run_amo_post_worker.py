@@ -2,7 +2,7 @@ import asyncio
 import os
 
 from apps.amocrm.leads.worker.impl.PostAmoLeadWorker import PostAmpLeadWorker
-from common.amqp_messaging.impl.RabbitFactory import RabbitFactory
+from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
 from database.db import database
 

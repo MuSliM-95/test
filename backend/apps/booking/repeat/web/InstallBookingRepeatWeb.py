@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from starlette import status
 
 from apps.booking.repeat.web.view.CreateBookingRepeatView import CreateBookingRepeatView
-from common.amqp_messaging.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.utils.ioc.ioc import ioc
 
 
