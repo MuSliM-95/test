@@ -1,10 +1,18 @@
 import json
+import os
+
 from database.db import database,  users
 import aio_pika
 
 
 async def produce_message(body: dict) -> None:
-    connection = await aio_pika.connect_robust(host="rabbitmq", port=5672)
+    connection = await aio_pika.connect_robust(
+        host=os.getenv('RABBITMQ_HOST'),
+        port=os.getenv('RABBITMQ_PORT'),
+        login=os.getenv('RABBITMQ_USER'),
+        password=os.getenv('RABBITMQ_PASS'),
+        virtualhost=os.getenv('RABBITMQ_VHOST'),
+        timeout=10)
 
     async with connection:
         routing_key = "message_queue"
