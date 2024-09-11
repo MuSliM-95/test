@@ -1,4 +1,6 @@
 import asyncio
+import os
+
 import aio_pika
 import json
 import logging
@@ -13,7 +15,13 @@ logger.setLevel(logging.INFO)
 
 async def message_consumer() -> None:
     logger.info("START CONSUMER")
-    connection = await aio_pika.connect_robust(host="rabbitmq", port=5672, timeout=10)
+    connection = await aio_pika.connect_robust(
+        host=os.getenv('RABBITMQ_HOST'),
+        port=os.getenv('RABBITMQ_PORT'),
+        login=os.getenv('RABBITMQ_USER'),
+        password=os.getenv('RABBITMQ_PASS'),
+        virtualhost=os.getenv('RABBITMQ_VHOST'),
+        timeout=10)
     await database.connect()
     async with connection:
         channel = await connection.channel()
