@@ -203,6 +203,7 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
     networks:
       - nginx-proxy
+      - infrastructure
 
   db:
     image: postgres:14.2
