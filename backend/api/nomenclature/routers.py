@@ -160,7 +160,7 @@ async def get_nomenclature_by_id(token: str, idx: int):
 
 @router.post("/nomenclatures/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example=[1, 2, 3]), with_prices: bool = False, with_balance: bool = False):
-    """Получение списка номенклатур по списку ID"""
+    """Получение списка номенклатур по списку ID категорий"""
     user = await get_user_by_token(token)
 
     if not ids:
