@@ -178,7 +178,7 @@ async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example
         .where(
             nomenclature.c.cashbox == user.cashbox_id,
             nomenclature.c.is_deleted.is_not(True),
-            nomenclature.c.id.in_(ids)
+            nomenclature.c.category.in_(ids)
         )
         .group_by(nomenclature.c.id, units.c.convent_national_view)
         .order_by(asc(nomenclature.c.id))
