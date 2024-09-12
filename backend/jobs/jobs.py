@@ -41,11 +41,16 @@ from functions.gross_profit import process_gross_profit_report
 from functions.helpers import init_statement, get_statement
 from functions.payments import clear_repeats, repeat_payment
 from functions.users import raschet
+from jobs.module_bank_job.job import module_bank_update_transaction
+from jobs.tochka_bank_job.job import tochka_update_transaction
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
 )
 jobstore = SQLAlchemyJobStore(engine=engine_job_store)
+
+scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5, id="tochka_update_transaction", max_instances=1)
+
 try:
     try:
         jobstore.remove_job("check_account")

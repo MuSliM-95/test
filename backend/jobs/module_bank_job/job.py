@@ -6,7 +6,7 @@ from sqlalchemy import select, and_
 from database.db import payments, pboxes, users_cboxes_relation, contragents, docs_sales, async_session_maker, \
     module_bank_operations, module_bank_accounts, module_bank_credentials, integrations_to_cashbox
 from functions.users import raschet
-from jobs.jobs import scheduler
+
 from jobs.module_bank_job.repositories.ContragentRepository import ContragentRepository
 
 async def extract_number(text):
@@ -93,7 +93,7 @@ async def process_payment(contragent_id, operation, cashbox_id, session):
     return False, 0
 
 
-@scheduler.scheduled_job('interval', minutes=5, id="module_bank_update_transaction", max_instances=1)
+# @scheduler.scheduled_job('interval', minutes=5, id="module_bank_update_transaction", max_instances=1)
 async def module_bank_update_transaction(
         contragent_repository: ContragentRepository = ContragentRepository()
 ):
