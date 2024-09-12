@@ -304,12 +304,13 @@ async def module_bank_update_transaction(
 
                         if contragent_db:
                             contragent_id = contragent_db.id
-                            result_process, payment_create_id = await process_payment(
-                                contragent_id=contragent_db.id,
-                                operation=operation,
-                                cashbox_id=account.cashbox_id,
-                                session=session
-                            )
+                            if operation.get('category') == "Debet":
+                                result_process, payment_create_id = await process_payment(
+                                    contragent_id=contragent_db.id,
+                                    operation=operation,
+                                    cashbox_id=account.cashbox_id,
+                                    session=session
+                                )
                         else:
                             query = (
                                 contragents.insert()
