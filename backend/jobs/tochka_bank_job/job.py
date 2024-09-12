@@ -1,4 +1,5 @@
 import asyncio
+import re
 from datetime import datetime, timedelta
 
 import aiohttp
@@ -10,8 +11,12 @@ from database.db import database, payments, tochka_bank_accounts, tochka_bank_cr
     tochka_bank_payments, contragents, docs_sales
 from functions.helpers import init_statement, get_statement
 from jobs.jobs import scheduler
-from jobs.module_bank_job.job import extract_number
 
+async def extract_number(text):
+    match = re.search(r'[№#]\s*(\d+)', text)
+    if match:
+        return int(match.group(1))
+    return None
 
 async def process_payment(contragent_id, description, amount, cashbox_id):
     if description:
