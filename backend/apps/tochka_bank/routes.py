@@ -1,11 +1,12 @@
 import aiohttp
-from jobs.jobs import scheduler, tochka_update_transaction
+from jobs.jobs import scheduler
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database, tochka_bank_credentials, pboxes, tochka_bank_accounts
 from datetime import datetime
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
+from jobs.tochka_bank_job.job import tochka_update_transaction
 from ws_manager import manager
 from apps.tochka_bank.schemas import Account, AccountUpdate, StatementData
 
