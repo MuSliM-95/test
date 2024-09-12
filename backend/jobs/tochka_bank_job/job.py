@@ -10,7 +10,6 @@ from database.db import database, payments, tochka_bank_accounts, tochka_bank_cr
     users_cboxes_relation, \
     tochka_bank_payments, contragents, docs_sales
 from functions.helpers import init_statement, get_statement
-# from jobs.jobs import scheduler
 
 async def extract_number(text):
     match = re.search(r'[№#]\s*(\d+)', text)
@@ -87,7 +86,6 @@ async def process_payment(contragent_id, description, amount, cashbox_id):
 
     return False, 0
 
-# @scheduler.scheduled_job('interval', minutes=5, id="tochka_update_transaction", max_instances=1)
 async def tochka_update_transaction():
     await database.connect()
     print("START TOCHKABANK")

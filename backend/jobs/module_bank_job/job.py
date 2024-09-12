@@ -93,7 +93,6 @@ async def process_payment(contragent_id, operation, cashbox_id, session):
     return False, 0
 
 
-# @scheduler.scheduled_job('interval', minutes=5, id="module_bank_update_transaction", max_instances=1)
 async def module_bank_update_transaction(
         contragent_repository: ContragentRepository = ContragentRepository()
 ):

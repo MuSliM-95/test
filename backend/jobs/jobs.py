@@ -50,6 +50,7 @@ scheduler = AsyncIOScheduler(
 jobstore = SQLAlchemyJobStore(engine=engine_job_store)
 
 scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5, id="tochka_update_transaction", max_instances=1)
+scheduler.add_job(func=module_bank_update_transaction, trigger='interval', minutes=5, id="module_bank_update_transaction", max_instances=1)
 
 try:
     try:
