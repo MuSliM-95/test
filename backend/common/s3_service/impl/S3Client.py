@@ -1,0 +1,39 @@
+import io
+
+import aioboto3
+
+from ..core.IS3Client import IS3Client
+from ..models.S3SettingsModel import S3SettingsModel
+
+
+class S3Client(IS3Client):
+    def __init__(
+        self,
+        s3_settings: S3SettingsModel
+    ):
+        self.session = aioboto3.Session(
+            aws_access_key_id=s3_settings.aws_access_key_id,
+            aws_secret_access_key=s3_settings.aws_secret_access_key
+        )
+
+    async def upload_file(self, bucket_name: str, object_name: str, file_path: str):
+        async with self.session.client('s3') as s3_client:
+            await s3_client.upload_file(file_path, bucket_name, object_name)
+
+    async def upload_file_object(self, bucket_name: str, file_key: str, file_bytes: bytes):
+        async with self.session.client('s3') as s3_client:
+            await s3_client.upload_fileobj(io.BytesIO(file_bytes), bucket_name, file_key)
+
+    async def download_file(self, bucket_name: str, object_name: str, file_path: str):
+        async with self.session.client('s3') as s3_client:
+            await s3_client.download_file(bucket_name, object_name, file_path)
+
+    async def get_object(self, bucket_name: str, object_name: str) -> bytes:
+        async with self.session.client('s3') as s3_client:
+            response = await s3_client.get_object(Bucket=bucket_name, Key=object_name)
+            data = await response['Body'].read()
+            return data
+
+    async def put_object(self, bucket_name: str, object_name: str, data: bytes):
+        async with self.session.client('s3') as s3_client:
+            await s3_client.put_object(Bucket=bucket_name, Key=object_name, Body=data)
