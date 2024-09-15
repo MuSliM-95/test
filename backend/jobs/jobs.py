@@ -50,10 +50,6 @@ scheduler = AsyncIOScheduler(
 )
 jobstore = SQLAlchemyJobStore(engine=engine_job_store)
 
-scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5, id="tochka_update_transaction", max_instances=1)
-scheduler.add_job(func=module_bank_update_transaction, trigger='interval', minutes=5, id="module_bank_update_transaction", max_instances=1)
-scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", max_instances=1)
-
 try:
     try:
         jobstore.remove_job("check_account")
@@ -75,6 +71,14 @@ try:
         jobstore.remove_job("distribution")
     except JobLookupError:
         pass
+    try:
+        jobstore.remove_job("tochka_update_transaction")
+    except JobLookupError:
+        pass
+    try:
+        jobstore.remove_job("module_bank_update_transaction")
+    except JobLookupError:
+        pass
     # try:
     # jobstore.remove_job("amo_import")
     # except JobLookupError:
@@ -91,6 +95,9 @@ def add_job_to_sched(func, **kwargs):
 
 accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 
+scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5, id="tochka_update_transaction", max_instances=1)
+scheduler.add_job(func=module_bank_update_transaction, trigger='interval', minutes=5, id="module_bank_update_transaction", max_instances=1)
+scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", max_instances=1)
 
 # accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 # amo_interval = int(os.getenv("AMO_CONTACTS_IMPORT_FREQUENCY_SECONDS", default=120))
