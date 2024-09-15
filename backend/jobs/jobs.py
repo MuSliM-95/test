@@ -71,14 +71,6 @@ try:
         jobstore.remove_job("distribution")
     except JobLookupError:
         pass
-    try:
-        jobstore.remove_job("tochka_update_transaction")
-    except JobLookupError:
-        pass
-    try:
-        jobstore.remove_job("module_bank_update_transaction")
-    except JobLookupError:
-        pass
     # try:
     # jobstore.remove_job("amo_import")
     # except JobLookupError:
