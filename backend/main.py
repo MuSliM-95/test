@@ -222,7 +222,8 @@ async def startup():
     s3_factory = S3ServiceFactory(
         s3_settings=S3SettingsModel(
             aws_access_key_id=os.getenv('S3_ACCESS'),
-            aws_secret_access_key=os.getenv('S3_SECRET')
+            aws_secret_access_key=os.getenv('S3_SECRET'),
+            endpoint_url=os.getenv('S3_URL')
         )
     )
 
