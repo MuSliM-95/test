@@ -302,21 +302,3 @@ async def create_booking(token: str, bookings: BookingEditList):
 
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
-
-
-@database.transaction()
-@router.post("/booking/events/create",
-             status_code=201,
-             )
-async def create_events(token: str):
-    pass
-
-
-@router.get("/booking/events", status_code=200)
-async def get_list_events(token: str):
-    pass
-
-
-@router.get("/booking/events/{idx}", status_code=200)
-async def get_event_by_idx(token: str, idx: int):
-    pass

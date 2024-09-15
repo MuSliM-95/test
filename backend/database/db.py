@@ -134,6 +134,13 @@ booking_events = sqlalchemy.Table(
     sqlalchemy.Column("is_deleted", Boolean),
 )
 
+booking_events_photo = sqlalchemy.Table(
+    "booking_events_photo",
+    metadata,
+    sqlalchemy.Column("id", Integer, index=True),
+    sqlalchemy.Column("booking_event_id", Integer, ForeignKey("booking_events.id"), primary_key=True),
+    sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), primary_key=True),
+)
 
 module_bank_credentials = sqlalchemy.Table(
     "module_bank_credentials",

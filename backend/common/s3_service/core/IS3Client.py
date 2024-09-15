@@ -12,5 +12,8 @@ class IS3Client:
     async def get_object(self, bucket_name: str, object_name: str) -> bytes:
         raise NotImplementedError()
 
+    async def get_link_object(self, bucket_name: str, file_key: str):
+        raise NotImplementedError()
+
     async def put_object(self, bucket_name: str, object_name: str, data: bytes):
         raise NotImplementedError()

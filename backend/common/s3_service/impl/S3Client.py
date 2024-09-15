@@ -34,6 +34,18 @@ class S3Client(IS3Client):
             data = await response['Body'].read()
             return data
 
+    async def get_link_object(self, bucket_name: str, file_key: str):
+        async with self.session.client('s3') as s3_client:
+            url = await s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': bucket_name,
+                    'Key': file_key
+                },
+                ExpiresIn=None
+            )
+            return url
+
     async def put_object(self, bucket_name: str, object_name: str, data: bytes):
         async with self.session.client('s3') as s3_client:
             await s3_client.put_object(Bucket=bucket_name, Key=object_name, Body=data)

@@ -6,10 +6,16 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from apps.booking.events.infrastructure.repositories.core.IBookingEventsRepository import IBookingEventsRepository
+from apps.booking.events.infrastructure.repositories.impl.BookingEventsRepository import BookingEventsRepository
+from apps.booking.events.web.InstallBookingEventsWeb import InstallBookingEventsWeb
 from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
+from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
+from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
+from common.s3_service.models.S3SettingsModel import S3SettingsModel
 from common.utils.ioc.ioc import ioc
 
 from database.db import database
@@ -213,9 +219,20 @@ async def startup():
         rabbitmq_vhost=os.getenv('RABBITMQ_VHOST')
     ))
 
+    s3_factory = S3ServiceFactory(
+        s3_settings=S3SettingsModel(
+            aws_access_key_id=os.getenv('S3_ACCESS'),
+            aws_secret_access_key=os.getenv('S3_SECRET')
+        )
+    )
+
     ioc.set(IRabbitFactory, await rabbit_factory())
+    ioc.set(IS3ServiceFactory, s3_factory)
+
+    ioc.set(IBookingEventsRepository, BookingEventsRepository())
 
     InstallBookingRepeatWeb()(app=app)
+    InstallBookingEventsWeb()(app=app)
 
     init_db()
     await database.connect()

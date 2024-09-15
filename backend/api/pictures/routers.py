@@ -27,7 +27,7 @@ s3_session = aioboto3.Session()
 
 s3_data = {
     "service_name": "s3",
-    "endpoint_url": "https://storage.clo.ru",
+    "endpoint_url": "http://localhost:8000",
     "aws_access_key_id": environ.get("S3_ACCESS"),
     "aws_secret_access_key": environ.get("S3_SECRET"),
 }
@@ -50,6 +50,7 @@ async def get_picture_by_id(filename: str):
     """Получение картинки по ID"""
     async with s3_session.client(**s3_data) as s3:
         try:
+
 
             file_key = f"photos/{filename}"
             s3_ob = await s3.get_object(Bucket=bucket_name, Key=file_key)
