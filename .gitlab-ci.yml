@@ -1,50 +1,25 @@
 stages:
-#  - test
-  - build_up_docker
+  - docker
 
-#test:
-#  stage: test
-#  only:
-#    - master
-#  tags:
-#    - master_runner
-#  script:
-#    - echo "Starting Unit test"
-#    - python3 -m venv .venv # Создаем Виртуальное окружение
-#    - source .venv/bin/activate # Выполняем вход и следующей строкой устанавливаем зависимости
-#    - pip install -r backend/requirements.txt
-#    # - python3 backend/api_tests/*.py  # Выполняем тесты
-#    - export APP_URL=$APP_URL
-#    - export S3_ACCESS=$S3_ACCESS
-#    - export S3_SECRET=$S3_SECRET
-#    - export S3_BACKUPS_ACCESSKEY=$S3_BACKUPS_ACCESSKEY
-#    - export S3_BACKUPS_SECRETKEY=$S3_BACKUPS_SECRETKEY
-#    - export TG_TOKEN=$TG_TOKEN
-#    - export POSTGRES_USER=$POSTGRES_USER
-#    - export POSTGRES_PASS=$POSTGRES_PASS
-#    - export CHEQUES_TOKEN=$CHEQUES_TOKEN
-#    - export ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL
-#    - pytest
-#    - rm -rf .venv
-#    - unset APP_URL
-#    - unset S3_ACCESS
-#    - unset S3_SECRET
-#    - unset S3_BACKUPS_ACCESSKEY
-#    - unset S3_BACKUPS_SECRETKEY
-#    - unset TG_TOKEN
-#    - unset POSTGRES_USER
-#    - unset POSTGRES_PASS
-#    - unset CHEQUES_TOKEN
-#    - unset ACCOUNT_INTERVAL
+.docker_script: &docker_script
+  script:
+    - CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME docker compose build
+    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up -d --force-recreate
 
 build-up-docker-job:
-  stage: build_up_docker
+  stage: docker
   only:
     - master
   tags:
     - master_runner
   environment: production
-  script:
-    - echo "Deploying application..."
-    - docker compose stop
-    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up --build -d
+  <<: *docker_script
+
+build-up-docker-job-dev:
+  stage: docker
+  only:
+    - dev
+  tags:
+    - dev_runner
+  environment: production
+  <<: *docker_script

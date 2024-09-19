@@ -151,7 +151,11 @@ services:
       - nginx-proxy
 
   nginx:
-    build: ./nginx
+    build: 
+      context: ./nginx
+      dockerfile: Dockerfile
+      args:
+        BRANCH_NAME: ${CI_COMMIT_REF_NAME}
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     restart: always
     labels:
@@ -161,13 +165,11 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # - /etc/letsencrypt/:/etc/letsencrypt/
       - /certbot/www:/var/www/certbot/:ro
       - /etc/letsencrypt/:/etc/nginx/ssl/:ro
       - /var/log:/var/log
       - /var/www/tablecrm-app:/var/www/app
       - /var/www/tablecrm-landing:/var/www/landing
-      # - ./htpasswd:/etc/nginx/.htpasswd
       - /photos:/nginx/photos
     networks:
       - nginx-proxy
@@ -219,6 +221,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgresql.conf:/etc/postgresql.conf:ro
+      - ./initdb:/docker-entrypoint-initdb.d
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
