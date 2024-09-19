@@ -1,8 +1,8 @@
 import json
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 
-from database.db import engine, units, metadata, entity_or_function
+from database.db import engine, units, metadata, entity_or_function, payments
 
 
 def prepopulate_units(target, connection, **kwargs):
@@ -19,6 +19,13 @@ def prepopulate_functions(target, connection, **kwargs):
         connection.execute(target.insert(), *values)
 
 
+def create_raschet_func(target, connection, **kwargs):
+    with open("database/initial_data/raschet.sql", "r", encoding="UTF-8") as file:
+        sql = file.read()
+        connection.execute(text(sql))
+
+
 def init_db():
     event.listen(units, "after_create", prepopulate_units)
     event.listen(entity_or_function, "after_create", prepopulate_functions)
+    event.listen(payments, "after_create", create_raschet_func)
