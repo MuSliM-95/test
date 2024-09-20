@@ -21,5 +21,5 @@ build-up-docker-job-dev:
     - dev
   tags:
     - dev_runner
-  environment: production
+  environment: dev
   <<: *docker_script
