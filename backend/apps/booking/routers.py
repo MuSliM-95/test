@@ -201,8 +201,6 @@ async def create_booking(token: str, bookings: BookingCreateList):
 
             booking_goods_insert = []
 
-            print(prepare_booking_goods_list)
-
             for index, create_booking_id in enumerate(create_booking_ids):
 
                 booking_goods = prepare_booking_goods_list[index]
@@ -211,12 +209,11 @@ async def create_booking(token: str, bookings: BookingCreateList):
                     booking_good_info["booking_id"] = create_booking_id.id
                     booking_goods_insert.append(booking_good_info)
 
-            print(booking_goods_insert)
             if booking_goods_insert:
                 await database.execute(booking_nomenclature.insert().values(booking_goods_insert))
 
         response = {
-            "data": [BookingCreate(**booking_element) for booking_element in insert_booking_list],
+            "data": [BookingCreate(**booking_element, goods=good_elements) for booking_element, good_elements in zip(insert_booking_list, prepare_booking_goods_list)],
             "errors": exception_list
         }
         await manager.send_message(
