@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Mapping, Any
 from database.db import Tariff, DocSalesStatus, BookingStatus, BookingEventStatus
 from api.nomenclature.schemas import NomenclatureCreate
 
@@ -81,8 +81,8 @@ class BookingList(BaseModel):
 
 
 class ResponseCreate(BaseModel):
-    status: str
     data: List[BookingCreate]
+    errors: List[Mapping[str, Any]]
 
 
 class BookingEventCreate(BaseModel):
