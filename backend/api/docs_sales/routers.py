@@ -594,8 +594,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         if generate_out:
             goods_res = []
             for good in goods:
+                nomenclature_id = int(good['nomenclature'])
                 nomenclature_db = await database.fetch_one(
-                    nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+                    nomenclature.select().where(nomenclature.c.id == nomenclature_id))
                 if nomenclature_db.type == "product":
                     goods_res.append(
                         {
@@ -603,7 +604,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                             "price": 0,
                             "quantity": good['quantity'],
                             "unit": good['unit'],
-                            "nomenclature": good['nomenclature']
+                            "nomenclature": nomenclature_id
                         }
                     )
 
