@@ -155,8 +155,16 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     filter_list = []
     for k, v in filters_dict.items():
         if k.split("_")[-1] == "from":
+            dated_from_param_value = func.to_timestamp(v)
+            creation_date = func.to_timestamp(docs_sales.c.dated)
+            dated_to_param_value = func.to_timestamp(
+                filters_dict.get(k.replace("from", "to"))
+            )
             filter_list.append(
-                and_(v <= func.to_timestamp(docs_sales.c.dated) <= filters_dict.get(f"{k.replace('from', 'to')}"))
+                and_(
+                    dated_from_param_value <= creation_date,
+                    creation_date <= dated_to_param_value,
+                )
             )
 
         elif k.split("_")[-1] == "to":
