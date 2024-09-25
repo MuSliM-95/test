@@ -344,4 +344,8 @@ volumes:
 networks:
   nginx-proxy:
   infrastructure:
+    name: infrastructure
+    external: true
   shared_services:
+    external: true
+
