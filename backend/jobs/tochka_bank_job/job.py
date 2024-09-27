@@ -50,7 +50,10 @@ async def process_payment(contragent_id, description, amount, cashbox_id):
                     )
                 )
                 payment_id = await database.fetch_one(query)
-                return True, payment_id.id
+
+                if payment_id:
+
+                    return True, payment_id.id
 
     query = (
         docs_sales.select()
@@ -82,7 +85,8 @@ async def process_payment(contragent_id, description, amount, cashbox_id):
         )
         payment_id = await database.fetch_one(query)
 
-        return True, payment_id.id
+        if payment_id:
+            return True, payment_id.id
 
     return False, 0
 
