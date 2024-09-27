@@ -78,7 +78,7 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 
 scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5, id="tochka_update_transaction", max_instances=1, replace_existing=True)
 scheduler.add_job(func=module_bank_update_transaction, trigger='interval', minutes=5, id="module_bank_update_transaction", max_instances=1, replace_existing=True)
-scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", max_instances=1, replace_existing=True)
+# scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", max_instances=1, replace_existing=True)
 
 scheduler.add_jobstore(jobstore)
 
