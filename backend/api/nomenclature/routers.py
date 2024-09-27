@@ -216,7 +216,7 @@ async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example
                     func.sum(q).label("current_amount"))
                 .where(
                     nomenclature.c.id == nomenclature_info['id'],
-                    nomenclature.c.cashbox == user.cashbox_id
+                    warehouse_register_movement.c.cashbox_id == user.cashbox_id
                 )
             ).group_by(
                 warehouses.c.name,
