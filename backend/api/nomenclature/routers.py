@@ -198,37 +198,32 @@ async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example
             nomenclature_info["prices"] = price
 
         if with_balance:
-            subquery = (
-                select([
-                    warehouses.c.name.label('warehouse_name'),
-                    warehouse_balances.c.current_amount,
-                    func.row_number().over(
-                        partition_by=warehouses.c.name,
-                        order_by=warehouse_balances.c.id.desc()
-                    ).label('row_num')
-                ])
-                .select_from(
-                    warehouse_balances.join(warehouses, warehouses.c.id == warehouse_balances.c.warehouse_id)
-                )
-                .where(
-                    warehouse_balances.c.nomenclature_id == nomenclature_info['id'],
-                    warehouse_balances.c.cashbox_id == user.cashbox_id
-                )
-                .alias('subquery')
-            )
+            q = case(
+                [
+                    (
+                        warehouse_register_movement.c.type_amount == 'minus',
+                        warehouse_register_movement.c.amount * (-1)
+                    )
+                ],
+                else_=warehouse_register_movement.c.amount
 
-            query = (
-                select([
-                    subquery.c.warehouse_name,
-                    subquery.c.current_amount
-                ])
-                .where(
-                    subquery.c.row_num == 1
-                )
-                .order_by(
-                    subquery.c.warehouse_name
-                )
             )
+            query = (
+                select(
+                    warehouses.c.name.label("warehouse_name"),
+                    nomenclature.c.id,
+                    warehouse_register_movement.c.nomenclature_id,
+                    func.sum(q).label("current_amount"))
+                .where(
+                    nomenclature.c.id == nomenclature_info['id'],
+                )
+            ).group_by(
+                warehouses.c.name,
+                nomenclature.c.id,
+                warehouse_register_movement.c.nomenclature_id,
+            ) \
+                .select_from(warehouse_register_movement
+                             .join(warehouses, warehouse_register_movement.c.warehouse_id == warehouses.c.id))
 
             balances_list = await database.fetch_all(query)
             nomenclature_info["balances"] = balances_list
