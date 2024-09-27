@@ -52,7 +52,10 @@ async def process_payment(contragent_id, operation, cashbox_id, session):
                 )
                 result = await session.execute(query)
                 payment_id = result.fetchone()
-                return True, payment_id.id
+
+                if payment_id:
+
+                    return True, payment_id.id
 
 
     query = (
@@ -88,7 +91,9 @@ async def process_payment(contragent_id, operation, cashbox_id, session):
         result = await session.execute(query)
         payment_id = result.fetchone()
 
-        return True, payment_id.id
+        if payment_id:
+            
+            return True, payment_id.id
 
     return False, 0
 
