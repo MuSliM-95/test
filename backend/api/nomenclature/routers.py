@@ -307,6 +307,8 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
                     func.sum(q).label("current_amount"))
                 .where(
                     nomenclature.c.id == nomenclature_info['id'],
+                    nomenclature.c.cashbox == user.cashbox_id
+
                 )
                 .limit(limit)
                 .offset(offset)
