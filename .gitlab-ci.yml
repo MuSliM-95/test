@@ -4,7 +4,6 @@ stages:
 .docker_script: &docker_script
   stage: docker
   before_script:
-    - docker network create nginx-proxy
     - | 
       docker run -d \
         --name backend_temp \
