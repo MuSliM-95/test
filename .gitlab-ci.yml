@@ -4,6 +4,7 @@ stages:
 .docker_script: &docker_script
   stage: docker
   before_script:
+    - docker run -d --name backend_temp tablecrm_backend:latest echo 123
     - docker run -d \
       --name backend_temp \
       -p 8001:8000 \
