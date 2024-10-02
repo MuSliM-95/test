@@ -137,10 +137,11 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     user = await get_user_by_token(token)
 
     query = (
-        docs_sales.select(
-            docs_sales,
+        select(
+            *docs_sales.columns,
             contragents.c.name.label("contragent_name")
         )
+        .select_from(docs_sales)
         .outerjoin(contragents, docs_sales.c.contragent == contragents.c.id)
         .where(
             docs_sales.c.is_deleted.is_not(True),
