@@ -4,36 +4,33 @@ stages:
 .docker_script: &docker_script
   stage: docker
   before_script:
-    - docker run -d \
-      --name backend_temp \
-      tablecrm_backend:latest \
-      echo 123
-    - docker run -d \
-      --name backend_temp \
-      -p 8001:8000 \
-      --health-cmd="curl -f http://localhost:8001/health" \
-      --health-interval=30s \
-      --health-timeout=10s \
-      --health-retries=3 \
-      -e APP_URL="$APP_URL" \
-      -e S3_ACCESS="$S3_ACCESS" \
-      -e S3_SECRET="$S3_SECRET" \
-      -e S3_URL="$S3_URL" \
-      -e TG_TOKEN="$TG_TOKEN" \
-      -e CHEQUES_TOKEN="$CHEQUES_TOKEN" \
-      -e ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" \
-      -e POSTGRES_USER="$POSTGRES_USER" \
-      -e POSTGRES_PASS="$POSTGRES_PASS" \
-      -e POSTGRES_HOST="$POSTGRES_HOST" \
-      -e POSTGRES_PORT="$POSTGRES_PORT" \
-      -e XDG_RUNTIME_DIR=./tmp \
-      -e RABBITMQ_USER="$RABBITMQ_USER" \
-      -e RABBITMQ_PASS="$RABBITMQ_PASS" \
-      -e RABBITMQ_HOST="$RABBITMQ_HOST" \
-      -e RABBITMQ_PORT="$RABBITMQ_PORT" \
-      -e RABBITMQ_VHOST="$RABBITMQ_VHOST" \
-      tablecrm_backend:latest \
-      uvicorn main:app --host=0.0.0.0 --port 8001 --log-level=info
+    - | 
+      docker run -d \
+        --name backend_temp \
+        -p 8001:8000 \
+        --health-cmd="curl -f http://localhost:8001/health" \
+        --health-interval=30s \
+        --health-timeout=10s \
+        --health-retries=3 \
+        -e APP_URL="$APP_URL" \
+        -e S3_ACCESS="$S3_ACCESS" \
+        -e S3_SECRET="$S3_SECRET" \
+        -e S3_URL="$S3_URL" \
+        -e TG_TOKEN="$TG_TOKEN" \
+        -e CHEQUES_TOKEN="$CHEQUES_TOKEN" \
+        -e ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" \
+        -e POSTGRES_USER="$POSTGRES_USER" \
+        -e POSTGRES_PASS="$POSTGRES_PASS" \
+        -e POSTGRES_HOST="$POSTGRES_HOST" \
+        -e POSTGRES_PORT="$POSTGRES_PORT" \
+        -e XDG_RUNTIME_DIR=./tmp \
+        -e RABBITMQ_USER="$RABBITMQ_USER" \
+        -e RABBITMQ_PASS="$RABBITMQ_PASS" \
+        -e RABBITMQ_HOST="$RABBITMQ_HOST" \
+        -e RABBITMQ_PORT="$RABBITMQ_PORT" \
+        -e RABBITMQ_VHOST="$RABBITMQ_VHOST" \
+        tablecrm_backend:latest \
+        bash -c "uvicorn main:app --host=0.0.0.0 --port 8001 --log-level=info"
     - CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME docker compose build
     - until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker-compose ps -q backend_temp))" == "healthy" ]; do
       sleep 5
