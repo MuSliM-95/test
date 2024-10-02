@@ -12,6 +12,10 @@ stages:
         --health-interval=30s \
         --health-timeout=10s \
         --health-retries=3 \
+        -v ./backend:/backend \
+        -v /migrations:/backend/database/alembic/versions \
+        --network nginx-proxy \
+        --network infrastructure \
         -e APP_URL="$APP_URL" \
         -e S3_ACCESS="$S3_ACCESS" \
         -e S3_SECRET="$S3_SECRET" \
@@ -36,7 +40,7 @@ stages:
       sleep 5
       done
   script:
-    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up -f docker-compose.restart.yml -d --force-recreate
+    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up -d --force-recreate --no-deps backend repeat_worker post_amo_lead_worker backend_jobs teleg_bot message_consumer_task
   after_script:
     - docker stop backend_temp
     - docker rm backend_temp
