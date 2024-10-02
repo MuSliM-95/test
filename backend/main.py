@@ -79,7 +79,6 @@ from apps.evotor.routes import router as evotor_router
 from apps.module_bank.routes import router as module_bank_router
 from apps.booking.routers import router as booking_router
 
-
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
 #     enable_tracing=True,
@@ -158,6 +157,11 @@ app.include_router(reports_router)
 app.include_router(module_bank_router)
 
 
+@app.get("/health")
+async def check_health_app():
+    return {"status": "ok"}
+
+
 @app.middleware("http")
 async def write_event_middleware(request: Request, call_next):
     async def set_body(request: Request, body: bytes):
@@ -179,7 +183,8 @@ async def write_event_middleware(request: Request, call_next):
 
                 user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token=token)
                 type = "cashevent"
-                payload = {} if not body and request.headers.get("content-type") != "application/json" else json.loads(body)
+                payload = {} if not body and request.headers.get("content-type") != "application/json" else json.loads(
+                    body)
                 name = "" if request.scope.get("endpoint") != create_payment else payload.get("type")
 
                 await write_event(
@@ -195,7 +200,8 @@ async def write_event_middleware(request: Request, call_next):
                     status_code=status_code,
                     request_time=time.time() - time_start
                 )
-        except: pass
+        except:
+            pass
 
     time_start = time.time()
     await set_body(request, await request.body())
