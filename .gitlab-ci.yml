@@ -8,6 +8,10 @@ stages:
     - docker run -d \
       --name backend_temp \
       -p 8001:8000 \
+      --health-cmd="curl -f http://localhost:8001/health" \
+      --health-interval=30s \
+      --health-timeout=10s \
+      --health-retries=3 \
       -e APP_URL=${APP_URL} \
       -e S3_ACCESS=${S3_ACCESS} \
       -e S3_SECRET=${S3_SECRET} \
@@ -25,10 +29,6 @@ stages:
       -e RABBITMQ_HOST=${RABBITMQ_HOST} \
       -e RABBITMQ_PORT=${RABBITMQ_PORT} \
       -e RABBITMQ_VHOST=${RABBITMQ_VHOST} \
-      --health-cmd="curl -f http://localhost:8001/health" \
-      --health-interval=30s \
-      --health-timeout=10s \
-      --health-retries=3 \
       tablecrm_backend:latest \
       bash -c "uvicorn main:app --host=0.0.0.0 --port 8001 --log-level=info"
     - CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME docker compose build
