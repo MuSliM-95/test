@@ -4,7 +4,7 @@ stages:
 .docker_script: &docker_script
   stage: docker
   before_script:
-    - docker run \
+    - docker run -d \
       --name backend_temp \
       -p 8001:8000 \
       --health-cmd="curl -f http://localhost:8001/health" \
@@ -29,7 +29,7 @@ stages:
       -e RABBITMQ_PORT="$RABBITMQ_PORT" \
       -e RABBITMQ_VHOST="$RABBITMQ_VHOST" \
       tablecrm_backend:latest \
-      bash -c "uvicorn main:app --host=0.0.0.0 --port 8001 --log-level=info"
+      uvicorn main:app --host=0.0.0.0 --port 8001 --log-level=info
     - CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME docker compose build
     - until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker-compose ps -q backend_temp))" == "healthy" ]; do
       sleep 5
