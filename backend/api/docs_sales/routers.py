@@ -21,7 +21,7 @@ from database.db import (
     price_types, warehouse_balances,
     nomenclature,
     docs_warehouse, docs_sales_tags, amo_leads, amo_install_table_cashboxes, amo_leads_docs_sales_mapping,
-    docs_sales_settings,
+    docs_sales_settings, contragents,
 
 )
 import datetime
@@ -135,8 +135,13 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
                    filters: schemas.FilterSchema = Depends()):
     """Получение списка документов"""
     user = await get_user_by_token(token)
+
     query = (
-        select(docs_sales)
+        docs_sales.select(
+            docs_sales,
+            contragents.c.name.label("contragent_name")
+        )
+        .outerjoin(contragents, docs_sales.c.contragent == contragents.c.id)
         .where(
             docs_sales.c.is_deleted.is_not(True),
             docs_sales.c.cashbox == user.cashbox_id

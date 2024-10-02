@@ -104,6 +104,7 @@ class ViewInList(BaseModel):
     comment: Optional[str]
     client: Optional[int]
     contragent: Optional[int]
+    contragent_name: Optional[str]
     contract: Optional[int]
     organization: Optional[int]
     warehouse: Optional[int]
@@ -124,6 +125,7 @@ class ViewInListResult(BaseModel):
 
 
 class View(ViewInList):
+    contr
     goods: Optional[List[Item]]
 
     class Config:
