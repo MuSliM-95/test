@@ -5,7 +5,6 @@ services:
     restart: always
     command: bash -c "alembic revision --autogenerate && alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 8000 --log-level=info"
     volumes:
-      - ./backend:/backend
       - /migrations:/backend/database/alembic/versions
     ports:
       - "8000:8000"

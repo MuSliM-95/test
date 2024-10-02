@@ -12,7 +12,6 @@ stages:
         --health-interval=30s \
         --health-timeout=10s \
         --health-retries=3 \
-        -v ./backend:/backend \
         -v /migrations:/backend/database/alembic/versions \
         --network nginx-proxy \
         --network infrastructure \
