@@ -125,7 +125,6 @@ class ViewInListResult(BaseModel):
 
 
 class View(ViewInList):
-    contr
     goods: Optional[List[Item]]
 
     class Config:
