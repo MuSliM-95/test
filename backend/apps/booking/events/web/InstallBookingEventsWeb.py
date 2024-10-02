@@ -5,6 +5,7 @@ from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from common.utils.ioc.ioc import ioc
 from .view.DeleteImageBookingEventView import DeleteImageBookingEventView
 from .view.GetBookingEventsView import GetBookingEventsView
+from .view.PatchBookingEventsView import PatchBookingEventsView
 from ..functions.impl.EventFilterConverterFunction import EventFilterConverterFunction
 from ..functions.impl.EventsGetFunction import EventsGetFunction
 
@@ -57,6 +58,12 @@ class InstallBookingEventsWeb:
             )
         )
 
+        patch_booking_events_view = PatchBookingEventsView(
+            booking_events_service=BookingEventsService(
+                booking_events_repository=ioc.get(IBookingEventsRepository)
+            )
+        )
+
         app.add_api_route(
             path="/booking/events",
             endpoint=create_booking_events_view.__call__,
@@ -96,3 +103,12 @@ class InstallBookingEventsWeb:
             status_code=status.HTTP_200_OK,
             tags=["booking"]
         )
+
+        app.add_api_route(
+            path="/booking/events",
+            endpoint=patch_booking_events_view.__call__,
+            methods=["PATCH"],
+            status_code=status.HTTP_200_OK,
+            tags=["booking"]
+        )
+
