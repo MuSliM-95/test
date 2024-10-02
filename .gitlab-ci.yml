@@ -35,8 +35,16 @@ stages:
 #      sleep 5
 #      done
   script:
-    - docker run -d --name backend_temp tablecrm_backend:latest
-#    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up -f docker-compose.restart.yml -d --force-recreate
+    - docker run -d \
+      --name backend_temp \
+      -p 8001:8000 \
+      --health-cmd="curl -f http://localhost:8001/health" \
+      --health-interval=30s \
+      --health-timeout=10s \
+      --health-retries=3 \
+      tablecrm_backend:latest \
+      bash -c "uvicorn main:app --host=0.0.0.0 --port 8001 --log-level=info"
+  #    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up -f docker-compose.restart.yml -d --force-recreate
   after_script:
     - docker stop backend_temp
     - docker rm backend_temp
