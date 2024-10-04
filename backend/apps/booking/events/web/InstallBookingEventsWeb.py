@@ -13,6 +13,8 @@ from ..infrastructure.services.impl.BookingEventsService import BookingEventsSer
 from .view.AddImageBookingEventView import AddImageBookingEventView
 from .view.CreateBookingEventsView import CreateBookingEventsView
 from .view.DeleteBookingEventByIdView import DeleteBookingEventByIdView
+from ...booking.infrastructure.repositories.core.IBookingRepository import IBookingRepository
+
 
 class InstallBookingEventsWeb:
 
@@ -23,7 +25,8 @@ class InstallBookingEventsWeb:
         create_booking_events_view = CreateBookingEventsView(
             booking_events_service=BookingEventsService(
                 booking_events_repository=ioc.get(IBookingEventsRepository)
-            )
+            ),
+            booking_repository=ioc.get(IBookingRepository)
         )
 
         add_image_booking_event_view = AddImageBookingEventView(
@@ -85,7 +88,7 @@ class InstallBookingEventsWeb:
             status_code=status.HTTP_200_OK,
             tags=["booking"]
         )
-        
+
         app.add_api_route(
             path="/booking/events/search",
             endpoint=get_booking_events_view.__call__,
@@ -93,4 +96,3 @@ class InstallBookingEventsWeb:
             status_code=status.HTTP_200_OK,
             tags=["booking"]
         )
-

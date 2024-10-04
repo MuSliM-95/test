@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from apps.booking.booking.infrastructure.repositories.core.IBookingRepository import IBookingRepository
+from apps.booking.booking.infrastructure.repositories.impl.BookingRepository import BookingRepository
 from apps.booking.events.infrastructure.repositories.core.IBookingEventsRepository import IBookingEventsRepository
 from apps.booking.events.infrastructure.repositories.impl.BookingEventsRepository import BookingEventsRepository
 from apps.booking.events.web.InstallBookingEventsWeb import InstallBookingEventsWeb
@@ -237,6 +239,8 @@ async def startup():
     ioc.set(IS3ServiceFactory, s3_factory)
 
     ioc.set(IBookingEventsRepository, BookingEventsRepository())
+
+    ioc.set(IBookingRepository, BookingRepository())
 
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
