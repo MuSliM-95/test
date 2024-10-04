@@ -170,7 +170,10 @@ async def create_booking(token: str, bookings: BookingCreateList):
                     )
                 )
                 booking_find = await database.fetch_one(query)
+
                 if booking_find:
+                    print(booking_find.id)
+                    print(bookingItem.get("start_booking"), bookingItem.get("end_booking"))
                     skip_iteration_outer = True
                     exception["request_id"] = request_id
                     exception["error"] = "Conflict booking date with another booking"
