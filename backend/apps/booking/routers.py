@@ -163,8 +163,9 @@ async def create_booking(token: str, bookings: BookingCreateList):
                         and_(
                             booking_nomenclature.c.nomenclature_id == good_info["nomenclature_id"],
                             booking.c.cashbox == user.get("cashbox_id"),
-                            booking.c.start_booking <= bookingItem.get("start_booking"),
-                            bookingItem.get("start_booking") <= booking.c.end_booking
+                            booking.c.start_booking < bookingItem.get("end_booking"),
+                            booking.c.end_booking > bookingItem.get("start_booking"),
+                            booking.c.is_deleted == False
                         )
                     )
                 )
