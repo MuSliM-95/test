@@ -28,7 +28,10 @@ class CreateBookingEventsView:
             events=create_events
         )
 
+        print(created_events)
+
         for event_booking in created_events:
+            print(event_booking["type"])
             if event_booking["type"] == "Забрал":
                 booking_info = await self.__booking_repository.get_nearest_time_by_status(
                     current_date=int(time.time()),
