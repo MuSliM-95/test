@@ -170,13 +170,25 @@ async def new_picture(
         "owner": user.id,
         "url": file_link,
         "size": file_size,
-        "cashbox": user.cashbox_id
+        "cashbox": user.cashbox_id,
+        "is_deleted": False
     }
 
     query = pictures.insert().values(picture_values)
     picture_id = await database.execute(query)
 
-    picture_db = await get_entity_by_id(pictures, picture_id, user.id)
+    query = pictures.select().where(
+        pictures.c.id == picture_id,
+        pictures.c.owner == user.id,
+        pictures.c.is_deleted.is_not(True),
+    )
+    picture_db = await database.fetch_one(query)
+
+    if not picture_db:
+        raise HTTPException(
+            status_code=404, detail=f"У вас нет {pictures.name.rstrip('s')} с таким id."
+        )
+
     picture_db = datetime_to_timestamp(picture_db)
 
     await manager.send_message(
