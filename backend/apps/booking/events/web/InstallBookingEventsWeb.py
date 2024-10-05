@@ -27,26 +27,30 @@ class InstallBookingEventsWeb:
     ):
         create_booking_events_view = CreateBookingEventsView(
             booking_events_service=BookingEventsService(
-                booking_events_repository=ioc.get(IBookingEventsRepository)
+                booking_events_repository=ioc.get(IBookingEventsRepository),
+                booking_nomenclature_repository=ioc.get(IBookingNomenclatureRepository)
             ),
             booking_repository=ioc.get(IBookingRepository)
         )
 
         add_image_booking_event_view = AddImageBookingEventView(
             booking_events_service=BookingEventsService(
-                booking_events_repository=ioc.get(IBookingEventsRepository)
+                booking_events_repository=ioc.get(IBookingEventsRepository),
+                booking_nomenclature_repository=ioc.get(IBookingNomenclatureRepository)
             )
         )
 
         delete_booking_event_by_id = DeleteBookingEventByIdView(
             booking_events_service=BookingEventsService(
-                booking_events_repository=ioc.get(IBookingEventsRepository)
+                booking_events_repository=ioc.get(IBookingEventsRepository),
+                booking_nomenclature_repository=ioc.get(IBookingNomenclatureRepository)
             )
         )
 
         delete_image_booking_event = DeleteImageBookingEventView(
             booking_events_service=BookingEventsService(
-                booking_events_repository=ioc.get(IBookingEventsRepository)
+                booking_events_repository=ioc.get(IBookingEventsRepository),
+                booking_nomenclature_repository=ioc.get(IBookingNomenclatureRepository)
             )
         )
 
