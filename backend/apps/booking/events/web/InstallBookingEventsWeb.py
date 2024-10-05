@@ -67,7 +67,8 @@ class InstallBookingEventsWeb:
 
         patch_booking_events_view = PatchBookingEventsView(
             booking_events_service=BookingEventsService(
-                booking_events_repository=ioc.get(IBookingEventsRepository)
+                booking_events_repository=ioc.get(IBookingEventsRepository),
+                booking_nomenclature_repository=ioc.get(IBookingNomenclatureRepository)
             )
         )
 
