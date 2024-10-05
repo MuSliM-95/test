@@ -4,7 +4,6 @@ from typing import List
 from apps.booking.booking.infrastructure.repositories.core.IBookingRepository import IBookingRepository
 from apps.booking.events.domain.models.CreateBookingEventModel import CreateBookingEventModel
 from apps.booking.events.infrastructure.services.core.IBookingEventsService import IBookingEventsService
-from database.db import booking
 from functions.helpers import get_user_by_token
 
 
@@ -25,7 +24,8 @@ class CreateBookingEventsView:
         user = await get_user_by_token(token)
 
         created_events = await self.__booking_events_service.add_more(
-            events=create_events
+            events=create_events,
+            cashbox_id=user.cashbox_id
         )
 
         for event_booking in created_events:
