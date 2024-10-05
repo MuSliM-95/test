@@ -51,6 +51,12 @@ class Contragent_types(str, ENUM):
     Buyer = "Покупатель"
 
 
+class InstalledByRole(str, ENUM):
+    Partner = "Партнёр"
+    Client = "Клиент"
+
+
+
 class BookingStatus(str, ENUM):
     new = "Новый"
     confirmed = "Подтвержден"
@@ -137,9 +143,10 @@ booking_events = sqlalchemy.Table(
 booking_events_photo = sqlalchemy.Table(
     "booking_events_photo",
     metadata,
-    sqlalchemy.Column("id", Integer, index=True),
-    sqlalchemy.Column("booking_event_id", Integer, ForeignKey("booking_events.id"), primary_key=True),
-    sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), primary_key=True),
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("booking_event_id", Integer, ForeignKey("booking_events.id"), nullable=False),
+    sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), nullable=False),
+    sqlalchemy.UniqueConstraint('booking_event_id', 'photo_id'),
 )
 
 module_bank_credentials = sqlalchemy.Table(
@@ -1431,6 +1438,7 @@ amo_contacts = sqlalchemy.Table(
     sqlalchemy.Column("ext_id", Integer, index=True),
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
+    sqlalchemy.UniqueConstraint('amo_install_group_id', 'ext_id'),
     extend_existing=True
 )
 
@@ -1476,6 +1484,7 @@ amo_lead_pipelines = sqlalchemy.Table(
     sqlalchemy.Column("account_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint('amo_install_group_id', 'amo_id'),
     extend_existing=True
 )
 
@@ -1493,6 +1502,7 @@ amo_lead_statuses = sqlalchemy.Table(
     sqlalchemy.Column("account_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint('pipeline_id', 'amo_id'),
     extend_existing=True
 )
 
@@ -1515,6 +1525,7 @@ amo_leads = sqlalchemy.Table(
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
     sqlalchemy.Column("is_edit", Boolean, server_default="false"),
+    sqlalchemy.UniqueConstraint('amo_install_group_id', 'amo_id'),
     extend_existing=True
 )
 
@@ -1560,6 +1571,7 @@ amo_users = sqlalchemy.Table(
     sqlalchemy.Column("ext_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint('amo_install_group_id', 'ext_id'),
     extend_existing=True
 )
 
@@ -1571,6 +1583,21 @@ amo_custom_fields_comparison = sqlalchemy.Table(
     sqlalchemy.Column("field_amo_id", BIGINT),
     sqlalchemy.Column("field_detection_name", String),
     extend_existing=True
+)
+
+amo_install_widget_installer = sqlalchemy.Table(
+    "amo_install_widget_installer",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("amo_account_id", BigInteger, unique=True),
+    sqlalchemy.Column("installed_by_role", Enum(InstalledByRole)),
+    sqlalchemy.Column("client_name", String),
+    sqlalchemy.Column("partner_name", String),
+    sqlalchemy.Column("client_cashbox", Integer),
+    sqlalchemy.Column("partner_cashbox", Integer),
+    sqlalchemy.Column("client_number_phone", String),
+    sqlalchemy.Column("partner_number_phone", String),
+    sqlalchemy.Column("client_inn", String),
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
