@@ -170,6 +170,7 @@ async def new_picture(
         "owner": user.id,
         "url": file_link,
         "size": file_size,
+        "cashbox": user.cashbox_id
     }
 
     query = pictures.insert().values(picture_values)
