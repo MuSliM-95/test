@@ -36,7 +36,7 @@ class CreateBookingEventsView:
                     cashbox_id=user.cashbox_id,
                     status="Новый"
                 )
-
+                print(booking_info if not booking_info else booking_info.id)
                 if booking_info:
                     await self.__booking_repository.update_status(
                         booking_id=booking_info.id,
