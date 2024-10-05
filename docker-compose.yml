@@ -3,10 +3,9 @@ services:
     build: ./backend
     image: tablecrm_backend:latest
     restart: always
-    command: bash -c "alembic revision --autogenerate && alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 8000 --log-level=info"
+    command: bash -c "alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 8000 --log-level=info"
     volumes:
       - ./backend:/backend
-      - /migrations:/backend/database/alembic/versions
     ports:
       - "8000:8000"
     depends_on:
@@ -31,18 +30,6 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
     networks:
       - nginx-proxy
-      - infrastructure
-
-  rabbitmq:
-    image: rabbitmq
-    restart: always
-    ports:
-      - "${RABBITMQ_PORT:-5672}:${RABBITMQ_PORT:-5672}"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
-    networks:
       - infrastructure
 
   repeat_worker:
@@ -108,7 +95,6 @@ services:
     command: bash -c "python3 start_jobs.py"
     volumes:
       - ./backend:/backend
-      - /migrations:/backend/database/alembic/versions
     depends_on:
       - db
     environment:
@@ -160,8 +146,41 @@ services:
     networks:
       - nginx-proxy
 
+  message_consumer_task:
+    build: ./backend
+    restart: always
+    command: python3 message_consumer.py
+    volumes:
+      - ./backend:/backend
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASS: ${POSTGRES_PASS}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      TG_TOKEN: ${TG_TOKEN}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+    networks:
+      - nginx-proxy
+      - infrastructure
+
+  rabbitmq:
+    image: rabbitmq
+    restart: always
+    ports:
+      - "${RABBITMQ_PORT:-5672}:${RABBITMQ_PORT:-5672}"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
+    networks:
+      - infrastructure
+
   nginx:
-    build: 
+    build:
       context: ./nginx
       dockerfile: Dockerfile
       args:
@@ -199,27 +218,6 @@ services:
       - /etc/letsencrypt/:/etc/letsencrypt/:rw
     networks:
       - nginx-proxy
-
-  message_consumer_task:
-    build: ./backend
-    restart: always
-    command: python3 message_consumer.py
-    volumes:
-      - ./backend:/backend
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASS: ${POSTGRES_PASS}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      TG_TOKEN: ${TG_TOKEN}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASS: ${RABBITMQ_PASS}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-    networks:
-      - nginx-proxy
-      - infrastructure
 
   db:
     image: postgres:14.2
