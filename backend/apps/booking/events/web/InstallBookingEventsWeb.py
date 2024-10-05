@@ -15,6 +15,8 @@ from .view.AddImageBookingEventView import AddImageBookingEventView
 from .view.CreateBookingEventsView import CreateBookingEventsView
 from .view.DeleteBookingEventByIdView import DeleteBookingEventByIdView
 from ...booking.infrastructure.repositories.core.IBookingRepository import IBookingRepository
+from ...nomenclature.infrastructure.repositories.core.IBookingNomenclatureRepository import \
+    IBookingNomenclatureRepository
 
 
 class InstallBookingEventsWeb:
@@ -50,7 +52,8 @@ class InstallBookingEventsWeb:
 
         get_booking_events_view = GetBookingEventsView(
             booking_events_service=BookingEventsService(
-                booking_events_repository=ioc.get(IBookingEventsRepository)
+                booking_events_repository=ioc.get(IBookingEventsRepository),
+                booking_nomenclature_repository=ioc.get(IBookingNomenclatureRepository)
             ),
             event_filter_converter=EventFilterConverterFunction(),
             event_get_function=EventsGetFunction(

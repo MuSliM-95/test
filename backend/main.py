@@ -11,6 +11,10 @@ from apps.booking.booking.infrastructure.repositories.impl.BookingRepository imp
 from apps.booking.events.infrastructure.repositories.core.IBookingEventsRepository import IBookingEventsRepository
 from apps.booking.events.infrastructure.repositories.impl.BookingEventsRepository import BookingEventsRepository
 from apps.booking.events.web.InstallBookingEventsWeb import InstallBookingEventsWeb
+from apps.booking.nomenclature.infrastructure.repositories.core.IBookingNomenclatureRepository import \
+    IBookingNomenclatureRepository
+from apps.booking.nomenclature.infrastructure.repositories.impl.BookingNomenclatureRepository import \
+    BookingNomenclatureRepository
 from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
@@ -241,6 +245,8 @@ async def startup():
     ioc.set(IBookingEventsRepository, BookingEventsRepository())
 
     ioc.set(IBookingRepository, BookingRepository())
+
+    ioc.set(IBookingNomenclatureRepository, BookingNomenclatureRepository())
 
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
