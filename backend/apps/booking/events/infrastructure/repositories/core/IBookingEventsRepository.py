@@ -1,6 +1,7 @@
 from typing import Sequence, List, Mapping, Any
 
 from ....domain.models.CreateBookingEventModel import CreateBookingEventModel
+from ....domain.models.PatchBookingEventsModel import PatchBookingEventsModel
 
 
 class IBookingEventsRepository:
@@ -30,4 +31,7 @@ class IBookingEventsRepository:
         raise NotImplementedError()
 
     async def delete_by_ids(self, event_ids: List[int], cashbox_id: int):
+        raise NotImplementedError()
+
+    async def patch(self, patch_event: PatchBookingEventsModel, cashbox_id: int):
         raise NotImplementedError()

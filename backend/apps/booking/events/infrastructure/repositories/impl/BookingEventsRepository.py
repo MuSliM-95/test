@@ -1,8 +1,9 @@
-from typing import List, Mapping, Any
+from typing import List, Mapping, Any, Dict
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, update
 
 from apps.booking.events.domain.models.CreateBookingEventModel import CreateBookingEventModel
+from apps.booking.events.domain.models.PatchBookingEventsModel import PatchBookingEventsModel
 from database.db import booking_events, database, booking_events_photo, booking_nomenclature, booking
 from ..core.IBookingEventsRepository import IBookingEventsRepository
 
@@ -79,3 +80,37 @@ class BookingEventsRepository(IBookingEventsRepository):
             .where(booking_events.c.id.in_(event_ids))
         )
         await database.execute(query)
+
+    async def patch(self, patch_event: PatchBookingEventsModel, cashbox_id: int):
+        query = (
+            booking.select()
+            .join(booking_nomenclature, booking.c.id == booking_nomenclature.c.booking_id)
+            .join(booking_events, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)
+            .where(and_(
+                booking.c.cashbox == cashbox_id,
+                booking_events.c.id == patch_event.id
+            ))
+        )
+        booking_info = await database.fetch_one(query)
+
+        if not booking_info:
+            return
+
+        values = {}
+        if patch_event.value:
+            values["value"] = patch_event.value
+        if patch_event.type:
+            values["type"] = patch_event.type
+        if patch_event.latitude:
+            values["latitude"] = patch_event.latitude
+        if patch_event.longitude:
+            values["longitude"] = patch_event.longitude
+        if values:
+            query = (
+                booking_events.update()
+                .where(booking_events.c.id == patch_event.id)
+                .values(values)
+            )
+            await database.execute(query)
+            values["id"] = patch_event.id
+            return values

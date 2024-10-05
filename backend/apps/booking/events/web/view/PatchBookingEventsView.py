@@ -25,11 +25,9 @@ class PatchBookingEventsView:
     ):
         user = await get_user_by_token(token)
 
-        ...
+        result = await self.__booking_events_service.patch_mass(
+            patch_events=patch_events,
+            cashbox_id=user.cashbox_id
+        )
 
-
-
-
-
-
-
+        return result

@@ -8,7 +8,7 @@ from database.db import database, booking, booking_nomenclature, nomenclature, a
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
-    BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate, BookingFiltersList
+    BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate, BookingFiltersList, BookingCreate
 from ws_manager import manager
 
 
@@ -163,13 +163,18 @@ async def create_booking(token: str, bookings: BookingCreateList):
                         and_(
                             booking_nomenclature.c.nomenclature_id == good_info["nomenclature_id"],
                             booking.c.cashbox == user.get("cashbox_id"),
-                            booking.c.start_booking <= bookingItem.get("start_booking"),
-                            bookingItem.get("start_booking") <= booking.c.end_booking
+                            booking.c.start_booking < bookingItem.get("end_booking"),
+                            booking.c.end_booking > bookingItem.get("start_booking"),
+                            booking.c.is_deleted == False
                         )
                     )
                 )
                 booking_find = await database.fetch_one(query)
+
                 if booking_find:
+                    print(booking_find.id)
+                    print(bookingItem.get("start_booking"), bookingItem.get("end_booking"))
+                    skip_iteration_outer = True
                     exception["request_id"] = request_id
                     exception["error"] = "Conflict booking date with another booking"
                     break
@@ -189,32 +194,31 @@ async def create_booking(token: str, bookings: BookingCreateList):
                 {**bookingItem, "cashbox": user.get("cashbox_id"), "is_deleted": False}
             )
 
-        query = (
-            booking.insert()
-            .values(insert_booking_list)
-            .returning(booking.c.id)
-        )
-        create_booking_ids = await database.fetch_all(query)
+        create_booking_ids = []
+        if insert_booking_list:
+            query = (
+                booking.insert()
+                .values(insert_booking_list)
+                .returning(booking.c.id)
+            )
+            create_booking_ids = await database.fetch_all(query)
 
-        booking_goods_insert = []
+            booking_goods_insert = []
 
-        for index, create_booking_id in enumerate(create_booking_ids):
+            for index, create_booking_id in enumerate(create_booking_ids):
 
-            booking_goods = prepare_booking_goods_list[index]
+                booking_goods = prepare_booking_goods_list[index]
 
-            for booking_good_info in booking_goods:
-                booking_good_info["booking_id"] = create_booking_id.id
-                booking_goods_insert.append(booking_good_info)
+                for booking_good_info in booking_goods:
+                    booking_good_info["booking_id"] = create_booking_id.id
+                    booking_goods_insert.append(booking_good_info)
 
-        await database.execute(booking_nomenclature.insert().values(booking_goods_insert))
+            if booking_goods_insert:
+                await database.execute(booking_nomenclature.insert().values(booking_goods_insert))
 
         response = {
-            "status": "success created",
-            "data": [
-                await get_booking_by_idx(
-                    token=token,
-                    idx = booking_id) for booking_id in [booking_create.id for booking_create in create_booking_ids]
-            ]
+            "data": [BookingCreate(**booking_element, goods=good_elements) for booking_element, good_elements in zip(insert_booking_list, prepare_booking_goods_list)],
+            "errors": exception_list
         }
         await manager.send_message(
             token,

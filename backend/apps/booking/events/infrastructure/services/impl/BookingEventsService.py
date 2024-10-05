@@ -10,6 +10,7 @@ from ...repositories.core.IBookingEventsRepository import IBookingEventsReposito
 from ..core.IBookingEventsService import IBookingEventsService
 from ....domain.models.AddBookingEventPhotoModel import AddBookingEventPhotoModel
 from ....domain.models.CreateBookingEventModel import CreateBookingEventModel
+from ....domain.models.PatchBookingEventsModel import PatchBookingEventsModel
 from ....domain.models.ReponseCreatedBookingEventModel import ResponseCreatedBookingEventModel
 
 
@@ -107,3 +108,15 @@ class BookingEventsService(IBookingEventsService):
         await self.__booking_events_repository.delete_photos_by_ids(
             photo_ids=deleted_ids
         )
+
+    async def patch_mass(self, patch_events: List[PatchBookingEventsModel], cashbox_id: int):
+        return_updated = []
+        for event in patch_events:
+            result = await self.__booking_events_repository.patch(
+                patch_event=event,
+                cashbox_id=cashbox_id
+            )
+            if result:
+                return_updated.append(result)
+
+        return return_updated

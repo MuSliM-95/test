@@ -21,7 +21,7 @@ from database.db import (
     price_types, warehouse_balances,
     nomenclature,
     docs_warehouse, docs_sales_tags, amo_leads, amo_install_table_cashboxes, amo_leads_docs_sales_mapping,
-    docs_sales_settings,
+    docs_sales_settings, contragents,
 
 )
 import datetime
@@ -135,8 +135,14 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
                    filters: schemas.FilterSchema = Depends()):
     """Получение списка документов"""
     user = await get_user_by_token(token)
+
     query = (
-        select(docs_sales)
+        select(
+            *docs_sales.columns,
+            contragents.c.name.label("contragent_name")
+        )
+        .select_from(docs_sales)
+        .outerjoin(contragents, docs_sales.c.contragent == contragents.c.id)
         .where(
             docs_sales.c.is_deleted.is_not(True),
             docs_sales.c.cashbox == user.cashbox_id
@@ -155,8 +161,16 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     filter_list = []
     for k, v in filters_dict.items():
         if k.split("_")[-1] == "from":
+            dated_from_param_value = func.to_timestamp(v)
+            creation_date = func.to_timestamp(docs_sales.c.dated)
+            dated_to_param_value = func.to_timestamp(
+                filters_dict.get(k.replace("from", "to"))
+            )
             filter_list.append(
-                and_(v <= func.to_timestamp(docs_sales.c.dated) <= filters_dict.get(f"{k.replace('from', 'to')}"))
+                and_(
+                    dated_from_param_value <= creation_date,
+                    creation_date <= dated_to_param_value,
+                )
             )
 
         elif k.split("_")[-1] == "to":
@@ -311,8 +325,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         goods: Union[list, None] = instance_values.pop("goods", None)
 
-        paid_rubles = instance_values.pop("paid_rubles")
-        paid_lt = instance_values.pop("paid_lt")
+        paid_rubles = instance_values.pop("paid_rubles", 0)
+        paid_lt = instance_values.pop("paid_lt", 0)
         lt = instance_values.pop("loyality_card_id")
 
         if not await check_period_blocked(
@@ -586,8 +600,9 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         if generate_out:
             goods_res = []
             for good in goods:
+                nomenclature_id = int(good['nomenclature'])
                 nomenclature_db = await database.fetch_one(
-                    nomenclature.select().where(nomenclature.c.id == good['nomenclature']))
+                    nomenclature.select().where(nomenclature.c.id == nomenclature_id))
                 if nomenclature_db.type == "product":
                     goods_res.append(
                         {
@@ -595,7 +610,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                             "price": 0,
                             "quantity": good['quantity'],
                             "unit": good['unit'],
-                            "nomenclature": good['nomenclature']
+                            "nomenclature": nomenclature_id
                         }
                     )
 
