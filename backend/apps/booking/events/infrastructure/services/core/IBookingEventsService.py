@@ -11,7 +11,7 @@ class IBookingEventsService:
     async def add_one(self, event: CreateBookingEventModel) -> ResponseCreatedBookingEventModel:
         raise NotImplementedError()
 
-    async def add_more(self, events: List[CreateBookingEventModel]):
+    async def add_more(self, events: List[CreateBookingEventModel], cashbox_id: int):
         raise NotImplementedError()
 
     async def add_photos(self, events_photo: List[AddBookingEventPhotoModel], cashbox_id: int):

@@ -1,7 +1,10 @@
+import asyncio
 from typing import List
 
 from sqlalchemy import and_, select
 
+from apps.booking.nomenclature.infrastructure.repositories.core.IBookingNomenclatureRepository import \
+    IBookingNomenclatureRepository
 from database.db import pictures, database, booking_events, booking_nomenclature, booking, booking_events_photo
 from ...repositories.core.IBookingEventsRepository import IBookingEventsRepository
 from ..core.IBookingEventsService import IBookingEventsService
@@ -15,9 +18,11 @@ class BookingEventsService(IBookingEventsService):
 
     def __init__(
         self,
-        booking_events_repository: IBookingEventsRepository
+        booking_events_repository: IBookingEventsRepository,
+        booking_nomenclature_repository: IBookingNomenclatureRepository
     ):
         self.__booking_events_repository = booking_events_repository
+        self.__booking_nomenclature_repository = booking_nomenclature_repository
 
     async def add_one(self, events: CreateBookingEventModel) -> ResponseCreatedBookingEventModel:
         created_event_id = await self.__booking_events_repository.add_one(
@@ -28,8 +33,23 @@ class BookingEventsService(IBookingEventsService):
             **events.dict()
         )
 
-    async def add_more(self, events: List[CreateBookingEventModel]):
-        for_create_list = list(map(lambda row: {**row.dict(), "is_deleted": False}, events))
+    async def add_more(self, events: List[CreateBookingEventModel], cashbox_id: int):
+        async def convert_to_save(row: CreateBookingEventModel):
+            return {
+                "booking_nomenclature_id": await self.__booking_nomenclature_repository.get_by_id(
+                    cashbox=cashbox_id,
+                    nomenclature_id=row.booking_nomenclature_id
+                ),
+                "type": row.type,
+                "value": row.value,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                "is_deleted": False
+            }
+
+        tasks = [convert_to_save(row) for row in events]
+        for_create_list = await asyncio.gather(*tasks)
+
         created_event_ids = await self.__booking_events_repository.add_more(
             events=for_create_list
         )
