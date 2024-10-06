@@ -6,6 +6,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from apps.amocrm.api.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
+    IWidgetInstallerRepository
+from apps.amocrm.api.installer.infrastructure.repositories.impl.WidgetInstallerRepository import \
+    WidgetInstallerRepository
+from apps.amocrm.api.installer.web.InstallWidgetInstallerInfoWeb import InstallWidgetInstallerInfoWeb
 from apps.booking.booking.infrastructure.repositories.core.IBookingRepository import IBookingRepository
 from apps.booking.booking.infrastructure.repositories.impl.BookingRepository import BookingRepository
 from apps.booking.events.infrastructure.repositories.core.IBookingEventsRepository import IBookingEventsRepository
@@ -248,8 +253,11 @@ async def startup():
 
     ioc.set(IBookingNomenclatureRepository, BookingNomenclatureRepository())
 
+    ioc.set(IWidgetInstallerRepository, WidgetInstallerRepository())
+
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
+    InstallWidgetInstallerInfoWeb()(app=app)
 
     init_db()
     await database.connect()
