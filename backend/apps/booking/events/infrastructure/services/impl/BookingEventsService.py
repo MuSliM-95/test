@@ -78,7 +78,7 @@ class BookingEventsService(IBookingEventsService):
                 )
             else:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                    detail={f"Picture with ID: {event.photo_id} not found"})
+                                    detail={"error": f"Picture with ID: {event.photo_id} not found"})
 
         if for_create_list:
             await self.__booking_events_repository.add_photos(
