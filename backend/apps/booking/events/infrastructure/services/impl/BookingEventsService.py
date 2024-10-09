@@ -1,7 +1,9 @@
 import asyncio
 from typing import List
 
+from fastapi import HTTPException
 from sqlalchemy import and_, select
+from starlette import status
 
 from apps.booking.nomenclature.infrastructure.repositories.core.IBookingNomenclatureRepository import \
     IBookingNomenclatureRepository
@@ -56,6 +58,7 @@ class BookingEventsService(IBookingEventsService):
         return [{"id": created_event_id, **created_event} for created_event, created_event_id in zip(for_create_list, created_event_ids)]
 
     async def add_photos(self, events_photo: List[AddBookingEventPhotoModel], cashbox_id: int):
+
         for_create_list = []
         for event in events_photo:
             query = (
@@ -73,10 +76,14 @@ class BookingEventsService(IBookingEventsService):
                         "photo_id": event.photo_id
                     }
                 )
+            else:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                    detail={f"Picture with ID: {event.photo_id} not found"})
 
-        await self.__booking_events_repository.add_photos(
-            events_photos=for_create_list
-        )
+        if for_create_list:
+            await self.__booking_events_repository.add_photos(
+                events_photos=for_create_list
+            )
 
     async def delete_by_ids(self, event_ids: List[int], cashbox_id: int):
         deleted_ids = await self.__booking_events_repository.get_by_ids(
