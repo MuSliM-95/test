@@ -54,14 +54,12 @@ async def create_filters_list(filters: BookingFiltersList):
 @router.get("/booking/list", response_model = BookingList)
 async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
     filter_result = await create_filters_list(filters)
-    print(filter_result)
     user = await get_user_by_token(token)
     try:
         list_db = await database.fetch_all(select(booking).
                                            where(
             booking.c.cashbox == user.cashbox_id, *filter_result
         ))
-        print(list(map(dict, list_db)))
         list_result = []
         for item in list(map(dict, list_db)):
             goods = await database.fetch_all(
@@ -80,7 +78,6 @@ async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
             list_result.append({**item, "goods": list(map(dict, goods))})
 
-        print(list_result)
         return list_result
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))

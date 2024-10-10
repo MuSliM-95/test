@@ -26,16 +26,7 @@ class WidgetInstallerRepository(IWidgetInstallerRepository):
         )
         amo_install_widget_installer_info = await database.fetch_one(query)
         return ResponseGetByIdWidgetInstallerInfoModel(
-            id=amo_install_widget_installer_info.id,
-            amo_account_id=amo_install_widget_installer_info.amo_account_id,
-            installed_by_role=amo_install_widget_installer_info.installed_by_role,
-            client_name=amo_install_widget_installer_info.client_name,
-            client_cashbox=amo_install_widget_installer_info.client_cashbox,
-            client_number_phone=amo_install_widget_installer_info.client_number_phone,
-            partner_name=amo_install_widget_installer_info.partner_name,
-            partner_cashbox=amo_install_widget_installer_info.partner_cashbox,
-            partner_number_phone=amo_install_widget_installer_info.partner_number_phone,
-            client_inn=amo_install_widget_installer_info.client_inn,
+            **dict(amo_install_widget_installer_info)
         )
 
 
@@ -69,6 +60,6 @@ class WidgetInstallerRepository(IWidgetInstallerRepository):
         )
         await database.execute(query)
         return ResponsePatchWidgetInstallerInfoModel(
-            widget_installer_data.dict(exclude_none=True)
+            **widget_installer_data.dict(exclude_none=True)
         )
 
