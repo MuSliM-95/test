@@ -1,4 +1,6 @@
+from fastapi import HTTPException
 from sqlalchemy import and_
+from starlette import status
 
 from apps.amocrm.api.installer.infrastructure.models.InsertWidgetInstallerInfoModel import \
     InsertWidgetInstallerInfoModel
@@ -25,6 +27,8 @@ class WidgetInstallerRepository(IWidgetInstallerRepository):
             )
         )
         amo_install_widget_installer_info = await database.fetch_one(query)
+        if not amo_install_widget_installer_info:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error": "Installer Not Found"})
         return ResponseGetByIdWidgetInstallerInfoModel(
             **dict(amo_install_widget_installer_info)
         )
