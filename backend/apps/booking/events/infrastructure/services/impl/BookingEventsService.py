@@ -64,7 +64,7 @@ class BookingEventsService(IBookingEventsService):
             query = (
                 select(pictures.c.id)
                 .where(and_(
-                    pictures.c.owner == cashbox_id,
+                    pictures.c.cashbox == cashbox_id,
                     pictures.c.id == event.photo_id
                 ))
             )
