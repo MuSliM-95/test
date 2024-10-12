@@ -32,7 +32,7 @@ deploy_new_version() {
 
   docker run -d \
     --name "${SERVICE_NAME}_$NEW_PORT" \
-    --network infrastructure \
+    # --network infrastructure \
     -p $NEW_PORT:8000 \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
