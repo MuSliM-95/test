@@ -11,7 +11,7 @@ update_upstream_conf() {
   NEW_PORT=$1
 
   new_container_id=$(docker ps -f name="${SERVICE_NAME}_$NEW_PORT" -q | head -n1)
-  new_container_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{"\n"}}{{end}}' $nginx_container_id | head -n1)
+  new_container_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{"\n"}}{{end}}' $new_container_id | head -n1)
 
   echo "Обновление upstream.conf для указания порта $NEW_PORT и ip ${new_container_ip}"
 
