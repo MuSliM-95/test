@@ -11,7 +11,7 @@ update_upstream_conf() {
   NEW_PORT=$1
   echo "Обновление upstream.conf для указания порта $NEW_PORT..."
 
-  echo "server 45.8.96.92:$NEW_PORT;" > upstream.conf.tmp
+  echo "server 94.250.250.135:$NEW_PORT;" > upstream.conf.tmp
 
   docker cp upstream.conf.tmp $NGINX_CONTAINER_NAME:$UPSTREAM_CONF_PATH
 
@@ -32,7 +32,7 @@ deploy_new_version() {
   docker run -d \
     --name "${SERVICE_NAME}_$NEW_PORT" \
     -p $NEW_PORT:8000 \
-    -e RABBITMQ_HOST=$RABBITMQ_HOST \
+    -e RABBITMQ_HOST=94.250.250.135 \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
     -e RABBITMQ_USER=$RABBITMQ_USER \
     -e RABBITMQ_PASS=$RABBITMQ_PASS \
@@ -46,7 +46,7 @@ deploy_new_version() {
     -e TG_TOKEN=$TG_TOKEN \
     -e POSTGRES_USER=$POSTGRES_USER \
     -e POSTGRES_PASS=$POSTGRES_PASS \
-    -e POSTGRES_HOST=$POSTGRES_HOST \
+    -e POSTGRES_HOST=94.250.250.135 \
     -e POSTGRES_PORT=$POSTGRES_PORT \
     -e CHEQUES_TOKEN=$CHEQUES_TOKEN \
     -e ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL \
