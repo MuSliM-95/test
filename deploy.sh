@@ -38,6 +38,7 @@ deploy_new_version() {
 
   docker run -d \
     --name "${SERVICE_NAME}_$NEW_PORT" \
+    --restart always \
     --network infrastructure \
     -p $NEW_PORT:8000 \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
@@ -111,6 +112,7 @@ deploy_new_bot_version() {
 
   docker run -d \
     --name "$NEW_BOT_NAME" \
+    --restart always \
     --network infrastructure \
     -v "/photos:/backend/photos" \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
@@ -151,6 +153,7 @@ deploy_another_services() {
 
   docker run -d \
     --name "repeat_worker" \
+    --restart always \
     --network infrastructure \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
@@ -178,6 +181,7 @@ deploy_another_services() {
 
   docker run -d \
     --name "post_amo_lead_worker" \
+    --restart always \
     --network infrastructure \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
@@ -205,6 +209,7 @@ deploy_another_services() {
 
   docker run -d \
     --name "backend_jobs" \
+    --restart always \
     --network infrastructure \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
@@ -232,6 +237,7 @@ deploy_another_services() {
 
   docker run -d \
     --name "message_consumer_task" \
+    --restart always \
     --network infrastructure \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
