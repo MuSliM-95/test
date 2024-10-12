@@ -5,6 +5,7 @@ ARG BRANCH_NAME
 WORKDIR /etc/nginx
 
 COPY nginx.${BRANCH_NAME}.conf nginx.conf
+COPY upstream.conf upstream.conf
 COPY GeoIP.dat .
 COPY GeoIPCity.dat .
 COPY .htpasswd .
