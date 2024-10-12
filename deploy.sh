@@ -65,26 +65,26 @@ deploy_new_version() {
     sleep 1
   done
 
-#  if ! curl --silent --fail http://localhost:${NEW_PORT}/health; then
-#    echo "Новый сервис на порту $NEW_PORT не отвечает. Откат."
-#    docker stop "${SERVICE_NAME}_$NEW_PORT"
-#    docker rm "${SERVICE_NAME}_$NEW_PORT"
-#    exit 1
-#  fi
-#
-#  update_upstream_conf $NEW_PORT
-#
-#  reload_nginx
-#
-#  sleep 30
-#
-#  if [ -n "$current_ports" ]; then
-#    for port in $current_ports; do
-#      echo "Останавливаем старый сервис на порту $port"
-#      docker stop "${SERVICE_NAME}_${port}"
-#      docker rm "${SERVICE_NAME}_${port}"
-#    done
-#  fi
+  if ! curl --silent --fail http://localhost:${NEW_PORT}/health; then
+    echo "Новый сервис на порту $NEW_PORT не отвечает. Откат."
+    docker stop "${SERVICE_NAME}_$NEW_PORT"
+    docker rm "${SERVICE_NAME}_$NEW_PORT"
+    exit 1
+  fi
+
+  update_upstream_conf $NEW_PORT
+
+  reload_nginx
+
+  sleep 30
+
+  if [ -n "$current_ports" ]; then
+    for port in $current_ports; do
+      echo "Останавливаем старый сервис на порту $port"
+      docker stop "${SERVICE_NAME}_${port}"
+      docker rm "${SERVICE_NAME}_${port}"
+    done
+  fi
 
   echo "Деплой завершен успешно"
 }
