@@ -177,7 +177,7 @@ deploy_another_services() {
   docker rm "post_amo_lead_worker"
 
   docker run -d \
-    --name "repeat_worker" \
+    --name "post_amo_lead_worker" \
     --network infrastructure \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
