@@ -22,7 +22,7 @@ deploy_new_version() {
   current_ports=$(docker ps --filter "name=$SERVICE_NAME" --format '{{.Ports}}' | grep -o '0\.0\.0\.0:[0-9]\+' | grep -o '[0-9]\+')
 
   if [[ " $current_ports " =~ "8000" ]]; then
-    NEW_PORT=8001
+    NEW_PORT=8002
   else
     NEW_PORT=8000
   fi
