@@ -31,8 +31,9 @@ deploy_new_version() {
 
   docker run -d \
     --name "${SERVICE_NAME}_$NEW_PORT" \
+    --network infrastructure \
     -p $NEW_PORT:8000 \
-    -e RABBITMQ_HOST=94.250.250.135 \
+    -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
     -e RABBITMQ_USER=$RABBITMQ_USER \
     -e RABBITMQ_PASS=$RABBITMQ_PASS \
@@ -46,7 +47,7 @@ deploy_new_version() {
     -e TG_TOKEN=$TG_TOKEN \
     -e POSTGRES_USER=$POSTGRES_USER \
     -e POSTGRES_PASS=$POSTGRES_PASS \
-    -e POSTGRES_HOST=94.250.250.135 \
+    -e POSTGRES_HOST=$POSTGRES_HOST \
     -e POSTGRES_PORT=$POSTGRES_PORT \
     -e CHEQUES_TOKEN=$CHEQUES_TOKEN \
     -e ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL \
