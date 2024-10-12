@@ -29,4 +29,5 @@ build-up-docker-job-dev:
   tags:
     - dev_runner
   environment: dev
-  <<: *docker_script
+  script:
+    - chmod +x deploy.sh
