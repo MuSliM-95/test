@@ -20,7 +20,7 @@ build-up-docker-job:
   <<: *docker_script
   script:
     - chmod +x deploy.sh
-#    - ./deploy.sh
+    - ./deploy.sh
 
 build-up-docker-job-dev:
   stage: docker
