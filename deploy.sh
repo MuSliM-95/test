@@ -15,7 +15,7 @@ update_upstream_conf() {
 
   echo "Обновление upstream.conf для указания порта $NEW_PORT и ip ${new_container_ip}"
 
-  echo "server ${new_container_ip}:$NEW_PORT;" > upstream.conf.tmp
+  echo "server ${new_container_ip}:8000;" > upstream.conf.tmp
 
   docker cp upstream.conf.tmp $NGINX_CONTAINER_NAME:$UPSTREAM_CONF_PATH
 
