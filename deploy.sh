@@ -29,6 +29,7 @@ deploy_new_version() {
 
   echo "Деплой новой версии на порт $NEW_PORT"
 
+
   docker run -d \
     --name "${SERVICE_NAME}_$NEW_PORT" \
     --network infrastructure \
