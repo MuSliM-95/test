@@ -9,9 +9,13 @@ reload_nginx() {
 
 update_upstream_conf() {
   NEW_PORT=$1
-  echo "Обновление upstream.conf для указания порта $NEW_PORT..."
 
-  echo "server 94.250.250.135:$NEW_PORT;" > upstream.conf.tmp
+  new_container_id=$(docker ps -f name="${SERVICE_NAME}_$NEW_PORT" -q | head -n1)
+  new_container_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{"\n"}}{{end}}' $nginx_container_id | head -n1)
+
+  echo "Обновление upstream.conf для указания порта $NEW_PORT и ip ${new_container_ip}"
+
+  echo "server ${new_container_ip}:$NEW_PORT;" > upstream.conf.tmp
 
   docker cp upstream.conf.tmp $NGINX_CONTAINER_NAME:$UPSTREAM_CONF_PATH
 
@@ -32,6 +36,7 @@ deploy_new_version() {
 
   docker run -d \
     --name "${SERVICE_NAME}_$NEW_PORT" \
+    --network infrastructure \
     -p $NEW_PORT:8000 \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
     -e RABBITMQ_PORT=$RABBITMQ_PORT \
