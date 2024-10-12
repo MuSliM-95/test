@@ -131,7 +131,7 @@ deploy_new_bot_version() {
     -e POSTGRES_PORT=$POSTGRES_PORT \
     -e CHEQUES_TOKEN=$CHEQUES_TOKEN \
     -e ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL \
-    $BOT_IMAGE_NAME \
+    $IMAGE_NAME \
     /bin/bash -c "python3 bot.py"
 
   if [ -n "$current_bots" ]; then
