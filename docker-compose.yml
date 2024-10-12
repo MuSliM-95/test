@@ -32,7 +32,6 @@ services:
       - infrastructure
       - shared_services
     depends_on:
-      - backend
       - adminer
       - prometheus
       - loki
