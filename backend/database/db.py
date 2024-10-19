@@ -1467,6 +1467,7 @@ amo_table_contacts = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("is_main", Boolean, server_default="true", nullable=False),
     extend_existing=True
 )
 
@@ -1598,6 +1599,34 @@ amo_install_widget_installer = sqlalchemy.Table(
     sqlalchemy.Column("client_number_phone", String),
     sqlalchemy.Column("partner_number_phone", String),
     sqlalchemy.Column("client_inn", String),
+)
+
+tbank_accounts = sqlalchemy.Table(
+    "tbank_accounts",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True)),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True)),
+    sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
+    sqlalchemy.Column("terminal_key", Text),
+    sqlalchemy.Column("invite_token", Text),
+    sqlalchemy.Column("password", Text),
+)
+
+tbank_orders = sqlalchemy.Table(
+    "tbank_orders",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True)),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True)),
+    sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
+    sqlalchemy.Column("amount", BigInteger),
+    sqlalchemy.Column("token", Text),
+    sqlalchemy.Column("description", Text),
+    sqlalchemy.Column("invite_token", Text),
+    sqlalchemy.Column("payment_id", BigInteger),
+    sqlalchemy.Column("tbank_payment_id", Text),
+    sqlalchemy.Column("payment_url", Text),
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
