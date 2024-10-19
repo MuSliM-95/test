@@ -31,7 +31,7 @@ from common.utils.ioc.ioc import ioc
 
 from database.db import database
 from database.fixtures import init_db
-import sentry_sdk
+# import sentry_sdk
 
 from functions.users import get_user_id_cashbox_id_by_token
 from functions.events import write_event
@@ -90,14 +90,14 @@ from apps.evotor.routes import router as evotor_router
 from apps.module_bank.routes import router as module_bank_router
 from apps.booking.routers import router as booking_router
 
-sentry_sdk.init(
-    dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
-    enable_tracing=True,
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    # We recommend adjusting this value in production,
-    traces_sample_rate=1.0,
-)
+# sentry_sdk.init(
+#     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
+#     enable_tracing=True,
+#     # Set traces_sample_rate to 1.0 to capture 100%
+#     # of transactions for performance monitoring.
+#     # We recommend adjusting this value in production,
+#     traces_sample_rate=1.0,
+# )
 
 app = FastAPI(
     root_path="/api/v1",
