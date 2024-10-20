@@ -220,9 +220,11 @@ async def write_event_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
         await _write_event(request=request, body=body, time_start=time_start, status_code=response.status_code)
+        print(time.time() - time_start)
         return response
     except Exception as e:
         await _write_event(request=request, body=body, time_start=time_start)
+        print(time.time() - time_start)
         raise e
 
 
