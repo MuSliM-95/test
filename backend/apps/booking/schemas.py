@@ -63,6 +63,7 @@ class BookingEditList(BaseModel):
 
 
 class BookingCreate(BookingView):
+    tags: Optional[str]
     goods: List[NomenclatureBookingCreate]
 
 
@@ -127,6 +128,7 @@ class BookingFiltersList(BaseModel):
     end_booking: Optional[int] = None
     status_doc_sales: Optional[DocSalesStatus] = None
     status_booking: Optional[BookingStatus] = None
+    tags: Optional[str] = None
 
 
 

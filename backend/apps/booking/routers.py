@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
-    amo_leads
+    amo_leads, booking_tags
 from sqlalchemy import or_, and_, select
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
@@ -17,6 +17,7 @@ router = APIRouter(tags=["booking"])
 
 async def create_filters_list(filters: BookingFiltersList):
     result = []
+    result_join = []
 
     if filters.dict().get("title"):
         result.append(booking.c.title.ilike(f'%{filters.dict().get("title").strip().lower()}%'))
@@ -48,18 +49,33 @@ async def create_filters_list(filters: BookingFiltersList):
     if not filters.dict().get("status_booking") and filters.dict().get("status_doc_sales"):
         result.append(booking.c.status_doc_sales == filters.dict().get("status_doc_sales"))
 
-    return result
+    if filters.dict().get("tags"):
+        tags_list = filters.dict().get("tags").split(",")
+        filters_query = []
+        for tag in tags_list:
+            filters_query.append(booking_tags.c.name == tag)
+        result.append(or_(*filters_query))
+        result_join.append((booking_tags, booking_tags.c.booking_id == booking.c.id))
+
+    return result, result_join
 
 
 @router.get("/booking/list", response_model = BookingList)
 async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
-    filter_result = await create_filters_list(filters)
+    filter_result, join_results = await create_filters_list(filters)
     user = await get_user_by_token(token)
     try:
-        list_db = await database.fetch_all(select(booking).
-                                           where(
-            booking.c.cashbox == user.cashbox_id, *filter_result
-        ))
+        query = (
+            select(booking)
+            .where(
+                booking.c.cashbox == user.cashbox_id,
+                *filter_result
+            )
+        )
+        for join_result in join_results:
+            query = query.join(join_result[0], join_result[1])
+
+        list_db = await database.fetch_all(query)
         list_result = []
         for item in list(map(dict, list_db)):
             goods = await database.fetch_all(
@@ -122,6 +138,7 @@ async def create_booking(token: str, bookings: BookingCreateList):
 
     insert_booking_list = []
     prepare_booking_goods_list = []
+    prepare_booking_tags_list = []
     exception_list = []
     request_id = 0
 
@@ -169,8 +186,6 @@ async def create_booking(token: str, bookings: BookingCreateList):
                 booking_find = await database.fetch_one(query)
 
                 if booking_find:
-                    print(booking_find.id)
-                    print(bookingItem.get("start_booking"), bookingItem.get("end_booking"))
                     skip_iteration_outer = True
                     exception["request_id"] = request_id
                     exception["error"] = "Conflict booking date with another booking"
@@ -186,6 +201,11 @@ async def create_booking(token: str, bookings: BookingCreateList):
                 exception_list.append(exception)
                 continue
 
+            tags = bookingItem.pop("tags")
+            if tags:
+                prepare_booking_tags_list.append([{
+                    "name": tag
+                } for tag in tags.split(",")])
             prepare_booking_goods_list.append(good_info_list)
             insert_booking_list.append(
                 {**bookingItem, "cashbox": user.get("cashbox_id"), "is_deleted": False}
@@ -201,17 +221,26 @@ async def create_booking(token: str, bookings: BookingCreateList):
             create_booking_ids = await database.fetch_all(query)
 
             booking_goods_insert = []
+            booking_tags_insert = []
 
             for index, create_booking_id in enumerate(create_booking_ids):
 
                 booking_goods = prepare_booking_goods_list[index]
+                booking_tags_list = prepare_booking_tags_list[index]
 
                 for booking_good_info in booking_goods:
                     booking_good_info["booking_id"] = create_booking_id.id
                     booking_goods_insert.append(booking_good_info)
 
+                for booking_tag_info in booking_tags_list:
+                    booking_tag_info["booking_id"] = create_booking_id.id
+                    booking_tags_insert.append(booking_tag_info)
+
             if booking_goods_insert:
                 await database.execute(booking_nomenclature.insert().values(booking_goods_insert))
+
+            if booking_tags_insert:
+                await database.execute(booking_tags.insert().values(booking_tags_insert))
 
         response = {
             "data": [BookingCreate(**booking_element, goods=good_elements) for booking_element, good_elements in zip(insert_booking_list, prepare_booking_goods_list)],

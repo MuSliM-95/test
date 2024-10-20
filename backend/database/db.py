@@ -87,6 +87,13 @@ class BookingEventStatus(str, ENUM):
 
 metadata = sqlalchemy.MetaData()
 
+booking_tags = sqlalchemy.Table(
+    "booking_tags",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("booking_id", Integer, ForeignKey("bookikng.id")),
+    sqlalchemy.Column("name", String, nullable=False)
+)
 
 booking = sqlalchemy.Table(
     "bookikng",
