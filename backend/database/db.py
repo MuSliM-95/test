@@ -1643,9 +1643,7 @@ database = databases.Database(
     SQLALCHEMY_DATABASE_URL,
     min_size=1,
     max_size=10,
-    connect_args={
-        "statement_cache_size": 0
-    }
+    statement_cache_size=0
 )
 engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
 engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)
