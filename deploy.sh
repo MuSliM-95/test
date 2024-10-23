@@ -1,6 +1,6 @@
 SERVICE_NAME="backend"
 IMAGE_NAME="git.tablecrm.com:5050/tablecrm/tablecrm/backend:$CI_COMMIT_SHA"
-NGINX_CONTAINER_NAME="tablecrm-nginx-1"
+NGINX_CONTAINER_NAME="nginx"
 UPSTREAM_CONF_PATH="/etc/nginx/dir/upstream.conf"
 BOT_SERVICE_NAME="telegram_bot"
 BOT_CONTAINER_NAME_PREFIX="telegram_bot"
