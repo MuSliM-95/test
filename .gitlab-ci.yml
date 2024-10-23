@@ -13,7 +13,7 @@ build-up-docker-job:
   only:
     - master
   tags:
-    - master_runner
+    - master_backend_runner
   environment: production
   <<: *docker_script
   script:
