@@ -1641,9 +1641,9 @@ SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES
 SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_job_store"
 database = databases.Database(
     SQLALCHEMY_DATABASE_URL,
-    min_size=1,
-    max_size=10,
-    statement_cache_size=0
+    # min_size=1,
+    # max_size=10,
+    # statement_cache_size=0
 )
 engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
 engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)
