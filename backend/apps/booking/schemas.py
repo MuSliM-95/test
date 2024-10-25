@@ -75,6 +75,8 @@ class Booking(BookingView):
     id: int
     is_deleted: Optional[bool] = None
     goods: Optional[List[NomenclatureBookingPatch]]
+    tags: Optional[List[str]] = None
+    contragent_name: Optional[str] = None
 
 
 class BookingList(BaseModel):

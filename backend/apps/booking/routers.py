@@ -4,8 +4,8 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
-    amo_leads, booking_tags
-from sqlalchemy import or_, and_, select
+    amo_leads, booking_tags, contragents
+from sqlalchemy import or_, and_, select, func
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
     BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate, BookingFiltersList, BookingCreate
@@ -55,7 +55,7 @@ async def create_filters_list(filters: BookingFiltersList):
         for tag in tags_list:
             filters_query.append(booking_tags.c.name == tag)
         result.append(or_(*filters_query))
-        result_join.append((booking_tags, booking_tags.c.booking_id == booking.c.id))
+        # result_join.append((booking_tags, booking_tags.c.booking_id == booking.c.id))
 
     return result, result_join
 
@@ -65,8 +65,27 @@ async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
     filter_result, join_results = await create_filters_list(filters)
     user = await get_user_by_token(token)
     try:
+        tags_subquery = (
+            select(
+                booking_tags.c.booking_id,
+                func.coalesce(
+                    func.array_agg(booking_tags.c.name).filter(booking_tags.c.name.is_not(None)),
+                    []
+                ).label("tags")
+            )
+            .group_by(booking_tags.c.booking_id)
+            .subquery()
+        )
+
         query = (
-            select(booking)
+            select(
+                booking,
+                contragents.c.name.label("contragent_name"),
+                func.coalesce(tags_subquery.c.tags, []).label("tags")
+            )
+            .select_from(booking)
+            .outerjoin(contragents, booking.c.contragent == contragents.c.id)  # Присоединяем контрагента
+            .outerjoin(tags_subquery, tags_subquery.c.booking_id == booking.c.id)  # Левое соединение с тегами
             .where(
                 booking.c.cashbox == user.cashbox_id,
                 *filter_result
@@ -93,7 +112,7 @@ async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
                 .select_from(booking_nomenclature)
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
             list_result.append({**item, "goods": list(map(dict, goods))})
-
+        print(list_result)
         return list_result
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
