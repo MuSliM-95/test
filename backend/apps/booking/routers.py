@@ -55,7 +55,7 @@ async def create_filters_list(filters: BookingFiltersList):
         for tag in tags_list:
             filters_query.append(booking_tags.c.name == tag)
         result.append(or_(*filters_query))
-        # result_join.append((booking_tags, booking_tags.c.booking_id == booking.c.id))
+        result_join.append((booking_tags, booking_tags.c.booking_id == booking.c.id))
 
     return result, result_join
 
