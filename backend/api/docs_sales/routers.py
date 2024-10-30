@@ -45,7 +45,8 @@ from functions.helpers import (
     check_unit_exists,
     check_period_blocked,
     add_nomenclature_count,
-    raschet_oplat, add_docs_sales_settings
+    raschet_oplat,
+    add_docs_sales_settings
 )
 from functions.helpers import get_user_by_token
 
@@ -60,7 +61,6 @@ warehouses_cache = set()
 users_cache = set()
 price_types_cache = set()
 units_cache = set()
-
 
 async def exists_settings_docs_sales(docs_sales_id: int) -> bool:
     query = (
@@ -193,9 +193,6 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
 
     query = query.filter(and_(*filter_list))
-
-    compiled_query = query.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
-    print(str(compiled_query))
 
     count_query = count_query.filter(and_(*filter_list))
 
