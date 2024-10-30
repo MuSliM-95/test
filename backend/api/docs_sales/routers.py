@@ -188,7 +188,6 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
                     )
                 ))
             )
-
         else:
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
 
@@ -197,15 +196,44 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
     count_query = count_query.filter(and_(*filter_list))
 
     items_db = await database.fetch_all(query)
+    count = await database.fetch_val(count_query)
+
     items_db = [*map(datetime_to_timestamp, items_db)]
-    items_db = [*map(add_nomenclature_count, items_db)]
-    items_db = [await instance for instance in items_db]
+
+    doc_ids = [item["id"] for item in items_db]
+
+    goods_query = docs_sales_goods.select().where(docs_sales_goods.c.docs_sales_id.in_(doc_ids))
+    goods_data = await database.fetch_all(goods_query)
+    goods_map = {}
+
+    for good in goods_data:
+        doc_id = good["docs_sales_id"]
+        if doc_id not in goods_map:
+            goods_map[doc_id] = []
+        goods_map[doc_id].append(good)
+
+    for item in items_db:
+        goods = goods_map.get(item["id"], [])
+        item["nomenclature_count"] = len(goods)
+        item["doc_discount"] = round(sum(good.get("sum_discounted", 0) or 0 for good in goods), 2)
+
+    settings_ids = [item["settings"] for item in items_db]
+    settings_query = docs_sales_settings.select().where(docs_sales_settings.c.id.in_(settings_ids))
+    settings_data = await database.fetch_all(settings_query)
+    settings_map = {setting["id"]: setting for setting in settings_data}
+
+    for item in items_db:
+        item["settings"] = settings_map.get(item["settings"])
+
+    items_db = await asyncio.gather(*[raschet_oplat(item) for item in items_db])
+
     items_db = [*map(raschet_oplat, items_db)]
     items_db = [await instance for instance in items_db]
-    items_db = [*map(add_docs_sales_settings, items_db)]
-    items_db = [await instance for instance in items_db]
 
-    count = await database.fetch_val(count_query)
+    if show_goods:
+        for item in items_db:
+            item_goods = goods_map.get(item["id"], [])
+            item["goods"] = [add_nomenclature_name_to_goods(good) for good in item_goods]
 
     if show_goods:
         for item in items_db:
@@ -213,8 +241,7 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
             goods_db = await database.fetch_all(query)
             goods_db = [*map(datetime_to_timestamp, goods_db)]
 
-            goods_db = [*map(add_nomenclature_name_to_goods, goods_db)]
-            goods_db = [await instance for instance in goods_db]
+            goods_db = await asyncio.gather(*[add_nomenclature_name_to_goods(good) for good in goods_db])
 
             item['goods'] = goods_db
 
