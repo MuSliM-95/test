@@ -428,53 +428,51 @@ async def add_docs_sales_settings(instance: Optional[Record]) -> Optional[dict]:
 
 
 async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
-    if instance is not None:
-        instance = dict(instance)
+    if instance is None:
+        return None
 
-        proxyes_q = entity_to_entity.select().where(entity_to_entity.c.cashbox_id == instance['cashbox'],
-                                                    entity_to_entity.c.from_id == instance['id'])
-        proxyes = await database.fetch_all(proxyes_q)
+    instance = dict(instance)
 
-        paid_rubles = 0
-        paid_loyality = 0
+    proxyes_q = (
+        entity_to_entity.select()
+        .where(
+            entity_to_entity.c.cashbox_id == instance['cashbox'],
+            entity_to_entity.c.from_id == instance['id']
+        )
+    )
+    proxyes = await database.fetch_all(proxyes_q)
 
-        for proxy in proxyes:
-            print(proxy)
-            if proxy.from_entity == 7:
+    payment_ids = [proxy.to_id for proxy in proxyes if proxy.from_entity == 7 and proxy.to_entity == 5]
+    transaction_ids = [proxy.to_id for proxy in proxyes if proxy.from_entity == 7 and proxy.to_entity == 6]
 
-                # Платеж
+    paid_rubles = 0
+    paid_loyality = 0
 
-                if proxy.to_entity == 5:
-                    q_payment = payments.select().where(
-                        payments.c.id == proxy.to_id,
-                        payments.c.cashbox == instance['cashbox'],
-                        payments.c.status == True,
-                        payments.c.is_deleted == False
-                    )
-                    payment = await database.fetch_one(q_payment)
-                    if payment:
-                        paid_rubles += payment.amount
+    if payment_ids:
+        q_payment = payments.select().where(
+            payments.c.id.in_(payment_ids),
+            payments.c.cashbox == instance['cashbox'],
+            payments.c.status == True,
+            payments.c.is_deleted == False
+        )
+        payments_data = await database.fetch_all(q_payment)
+        paid_rubles = sum(payment.amount for payment in payments_data)
 
-                # Транзакция
-                if proxy.to_entity == 6:
-                    q_trans = loyality_transactions.select().where(
-                        loyality_transactions.c.id == proxy.to_id,
-                        loyality_transactions.c.cashbox == instance['cashbox'],
-                        loyality_transactions.c.status == True,
-                        loyality_transactions.c.is_deleted == False
-                    )
-                    trans = await database.fetch_one(q_trans)
-                    if trans:
-                        paid_loyality += trans.amount
+    if transaction_ids:
+        q_trans = loyality_transactions.select().where(
+            loyality_transactions.c.id.in_(transaction_ids),
+            loyality_transactions.c.cashbox == instance['cashbox'],
+            loyality_transactions.c.status == True,
+            loyality_transactions.c.is_deleted == False
+        )
+        transactions_data = await database.fetch_all(q_trans)
+        paid_loyality = sum(trans.amount for trans in transactions_data)
 
-        paid_rubles = round(paid_rubles, 2)
-        paid_loyality = round(paid_loyality, 2)
+    instance["paid_rubles"] = round(paid_rubles, 2)
+    instance["paid_loyality"] = round(paid_loyality, 2)
+    instance["paid_doc"] = round(paid_loyality + paid_rubles, 2)
 
-        instance["paid_rubles"] = paid_rubles
-        instance["paid_loyality"] = paid_loyality
-        instance["paid_doc"] = round(paid_loyality + paid_rubles, 2)
-
-        return instance
+    return instance
 
 
 async def nomenclature_unit_id_to_name(instance: Optional[Record]) -> Optional[dict]:
