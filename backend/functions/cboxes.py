@@ -99,13 +99,16 @@ async def join_cbox(user, cbox):
 
     tokens_list = [rel.token for rel in all_rl]
 
-    async with websockets.connect(f"wss://app.tablecrm.com/ws/{rel_token}") as ws:
-        await ws.send(json.dumps({
-            "super_secret_token": "143a2854998b0c3ab1e0f38b5a66d12024cd088b9eac8ae39df6161313d254fd",
-            "tokens_list": tokens_list,
-            "user": {"action": "users_create", "result": user_dict}
-        }))
+    try:
+        async with websockets.connect(f"wss://app.tablecrm.com/ws/{rel_token}") as ws:
+            await ws.send(json.dumps({
+                "super_secret_token": "143a2854998b0c3ab1e0f38b5a66d12024cd088b9eac8ae39df6161313d254fd",
+                "tokens_list": tokens_list,
+                "user": {"action": "users_create", "result": user_dict}
+            }))
 
-        await ws.close()
+            await ws.close()
+    except Exception as error:
+        print(f"Exception when send websocket add new user: {error}")
 
     return rl
