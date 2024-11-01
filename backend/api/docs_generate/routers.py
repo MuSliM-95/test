@@ -37,12 +37,11 @@ s3_session = aioboto3.Session()
 
 s3_data = {
     "service_name": "s3",
-    "endpoint_url": "https://storage.clo.ru",
+    "endpoint_url": environ.get("S3_URL"),
     "aws_access_key_id": environ.get("S3_ACCESS"),
     "aws_secret_access_key": environ.get("S3_SECRET"),
 }
 
-# bucket_name = "s3testbucket-default-bucket"
 bucket_name = "apptablecrmcom-default-bucket"
 
 router = APIRouter(tags=["docgenerated"])
