@@ -350,7 +350,11 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
         goods: Union[list, None] = instance_values.pop("goods", None)
 
         paid_rubles = instance_values.pop("paid_rubles", 0)
+        paid_rubles = 0 if not paid_rubles else paid_rubles
+
         paid_lt = instance_values.pop("paid_lt", 0)
+        paid_lt = 0 if not paid_lt else paid_lt
+
         lt = instance_values.pop("loyality_card_id")
 
         if not await check_period_blocked(
