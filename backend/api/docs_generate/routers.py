@@ -42,7 +42,7 @@ s3_data = {
     "aws_secret_access_key": environ.get("S3_SECRET"),
 }
 
-bucket_name = "apptablecrmcom-default-bucket"
+bucket_name = "5075293c-docs_generated"
 
 router = APIRouter(tags=["docgenerated"])
 
@@ -70,39 +70,36 @@ async def doc_generate(token: str,
 
     """ Генерирование документа с загрузкой в S3 и фиксацией записи генерации """
 
-    try:
-        user = await get_user_by_token(token)
-        query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox == user.cashbox_id)
-        template = await database.fetch_one(query)
-        data = generate_doc(template['template_data'], variable)
+    user = await get_user_by_token(token)
+    query = doc_templates.select().where(doc_templates.c.id == template_id, doc_templates.c.cashbox == user.cashbox_id)
+    template = await database.fetch_one(query)
+    data = generate_doc(template['template_data'], variable)
 
-        file_link = f"docsgenerate/{entity}_{entity_id}_{uuid4().hex[:8]}"
-        if type_doc is TypeDoc.html:
-            file_link += ".html"
-        if type_doc is TypeDoc.pdf:
-            data = convert_html_to_pdf(data)
-            file_link += ".pdf"
+    file_link = f"docsgenerate/{entity}_{entity_id}_{uuid4().hex[:8]}"
+    if type_doc is TypeDoc.html:
+        file_link += ".html"
+    if type_doc is TypeDoc.pdf:
+        data = convert_html_to_pdf(data)
+        file_link += ".pdf"
 
-        async with s3_session.client(**s3_data) as s3:
-            await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
+    async with s3_session.client(**s3_data) as s3:
+        await s3.put_object(Body=data, Bucket=bucket_name, Key=file_link)
 
-        file_dict = {
-                'cashbox_id': user.cashbox_id,
-                'doc_link': file_link,
-                'created_at': datetime.datetime.now(),
-                'tags': None if not tags else tags.lower(),
-                'template_id': template_id,
-                'entity': entity,
-                'entity_id': entity_id,
-                'type_doc': type_doc
-            }
-        query = doc_generated.insert().values(file_dict)
-        result_file_dict_id = await database.execute(query)
-        query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id, doc_generated.c.cashbox_id == user.cashbox_id)
-        result = await database.fetch_one(query)
-        return result
-    except Exception as error:
-        raise HTTPException(status_code=423, detail=str(error))
+    file_dict = {
+            'cashbox_id': user.cashbox_id,
+            'doc_link': file_link,
+            'created_at': datetime.datetime.now(),
+            'tags': None if not tags else tags.lower(),
+            'template_id': template_id,
+            'entity': entity,
+            'entity_id': entity_id,
+            'type_doc': type_doc
+        }
+    query = doc_generated.insert().values(file_dict)
+    result_file_dict_id = await database.execute(query)
+    query = doc_generated.select().where(doc_generated.c.id == result_file_dict_id, doc_generated.c.cashbox_id == user.cashbox_id)
+    result = await database.fetch_one(query)
+    return result
 
 
 @router.get('/docgenerated/{idx}', status_code=status.HTTP_200_OK)
