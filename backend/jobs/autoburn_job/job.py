@@ -176,11 +176,5 @@ async def autoburn():
     await database.connect()
 
     card_list = await AutoBurn.get_cards()
-
-    semaphore = asyncio.Semaphore(10)
-
-    async def process_card(card):
-        async with semaphore:
-            await AutoBurn(card=card).start()
-
-    await asyncio.gather(*(process_card(card) for card in card_list))
+    for card in card_list:
+        await AutoBurn(card=card).start()
