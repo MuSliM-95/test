@@ -68,7 +68,7 @@ class EventsGetFunction(IEventsGetFunction):
             for picture_info in pictures_list:
 
                 url = await s3_client.get_link_object(
-                    bucket_name="apptablecrmcom-default-bucket",
+                    bucket_name="5075293c-docs_generated",
                     file_key=picture_info.url
                 )
                 event_dict["photos"].append(url)

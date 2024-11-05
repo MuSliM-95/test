@@ -32,7 +32,7 @@ s3_data = {
     "aws_secret_access_key": environ.get("S3_SECRET"),
 }
 
-bucket_name = "apptablecrmcom-default-bucket"
+bucket_name = "5075293c-docs_generated"
 
 
 
