@@ -2,16 +2,16 @@ from fastapi import HTTPException
 from sqlalchemy import and_
 from starlette import status
 
-from apps.amocrm.api.installer.infrastructure.models.InsertWidgetInstallerInfoModel import \
+from apps.amocrm.installer.infrastructure.models.InsertWidgetInstallerInfoModel import \
     InsertWidgetInstallerInfoModel
-from apps.amocrm.api.installer.infrastructure.models.PatchWidgetInstallerInfoModel import PatchWidgetInstallerInfoModel
-from apps.amocrm.api.installer.infrastructure.models.ResponseGetByIdWidgetInstallerInfoModel import \
+from apps.amocrm.installer.infrastructure.models.PatchWidgetInstallerInfoModel import PatchWidgetInstallerInfoModel
+from apps.amocrm.installer.infrastructure.models.ResponseGetByIdWidgetInstallerInfoModel import \
     ResponseGetByIdWidgetInstallerInfoModel
-from apps.amocrm.api.installer.infrastructure.models.ResponseInsertWidgetInstallerInfoModel import \
+from apps.amocrm.installer.infrastructure.models.ResponseInsertWidgetInstallerInfoModel import \
     ResponseInsertWidgetInstallerInfoModel
-from apps.amocrm.api.installer.infrastructure.models.ResponsePatchWidgetInstallerInfoModel import \
+from apps.amocrm.installer.infrastructure.models.ResponsePatchWidgetInstallerInfoModel import \
     ResponsePatchWidgetInstallerInfoModel
-from apps.amocrm.api.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
+from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
 from database.db import amo_install_widget_installer, database
 

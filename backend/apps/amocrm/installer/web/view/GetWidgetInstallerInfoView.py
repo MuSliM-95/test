@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from starlette import status
 
-from apps.amocrm.api.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
+from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
 from functions.helpers import get_user_by_token
 

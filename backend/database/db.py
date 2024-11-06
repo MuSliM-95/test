@@ -55,7 +55,9 @@ class InstalledByRole(str, ENUM):
     Partner = "Партнёр"
     Client = "Клиент"
 
-
+class TypeCustomField(str, ENUM):
+    Contact = "Контакт"
+    Lead = "Сделка"
 
 class BookingStatus(str, ENUM):
     new = "Новый"
@@ -805,7 +807,6 @@ payments = sqlalchemy.Table(
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
-
 
 projects = sqlalchemy.Table(
     "projects",
@@ -1635,6 +1636,40 @@ tbank_orders = sqlalchemy.Table(
     sqlalchemy.Column("tbank_payment_id", Text),
     sqlalchemy.Column("payment_url", Text),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=True),
+)
+
+amo_custom_fields = sqlalchemy.Table(
+    "amo_custom_fields",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("type_entity", Enum(TypeCustomField), nullable=False),
+    sqlalchemy.Column("code", String, nullable=False),
+    sqlalchemy.Column("name", String, nullable=False),
+    sqlalchemy.Column("type", String, nullable=False),
+    extend_existing=True
+)
+
+amo_install_custom_fields = sqlalchemy.Table(
+    "amo_install_custom_fields",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("custom_field_id", Integer, ForeignKey("amo_custom_fields.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, nullable=False),
+    sqlalchemy.Column("active", Boolean, server_default="true"),
+    sqlalchemy.UniqueConstraint('custom_field_id', 'cashbox_id'),
+    extend_existing=True
+)
+
+amo_entity_custom_fields = sqlalchemy.Table(
+    "amo_entity_custom_fields",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("custom_field_id", Integer, ForeignKey("amo_custom_fields.id"), nullable=False),
+    sqlalchemy.Column("value", String, nullable=False),
+    sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=True, index=True),
+    sqlalchemy.Column("contact_id", Integer, ForeignKey("amo_contacts.id"), nullable=True, index=True),
+    sqlalchemy.UniqueConstraint('custom_field_id', 'lead_id', 'contact_id'),
+    extend_existing=True
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"

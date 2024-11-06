@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from apps.amocrm.function import refresh_token
+from apps.amocrm.pair.functions.fields import create_custom_fields_contacts, create_custom_fields_leads
 from ws_manager import manager
 
 from datetime import datetime
@@ -36,6 +37,19 @@ async def sc_l(token: str, amo_token: str):
             for install_info in amo_installs_in_group:
                 if install_info.active:
                     flag = True
+
+            if flag:
+                await create_custom_fields_contacts(
+                    cashbox_id=user["cashbox_id"],
+                    referer=amo_installs_in_group.referrer,
+                    access_token=amo_installs_in_group.access_token
+                )
+
+                await create_custom_fields_leads(
+                    cashbox_id=user["cashbox_id"],
+                    referer=amo_installs_in_group.referrer,
+                    access_token=amo_installs_in_group.access_token
+                )
 
             if not amo_pair:
                 integration_data["cashbox_id"] = user["cashbox_id"]
