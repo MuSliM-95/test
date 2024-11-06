@@ -18,6 +18,7 @@ section = config.config_ini_section
 config.set_section_option(section, "POSTGRES_USER", os.environ.get("POSTGRES_USER"))
 config.set_section_option(section, "POSTGRES_PASS", os.environ.get("POSTGRES_PASS"))
 config.set_section_option(section, "POSTGRES_HOST", os.environ.get("POSTGRES_HOST"))
+config.set_section_option(section, "POSTGRES_PORT", os.environ.get("POSTGRES_PORT"))
 
 
 # add your model's MetaData object here
