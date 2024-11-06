@@ -1,15 +1,13 @@
-from typing import List
-
 import asyncpg
 
 from fastapi import HTTPException
 from starlette import status
 
-from apps.amocrm.api.installer.infrastructure.models.InsertWidgetInstallerInfoModel import \
+from apps.amocrm.installer.infrastructure.models.InsertWidgetInstallerInfoModel import \
     InsertWidgetInstallerInfoModel
-from apps.amocrm.api.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
+from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
-from apps.amocrm.api.installer.web.models.AddInstallerInfoModel import AddInstallerInfoModel
+from apps.amocrm.installer.web.models.AddInstallerInfoModel import AddInstallerInfoModel
 from database.db import InstalledByRole
 from functions.helpers import get_user_by_token
 

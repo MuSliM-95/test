@@ -6,11 +6,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from apps.amocrm.api.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
+from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
-from apps.amocrm.api.installer.infrastructure.repositories.impl.WidgetInstallerRepository import \
+from apps.amocrm.installer.infrastructure.repositories.impl.WidgetInstallerRepository import \
     WidgetInstallerRepository
-from apps.amocrm.api.installer.web.InstallWidgetInstallerInfoWeb import InstallWidgetInstallerInfoWeb
+from apps.amocrm.installer.web.InstallWidgetInstallerInfoWeb import InstallWidgetInstallerInfoWeb
 from apps.booking.booking.infrastructure.repositories.core.IBookingRepository import IBookingRepository
 from apps.booking.booking.infrastructure.repositories.impl.BookingRepository import BookingRepository
 from apps.booking.events.infrastructure.repositories.core.IBookingEventsRepository import IBookingEventsRepository
@@ -76,7 +76,7 @@ from api.loyality_transactions.routers import router as loyality_transactions
 from api.loyality_settings.routers import router as loyality_settings
 
 from apps.amocrm.api.pair.routes import router as amo_pair_router
-from apps.amocrm.api.install.routes import router as amo_install_router
+from apps.amocrm.install.web.routes import router as amo_install_router
 
 from api.integrations.routers import router as int_router
 from api.oauth.routes import router as oauth_router
