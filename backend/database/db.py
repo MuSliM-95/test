@@ -1634,7 +1634,7 @@ tbank_orders = sqlalchemy.Table(
     sqlalchemy.Column("payment_id", BigInteger),
     sqlalchemy.Column("tbank_payment_id", Text),
     sqlalchemy.Column("payment_url", Text),
-    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=True),
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
