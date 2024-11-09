@@ -8,6 +8,7 @@ Create Date: 2024-11-09 23:23:29.060643
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '7ae789d0afe8'
@@ -17,6 +18,8 @@ depends_on = None
 
 
 def upgrade() -> None:
+    gender_enum = postgresql.ENUM('Мужчина', 'Женщина', name='gender')
+    gender_enum.create(op.get_bind())
     op.add_column('contragents', sa.Column('additional_phones', sa.String(), nullable=True))
     op.add_column('contragents', sa.Column('gender', sa.Enum('male', 'female', name='gender'), nullable=True))
 
