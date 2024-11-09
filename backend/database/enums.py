@@ -7,3 +7,8 @@ class Repeatability(str, Enum):
     days = "days"
     weeks = "weeks"
     months = "months"
+
+
+class Gender(str, Enum):
+    male = "Мужчина"
+    female = "Женщина"

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from database.enums import Repeatability
+from database.enums import Repeatability, Gender
 
 
 class OperationType(str, ENUM):
@@ -54,6 +54,7 @@ class Contragent_types(str, ENUM):
 class InstalledByRole(str, ENUM):
     Partner = "Партнёр"
     Client = "Клиент"
+
 
 class TypeCustomField(str, ENUM):
     Contact = "Контакт"
@@ -108,19 +109,18 @@ booking = sqlalchemy.Table(
     sqlalchemy.Column("date_booking", Integer, index=True),
     sqlalchemy.Column("start_booking", Integer, index=True),
     sqlalchemy.Column("end_booking", Integer, index=True),
-    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable = True),
-    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable = True),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=True),
     sqlalchemy.Column("booking_user_id", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("booking_driver_id", Integer, ForeignKey("tg_accounts.id")),
-    sqlalchemy.Column("status_doc_sales", Enum(DocSalesStatus), nullable = False),
-    sqlalchemy.Column("status_booking", Enum(BookingStatus), nullable = False),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("status_doc_sales", Enum(DocSalesStatus), nullable=False),
+    sqlalchemy.Column("status_booking", Enum(BookingStatus), nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("comment", String),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("sale_payload", JSON)
 )
-
 
 booking_nomenclature = sqlalchemy.Table(
     "booking_nomenclature",
@@ -128,24 +128,23 @@ booking_nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("booking_id", Integer, ForeignKey("bookikng.id")),
     sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
-    sqlalchemy.Column("tariff", Enum(Tariff), nullable = False),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("tariff", Enum(Tariff), nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("is_deleted", Boolean),
 )
-
 
 booking_events = sqlalchemy.Table(
     "booking_events",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("booking_nomenclature_id", Integer, ForeignKey("booking_nomenclature.id")),
-    sqlalchemy.Column("type", Enum(BookingEventStatus), index=True, nullable = False),
+    sqlalchemy.Column("type", Enum(BookingEventStatus), index=True, nullable=False),
     sqlalchemy.Column("value", String),
     sqlalchemy.Column("latitude", String),
     sqlalchemy.Column("longitude", String),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("is_deleted", Boolean),
 )
 
@@ -186,8 +185,8 @@ module_bank_accounts = sqlalchemy.Table(
     sqlalchemy.Column("accountId", String, nullable=False, unique=True),
     sqlalchemy.Column("number", String),
     sqlalchemy.Column("status", String),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("is_active", Boolean, default=False),
 )
@@ -230,19 +229,17 @@ module_bank_operations = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-
 evotor_credentials = sqlalchemy.Table(
     "evotor_credentials",
     metadata,
-    sqlalchemy.Column("id", Integer, primary_key = True, index = True),
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id"), nullable=True),
     sqlalchemy.Column('evotor_token', String),
     sqlalchemy.Column("userId", String),
     sqlalchemy.Column("status", Boolean),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
-
 
 tochka_bank_credentials = sqlalchemy.Table(
     "tochka_bank_credentials",
@@ -254,7 +251,6 @@ tochka_bank_credentials = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
-
 
 tochka_bank_payments = sqlalchemy.Table(
     "tochka_bank_payments",
@@ -298,7 +294,6 @@ tochka_bank_payments = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-
 tochka_bank_accounts = sqlalchemy.Table(
     "tochka_bank_accounts",
     metadata,
@@ -313,13 +308,12 @@ tochka_bank_accounts = sqlalchemy.Table(
     sqlalchemy.Column("currency", String),
     sqlalchemy.Column("accountType", String),
     sqlalchemy.Column("accountSubType", String),
-    sqlalchemy.Column("registrationDate", String ),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("registrationDate", String),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("is_active", Boolean, default=False),
 )
-
 
 entity_type = sqlalchemy.Table(
     "entity_type",
@@ -494,7 +488,6 @@ nomenclature_barcodes = sqlalchemy.Table(
     sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
     sqlalchemy.Column("code", String),
 )
-
 
 categories = sqlalchemy.Table(
     "categories",
@@ -739,6 +732,8 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("contragent_type", Enum(Contragent_types)),
     sqlalchemy.Column("birth_date", Date),
     sqlalchemy.Column("data", JSON),
+    sqlalchemy.Column("additional_phones", String, nullable=True),
+    sqlalchemy.Column("gender", Enum(Gender), nullable=True),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", Integer),
@@ -1242,7 +1237,6 @@ fifo_settings = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-
 warehouse_balances = sqlalchemy.Table(
     "warehouse_balances",
     metadata,
@@ -1396,8 +1390,8 @@ areas = sqlalchemy.Table(
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 pages = sqlalchemy.Table(
@@ -1408,8 +1402,8 @@ pages = sqlalchemy.Table(
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
 amo_settings = sqlalchemy.Table(

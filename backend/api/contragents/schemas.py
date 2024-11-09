@@ -3,7 +3,7 @@ from typing import Optional
 
 from enum import Enum
 from datetime import date
-
+from database.enums import Gender
 
 class Contragent_types(str, Enum):
     Supplier = "Поставщик"
@@ -19,6 +19,8 @@ class Contragent(BaseModel):
     contragent_type: Optional[Contragent_types]
     birth_date: Optional[date]
     data: Optional[dict]
+    gender: Optional[Gender]
+    additional_phones: Optional[str]
 
 
 class ContragentEdit(BaseModel):
@@ -31,6 +33,8 @@ class ContragentEdit(BaseModel):
     contragent_type: Optional[Contragent_types]
     birth_date: Optional[date]
     data: Optional[dict]
+    gender: Optional[Gender]
+    additional_phones: Optional[str]
 
 
 class ContragentCreate(BaseModel):
@@ -44,3 +48,8 @@ class ContragentCreate(BaseModel):
     birth_date: Optional[date]
     email: Optional[str]
     data: Optional[dict]
+    gender: Optional[Gender]
+    additional_phones: Optional[str]
+
+class ContragentResponse(Contragent):
+    external_id: Optional[str]
