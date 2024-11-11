@@ -18,7 +18,7 @@ router = APIRouter(tags=["categories"])
 async def get_category_by_id(token: str, idx: int):
     """Получение категории по ID"""
     user = await get_user_by_token(token)
-    category_db = await get_entity_by_id(categories, idx, user.id)
+    category_db = await get_entity_by_id(categories, idx, user.cashbox_id)
     category_db = datetime_to_timestamp(category_db)
     return category_db
 
