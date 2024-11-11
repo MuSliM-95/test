@@ -43,9 +43,11 @@ async def create_amo_group_contacts(referer: str, access_token: str):
         async with http_session.get(url) as groups_resp:
             groups_resp.raise_for_status()
             resp_json = await groups_resp.json()
-            for group in resp_json:
-                if group["name"] == "Tablecrm":
-                    group_id = group["id"]
+            if "_embedded" in resp_json:
+                if "custom_field_groups" in resp_json["_embedded"]:
+                    for group in resp_json["_embedded"]["custom_field_groups"]:
+                        if group["name"] == "Tablecrm":
+                            group_id = group["id"]
 
         if not group_id:
             data = [
@@ -75,9 +77,11 @@ async def create_amo_group_leads(referer: str, access_token: str):
         async with http_session.get(url) as groups_resp:
             groups_resp.raise_for_status()
             resp_json = await groups_resp.json()
-            for group in resp_json:
-                if group["name"] == "Tablecrm":
-                    group_id = group["id"]
+            if "_embedded" in resp_json:
+                if "custom_field_groups" in resp_json["_embedded"]:
+                    for group in resp_json["_embedded"]["custom_field_groups"]:
+                        if group["name"] == "Tablecrm":
+                            group_id = group["id"]
 
         if not group_id:
             data = [
