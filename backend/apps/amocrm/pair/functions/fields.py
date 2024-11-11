@@ -40,20 +40,28 @@ async def create_amo_group_contacts(referer: str, access_token: str):
 
     async with aiohttp.ClientSession(headers=headers) as http_session:
         url = f"https://{referer}/api/v4/contacts/custom_fields/groups"
-        data = [
-            {
-                "name": "Tablecrm",
-                "sort": 2
-            }
-        ]
-        async with http_session.post(url, data=json.dumps(data)) as groups_resp:
+        async with http_session.get(url) as groups_resp:
             groups_resp.raise_for_status()
             resp_json = await groups_resp.json()
-            if "_embedded" in resp_json:
-                if "custom_field_groups" in resp_json["_embedded"]:
-                    for group in resp_json["_embedded"]["custom_field_groups"]:
-                        if group["name"] == "Tablecrm":
-                            group_id = group["id"]
+            for group in resp_json:
+                if group["name"] == "Tablecrm":
+                    group_id = group["id"]
+
+        if not group_id:
+            data = [
+                {
+                    "name": "Tablecrm",
+                    "sort": 2
+                }
+            ]
+            async with http_session.post(url, data=json.dumps(data)) as groups_resp:
+                groups_resp.raise_for_status()
+                resp_json = await groups_resp.json()
+                if "_embedded" in resp_json:
+                    if "custom_field_groups" in resp_json["_embedded"]:
+                        for group in resp_json["_embedded"]["custom_field_groups"]:
+                            if group["name"] == "Tablecrm":
+                                group_id = group["id"]
     return group_id
 
 
@@ -63,20 +71,29 @@ async def create_amo_group_leads(referer: str, access_token: str):
 
     async with aiohttp.ClientSession(headers=headers) as http_session:
         url = f"https://{referer}/api/v4/leads/custom_fields/groups"
-        data = [
-            {
-                "name": "Tablecrm",
-                "sort": 2
-            }
-        ]
-        async with http_session.post(url, data=json.dumps(data)) as groups_resp:
+
+        async with http_session.get(url) as groups_resp:
             groups_resp.raise_for_status()
             resp_json = await groups_resp.json()
-            if "_embedded" in resp_json:
-                if "custom_field_groups" in resp_json["_embedded"]:
-                    for group in resp_json["_embedded"]["custom_field_groups"]:
-                        if group["name"] == "Tablecrm":
-                            group_id = group["id"]
+            for group in resp_json:
+                if group["name"] == "Tablecrm":
+                    group_id = group["id"]
+
+        if not group_id:
+            data = [
+                {
+                    "name": "Tablecrm",
+                    "sort": 2
+                }
+            ]
+            async with http_session.post(url, data=json.dumps(data)) as groups_resp:
+                groups_resp.raise_for_status()
+                resp_json = await groups_resp.json()
+                if "_embedded" in resp_json:
+                    if "custom_field_groups" in resp_json["_embedded"]:
+                        for group in resp_json["_embedded"]["custom_field_groups"]:
+                            if group["name"] == "Tablecrm":
+                                group_id = group["id"]
     return group_id
 
 
