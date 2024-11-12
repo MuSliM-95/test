@@ -255,7 +255,12 @@ async def delete_loyality_transaction(token: str, idx: int):
         loyality_transactions.c.id == idx, loyality_transactions.c.cashbox == user.cashbox_id
     )
     loyality_transaction_db = await database.fetch_one(query)
+
+    loyality_transaction_card_id = loyality_transaction_db.loyality_card_id
+
     loyality_transaction_db = datetime_to_timestamp(loyality_transaction_db)
+
+
 
     await manager.send_message(
         token,
@@ -266,6 +271,6 @@ async def delete_loyality_transaction(token: str, idx: int):
         },
     )
 
-    await asyncio.gather(asyncio.create_task(raschet_bonuses(loyality_transaction_db.loyality_card_id)))
+    await asyncio.gather(asyncio.create_task(raschet_bonuses(loyality_transaction_card_id)))
 
     return {**loyality_transaction_db, **{"data": {"status": "success"}}}
