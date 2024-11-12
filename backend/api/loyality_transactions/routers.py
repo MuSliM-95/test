@@ -42,6 +42,7 @@ async def raschet_bonuses(card_id: int) -> None:
         )
     )
     edit_dict: Dict[str, Any] = dict(await database.fetch_one(q))
+
     await database.execute(loyality_cards.update().where(loyality_cards.c.id == card_id).values(edit_dict))
 
 
@@ -256,7 +257,7 @@ async def delete_loyality_transaction(token: str, idx: int):
     )
     loyality_transaction_db = await database.fetch_one(query)
 
-    loyality_transaction_card_id = loyality_transaction_db.loyality_card_id
+    loyality_card_id = loyality_transaction_db.loyality_card_id
 
     loyality_transaction_db = datetime_to_timestamp(loyality_transaction_db)
 
@@ -271,6 +272,6 @@ async def delete_loyality_transaction(token: str, idx: int):
         },
     )
 
-    await asyncio.gather(asyncio.create_task(raschet_bonuses(loyality_transaction_card_id)))
+    await asyncio.gather(asyncio.create_task(raschet_bonuses(loyality_card_id)))
 
     return {**loyality_transaction_db, **{"data": {"status": "success"}}}
