@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '7ae789d0afe8'
-down_revision = 'dbbe06a4083d'
+down_revision = 'fab805a9d974'
 branch_labels = None
 depends_on = None
 
@@ -25,4 +25,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    pass
+    op.drop_column('contragents', 'gender')
+    op.drop_column('contragents', 'additional_phones')
+    gender_enum = postgresql.ENUM('Мужчина', 'Женщина', name='gender')
+    gender_enum.drop(op.get_bind())
