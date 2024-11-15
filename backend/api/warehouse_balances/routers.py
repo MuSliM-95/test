@@ -14,6 +14,57 @@ from functions.helpers import get_user_by_token
 router = APIRouter(tags=["warehouse_balances"])
 
 
+@router.get("/warehouse_balances/clearQuantity/category/{id_category}")
+async def clear_quantity(token: str, id_category: int, warehouse_id: int, date_from: Optional[int] = None, date_to: Optional[int] = None):
+    await get_user_by_token(token)
+
+    dates_arr = []
+
+    if date_to and not date_from:
+        dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+    if date_to and date_from:
+        dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+        dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+    if not date_to and date_from:
+        dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+
+    selection_conditions = [
+        warehouse_register_movement.c.warehouse_id == warehouse_id,
+        nomenclature.c.category == id_category,
+        *dates_arr
+    ]
+
+    query = (
+        select(
+            nomenclature.c.id,
+            nomenclature.c.name,
+            nomenclature.c.category,
+            warehouse_register_movement.c.id,
+            warehouse_register_movement.c.type_amount,
+            warehouse_register_movement.c.amount,
+            warehouse_register_movement.c.organization_id,
+            warehouse_register_movement.c.warehouse_id
+        )
+        .where(*selection_conditions)
+    )\
+        .select_from(warehouse_register_movement
+                      .join(nomenclature,
+                             warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                             ))
+
+    warehouse_balances_db = await database.fetch_all(query)
+    print(warehouse_balances_db)
+
+    return warehouse_balances_db
+
+
+
+@router.get("/warehouse_balances/clearQuantity/product/{id_product}")
+async def clear_quantity(token: str, id_product: int):
+    await get_user_by_token(token)
+    pass
+
+
 @router.get("/warehouse_balances/{warehouse_id}/", response_model=int)
 async def get_warehouse_current_balance(token: str, warehouse_id: int, nomenclature_id: int, organization_id: int):
     """Получение текущего остатка товара по складу"""
