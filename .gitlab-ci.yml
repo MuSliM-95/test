@@ -1,13 +1,6 @@
 stages:
   - docker
 
-.docker_script: &docker_script
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
-    - docker build -t tablecrm_backend:latest ./backend
-    - docker tag tablecrm_backend:latest $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
-    - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
-
 build-up-docker-job:
   stage: docker
   only:
@@ -15,7 +8,11 @@ build-up-docker-job:
   tags:
     - master_backend_runner
   environment: production
-  <<: *docker_script
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+    - docker build -t tablecrm_backend:latest ./backend
+    - docker tag tablecrm_backend:latest $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
   script:
     - chmod +x deploy.sh
     - ./deploy.sh
@@ -27,6 +24,7 @@ build-up-docker-job-dev:
   tags:
     - dev_runner
   environment: dev
+  before_script:
+    - CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME docker compose build
   script:
-    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose -f docker-compose-dev-server.yml up -d --force-recreate --remove-orphans
-
+    - RABBITMQ_HOST="$RABBITMQ_HOST" RABBITMQ_PORT="$RABBITMQ_PORT" RABBITMQ_USER="$RABBITMQ_USER" RABBITMQ_PASS="$RABBITMQ_PASS" RABBITMQ_VHOST="$RABBITMQ_VHOST" APP_URL="$APP_URL" S3_ACCESS="$S3_ACCESS" S3_SECRET="$S3_SECRET" S3_URL="$S3_URL" S3_BACKUPS_ACCESSKEY="$S3_BACKUPS_ACCESSKEY" S3_BACKUPS_SECRETKEY="$S3_BACKUPS_SECRETKEY" TG_TOKEN="$TG_TOKEN" POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASS="$POSTGRES_PASS" POSTGRES_HOST="$POSTGRES_HOST" POSTGRES_PORT="$POSTGRES_PORT" CHEQUES_TOKEN="$CHEQUES_TOKEN" ACCOUNT_INTERVAL="$ACCOUNT_INTERVAL" docker compose up -d --force-recreate --remove-orphans
