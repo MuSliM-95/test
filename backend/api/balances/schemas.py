@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 
 class AccountInfo(BaseModel):
+    is_owner: bool = None
     type: str
     demo_expiration: int
     demo_left: int
