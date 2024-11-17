@@ -1,9 +1,10 @@
 from typing import Optional, List
 from fastapi_pagination import paginate, add_pagination
 from api.pagination.pagination import Page
-from fastapi import APIRouter
-from sqlalchemy import select, func, desc, case
-
+from fastapi import APIRouter, status, HTTPException
+from fastapi.responses import JSONResponse
+from sqlalchemy import select, func, desc, case, delete
+from fastapi.encoders import jsonable_encoder
 from database.db import database, warehouse_balances, warehouses, warehouse_register_movement, nomenclature, OperationType, organizations, categories
 from . import schemas
 from datetime import datetime
@@ -14,55 +15,112 @@ from functions.helpers import get_user_by_token
 router = APIRouter(tags=["warehouse_balances"])
 
 
-@router.get("/warehouse_balances/clearQuantity/category/{id_category}")
+@database.transaction()
+@router.get("/warehouse_balances/clearQuantity/category/{id_category}", status_code = status.HTTP_202_ACCEPTED)
 async def clear_quantity(token: str, id_category: int, warehouse_id: int, date_from: Optional[int] = None, date_to: Optional[int] = None):
-    await get_user_by_token(token)
+    try:
+        await get_user_by_token(token)
 
-    dates_arr = []
+        dates_arr = []
 
-    if date_to and not date_from:
-        dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
-    if date_to and date_from:
-        dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
-        dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
-    if not date_to and date_from:
-        dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+        if date_to and not date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+        if date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+        if not date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
 
-    selection_conditions = [
-        warehouse_register_movement.c.warehouse_id == warehouse_id,
-        nomenclature.c.category == id_category,
-        *dates_arr
-    ]
+        selection_conditions = [
+            warehouse_register_movement.c.warehouse_id == warehouse_id,
+            nomenclature.c.category == id_category,
+            *dates_arr
+        ]
 
-    query = (
-        select(
-            nomenclature.c.id,
-            nomenclature.c.name,
-            nomenclature.c.category,
-            warehouse_register_movement.c.id,
-            warehouse_register_movement.c.type_amount,
-            warehouse_register_movement.c.amount,
-            warehouse_register_movement.c.organization_id,
-            warehouse_register_movement.c.warehouse_id
-        )
-        .where(*selection_conditions)
-    )\
-        .select_from(warehouse_register_movement
-                      .join(nomenclature,
-                             warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
-                             ))
+        query = (
+            select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.category,
+                warehouse_register_movement.c.id.label("id_movement"),
+                warehouse_register_movement.c.type_amount,
+                warehouse_register_movement.c.amount,
+                warehouse_register_movement.c.organization_id,
+                warehouse_register_movement.c.warehouse_id
+            )
+            .where(*selection_conditions)
+        )\
+            .select_from(warehouse_register_movement
+                          .join(nomenclature,
+                                 warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                                 ))
 
-    warehouse_balances_db = await database.fetch_all(query)
-    print(warehouse_balances_db)
+        warehouse_balances_db = await database.fetch_all(query)
+        query_delete_warehouse_register_movement_by_category = \
+            warehouse_register_movement.delete().\
+            where(
+                warehouse_register_movement.c.id.in_(
+                    [item.id_movement for item in warehouse_balances_db]
+                )
+            )
+        await database.execute(query_delete_warehouse_register_movement_by_category)
+        return warehouse_balances_db
+    except HTTPException as e:
+        raise HTTPException(status_code = 432, detail = str(e.detail))
 
-    return warehouse_balances_db
 
+@database.transaction()
+@router.get("/warehouse_balances/clearQuantity/product/{id_product}", status_code = status.HTTP_202_ACCEPTED)
+async def clear_quantity(token: str, id_product: int, warehouse_id: int, date_from: Optional[int] = None, date_to: Optional[int] = None):
+    try:
+        await get_user_by_token(token)
 
+        dates_arr = []
 
-@router.get("/warehouse_balances/clearQuantity/product/{id_product}")
-async def clear_quantity(token: str, id_product: int):
-    await get_user_by_token(token)
-    pass
+        if date_to and not date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+        if date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+        if not date_to and date_from:
+            dates_arr.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+
+        selection_conditions = [
+            warehouse_register_movement.c.warehouse_id == warehouse_id,
+            nomenclature.c.id == id_product,
+            *dates_arr
+        ]
+
+        query = (
+            select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.category,
+                warehouse_register_movement.c.id.label("id_movement"),
+                warehouse_register_movement.c.type_amount,
+                warehouse_register_movement.c.amount,
+                warehouse_register_movement.c.organization_id,
+                warehouse_register_movement.c.warehouse_id
+            )
+            .where(*selection_conditions)
+        )\
+            .select_from(warehouse_register_movement
+                          .join(nomenclature,
+                                 warehouse_register_movement.c.nomenclature_id == nomenclature.c.id
+                                 ))
+
+        warehouse_balances_db = await database.fetch_one(query)
+
+        if warehouse_balances_db:
+            query_delete_warehouse_register_movement_by_category =\
+                warehouse_register_movement.delete().\
+                    where(
+                    warehouse_register_movement.c.id == warehouse_balances_db.get("id_movement")
+                )
+            await database.execute(query_delete_warehouse_register_movement_by_category)
+            return warehouse_balances_db
+    except HTTPException as e:
+        raise HTTPException(status_code = 432, detail = str(e.detail))
 
 
 @router.get("/warehouse_balances/{warehouse_id}/", response_model=int)
