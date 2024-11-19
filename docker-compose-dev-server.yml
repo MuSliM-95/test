@@ -241,6 +241,9 @@ services:
       - nginx-proxy
       - infrastructure
 
+volumes:
+  pgdata:
+
 networks:
   nginx-proxy:
     name: tablecrm_nginx-proxy
