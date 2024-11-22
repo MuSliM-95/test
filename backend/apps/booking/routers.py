@@ -149,8 +149,8 @@ async def get_booking_by_idx(token: str, idx: int):
 @database.transaction()
 @router.post("/booking/create",
              status_code=201,
-             response_model = ResponseCreate,
-             responses={201: {"model": ResponseCreate}}
+             # response_model = ResponseCreate,
+             # responses={201: {"model": ResponseCreate}}
              )
 async def create_booking(token: str, bookings: BookingCreateList):
     user = await get_user_by_token(token)
@@ -243,9 +243,16 @@ async def create_booking(token: str, bookings: BookingCreateList):
             booking_tags_insert = []
 
             for index, create_booking_id in enumerate(create_booking_ids):
-
-                booking_goods = prepare_booking_goods_list[index]
-                booking_tags_list = prepare_booking_tags_list[index]
+                #была ошибка обращение к индексу который не существует массива prepare_booking_goods_list. Сделал проверку
+                if len(prepare_booking_goods_list) > 0:
+                    booking_goods = prepare_booking_goods_list[index]
+                else:
+                    booking_goods = []
+                #была ошибка обращение к индексу который не существует prepare_booking_tags_list. Сделал проверку
+                if len(prepare_booking_tags_list) > 0:
+                    booking_tags_list = prepare_booking_tags_list[index]
+                else:
+                    booking_tags_list = []
 
                 for booking_good_info in booking_goods:
                     booking_good_info["booking_id"] = create_booking_id.id
