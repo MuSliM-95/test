@@ -2,6 +2,7 @@ from typing import Union, List
 
 from asyncpg import ForeignKeyViolationError
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy import desc, asc, func, select
 
 from ws_manager import manager
@@ -81,6 +82,9 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
                 update_dict['created_at'] = int(datetime.utcnow().timestamp())
 
                 ca_list.append(update_dict)
+
+            if not ca_list:
+                return Response(status_code=204)
 
             q = contragents.insert().values(ca_list).returning(
                 contragents.c.id, contragents.c.name,
