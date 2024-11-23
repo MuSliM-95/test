@@ -69,6 +69,12 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
             for ca in ca_body:
                 update_dict = ca.dict(exclude_unset=True)
 
+                if update_dict['phone']:
+                    q = contragents.select().where(contragents.c.phone == update_dict['phone'])
+                    contr = await database.fetch_one(q)
+                    if contr:
+                        continue
+
                 update_dict['cashbox'] = user.cashbox_id
                 update_dict['is_deleted'] = False
                 update_dict['updated_at'] = int(datetime.utcnow().timestamp())
