@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
-    amo_leads, booking_tags, contragents
+    amo_leads, booking_tags, contragents, booking_events
 from sqlalchemy import or_, and_, select, func
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
@@ -59,6 +59,19 @@ async def create_filters_list(filters: BookingFiltersList):
 
     return result, result_join
 
+
+@router.get("/booking/events/nomenclature/{idx}")
+async def get_events_by_nomenclature(token: str, idx: int):
+    await get_user_by_token(token)
+    try:
+        query = booking_events.select().\
+            select_from(booking_events).\
+            join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)\
+            .where(booking_nomenclature.c.nomenclature_id == idx)
+        events_list = await database.fetch_all(query)
+        return events_list
+    except Exception as e:
+        raise HTTPException(status_code = 432, detail = str(e))
 
 @router.get("/booking/list", response_model = BookingList)
 async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
@@ -149,8 +162,8 @@ async def get_booking_by_idx(token: str, idx: int):
 @database.transaction()
 @router.post("/booking/create",
              status_code=201,
-             response_model = ResponseCreate,
-             responses={201: {"model": ResponseCreate}}
+             # response_model = ResponseCreate,
+             # responses={201: {"model": ResponseCreate}}
              )
 async def create_booking(token: str, bookings: BookingCreateList):
     user = await get_user_by_token(token)
@@ -243,9 +256,16 @@ async def create_booking(token: str, bookings: BookingCreateList):
             booking_tags_insert = []
 
             for index, create_booking_id in enumerate(create_booking_ids):
-
-                booking_goods = prepare_booking_goods_list[index]
-                booking_tags_list = prepare_booking_tags_list[index]
+                #была ошибка обращение к индексу который не существует массива prepare_booking_goods_list. Сделал проверку
+                if len(prepare_booking_goods_list) > 0:
+                    booking_goods = prepare_booking_goods_list[index]
+                else:
+                    booking_goods = []
+                #была ошибка обращение к индексу который не существует prepare_booking_tags_list. Сделал проверку
+                if len(prepare_booking_tags_list) > 0:
+                    booking_tags_list = prepare_booking_tags_list[index]
+                else:
+                    booking_tags_list = []
 
                 for booking_good_info in booking_goods:
                     booking_good_info["booking_id"] = create_booking_id.id
