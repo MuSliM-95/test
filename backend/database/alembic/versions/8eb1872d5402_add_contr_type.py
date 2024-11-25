@@ -18,8 +18,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    gender_enum = postgresql.ENUM('Компания', 'Контакт', name='contrtype')
-    gender_enum.create(op.get_bind())
+    contrtype_enum = postgresql.ENUM('Компания', 'Контакт', name='contrtype')
+    contrtype_enum.create(op.get_bind())
     op.add_column('contragents', sa.Column('type', sa.Enum('company', 'contact', name='contrtype'), nullable=True))
 
 
