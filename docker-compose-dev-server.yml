@@ -109,6 +109,7 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
@@ -137,6 +138,7 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
@@ -166,6 +168,7 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
@@ -190,6 +193,7 @@ services:
       POSTGRES_PASS: ${POSTGRES_PASS}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
+      ADMIN_ID: ${ADMIN_ID}
       XDG_RUNTIME_DIR: ./tmp
     networks:
       - nginx-proxy
@@ -216,6 +220,7 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
@@ -237,6 +242,7 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
