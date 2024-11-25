@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from database.enums import Repeatability, Gender
+from database.enums import Repeatability, Gender, ContragentType
 
 
 class OperationType(str, ENUM):
@@ -730,6 +730,7 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("inn", String, nullable=True),
     sqlalchemy.Column("description", Text),
     sqlalchemy.Column("contragent_type", Enum(Contragent_types)),
+    sqlalchemy.Column("type", Enum(ContragentType), nullable=True),
     sqlalchemy.Column("birth_date", Date),
     sqlalchemy.Column("data", JSON),
     sqlalchemy.Column("additional_phones", String, nullable=True),

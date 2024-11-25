@@ -12,3 +12,8 @@ class Repeatability(str, Enum):
 class Gender(str, Enum):
     male = "Мужчина"
     female = "Женщина"
+
+
+class ContragentType(str, Enum):
+    company = "Компания"
+    contact = "Контакт"
