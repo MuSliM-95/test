@@ -373,14 +373,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 
             if not cbox_by_invite:
                 # Если пригласительный токен - невалидный - пропускаем регистрацию как обычную
-                answer = texts.bad_token
-                await message.answer(text=answer, reply_markup=types.ReplyKeyboardRemove())
-                await store_bot_message(
-                    tg_message_id=message.message_id + 1,
-                    tg_user_or_chat=str(message.chat.id),
-                    from_or_to=str(bot.id),
-                    body=answer
-                )
                 await welcome_and_share_number(message)
                 await state.set_state(Form.start)
                 return
