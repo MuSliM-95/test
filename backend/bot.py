@@ -831,7 +831,7 @@ async def reg_user_create(message: types.Message, state: FSMContext):
             file_id = photos.photos[0][0].file_id
             await bot.send_photo(chat_id=os.getenv("ADMIN_ID"), photo=file_id, caption=text)
         else:
-            await bot.send_message(chat_id=os.getenv("ADMIN_ID"),text=text)
+            await bot.send_message(chat_id=os.getenv("ADMIN_ID"), text=text)
 
         await state.clear()
 
