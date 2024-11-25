@@ -15,6 +15,7 @@ async def get_account_info(token: str):
     query = users_cboxes_relation.select(
         users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
+    print(dict(user))
     if user:
         if user.status:
             balance = await database.fetch_one(
@@ -43,6 +44,7 @@ async def get_account_info(token: str):
                     raise HTTPException(status_code=404, detail="Нет доп. информации о вашем телеграм аккаунте")
 
                 info = AccountInfo(
+                    is_owner=user.get('is_owner'),
                     type=balance.tariff_type,
                     demo_expiration=demo_expiration,
                     demo_left=demo_left if demo_left >= 0 else 0,
