@@ -44,6 +44,7 @@ from functions.users import raschet
 from jobs.autoburn_job.job import autoburn
 from jobs.module_bank_job.job import module_bank_update_transaction
 from jobs.tochka_bank_job.job import tochka_update_transaction
+from jobs.check_account.job import check_account
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
@@ -70,6 +71,7 @@ try:
 except DatabaseError:
     pass
 
+
 def add_job_to_sched(func, **kwargs):
     scheduler.add_job(func, **kwargs)
 
@@ -79,6 +81,7 @@ accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5, id="tochka_update_transaction", max_instances=1, replace_existing=True)
 scheduler.add_job(func=module_bank_update_transaction, trigger='interval', minutes=5, id="module_bank_update_transaction", max_instances=1, replace_existing=True)
 scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", max_instances=1, replace_existing=True)
+scheduler.add_job(func=check_account, trigger="interval", seconds=accountant_interval, id="check_account", max_instances=1, replace_existing=True)
 
 scheduler.add_jobstore(jobstore)
 
