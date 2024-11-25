@@ -816,6 +816,23 @@ async def reg_user_create(message: types.Message, state: FSMContext):
         await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
         await create_balance(rel.cashbox_id, message, tariff)
 
+        # Уведомление ADMIN_ID о новой регистрации
+        name = message.from_user.first_name
+        if message.from_user.username:
+            name += f" ({message.from_user.username})"
+        text = f"""
+<b>🥳 Новая регистрация</b>
+👤 {name} 
+☎️ {message.contact.phone_number}
+"""
+
+        photos = await bot.get_user_profile_photos(user_id=message.from_user.id)
+        if photos.total_count > 0:
+            file_id = photos.photos[0][0].file_id
+            await bot.send_photo(chat_id=os.getenv("ADMIN_ID"), photo=file_id, caption=text)
+        else:
+            await bot.send_message(chat_id=os.getenv("ADMIN_ID"),text=text)
+
         await state.clear()
 
 
