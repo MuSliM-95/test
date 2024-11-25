@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
     amo_leads, booking_tags, contragents, booking_events
-from sqlalchemy import or_, and_, select, func
+from sqlalchemy import or_, and_, select, func, desc
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
     BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate, BookingFiltersList, BookingCreate
@@ -61,15 +61,16 @@ async def create_filters_list(filters: BookingFiltersList):
 
 
 @router.get("/booking/events/nomenclature/{idx}")
-async def get_events_by_nomenclature(token: str, idx: int):
+async def get_events_by_nomenclature(token: str, idx: int, limit: int = 5, offset: int = 0):
     await get_user_by_token(token)
     try:
         query = booking_events.select().\
             select_from(booking_events).\
             join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)\
-            .where(booking_nomenclature.c.nomenclature_id == idx)
+            .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at)).limit(limit).offset(offset)
         events_list = await database.fetch_all(query)
-        return events_list
+        total = await database.fetch_val(select(func.count()).select_from(booking_events))
+        return {"items": events_list, "pageSize": limit, "total": total}
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
 
