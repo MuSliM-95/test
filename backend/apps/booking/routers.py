@@ -67,9 +67,9 @@ async def get_events_by_nomenclature(token: str, idx: int, limit: int = 5, offse
         query = booking_events.select().\
             select_from(booking_events).\
             join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)\
-            .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at)).limit(limit).offset(offset)
-        events_list = await database.fetch_all(query)
-        total = await database.fetch_val(select(func.count()).select_from(booking_events))
+            .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at))
+        events_list = await database.fetch_all(query.limit(limit).offset(offset))
+        total = await database.fetch_val(select(func.count()).select_from(query))
         return {"items": events_list, "pageSize": limit, "total": total}
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
