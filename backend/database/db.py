@@ -871,6 +871,61 @@ cheques = sqlalchemy.Table(
     sqlalchemy.Column("created_at", Integer),
 )
 
+
+amo_bots = sqlalchemy.Table(
+    "amo_bots",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("type_functionality", String),
+    sqlalchemy.Column("type", Integer),
+    sqlalchemy.Column("handler_id", Integer),
+    sqlalchemy.Column("work_time_id", Integer),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
+
+amo_bots_settings = sqlalchemy.Table(
+    "amo_bots_settings",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("amo_bots_id", Integer, ForeignKey("amo_bots.id"), unique = True),
+    sqlalchemy.Column("silent", Integer),
+    sqlalchemy.Column("type_functionality", Integer),
+    sqlalchemy.Column("is_working_without_chat", Boolean),
+    sqlalchemy.Column("active", Boolean),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
+
+table_triggers = sqlalchemy.Table(
+    "table_triggers",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key = True, index = True),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("type", String),
+    sqlalchemy.Column("time", BigInteger),
+    sqlalchemy.Column("key", String),
+    sqlalchemy.Column("active", Boolean),
+    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
+
+table_triggers_events = sqlalchemy.Table(
+    "table_triggers_events",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key = True, index = True),
+    sqlalchemy.Column("request", String),
+    sqlalchemy.Column("body", JSON),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
+
 amo_install = sqlalchemy.Table(
     "amo_install",
     metadata,
