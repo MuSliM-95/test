@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from database.enums import Repeatability, Gender, ContragentType
+from database.enums import Repeatability, Gender, ContragentType, TriggerType, TriggerTime
 
 
 class OperationType(str, ENUM):
@@ -893,7 +893,8 @@ table_triggers = sqlalchemy.Table(
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("amo_bots_id", Integer, ForeignKey("amo_bots.id")),
     sqlalchemy.Column("name", String),
-    sqlalchemy.Column("type", String),
+    sqlalchemy.Column("type", Enum(TriggerType)),
+    sqlalchemy.Column("time_variant", Enum(TriggerTime)),
     sqlalchemy.Column("time", BigInteger),
     sqlalchemy.Column("key", String),
     sqlalchemy.Column("active", Boolean),
