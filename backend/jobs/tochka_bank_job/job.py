@@ -6,6 +6,7 @@ import aiohttp
 
 from sqlalchemy import select, and_
 
+from apps.tochka_bank.routes import integration_info, refresh_token
 from database.db import database, payments, tochka_bank_accounts, tochka_bank_credentials, pboxes, \
     users_cboxes_relation, \
     tochka_bank_payments, contragents, docs_sales
@@ -128,7 +129,11 @@ async def tochka_update_transaction():
                     await session.close()
 
                 if not balance_json.get("Data"):
-                    raise Exception("проблема с получением баланса (вероятно некорректный access_token)")
+                    user_integration = await integration_info(account.get('cashbox_id'), 1)
+
+                    await refresh_token(integration_cashboxes=user_integration.get('id'))
+
+                    raise Exception("проблема с получением баланса (вероятно некорректный access_token), был произведён рефреш")
 
                 await database.execute(pboxes.
                 update().
