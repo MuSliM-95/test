@@ -1,5 +1,5 @@
 import aiohttp
-from jobs.jobs import scheduler
+# from jobs.jobs import scheduler
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from database.db import integrations, integrations_to_cashbox, users_cboxes_relation, database, tochka_bank_credentials, pboxes, tochka_bank_accounts
@@ -165,10 +165,10 @@ async def tochkaoauth(code: str, state: int):
                             }
                         ))
 
-    if not scheduler.get_job(job_id = str(user_integration.get('installed_by'))):
-        scheduler.add_job(refresh_token, 'interval', seconds = int(token_json.get('expires_in')), kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
-    else:
-        scheduler.get_job(job_id = str(user_integration.get('installed_by'))).reschedule('interval', seconds = int(token_json.get('expires_in')))
+    # if not scheduler.get_job(job_id = str(user_integration.get('installed_by'))):
+    #     scheduler.add_job(refresh_token, 'interval', seconds = int(token_json.get('expires_in')), kwargs = {'integration_cashboxes': user_integration.get('id')}, name = 'refresh token', id = str(user_integration.get('installed_by')))
+    # else:
+    #     scheduler.get_job(job_id = str(user_integration.get('installed_by'))).reschedule('interval', seconds = int(token_json.get('expires_in')))
     return RedirectResponse(f'https://app.tablecrm.com/integrations?token={user_integration.get("token")}')
 
 
@@ -284,12 +284,12 @@ async def integration_on(token: str, id_integration: int):
                 'status': True,
             }))
             refresh = False
-        if not scheduler.get_job(job_id = str(check.get('installed_by'))):
-            scheduler.add_job(refresh_token, 'interval', seconds = 86400,
-                              kwargs = {'integration_cashboxes': check.get('id')},
-                              name = 'refresh token', id = str(check.get('installed_by')))
-        else:
-            scheduler.get_job(job_id = str(check.get('installed_by'))).reschedule('interval', seconds = 86400)
+        # if not scheduler.get_job(job_id = str(check.get('installed_by'))):
+        #     scheduler.add_job(refresh_token, 'interval', seconds = 86400,
+        #                       kwargs = {'integration_cashboxes': check.get('id')},
+        #                       name = 'refresh token', id = str(check.get('installed_by')))
+        # else:
+        #     scheduler.get_job(job_id = str(check.get('installed_by'))).reschedule('interval', seconds = 86400)
 
         await manager.send_message(user.token,
                                     {"action": "on",
@@ -319,8 +319,8 @@ async def integration_off(token: str, id_integration: int):
         await manager.send_message(user.token,
                                     {"action": "off", "target": "IntegrationTochkaBank", "integration_status": False})
 
-        if scheduler.get_job(job_id = str(user.get("id"))):
-            scheduler.remove_job(job_id = str(user.get("id")))
+        # if scheduler.get_job(job_id = str(user.get("id"))):
+        #     scheduler.remove_job(job_id = str(user.get("id")))
         return {'isAuth': False}
     except:
         raise HTTPException(status_code=422, detail="ошибка удаления связи аккаунта пользователя и интеграции")
