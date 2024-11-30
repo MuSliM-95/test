@@ -6,11 +6,44 @@ import aiohttp
 
 from sqlalchemy import select, and_
 
-from apps.tochka_bank.routes import integration_info, refresh_token
 from database.db import database, payments, tochka_bank_accounts, tochka_bank_credentials, pboxes, \
     users_cboxes_relation, \
-    tochka_bank_payments, contragents, docs_sales
+    tochka_bank_payments, contragents, docs_sales, integrations_to_cashbox, integrations
 from functions.helpers import init_statement, get_statement
+
+async def integration_info(cashbox_id, id_integration):
+    query = select(integrations_to_cashbox.c.installed_by,
+                   users_cboxes_relation.c.token,
+                   integrations_to_cashbox.c.id,
+                   *integrations.columns) \
+        .where(users_cboxes_relation.c.cashbox_id == cashbox_id) \
+        .select_from(users_cboxes_relation) \
+        .join(integrations_to_cashbox, users_cboxes_relation.c.id == integrations_to_cashbox.c.installed_by) \
+        .select_from(integrations_to_cashbox) \
+        .join(integrations, integrations.c.id == integrations_to_cashbox.c.integration_id).where(
+        integrations.c.id == id_integration)
+    return await database.fetch_one(query)
+
+async def refresh_token(integration_cashboxes: int):
+    integration_cbox = await database.fetch_one(
+        integrations_to_cashbox.select().where(integrations_to_cashbox.c.id == integration_cashboxes))
+    integration = await database.fetch_one(
+        integrations.select().where(integrations.c.id == integration_cbox.get('integration_id')))
+    credentials = await database.fetch_one(
+        tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == integration_cashboxes))
+    async with aiohttp.ClientSession(trust_env = True) as session:
+        async with session.post(f'https://enter.tochka.com/connect/token', data = {
+            'client_id': integration.get('client_app_id'),
+            'client_secret': integration.get('client_secret'),
+            'grant_type': 'refresh_token',
+            'refresh_token': credentials.get('refresh_token'),
+        }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
+            token_json = await resp.json()
+        await session.close()
+        await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.integration_cashboxes == integration_cashboxes).values({
+            'access_token': token_json.get('access_token'),
+            'refresh_token': token_json.get('refresh_token'),
+        }))
 
 async def extract_number(text):
     match = re.search(r'[№#]\s*(\d+)', text)
