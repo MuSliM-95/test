@@ -24,11 +24,12 @@ async def refresh_token(cred_id: int):
             'refresh_token': credentials.get('refresh_token'),
         }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
             token_json = await resp.json()
-        await session.close()
-        await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.id == cred_id).values({
-            'access_token': token_json.get('access_token'),
-            'refresh_token': token_json.get('refresh_token'),
-        }))
+            print(token_json)
+            if token_json.get('access_token') and token_json.get('refresh_token'):
+                await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.id == cred_id).values({
+                    'access_token': token_json.get('access_token'),
+                    'refresh_token': token_json.get('refresh_token'),
+                }))
 
 async def extract_number(text):
     match = re.search(r'[№#]\s*(\d+)', text)
@@ -151,7 +152,9 @@ async def tochka_update_transaction():
 
                     await refresh_token(cred_id=account.get('cred_id'))
 
-                    raise Exception("проблема с получением баланса (вероятно некорректный access_token), был произведён рефреш")
+                    print("проблема с получением баланса (вероятно некорректный access_token), был произведён рефреш")
+
+                    continue
 
                 await database.execute(pboxes.
                 update().
