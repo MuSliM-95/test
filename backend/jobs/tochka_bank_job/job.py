@@ -11,26 +11,11 @@ from database.db import database, payments, tochka_bank_accounts, tochka_bank_cr
     tochka_bank_payments, contragents, docs_sales, integrations_to_cashbox, integrations
 from functions.helpers import init_statement, get_statement
 
-async def integration_info(cashbox_id, id_integration):
-    query = select(integrations_to_cashbox.c.installed_by,
-                   users_cboxes_relation.c.token,
-                   integrations_to_cashbox.c.id,
-                   *integrations.columns) \
-        .where(users_cboxes_relation.c.cashbox_id == cashbox_id) \
-        .select_from(users_cboxes_relation) \
-        .join(integrations_to_cashbox, users_cboxes_relation.c.id == integrations_to_cashbox.c.installed_by) \
-        .select_from(integrations_to_cashbox) \
-        .join(integrations, integrations.c.id == integrations_to_cashbox.c.integration_id).where(
-        integrations.c.id == id_integration)
-    return await database.fetch_one(query)
-
-async def refresh_token(integration_cashboxes: int):
-    integration_cbox = await database.fetch_one(
-        integrations_to_cashbox.select().where(integrations_to_cashbox.c.id == integration_cashboxes))
+async def refresh_token(cred_id: int):
     integration = await database.fetch_one(
-        integrations.select().where(integrations.c.id == integration_cbox.get('integration_id')))
+        integrations.select().where(integrations.c.id == 1))
     credentials = await database.fetch_one(
-        tochka_bank_credentials.select().where(tochka_bank_credentials.c.integration_cashboxes == integration_cashboxes))
+        tochka_bank_credentials.select().where(tochka_bank_credentials.c.id == cred_id))
     async with aiohttp.ClientSession(trust_env = True) as session:
         async with session.post(f'https://enter.tochka.com/connect/token', data = {
             'client_id': integration.get('client_app_id'),
@@ -40,7 +25,7 @@ async def refresh_token(integration_cashboxes: int):
         }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
             token_json = await resp.json()
         await session.close()
-        await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.integration_cashboxes == integration_cashboxes).values({
+        await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.id == cred_id).values({
             'access_token': token_json.get('access_token'),
             'refresh_token': token_json.get('refresh_token'),
         }))
@@ -133,6 +118,7 @@ async def tochka_update_transaction():
             select(tochka_bank_accounts.c.accountId,
                    tochka_bank_accounts.c.registrationDate,
                    tochka_bank_credentials.c.access_token,
+                   tochka_bank_credentials.c.id.label("cred_id"),
                    pboxes.c.id.label("pbox_id"),
                    users_cboxes_relation.c.token,
                    pboxes.c.cashbox.label("cashbox_id")
@@ -162,9 +148,8 @@ async def tochka_update_transaction():
                     await session.close()
 
                 if not balance_json.get("Data"):
-                    user_integration = await integration_info(account.get('cashbox_id'), 1)
 
-                    await refresh_token(integration_cashboxes=user_integration.get('id'))
+                    await refresh_token(cred_id=account.get('cred_id'))
 
                     raise Exception("проблема с получением баланса (вероятно некорректный access_token), был произведён рефреш")
 
