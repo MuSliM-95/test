@@ -56,6 +56,7 @@ async def post_trigger(token: str, trigger: schemas.CreateTrigger, user = Depend
             else trigger.time*3600 if trigger.time_variant == TriggerTime.hour
             else trigger.time*86400 if trigger.time_variant == TriggerTime.day
             else 0}
+        print(trigger)
         query = table_triggers.insert()
     except Exception as e:
         raise HTTPException(
