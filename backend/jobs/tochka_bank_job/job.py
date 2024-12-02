@@ -8,8 +8,28 @@ from sqlalchemy import select, and_
 
 from database.db import database, payments, tochka_bank_accounts, tochka_bank_credentials, pboxes, \
     users_cboxes_relation, \
-    tochka_bank_payments, contragents, docs_sales
+    tochka_bank_payments, contragents, docs_sales, integrations_to_cashbox, integrations
 from functions.helpers import init_statement, get_statement
+
+async def refresh_token(cred_id: int):
+    integration = await database.fetch_one(
+        integrations.select().where(integrations.c.id == 1))
+    credentials = await database.fetch_one(
+        tochka_bank_credentials.select().where(tochka_bank_credentials.c.id == cred_id))
+    async with aiohttp.ClientSession(trust_env = True) as session:
+        async with session.post(f'https://enter.tochka.com/connect/token', data = {
+            'client_id': integration.get('client_app_id'),
+            'client_secret': integration.get('client_secret'),
+            'grant_type': 'refresh_token',
+            'refresh_token': credentials.get('refresh_token'),
+        }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
+            token_json = await resp.json()
+            print(token_json)
+            if token_json.get('access_token') and token_json.get('refresh_token'):
+                await database.execute(tochka_bank_credentials.update().where(tochka_bank_credentials.c.id == cred_id).values({
+                    'access_token': token_json.get('access_token'),
+                    'refresh_token': token_json.get('refresh_token'),
+                }))
 
 async def extract_number(text):
     match = re.search(r'[№#]\s*(\d+)', text)
@@ -99,6 +119,7 @@ async def tochka_update_transaction():
             select(tochka_bank_accounts.c.accountId,
                    tochka_bank_accounts.c.registrationDate,
                    tochka_bank_credentials.c.access_token,
+                   tochka_bank_credentials.c.id.label("cred_id"),
                    pboxes.c.id.label("pbox_id"),
                    users_cboxes_relation.c.token,
                    pboxes.c.cashbox.label("cashbox_id")
@@ -128,7 +149,12 @@ async def tochka_update_transaction():
                     await session.close()
 
                 if not balance_json.get("Data"):
-                    raise Exception("проблема с получением баланса (вероятно некорректный access_token)")
+
+                    await refresh_token(cred_id=account.get('cred_id'))
+
+                    print("проблема с получением баланса (вероятно некорректный access_token), был произведён рефреш")
+
+                    continue
 
                 await database.execute(pboxes.
                 update().
