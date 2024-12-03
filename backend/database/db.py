@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from database.enums import Repeatability, Gender, ContragentType
+from database.enums import Repeatability, Gender, ContragentType, TriggerType, TriggerTime
 
 
 class OperationType(str, ENUM):
@@ -870,6 +870,54 @@ cheques = sqlalchemy.Table(
     sqlalchemy.Column("data", JSON),
     sqlalchemy.Column("created_at", Integer),
 )
+
+
+amo_bots = sqlalchemy.Table(
+    "amo_bots",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("type_functionality", String),
+    sqlalchemy.Column("type", Integer),
+    sqlalchemy.Column("amo_bot_handler_id", Integer),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
+
+table_triggers = sqlalchemy.Table(
+    "table_triggers",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key = True, index = True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("amo_bots_id", Integer, ForeignKey("amo_bots.id")),
+    sqlalchemy.Column("name", String),
+    sqlalchemy.Column("type", Enum(TriggerType)),
+    sqlalchemy.Column("time_variant", Enum(TriggerTime)),
+    sqlalchemy.Column("time", BigInteger),
+    sqlalchemy.Column("key", String),
+    sqlalchemy.Column("active", Boolean),
+    sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
+
+table_triggers_events = sqlalchemy.Table(
+    "table_triggers_events",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key = True, index = True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("table_triggers_id", Integer, ForeignKey("table_triggers.id")),
+    sqlalchemy.Column("client", Integer),
+    sqlalchemy.Column("event", String),
+    sqlalchemy.Column("body", JSON),
+    sqlalchemy.Column("status", Boolean),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+)
+
 
 amo_install = sqlalchemy.Table(
     "amo_install",
