@@ -94,10 +94,25 @@ async def patch_trigger(token: str, idx: int, trigger: schemas.PatchTrigger, use
         if stored_item_data:
             stored_item_model = schemas.PatchTrigger(**stored_item_data)
             update_data = trigger.dict(exclude_unset = True)
-            updated_item = stored_item_model.copy(update = update_data)
-            await database.execute(update(table_triggers).values({**updated_item.dict()}).
-                                   where(table_triggers.c.id == stored_item_data.get("id")))
-            return updated_item
+            if update_data.get("time"):
+                updated_item = {**stored_item_model.copy(update = update_data).dict(),
+                                "time": stored_item_model.copy(update = update_data).dict().get("time")*60 if stored_item_model.copy(update = update_data).dict().get("time_variant") == TriggerTime.minute
+                                else stored_item_model.copy(update = update_data).dict().get("time")*3600 if stored_item_model.copy(update = update_data).dict().get("time_variant") == TriggerTime.hour
+                                else stored_item_model.copy(update = update_data).dict().get("time")*86400 if stored_item_model.copy(update = update_data).dict().get("time_variant") == TriggerTime.day
+                                else 0
+                                }
+            else:
+                updated_item = {**stored_item_model.copy(update = update_data).dict()}
+
+            print(updated_item)
+            await database.execute(update(table_triggers).values(
+                {**updated_item
+                 }
+            ).where(table_triggers.c.id == stored_item_data.get("id")))
+            return {**updated_item, "time": updated_item.get("time")/60 if updated_item.get("time_variant") == TriggerTime.minute
+                            else updated_item.get("time")/3600 if updated_item.get("time_variant") == TriggerTime.hour
+                            else updated_item.get("time")/86400 if updated_item.get("time_variant") == TriggerTime.day
+                            else 0}
         else:
             raise Exception("not found trigger")
     except Exception as e:
