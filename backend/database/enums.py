@@ -17,3 +17,14 @@ class Gender(str, Enum):
 class ContragentType(str, Enum):
     company = "Компания"
     contact = "Контакт"
+
+
+class TriggerType(str, Enum):
+    before = "до"
+    after = "после"
+
+
+class TriggerTime(str, Enum):
+    minute = "минуты"
+    hour = "часы"
+    day = "дни"
