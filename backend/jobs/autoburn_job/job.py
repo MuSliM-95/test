@@ -132,6 +132,7 @@ class AutoBurn:
         }
 
     async def transactions(self):
+        await self._get_first_operation_burned()
         await self._get_transaction()
         return self.withdraw_list, self.burned_list
 
