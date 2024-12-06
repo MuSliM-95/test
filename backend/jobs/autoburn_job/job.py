@@ -10,7 +10,7 @@ class AutoBurn:
     def __init__(self, card: Record) -> None:
         self.card: Record = card
         self.card_balance: float = card.balance
-        self.first_operation_burned: Union[int, None] = None
+        self.first_operation_burned: Union[int, None] = None # самая первая транзакция по карте которая не сгорела
         self.accrual_list: List[dict] = []
         self.withdraw_list: List[dict] = []
         self.burned_list: List[int] = []
@@ -130,6 +130,10 @@ class AutoBurn:
             "autoburned": True,
             "card_balance": self.card_balance
         }
+
+    async def transactions(self):
+        await self._get_transaction()
+        return self.withdraw_list, self.burned_list
 
     async def start(self) -> None:
         await self._get_first_operation_burned()
