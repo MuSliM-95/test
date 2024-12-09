@@ -484,7 +484,7 @@ async def delete_nomenclature(token: str, idx: int):
     """Удаление категории"""
     user = await get_user_by_token(token)
 
-    await get_entity_by_id(nomenclature, idx, user.id)
+    await get_entity_by_id(nomenclature, idx, user.cashbox_id)
 
     query = (
         nomenclature.update()
