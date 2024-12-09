@@ -4,13 +4,13 @@ from jobs.autoburn_job.job import AutoBurn
 
 class TriggersNotification(AutoBurn):
     async def test(self) -> None:
-        return await self.transactions()
+        return await self.transactions(trigger=3600*4)
 
 
 async def run():
-    triggers = await TriggersNotification.get_cards()
-    for trigger in triggers:
-        print(await TriggersNotification(card = trigger).test())
+    cards = await TriggersNotification.get_cards()
+    for card in cards:
+        print(await TriggersNotification(card = card).test())
 
 
 
