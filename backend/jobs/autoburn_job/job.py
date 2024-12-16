@@ -10,10 +10,11 @@ class AutoBurn:
     def __init__(self, card: Record) -> None:
         self.card: Record = card
         self.card_balance: float = card.balance
-        self.first_operation_burned: Union[int, None] = None
+        self.first_operation_burned: Union[int, None] = None # самая первая транзакция по карте которая не сгорела
         self.accrual_list: List[dict] = []
         self.withdraw_list: List[dict] = []
         self.burned_list: List[int] = []
+        self.burned_list_trigger: List[Record] = []
         self.autoburn_operation_list: List[dict] = []
 
     @staticmethod
@@ -56,7 +57,8 @@ class AutoBurn:
                     loyality_transactions.c.type.in_(["accrual", "withdraw"]),
                     loyality_transactions.c.amount > 0,
                     loyality_transactions.c.autoburned.is_not(True),
-                    loyality_transactions.c.id >= self.first_operation_burned
+                    loyality_transactions.c.id >= self.first_operation_burned,
+                    loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.utcnow()
                 )
             )
             transaction_list = await database.fetch_all(q)
@@ -79,6 +81,22 @@ class AutoBurn:
                             minus_index += 1
 
                     self.withdraw_list.append(transaction)
+
+    async def _get_transaction_burned_trigger(self, trigger = 0) -> None:
+        if self.first_operation_burned is not None:
+            q = (
+                loyality_transactions
+                .select()
+                .where(
+                    loyality_transactions.c.loyality_card_id == self.card.id,
+                    loyality_transactions.c.type.in_(["accrual", "withdraw"]),
+                    loyality_transactions.c.amount > 0,
+                    loyality_transactions.c.autoburned.is_not(True),
+                    loyality_transactions.c.id >= self.first_operation_burned,
+                    loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) >= datetime.utcnow() - timedelta(seconds=trigger)
+                )
+            )
+            self.burned_list_trigger = await database.fetch_all(q)
 
     @database.transaction()
     async def _burn(self) -> None:
@@ -131,6 +149,11 @@ class AutoBurn:
             "autoburned": True,
             "card_balance": self.card_balance
         }
+
+    async def transactions(self, trigger):
+        await self._get_first_operation_burned()
+        await self._get_transaction_burned_trigger(trigger=trigger)
+        return self.burned_list_trigger
 
     async def start(self) -> None:
         await self._get_first_operation_burned()
