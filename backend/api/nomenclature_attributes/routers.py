@@ -158,7 +158,7 @@ async def get_nomenclature_attributes(nomenclature_id: int, token: str):
     return attributes
 
 
-@router.post("/nomenclature/relations", response_model=dict)
+@router.post("/nomenclature/make-groups", response_model=dict)
 async def create_nomenclature_group(token: str, data: schemas.NomenclatureRelations):
     """
     Объединяет номенклатуры в группу.
@@ -296,7 +296,7 @@ async def add_nomenclature_to_group(token: str, group_id: int, nomenclature_id: 
         nomenclature_id=nomenclature_id
     )
 
-@router.get("/nomenclature/relations/{group_id}", response_model=List[int])
+@router.get("/nomenclature/groups/{group_id}", response_model=List[int])
 async def get_nomenclatures_by_group(token: str, group_id: int):
     """
     Возвращает список ID всех номенклатур из указанной группы.
