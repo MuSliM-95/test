@@ -59,6 +59,7 @@ from api.manufacturers.routers import router as manufacturers_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.nomenclature.routers import router as nomenclature_router
+from api.nomenclature_attributes.routers import router as nomenclature_attributes_router
 from api.pictures.routers import router as pictures_router
 from api.functions.routers import router as entity_functions_router
 from api.units.routers import router as units_router
@@ -143,6 +144,7 @@ app.include_router(manufacturers_router)
 app.include_router(price_types_router)
 app.include_router(prices_router)
 app.include_router(nomenclature_router)
+app.include_router(nomenclature_attributes_router)
 app.include_router(pictures_router)
 app.include_router(entity_functions_router)
 app.include_router(units_router)
