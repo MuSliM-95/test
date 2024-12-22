@@ -40,7 +40,7 @@ class AutoBurn:
                 loyality_transactions.c.amount > 0,
                 loyality_transactions.c.autoburned.is_not(True),
                 loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.utcnow(),
-                # loyality_transactions.c.card_balance == 0
+                loyality_transactions.c.card_balance == 0
             )
             .order_by(asc(loyality_transactions.c.id))
             .limit(1)
