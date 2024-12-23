@@ -926,12 +926,14 @@ table_triggers_events = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key = True, index = True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("table_triggers_id", Integer, ForeignKey("table_triggers.id")),
-    sqlalchemy.Column("client", Integer),
+    sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("loyality_transactions_id", Integer, ForeignKey("loyality_transactions.id")),
     sqlalchemy.Column("event", String),
     sqlalchemy.Column("body", JSON),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+
 )
 
 
