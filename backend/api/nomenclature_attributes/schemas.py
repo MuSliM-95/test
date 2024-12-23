@@ -14,7 +14,7 @@ class AttributeCreateResponse(BaseModel):
 #Создание значений для атрибутов номенклатур
 class AttributeValue(BaseModel):
     attribute_id: int
-    value: Union[str, List[str]]
+    value: List[str]
 
 class AttributeValueCreate(BaseModel):
     nomenclature_id: int
