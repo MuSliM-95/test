@@ -481,15 +481,21 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
+nomenclature_relations = sqlalchemy.Table(
+    "nomenclature_relations",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("group_id", Integer, ForeignKey("nomenclature_groups.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint("nomenclature_id", name="uq_variant_per_nomenclature"),
+)
+
 nomenclature_groups = sqlalchemy.Table(
     "nomenclature_groups",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id", ondelete="CASCADE"), nullable=False),
-    sqlalchemy.Column("group_id", Integer, nullable=True),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("nomenclature_id", name="uq_variant_per_nomenclature"),
 )
 
 nomenclature_attributes = sqlalchemy.Table(
@@ -498,6 +504,7 @@ nomenclature_attributes = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("alias", String, nullable=True),
+    sqlalchemy.Column("cash_box", Integer, nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.UniqueConstraint("name", name="uq_attribute_name")
@@ -513,7 +520,6 @@ nomenclature_attributes_value = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("value", String, nullable=False),
 )
-
 
 nomenclature_barcodes = sqlalchemy.Table(
     "nomenclature_barcodes",
