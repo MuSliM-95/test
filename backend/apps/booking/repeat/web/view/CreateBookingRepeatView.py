@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, and_
 
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
+from apps.booking.repeat.models.CreateBookingRepeatModel import CreateBookingRepeatModel
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import docs_sales, amo_leads_docs_sales_mapping, amo_leads, database, booking
@@ -20,7 +21,7 @@ class CreateBookingRepeatView:
 
     async def __call__(
         self,
-        token: str, lead_id: int
+        token: str, create_booking_repeat_model: CreateBookingRepeatModel
     ):
         user = await get_user_by_token(token)
 
@@ -32,7 +33,7 @@ class CreateBookingRepeatView:
             .join(amo_leads_docs_sales_mapping, docs_sales.c.id == amo_leads_docs_sales_mapping.c.docs_sales_id)
             .join(amo_leads, amo_leads_docs_sales_mapping.c.lead_id == amo_leads.c.id)
             .where(and_(
-                amo_leads.c.amo_id == lead_id,
+                amo_leads.c.amo_id == create_booking_repeat_model.leads.add[0].id,
                 docs_sales.c.cashbox == user.cashbox_id,
                 docs_sales.c.is_deleted == False,
                 amo_leads.c.is_deleted == False,
