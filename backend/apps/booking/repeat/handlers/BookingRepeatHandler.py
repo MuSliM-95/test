@@ -200,7 +200,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
 
                 query = (
                     select(booking_tags)
-                    .where(booking_tags.booking_id == booking_info.id)
+                    .where(booking_tags.c.booking_id == booking_info.id)
                 )
                 tags_list = await database.fetch_all(query)
 
