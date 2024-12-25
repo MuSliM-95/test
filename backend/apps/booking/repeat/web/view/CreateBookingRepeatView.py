@@ -1,4 +1,5 @@
 import uuid
+from typing import Dict, Any
 
 from fastapi import HTTPException
 from sqlalchemy import select, and_
@@ -21,8 +22,9 @@ class CreateBookingRepeatView:
 
     async def __call__(
         self,
-        token: str, create_booking_repeat_model: CreateBookingRepeatModel
+        token: str, body: Dict[str, Any]
     ):
+        print(body)
         user = await get_user_by_token(token)
 
         amqp_messaging: IRabbitMessaging = await self.__amqp_messaging_factory()
