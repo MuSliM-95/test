@@ -13,7 +13,7 @@ from common.amqp_messaging.common.core.EventHandler import IEventHandler
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import booking, booking_nomenclature, database, nomenclature, docs_sales, docs_sales_goods, \
-    entity_to_entity, payments, loyality_transactions, amo_leads, amo_contacts, amo_lead_statuses
+    entity_to_entity, payments, loyality_transactions, amo_leads, amo_contacts, amo_lead_statuses, booking_tags
 
 
 class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
@@ -123,21 +123,25 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                     ))
                 )
                 nomenclature_info = await database.fetch_one(query)
+                new_nomenclature_id = nomenclature_info.id
+                nomenclature_name = nomenclature_info.name
 
-                if nomenclature_info.type in ["resurs", "dopresurs"]:
-                    nomenclature_info_dict = dict(nomenclature_info)
-                    del nomenclature_info_dict["id"]
-                    query = (
-                        insert(nomenclature)
-                        .values(**nomenclature_info_dict)
-                        .returning(nomenclature)
-                    )
-                    result_new_nomenclature_id = await database.fetch_one(query)
-                    new_nomenclature_id = result_new_nomenclature_id.id
-                    nomenclature_name = result_new_nomenclature_id.name
-                else:
-                    new_nomenclature_id = nomenclature_info.id
-                    nomenclature_name = nomenclature_info.name
+                query = (
+                    select(docs_sales_goods)
+                    .where(and_(
+                        docs_sales_goods.c.docs_sales_id == booking_info.docs_sales_id
+                    ))
+                )
+                docs_sales_goods_info_list = await database.fetch_all(query)
+
+                if not docs_sales_goods_info_list:
+                    print("Чёт не то")
+                    return
+
+                nomenclatures_to_duplicate = []
+                for good in docs_sales_goods_info_list:
+                    if good.type in ["resurs", "dopresurs"]:
+                        nomenclatures_to_duplicate.append(good)
 
                 query = (
                     select(docs_sales)
@@ -148,19 +152,6 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 )
                 docs_sales_info = await database.fetch_one(query)
                 docs_sales_info_dict = dict(docs_sales_info)
-
-                query = (
-                    select(docs_sales_goods)
-                    .where(and_(
-                        docs_sales_goods.c.docs_sales_id == booking_info.docs_sales_id,
-                        docs_sales_goods.c.nomenclature == nomenclature_info.id
-                    ))
-                )
-                docs_sales_goods_info = await database.fetch_one(query)
-
-                if not docs_sales_goods_info:
-                    print("Чёт не то")
-                    return
 
                 paid_rubles, paid_loyality = await __calculate_paid_doc(
                     docs_sales_id=booking_info.docs_sales_id,
@@ -181,7 +172,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                                 **docs_sales_info_dict,
                                 goods=[
                                     Item(
-                                        nomenclature=new_nomenclature_id,
+                                        nomenclature=docs_sales_goods_info.nomenclature,
                                         price_type=docs_sales_goods_info.price_type,
                                         price=docs_sales_goods_info.price,
                                         quantity=docs_sales_goods_info.quantity,
@@ -191,7 +182,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                                         discount=docs_sales_goods_info.discount,
                                         sum_discounted=docs_sales_goods_info.sum_discounted,
                                         status=docs_sales_goods_info.status,
-                                    )
+                                    ) for docs_sales_goods_info in nomenclatures_to_duplicate
                                 ]
                             )
                         ]
@@ -215,6 +206,23 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                     .returning(booking.c.id)
                 )
                 new_booking_id = await database.fetch_one(query)
+
+                query = (
+                    select(booking_tags)
+                    .where(booking_tags.booking_id == booking_info.id)
+                )
+                tags_list = await database.fetch_all(query)
+
+                tags_for_create = dict(tags_list)
+                for tag_booking in tags_for_create:
+                    del tag_booking["id"]
+                    tag_booking["booking_id"] = new_booking_id.id
+
+                query = (
+                    insert(booking_tags)
+                    .values(**tags_for_create)
+                )
+                await database.execute(query)
 
                 query = (
                     insert(booking_nomenclature)

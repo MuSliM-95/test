@@ -27,7 +27,7 @@ class CreateBookingRepeatView:
         amqp_messaging: IRabbitMessaging = await self.__amqp_messaging_factory()
 
         query = (
-            select(docs_sales.c.id, amo_leads.c.id)
+            select(docs_sales, amo_leads.c.id.label("amo_lead_id"))
             .select_from(docs_sales)
             .join(amo_leads_docs_sales_mapping, docs_sales.c.id == amo_leads_docs_sales_mapping.c.docs_sales_id)
             .join(amo_leads, amo_leads_docs_sales_mapping.c.lead_id == amo_leads.c.id)
@@ -39,15 +39,15 @@ class CreateBookingRepeatView:
             ))
         )
 
-        docs_sales_id = await database.fetch_one(query)
+        synced_docs_sales = await database.fetch_one(query)
 
-        if not docs_sales_id:
+        if not synced_docs_sales:
             raise HTTPException(status_code=404, detail="Docs Sales Not Found")
 
         query = (
             select(booking)
             .where(and_(
-                booking.c.docs_sales_id == docs_sales_id.id,
+                booking.c.docs_sales_id == synced_docs_sales.id,
                 booking.c.cashbox == user.cashbox_id,
                 booking.c.is_deleted == False
             ))
@@ -65,7 +65,7 @@ class CreateBookingRepeatView:
                 start_booking=booking_info.start_booking,
                 end_booking=booking_info.end_booking,
                 token=token,
-                lead_id=docs_sales_id.id_1
+                lead_id=synced_docs_sales.id_1
             ),
             routing_key="booking_repeat_tasks"
         )
