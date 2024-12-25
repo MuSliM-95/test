@@ -114,8 +114,8 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                     ))
                 )
                 nomenclature_info = await database.fetch_one(query)
-                new_nomenclature_id = nomenclature_info.id
-                nomenclature_name = nomenclature_info.name
+                new_nomenclature_id = None if not nomenclature_info else nomenclature_info.id
+                nomenclature_name = None if not nomenclature_info else nomenclature_info.name
 
                 query = (
                     select(docs_sales_goods)
@@ -215,16 +215,17 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 )
                 await database.execute(query)
 
-                query = (
-                    insert(booking_nomenclature)
-                    .values({
-                        "booking_id": new_booking_id.id,
-                        "nomenclature_id": new_nomenclature_id,
-                        "tariff": "month",
-                        "is_deleted": False,
-                    })
-                )
-                await database.execute(query)
+                if new_nomenclature_id:
+                    query = (
+                        insert(booking_nomenclature)
+                        .values({
+                            "booking_id": new_booking_id.id,
+                            "nomenclature_id": new_nomenclature_id,
+                            "tariff": "month",
+                            "is_deleted": False,
+                        })
+                    )
+                    await database.execute(query)
 
                 query = (
                     select(amo_lead_statuses.c.amo_id)
@@ -242,7 +243,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                         contact_id=lead_info.contact_id,
                         account_link="https://www.drom.ru",
                         act_link="https://www.drom.ru",
-                        nomenclature=nomenclature_name,
+                        nomenclature="Не указано" if not nomenclature_name else nomenclature_name,
                         start_period=booking_info_dict["start_booking"],
                         end_period=booking_info_dict["end_booking"],
                         docs_sales_id=result[0]["id"],
