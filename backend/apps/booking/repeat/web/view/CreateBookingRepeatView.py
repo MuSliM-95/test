@@ -27,48 +27,48 @@ class CreateBookingRepeatView:
         print(body)
         user = await get_user_by_token(token)
 
-        amqp_messaging: IRabbitMessaging = await self.__amqp_messaging_factory()
-
-        query = (
-            select(docs_sales, amo_leads.c.id.label("amo_lead_id"))
-            .select_from(docs_sales)
-            .join(amo_leads_docs_sales_mapping, docs_sales.c.id == amo_leads_docs_sales_mapping.c.docs_sales_id)
-            .join(amo_leads, amo_leads_docs_sales_mapping.c.lead_id == amo_leads.c.id)
-            .where(and_(
-                amo_leads.c.amo_id == create_booking_repeat_model.leads.add[0].id,
-                docs_sales.c.cashbox == user.cashbox_id,
-                docs_sales.c.is_deleted == False,
-                amo_leads.c.is_deleted == False,
-            ))
-        )
-
-        synced_docs_sales = await database.fetch_one(query)
-
-        if not synced_docs_sales:
-            raise HTTPException(status_code=404, detail="Docs Sales Not Found")
-
-        query = (
-            select(booking)
-            .where(and_(
-                booking.c.docs_sales_id == synced_docs_sales.id,
-                booking.c.cashbox == user.cashbox_id,
-                booking.c.is_deleted == False
-            ))
-        )
-        booking_info = await database.fetch_one(query)
-
-        if not booking_info:
-            raise HTTPException(status_code=404, detail="Booking Not Found")
-
-        await amqp_messaging.publish(
-            BaseBookingRepeatMessage(
-                message_id=uuid.uuid4(),
-                cashbox_id=user.cashbox_id,
-                booking_id=booking_info.id,
-                start_booking=booking_info.start_booking,
-                end_booking=booking_info.end_booking,
-                token=token,
-                lead_id=synced_docs_sales.id_1
-            ),
-            routing_key="booking_repeat_tasks"
-        )
+        # amqp_messaging: IRabbitMessaging = await self.__amqp_messaging_factory()
+        #
+        # query = (
+        #     select(docs_sales, amo_leads.c.id.label("amo_lead_id"))
+        #     .select_from(docs_sales)
+        #     .join(amo_leads_docs_sales_mapping, docs_sales.c.id == amo_leads_docs_sales_mapping.c.docs_sales_id)
+        #     .join(amo_leads, amo_leads_docs_sales_mapping.c.lead_id == amo_leads.c.id)
+        #     .where(and_(
+        #         amo_leads.c.amo_id == create_booking_repeat_model.leads.add[0].id,
+        #         docs_sales.c.cashbox == user.cashbox_id,
+        #         docs_sales.c.is_deleted == False,
+        #         amo_leads.c.is_deleted == False,
+        #     ))
+        # )
+        #
+        # synced_docs_sales = await database.fetch_one(query)
+        #
+        # if not synced_docs_sales:
+        #     raise HTTPException(status_code=404, detail="Docs Sales Not Found")
+        #
+        # query = (
+        #     select(booking)
+        #     .where(and_(
+        #         booking.c.docs_sales_id == synced_docs_sales.id,
+        #         booking.c.cashbox == user.cashbox_id,
+        #         booking.c.is_deleted == False
+        #     ))
+        # )
+        # booking_info = await database.fetch_one(query)
+        #
+        # if not booking_info:
+        #     raise HTTPException(status_code=404, detail="Booking Not Found")
+        #
+        # await amqp_messaging.publish(
+        #     BaseBookingRepeatMessage(
+        #         message_id=uuid.uuid4(),
+        #         cashbox_id=user.cashbox_id,
+        #         booking_id=booking_info.id,
+        #         start_booking=booking_info.start_booking,
+        #         end_booking=booking_info.end_booking,
+        #         token=token,
+        #         lead_id=synced_docs_sales.id_1
+        #     ),
+        #     routing_key="booking_repeat_tasks"
+        # )
