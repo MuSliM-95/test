@@ -44,16 +44,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
         )
         lead_info = await database.fetch_one(query)
 
-        amo_contact_ext_id = None
-
-        if lead_info:
-            if lead_info.contact_id:
-                query = (
-                    select(amo_contacts)
-                    .where(amo_contacts.c.id == lead_info.contact_id)
-                )
-                amo_contact_info = await database.fetch_one(query)
-                amo_contact_ext_id = amo_contact_info.ext_id
+        amo_contact_ext_id = lead_info.contact_id
 
         async def __calculate_paid_doc(docs_sales_id, cashbox_id):
             query = (
