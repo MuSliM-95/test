@@ -3,6 +3,7 @@ from typing import Dict, Any
 
 from fastapi import HTTPException
 from sqlalchemy import select, and_
+from starlette.requests import Request
 
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
 from apps.booking.repeat.models.CreateBookingRepeatModel import CreateBookingRepeatModel
@@ -22,9 +23,9 @@ class CreateBookingRepeatView:
 
     async def __call__(
         self,
-        token: str, body: Dict[str, Any]
+        token: str, request: Request
     ):
-        print(body)
+        print(await request.body())
         user = await get_user_by_token(token)
 
         # amqp_messaging: IRabbitMessaging = await self.__amqp_messaging_factory()
