@@ -8,7 +8,7 @@ from starlette.requests import Request
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
-from database.db import docs_sales, amo_leads_docs_sales_mapping, amo_leads, database, booking
+from database.db import docs_sales, amo_leads_docs_sales_mapping, amo_leads, database, booking, docs_sales_tags
 from functions.helpers import get_user_by_token
 
 
@@ -36,20 +36,22 @@ class CreateBookingRepeatView:
             return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lead Id Not Available")
 
         query = (
-            select(docs_sales, amo_leads.c.id.label("amo_lead_id"))
-            .select_from(docs_sales)
-            .join(amo_leads_docs_sales_mapping, docs_sales.c.id == amo_leads_docs_sales_mapping.c.docs_sales_id)
-            .join(amo_leads, amo_leads_docs_sales_mapping.c.lead_id == amo_leads.c.id)
+            select(amo_leads.c.id)
             .where(and_(
                 amo_leads.c.amo_id == int(lead_id),
-                docs_sales.c.cashbox == user.cashbox_id,
-                docs_sales.c.is_deleted == False,
                 amo_leads.c.is_deleted == False,
             ))
         )
+        amo_lead_info = await database.fetch_one(query)
+        if not amo_lead_info:
+            return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead Not Found")
 
+        query = (
+            select(docs_sales)
+            .join(docs_sales_tags, docs_sales.c.id == docs_sales_tags.c.docs_sales_id)
+            .where(docs_sales_tags.c.name == f"ID_{lead_id}")
+        )
         synced_docs_sales = await database.fetch_one(query)
-
         if not synced_docs_sales:
             raise HTTPException(status_code=404, detail="Docs Sales Not Found")
 
@@ -74,7 +76,7 @@ class CreateBookingRepeatView:
                 start_booking=booking_info.start_booking,
                 end_booking=booking_info.end_booking,
                 token=token,
-                lead_id=synced_docs_sales.id_1
+                lead_id=amo_lead_info.id
             ),
             routing_key="booking_repeat_tasks"
         )
