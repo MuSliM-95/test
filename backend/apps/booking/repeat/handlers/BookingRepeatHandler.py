@@ -125,9 +125,9 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 )
                 docs_sales_goods_info_list = await database.fetch_all(query)
 
-                if not docs_sales_goods_info_list:
-                    print("Чёт не то")
-                    return
+                # if not docs_sales_goods_info_list:
+                #     print("Чёт не то")
+                #     return
 
                 nomenclatures_to_duplicate = []
                 for good in docs_sales_goods_info_list:
