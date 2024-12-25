@@ -199,19 +199,11 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 new_booking_id = await database.fetch_one(query)
 
                 query = (
-                    select(booking_tags)
-                    .where(booking_tags.c.booking_id == booking_info.id)
-                )
-                tags_list = await database.fetch_all(query)
-
-                tags_for_create = dict(tags_list)
-                for tag_booking in tags_for_create:
-                    del tag_booking["id"]
-                    tag_booking["booking_id"] = new_booking_id.id
-
-                query = (
                     insert(booking_tags)
-                    .values(**tags_for_create)
+                    .values(
+                        booking_id=new_booking_id.id,
+                        name=f"ID_{booking_repeat_message.lead_id}"
+                    )
                 )
                 await database.execute(query)
 
