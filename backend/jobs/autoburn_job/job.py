@@ -1,10 +1,12 @@
 import asyncio
+import sys
 from datetime import datetime, timedelta
 from typing import List, Union, Any, Dict
 from databases.backends.postgres import Record
 from sqlalchemy import select, asc
 from database.db import database, loyality_transactions, loyality_cards
 
+import logging
 
 class AutoBurn:
     def __init__(self, card: Record) -> None:
@@ -23,7 +25,7 @@ class AutoBurn:
             loyality_cards
             .select()
             .where(
-                loyality_cards.c.balance > 0,
+                loyality_cards.c.balance >= 0,
                 loyality_cards.c.lifetime.is_not(None),
                 loyality_cards.c.lifetime > 0
             )
@@ -39,7 +41,7 @@ class AutoBurn:
                 loyality_transactions.c.amount > 0,
                 loyality_transactions.c.autoburned.is_not(True),
                 loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) <= datetime.utcnow(),
-                loyality_transactions.c.card_balance == 0
+                loyality_transactions.c.card_balance >= 0
             )
             .order_by(asc(loyality_transactions.c.id))
             .limit(1)
@@ -66,18 +68,23 @@ class AutoBurn:
             self.accrual_list.extend(
                 [dict(i, start_amount=i.amount) for i in transaction_list if i.type == "accrual"]
             )
+            print(self.accrual_list)
             for transaction in transaction_list:
                 transaction: Dict[str, Any] = dict(transaction, start_amount=transaction["amount"])
+                print("accrual_list", self.accrual_list)
                 self.burned_list.append(transaction["id"])
                 if transaction["type"] == "withdraw":
                     if self.accrual_list[minus_index]["amount"] > 0:
                         if self.accrual_list[minus_index]["amount"] >= transaction["amount"]:
                             self.accrual_list[minus_index]["amount"] -= transaction["amount"]
+
                         else:
                             transaction["amount"] = transaction["amount"] - self.accrual_list[minus_index]["amount"]
+                            print("transaction", transaction)
                             self.accrual_list[minus_index]["amount"] = 0
                         if self.accrual_list[minus_index]["amount"] == 0:
                             minus_index += 1
+                            print(minus_index)
 
                     self.withdraw_list.append(transaction)
 
@@ -156,6 +163,7 @@ class AutoBurn:
 
     async def start(self) -> None:
         await self._get_first_operation_burned()
+        logging.error(self.first_operation_burned)
         await self._get_transaction()
         for a in self.accrual_list:
             amount, update_balance_sum = a["amount"], 0
