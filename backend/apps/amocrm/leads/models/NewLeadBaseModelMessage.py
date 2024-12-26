@@ -14,6 +14,7 @@ class NewLeadBaseModelMessage(BaseModelMessage):
     nomenclature: str
     start_period: int
     end_period: int
+    booking_id: int
 
     docs_sales_id: int
     cashbox_id: int
