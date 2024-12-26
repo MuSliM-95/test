@@ -8,7 +8,7 @@ from apps.amocrm.leads.repositories.models.CreateLeadModel import CreateLeadMode
     CustomFieldValueElement, EmveddedModel, EmveddedContactModel
 from apps.amocrm.tools.get_install import get_install_by_cashbox
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
-from database.db import amo_leads, database, amo_leads_docs_sales_mapping, docs_sales_tags, docs_sales
+from database.db import amo_leads, database, amo_leads_docs_sales_mapping, docs_sales_tags, docs_sales, booking_tags
 
 
 class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
@@ -127,6 +127,15 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
                 insert(docs_sales_tags)
                 .values(
                     docs_sales_id=post_amo_lead_message.docs_sales_id,
+                    name=f"ID_{lead_info['id']}"
+                )
+            )
+            await database.execute(query)
+
+            query = (
+                insert(booking_tags)
+                .values(
+                    booking_id=post_amo_lead_message.booking_id,
                     name=f"ID_{lead_info['id']}"
                 )
             )

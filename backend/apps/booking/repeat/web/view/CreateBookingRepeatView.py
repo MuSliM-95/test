@@ -49,7 +49,10 @@ class CreateBookingRepeatView:
         query = (
             select(docs_sales)
             .join(docs_sales_tags, docs_sales.c.id == docs_sales_tags.c.docs_sales_id)
-            .where(docs_sales_tags.c.name == f"ID_{lead_id}")
+            .where(and_(
+                docs_sales_tags.c.name == f"ID_{lead_id}",
+                docs_sales.c.is_deleted == False
+            ))
         )
         synced_docs_sales = await database.fetch_one(query)
         if not synced_docs_sales:

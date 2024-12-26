@@ -177,7 +177,8 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                                 ]
                             )
                         ]
-                    )
+                    ),
+                    generate_out=False if not nomenclatures_to_duplicate else True
                 )
 
                 booking_info_dict = dict(booking_info)
@@ -197,15 +198,6 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                     .returning(booking.c.id)
                 )
                 new_booking_id = await database.fetch_one(query)
-
-                query = (
-                    insert(booking_tags)
-                    .values(
-                        booking_id=new_booking_id.id,
-                        name=f"ID_{booking_repeat_message.lead_id}"
-                    )
-                )
-                await database.execute(query)
 
                 if new_nomenclature_id:
                     query = (
@@ -240,6 +232,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                         end_period=booking_info_dict["end_booking"],
                         docs_sales_id=result[0]["id"],
                         cashbox_id=booking_repeat_message.cashbox_id,
+                        booking_id=new_booking_id.id
                     ),
                     routing_key="post_amo_lead"
                 )
