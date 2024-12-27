@@ -118,10 +118,11 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 nomenclature_name = None if not nomenclature_info else nomenclature_info.name
 
                 query = (
-                    select(nomenclature)
-                    .join(docs_sales_goods, nomenclature.c.id == docs_sales_goods.c.nomenclature)
+                    select(docs_sales_goods)
+                    .join(nomenclature, nomenclature.c.id == docs_sales_goods.c.nomenclature)
                     .where(and_(
-                        docs_sales_goods.c.docs_sales_id == booking_info.docs_sales_id
+                        docs_sales_goods.c.docs_sales_id == booking_info.docs_sales_id,
+                        nomenclature.c.type.in_(["resurs", "dopresurs"])
                     ))
                 )
                 docs_sales_goods_info_list = await database.fetch_all(query)
@@ -130,10 +131,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 #     print("Чёт не то")
                 #     return
 
-                nomenclatures_to_duplicate = []
-                for good in docs_sales_goods_info_list:
-                    if good.type in ["resurs", "dopresurs"]:
-                        nomenclatures_to_duplicate.append(good)
+                nomenclatures_to_duplicate = [good for good in docs_sales_goods_info_list]
 
                 query = (
                     select(docs_sales)
