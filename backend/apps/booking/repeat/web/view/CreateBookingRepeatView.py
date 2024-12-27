@@ -8,7 +8,8 @@ from starlette.requests import Request
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
-from database.db import docs_sales, amo_leads_docs_sales_mapping, amo_leads, database, booking, docs_sales_tags
+from database.db import docs_sales, amo_leads_docs_sales_mapping, amo_leads, database, booking, docs_sales_tags, \
+    booking_tags
 from functions.helpers import get_user_by_token
 
 
@@ -47,22 +48,11 @@ class CreateBookingRepeatView:
             return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead Not Found")
 
         query = (
-            select(docs_sales)
-            .join(docs_sales_tags, docs_sales.c.id == docs_sales_tags.c.docs_sales_id)
-            .where(and_(
-                docs_sales_tags.c.name == f"ID_{lead_id}",
-                docs_sales.c.is_deleted == False
-            ))
-        )
-        synced_docs_sales = await database.fetch_one(query)
-        if not synced_docs_sales:
-            raise HTTPException(status_code=404, detail="Docs Sales Not Found")
-
-        query = (
             select(booking)
+            .join(booking_tags, booking.c.id == booking_tags.c.booking_id)
             .where(and_(
-                booking.c.docs_sales_id == synced_docs_sales.id,
                 booking.c.cashbox == user.cashbox_id,
+                booking_tags.c.name == f"ID_{lead_id}",
                 booking.c.is_deleted == False
             ))
         )
