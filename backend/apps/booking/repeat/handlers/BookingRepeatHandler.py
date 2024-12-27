@@ -118,7 +118,8 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 nomenclature_name = None if not nomenclature_info else nomenclature_info.name
 
                 query = (
-                    select(docs_sales_goods)
+                    select(nomenclature)
+                    .join(docs_sales_goods, nomenclature.c.id == docs_sales_goods.c.nomenclature)
                     .where(and_(
                         docs_sales_goods.c.docs_sales_id == booking_info.docs_sales_id
                     ))
