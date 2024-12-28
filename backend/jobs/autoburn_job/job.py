@@ -8,6 +8,15 @@ from database.db import database, loyality_transactions, loyality_cards
 
 import logging
 
+logger = logging.getLogger('autoburn')
+logger.setLevel(logging.INFO)
+# create file handler which logs even debug messages
+formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
+fh = logging.FileHandler('autoburn.log')
+fh.setFormatter(formatter)
+fh.setLevel(logging.INFO)
+logger.addHandler(fh)
+
 class AutoBurn:
     def __init__(self, card: Record) -> None:
         self.card: Record = card
@@ -40,8 +49,8 @@ class AutoBurn:
                 loyality_transactions.c.type.in_(["accrual", "withdraw"]),
                 loyality_transactions.c.amount > 0,
                 loyality_transactions.c.autoburned.is_not(True),
-                loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) <= datetime.utcnow(),
-                loyality_transactions.c.card_balance >= 0
+                loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.utcnow(),
+                loyality_transactions.c.card_balance == 0
             )
             .order_by(asc(loyality_transactions.c.id))
             .limit(1)
@@ -59,7 +68,6 @@ class AutoBurn:
                     loyality_transactions.c.amount > 0,
                     loyality_transactions.c.autoburned.is_not(True),
                     loyality_transactions.c.id >= self.first_operation_burned,
-                    loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.utcnow()
                 )
             )
             transaction_list = await database.fetch_all(q)
@@ -68,10 +76,9 @@ class AutoBurn:
             self.accrual_list.extend(
                 [dict(i, start_amount=i.amount) for i in transaction_list if i.type == "accrual"]
             )
-            print(self.accrual_list)
+            logger.info(f'Лист транзакций: {[dict(transaction) for transaction in transaction_list]}')
             for transaction in transaction_list:
                 transaction: Dict[str, Any] = dict(transaction, start_amount=transaction["amount"])
-                print("accrual_list", self.accrual_list)
                 self.burned_list.append(transaction["id"])
                 if transaction["type"] == "withdraw":
                     if self.accrual_list[minus_index]["amount"] > 0:
@@ -80,12 +87,9 @@ class AutoBurn:
 
                         else:
                             transaction["amount"] = transaction["amount"] - self.accrual_list[minus_index]["amount"]
-                            print("transaction", transaction)
                             self.accrual_list[minus_index]["amount"] = 0
                         if self.accrual_list[minus_index]["amount"] == 0:
                             minus_index += 1
-                            print(minus_index)
-
                     self.withdraw_list.append(transaction)
 
     async def _get_transaction_burned_trigger(self, trigger = 0) -> None:
@@ -106,6 +110,7 @@ class AutoBurn:
 
     @database.transaction()
     async def _burn(self) -> None:
+        logger.info(self.burned_list) if len(self.burned_list) > 0 else None
         update_transaction_status_query = (
             loyality_transactions
             .update()
@@ -120,7 +125,7 @@ class AutoBurn:
             loyality_cards
             .update()
             .where(loyality_cards.c.id == self.card.id)
-            .values({"balance": self.card_balance})
+            .values({"balance": round(self.card_balance,2)})
         )
         await database.execute(update_balance_query)
 
@@ -153,7 +158,7 @@ class AutoBurn:
             "dead_at": None,
             "is_deleted": False,
             "autoburned": True,
-            "card_balance": self.card_balance
+            "card_balance": round(self.card_balance,2)
         }
 
     async def transactions(self, trigger):
@@ -163,8 +168,12 @@ class AutoBurn:
 
     async def start(self) -> None:
         await self._get_first_operation_burned()
-        logging.error(self.first_operation_burned)
         await self._get_transaction()
+
+        logger.info(self.first_operation_burned) if self.first_operation_burned is not None else None
+        logger.info(f'Лист начисления: {self.accrual_list}') if len(self.accrual_list) > 0 else None
+        logger.info(f'Лист списания: {self.withdraw_list}') if len(self.withdraw_list) > 0 else None
+
         for a in self.accrual_list:
             amount, update_balance_sum = a["amount"], 0
             if amount == 0:
@@ -173,7 +182,8 @@ class AutoBurn:
             w = 0
             while w < len(self.withdraw_list):
                 if amount == 0:
-                    break
+                    w += 1
+                    continue
 
                 if a["amount"] >= self.withdraw_list[w]["amount"]:
                     update_balance_sum += a["amount"] - self.withdraw_list[w]["amount"]
@@ -184,9 +194,13 @@ class AutoBurn:
                     self.withdraw_list[w]["amount"] -= a["amount"]
                 amount -= update_balance_sum
                 w += 1
-
+            logger.info(f'Обновление баланса карты: шагов {w}')
+            logger.info(f'Сумма для изменения баланса: {update_balance_sum}')
             if update_balance_sum != 0:
+                logger.info(f'Баланс до обновления: {self.card_balance}')
+                logger.info(f'баланс минус сумма для изменения баланса: {self.card_balance}')
                 self.card_balance -= update_balance_sum
+                logger.info(f'Обновленный баланс: {self.card_balance}')
                 self.autoburn_operation_list.append(
                     self._get_autoburned_operation_dict(
                         update_balance_sum=update_balance_sum, start_amount=a["start_amount"],
@@ -194,7 +208,10 @@ class AutoBurn:
                     )
                 )
             else:
+                logger.info(f'Баланс до обновления: {self.card_balance}')
+                logger.info(f'amount элемента листа начисления: {a["amount"]}')
                 self.card_balance -= a["amount"]
+                logger.info(f'Обновленный баланс: {self.card_balance}')
                 self.autoburn_operation_list.append(
                     self._get_autoburned_operation_dict(
                         update_balance_sum=a["amount"], start_amount=a["start_amount"], created_at=a["created_at"]
@@ -205,7 +222,6 @@ class AutoBurn:
 
 async def autoburn():
     await database.connect()
-
     card_list = await AutoBurn.get_cards()
     for card in card_list:
         await AutoBurn(card=card).start()
