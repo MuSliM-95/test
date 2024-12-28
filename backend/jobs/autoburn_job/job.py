@@ -182,8 +182,7 @@ class AutoBurn:
             w = 0
             while w < len(self.withdraw_list):
                 if amount == 0:
-                    w += 1
-                    continue
+                    break
 
                 if a["amount"] >= self.withdraw_list[w]["amount"]:
                     update_balance_sum += a["amount"] - self.withdraw_list[w]["amount"]
@@ -210,7 +209,11 @@ class AutoBurn:
             else:
                 logger.info(f'Баланс до обновления: {self.card_balance}')
                 logger.info(f'amount элемента листа начисления: {a["amount"]}')
-                self.card_balance -= a["amount"]
+                if a["amount"] >= self.card_balance:
+                    a["amount"] = self.card_balance
+                    self.card_balance = 0
+                else:
+                    self.card_balance -= a["amount"]
                 logger.info(f'Обновленный баланс: {self.card_balance}')
                 self.autoburn_operation_list.append(
                     self._get_autoburned_operation_dict(
