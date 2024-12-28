@@ -2,8 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Mapping, Any
 
+from dateutil.relativedelta import relativedelta
 from pydantic.validators import timedelta
-from sqlalchemy import select, and_, insert
+from sqlalchemy import select, and_, insert, or_
 
 from api.docs_sales.routers import create
 from api.docs_sales.schemas import CreateMass, Create, Item
@@ -237,7 +238,16 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 )
 
         if booking_nomenclature_info:
-            booking_start_next_month = booking_repeat_message.start_booking + timedelta(days=30).total_seconds() + 1
+            original_start_dt = datetime.fromtimestamp(booking_repeat_message.start_booking)
+            original_end_dt = datetime.fromtimestamp(booking_repeat_message.end_booking)
+
+            # Вычисление нового периода бронирования через месяц
+            new_start_dt = original_start_dt + relativedelta(months=1)
+            new_end_dt = original_end_dt + relativedelta(months=1)
+
+            new_start = int(new_start_dt.timestamp())
+            new_end = int(new_end_dt.timestamp())
+
             query = (
                 select(booking)
                 .join(
@@ -251,9 +261,19 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                     )
                 )
                 .where(
-                    and_(
-                        booking.c.start_booking <= booking_start_next_month,
-                        booking_start_next_month <= booking.c.end_booking
+                    or_(
+                        and_(
+                            booking.c.start_booking <= new_start,
+                            booking.c.end_booking >= new_start
+                        ),
+                        and_(
+                            booking.c.start_booking <= new_end,
+                            booking.c.end_booking >= new_end
+                        ),
+                        and_(
+                            booking.c.start_booking >= new_start,
+                            booking.c.end_booking <= new_end
+                        )
                     )
                 )
             )
