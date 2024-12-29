@@ -69,7 +69,7 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
                 ]
             ),
         ]
-        if post_amo_lead_message.contact_ext_id:
+        if post_amo_lead_message.contact_id:
             create_lead_model = CreateLeadModel(
                 name=post_amo_lead_message.lead_name,
                 price=0 if not post_amo_lead_message.price else post_amo_lead_message.price,
@@ -78,7 +78,7 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
                 _embedded=EmveddedModel(
                     contacts=[
                         EmveddedContactModel(
-                            id=post_amo_lead_message.contact_ext_id
+                            id=post_amo_lead_message.contact_id
                         )
                     ]
                 )

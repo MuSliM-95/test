@@ -8,7 +8,6 @@ class NewLeadBaseModelMessage(BaseModelMessage):
     price: Optional[int]
     status_id: int
     contact_id: Optional[int]
-    contact_ext_id: Optional[int]
     account_link: str
     act_link: str
     nomenclature: str

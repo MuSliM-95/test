@@ -8,8 +8,7 @@ from starlette.requests import Request
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
-from database.db import docs_sales, amo_leads_docs_sales_mapping, amo_leads, database, booking, docs_sales_tags, \
-    booking_tags
+from database.db import amo_leads, database, booking, booking_tags
 from functions.helpers import get_user_by_token
 
 
