@@ -263,6 +263,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 .where(
                     and_(
                         booking.c.cashbox == booking_repeat_message.cashbox_id,
+                        booking.c.is_deleted == False,
                         booking_nomenclature.c.nomenclature_id == booking_nomenclature_info.nomenclature_id,
                         booking_nomenclature.c.is_deleted == False,
                         booking.c.id != booking_repeat_message.booking_id
