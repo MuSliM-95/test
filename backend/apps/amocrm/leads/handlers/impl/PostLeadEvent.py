@@ -8,7 +8,8 @@ from apps.amocrm.leads.repositories.models.CreateLeadModel import CreateLeadMode
     CustomFieldValueElement, EmveddedModel, EmveddedContactModel
 from apps.amocrm.tools.get_install import get_install_by_cashbox
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
-from database.db import amo_leads, database, amo_leads_docs_sales_mapping, docs_sales_tags, docs_sales, booking_tags
+from database.db import amo_leads, database, amo_leads_docs_sales_mapping, docs_sales_tags, docs_sales, booking_tags, \
+    payments
 
 
 class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
@@ -159,6 +160,27 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
                 .where(docs_sales.c.id == post_amo_lead_message.docs_sales_id)
                 .values(
                     tags=tags
+                )
+            )
+            await database.execute(query)
+
+            query = (
+                select(payments.c.tags)
+                .where(payments.c.docs_sales_id == post_amo_lead_message.docs_sales_id)
+            )
+            payment_tags_info = await database.fetch_one(query)
+            if payment_tags_info:
+                if payment_tags_info.tags:
+                    payment_tags = payment_tags_info.tags + f",ID_{lead_info['id']}"
+                else:
+                    payment_tags = f"ID_{lead_info['id']}"
+            else:
+                payment_tags = f"ID_{lead_info['id']}"
+            query = (
+                update(payments)
+                .where(payments.c.docs_sales_id == post_amo_lead_message.docs_sales_id)
+                .values(
+                    tags=payment_tags
                 )
             )
             await database.execute(query)
