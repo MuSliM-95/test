@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime
 from typing import Mapping, Any
@@ -79,6 +80,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
         rabbitmq_messaging_instance: IRabbitMessaging
     ):
         async with database.transaction(force_rollback=True):
+            print(booking_repeat_message.dict())
             query = (
                 select(booking)
                 .where(booking.c.id == booking_repeat_message.booking_id)
@@ -128,9 +130,10 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                 docs_sales_id=booking_info.docs_sales_id,
                 cashbox_id=booking_repeat_message.cashbox_id
             )
-
+            print(paid_rubles, paid_loyality)
             del docs_sales_info_dict["number"]
             del docs_sales_info_dict["dated"]
+            docs_sales_info_dict["tags"] = re.sub(r'(?:^|,)ID_[^,]*', '', docs_sales_info_dict["tags"])
             result = await create(
                 token=booking_repeat_message.token,
                 docs_sales_data=CreateMass(

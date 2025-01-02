@@ -21,7 +21,7 @@ class RabbitMessagingImpl(IRabbitMessaging):
         channel: IRabbitChannel
     ):
         self.__channel = channel
-        self.__handlers: Dict[str, EventHandler] = {}
+        self.__handlers: Dict[str, IEventHandler] = {}
 
     async def publish(
         self,
@@ -78,7 +78,7 @@ class RabbitMessagingImpl(IRabbitMessaging):
         await asyncio.Future()
 
     async def __amqp_event_message_consumer(self, message: IncomingMessage):
-        async with message.process():
+        async with message.process(ignore_processed=True):
             try:
                 message_json = loads(message.body.decode("utf-8"))
             except Exception as error:
