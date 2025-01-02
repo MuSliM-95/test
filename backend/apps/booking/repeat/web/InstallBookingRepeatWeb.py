@@ -20,6 +20,6 @@ class InstallBookingRepeatWeb:
             path="/booking/amo/repeat",
             endpoint=create_booking_repeat_view.__call__,
             methods=["POST"],
-            status_code=status.HTTP_201_CREATED,
+            status_code=status.HTTP_200_OK,
             tags=["booking"]
         )

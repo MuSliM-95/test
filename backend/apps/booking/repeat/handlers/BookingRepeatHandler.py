@@ -48,7 +48,6 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                         .where(and_(
                             payments.c.id == proxy.to_id,
                             payments.c.cashbox == cashbox_id,
-                            payments.c.status == True,
                             payments.c.is_deleted == False
                         ))
                     )
@@ -63,7 +62,6 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                             .where(and_(
                                 loyality_transactions.c.id == proxy.to_id,
                                 loyality_transactions.c.cashbox == cashbox_id,
-                                loyality_transactions.c.status == True,
                                 loyality_transactions.c.is_deleted == False
                             ))
                         )
@@ -133,6 +131,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
             print(paid_rubles, paid_loyality)
             del docs_sales_info_dict["number"]
             del docs_sales_info_dict["dated"]
+            del docs_sales_info_dict["status"]
             docs_sales_info_dict["tags"] = re.sub(r'(?:^|,)ID_[^,]*', '', docs_sales_info_dict["tags"])
             result = await create(
                 token=booking_repeat_message.token,
@@ -142,6 +141,7 @@ class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
                             dated=int(datetime.now().timestamp()),
                             paid_rubles=paid_rubles,
                             paid_lt=paid_loyality,
+                            status=False,
                             **docs_sales_info_dict,
                             goods=[
                                 Item(
