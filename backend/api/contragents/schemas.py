@@ -19,8 +19,8 @@ class Contragent(BaseModel):
     contragent_type: Optional[Contragent_types]
     birth_date: Optional[date]
     data: Optional[dict]
-    gender: Optional[Gender]
-    type: Optional[ContragentType]
+    gender: Optional[Gender] = None
+    type: Optional[ContragentType] = None
     additional_phones: Optional[str]
 
 
@@ -34,8 +34,8 @@ class ContragentEdit(BaseModel):
     contragent_type: Optional[Contragent_types]
     birth_date: Optional[date]
     data: Optional[dict]
-    gender: Optional[Gender]
-    type: Optional[ContragentType]
+    gender: Optional[Gender] = None
+    type: Optional[ContragentType] = None
     additional_phones: Optional[str]
 
 
@@ -50,8 +50,8 @@ class ContragentCreate(BaseModel):
     birth_date: Optional[date]
     email: Optional[str]
     data: Optional[dict]
-    gender: Optional[Gender]
-    type: Optional[ContragentType]
+    gender: Optional[Gender] = None
+    type: Optional[ContragentType] = None
     additional_phones: Optional[str]
 
 class ContragentResponse(Contragent):

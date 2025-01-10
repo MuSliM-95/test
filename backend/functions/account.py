@@ -63,9 +63,9 @@ async def make_account(balance: accounts_balances) -> None:
         .where(users_cboxes_relation.c.cashbox_id == balance.cashbox)
     )
     users_quantity = await database.execute(count_query)
-    price = balance_tariff.price
+    price = balance_tariff.price / balance_tariff.frequency
     if balance_tariff.per_user:
-        price = balance_tariff.price * users_quantity
+        price *= users_quantity
 
     # making new transaction
     if price and balance.balance >= price:
@@ -81,7 +81,7 @@ async def make_account(balance: accounts_balances) -> None:
     await database.execute(query)
 
     get_users_id = select(users_cboxes_relation.c.user).where(
-        users_cboxes_relation.c.cashbox_id==balance.cashbox
+        users_cboxes_relation.c.cashbox_id == balance.cashbox
     )
     query = users.select().where(users.c.id == get_users_id.scalar_subquery())
     user = await database.fetch_one(query)

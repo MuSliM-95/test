@@ -1,5 +1,6 @@
 from typing import Any, List, Optional
 
+from pydantic import Field
 from pydantic.main import BaseModel
 
 
@@ -21,4 +22,4 @@ class CreateLeadModel(BaseModel):
     price: Optional[int]
     status_id: int
     custom_fields_values: Optional[List[CustomFieldValue]]
-    _embedded: Optional[EmveddedModel]
+    embedded: Optional[EmveddedModel] = Field(None, alias='_embedded')

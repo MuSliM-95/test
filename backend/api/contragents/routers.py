@@ -71,7 +71,12 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
                 update_dict = ca.dict(exclude_unset=True)
 
                 if update_dict['phone']:
-                    q = contragents.select().where(contragents.c.phone == update_dict['phone'])
+                    q = (
+                        contragents.select()
+                        .where(
+                            contragents.c.cashbox == user.cashbox_id, contragents.c.phone == update_dict['phone']
+                        )
+                    )
                     contr = await database.fetch_one(q)
                     if contr:
                         continue

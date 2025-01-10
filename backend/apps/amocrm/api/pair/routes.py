@@ -5,7 +5,6 @@ from apps.amocrm.pair.functions.fields import create_custom_fields_contacts, cre
 from ws_manager import manager
 
 from datetime import datetime
-from jobs.jobs import scheduler
 from functions.helpers import gen_token
 
 
@@ -33,22 +32,24 @@ async def sc_l(token: str, amo_token: str):
             query = amo_install.select().where(amo_install.c.install_group_id == a_t_group.id)
             amo_installs_in_group = await database.fetch_all(query)
 
+            active_amo_install = None
             flag = False
             for install_info in amo_installs_in_group:
                 if install_info.active:
+                    active_amo_install = install_info
                     flag = True
 
-            if flag:
+            if flag and active_amo_install:
                 await create_custom_fields_contacts(
                     cashbox_id=user["cashbox_id"],
-                    referer=amo_installs_in_group.referrer,
-                    access_token=amo_installs_in_group.access_token
+                    referer=active_amo_install.referrer,
+                    access_token=active_amo_install.access_token
                 )
 
                 await create_custom_fields_leads(
                     cashbox_id=user["cashbox_id"],
-                    referer=amo_installs_in_group.referrer,
-                    access_token=amo_installs_in_group.access_token
+                    referer=active_amo_install.referrer,
+                    access_token=active_amo_install.access_token
                 )
 
             if not amo_pair:
