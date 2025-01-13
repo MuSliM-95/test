@@ -5,19 +5,6 @@ from databases.backends.postgres import Record
 from sqlalchemy import select, asc
 from database.db import database, loyality_transactions, loyality_cards
 
-import logging
-
-logger = logging.getLogger('autoburn')
-logger.setLevel(logging.INFO)
-# create file handler which logs even debug messages
-formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
-fh = logging.FileHandler('autoburn.log')
-fh.setFormatter(formatter)
-fh.setLevel(logging.INFO)
-logger.addHandler(fh)
-
-
-
 
 class AutoBurn:
     def __init__(self, card: Record) -> None:
