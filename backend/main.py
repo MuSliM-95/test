@@ -21,6 +21,9 @@ from apps.booking.nomenclature.infrastructure.repositories.core.IBookingNomencla
 from apps.booking.nomenclature.infrastructure.repositories.impl.BookingNomenclatureRepository import \
     BookingNomenclatureRepository
 from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
+from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
+from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
+from apps.yookassa.web.InstallOauthWeb import InstallYookassaOauthWeb
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
@@ -259,10 +262,12 @@ async def startup():
     ioc.set(IBookingNomenclatureRepository, BookingNomenclatureRepository())
 
     ioc.set(IWidgetInstallerRepository, WidgetInstallerRepository())
+    ioc.set(IYookassaOauthRepository, YookassaOauthRepository())
 
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
     InstallWidgetInstallerInfoWeb()(app=app)
+    InstallYookassaOauthWeb()(app=app)
 
     init_db()
     await database.connect()
