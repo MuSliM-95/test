@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
 
-class OauthModel(BaseModel):
+class OauthModelCredential(BaseModel):
     client_id: str
     client_secret: str
