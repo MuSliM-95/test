@@ -24,7 +24,8 @@ class AutoBurn:
             .where(
                 loyality_cards.c.balance > 0,
                 loyality_cards.c.lifetime.is_not(None),
-                loyality_cards.c.lifetime > 0
+                loyality_cards.c.lifetime > 0,
+                loyality_cards.c.is_deleted == False
             )
         )
         return await database.fetch_all(cards_query)
@@ -99,12 +100,12 @@ class AutoBurn:
         )
         await database.execute(update_balance_query)
 
-        create_transcation_query = (
+        create_transaction_query = (
             loyality_transactions
             .insert()
             .values()
         )
-        await database.execute_many(query=create_transcation_query, values=self.autoburn_operation_list)
+        await database.execute_many(query=create_transaction_query, values=self.autoburn_operation_list)
 
     def _get_autoburned_operation_dict(
             self,
@@ -135,38 +136,18 @@ class AutoBurn:
         await self._get_first_operation_burned()
         await self._get_transaction()
         for a in self.accrual_list:
-            amount, update_balance_sum = a["amount"], 0
+            amount = a["amount"]
             if amount == 0:
                 continue
 
-            w = 0
-            while w < len(self.withdraw_list):
-                if amount == 0:
-                    break
+            update_balance_sum = min(self.card_balance, amount)
 
-                if a["amount"] >= self.withdraw_list[w]["amount"]:
-                    update_balance_sum += a["amount"] - self.withdraw_list[w]["amount"]
-                    del self.withdraw_list[w]
-                    w -= 1
-                else:
-                    update_balance_sum += a["amount"]
-                    self.withdraw_list[w]["amount"] -= a["amount"]
-                amount -= update_balance_sum
-                w += 1
-
-            if update_balance_sum != 0:
+            if update_balance_sum > 0:
                 self.card_balance -= update_balance_sum
                 self.autoburn_operation_list.append(
                     self._get_autoburned_operation_dict(
                         update_balance_sum=update_balance_sum, start_amount=a["start_amount"],
                         created_at=a["created_at"]
-                    )
-                )
-            else:
-                self.card_balance -= a["amount"]
-                self.autoburn_operation_list.append(
-                    self._get_autoburned_operation_dict(
-                        update_balance_sum=a["amount"], start_amount=a["start_amount"], created_at=a["created_at"]
                     )
                 )
 
@@ -178,3 +159,4 @@ async def autoburn():
     card_list = await AutoBurn.get_cards()
     for card in card_list:
         await AutoBurn(card=card).start()
+

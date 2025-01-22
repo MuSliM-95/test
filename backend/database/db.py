@@ -876,13 +876,29 @@ amo_bots = sqlalchemy.Table(
     "amo_bots",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("ext_id", Integer, index=True),
+    sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True),
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("type_functionality", String),
     sqlalchemy.Column("type", Integer),
     sqlalchemy.Column("amo_bot_handler_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.UniqueConstraint('install_group_id', 'ext_id'),
+    extend_existing = True
+)
+
+amo_bots_settings = sqlalchemy.Table(
+    "amo_bots_settings",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key = True, index = True),
+    sqlalchemy.Column("silent", Integer),
+    sqlalchemy.Column("active", Boolean),
+    sqlalchemy.Column("is_working_without_chat", Boolean),
+    sqlalchemy.Column("type_functionality", Integer),
+    sqlalchemy.Column("amo_bots_id", Integer, ForeignKey("amo_bots.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now())
 )
 
 
@@ -909,13 +925,19 @@ table_triggers_events = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key = True, index = True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
-    sqlalchemy.Column("table_triggers_id", Integer, ForeignKey("table_triggers.id")),
-    sqlalchemy.Column("client", Integer),
+    sqlalchemy.Column("table_triggers_id", Integer, ForeignKey("table_triggers.id"), index=True),
+    sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("loyality_transactions_id", Integer, index=True),
     sqlalchemy.Column("event", String),
+    sqlalchemy.Column("before_event", Boolean),
+    sqlalchemy.Column("after_event", Boolean),
     sqlalchemy.Column("body", JSON),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone = True), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.UniqueConstraint('table_triggers_id', 'loyality_transactions_id'),
+    extend_existing = True
+
 )
 
 
