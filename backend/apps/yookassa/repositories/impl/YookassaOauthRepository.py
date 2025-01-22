@@ -9,13 +9,6 @@ from database.db import yookassa_install, database
 
 class YookassaOauthRepository(IYookassaOauthRepository):
 
-    def get_oauth_credentials(self, cashbox: int) -> OauthModelCredential:
-        return OauthModelCredential(
-            client_id = os.getenv("YOOKASSA_OAUTH_APP_CLIENT_ID"),
-            client_secret = os.getenv("YOOKASSA_OAUTH_APP_CLIENT_SECRET"),
-            cashbox = cashbox
-        )
-
     async def get_oauth(self, cashbox: int) -> OauthBaseModel:
         query = select(yookassa_install).where(
             yookassa_install.c.cashbox_id == cashbox,

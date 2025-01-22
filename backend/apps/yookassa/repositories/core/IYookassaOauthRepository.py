@@ -3,9 +3,6 @@ from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthModel, Oaut
 
 class IYookassaOauthRepository:
 
-    def get_oauth_credentials(self, cashbox: int):
-        raise NotImplementedError
-
     async def update_oauth(self, cashbox: int, oauth: OauthUpdateModel) -> None:
         raise NotImplementedError
 
