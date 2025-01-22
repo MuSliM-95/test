@@ -6,3 +6,6 @@ class IYookassaRequestRepository:
     async def get_payments(self):
         raise NotImplementedError
 
+    async def revoke_token(self, token: str, client_id: str, client_secret: str):
+        raise NotImplementedError
+

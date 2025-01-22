@@ -36,4 +36,5 @@ class YookassaOauthRepository(IYookassaOauthRepository):
 
     async def delete_oauth(self, cashbox: int):
         oauth = await self.get_oauth(cashbox)
+        print(oauth)
         await self.update_oauth(cashbox, OauthUpdateModel(**oauth.dict(), is_delete = True))
