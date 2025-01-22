@@ -17,6 +17,5 @@ class CreateOauthView:
 
     async def __call__(self, token: str):
         user = await get_user_by_token(token)
-        create_link = await self.__oauth_service.create(user.cashbox_id)
-        return create_link
-        # return RedirectResponse(create_link, status_code = status.HTTP_303_SEE_OTHER)
+        create_link = await self.__oauth_service.oauth_link(user.cashbox_id)
+        return RedirectResponse(create_link, status_code = status.HTTP_303_SEE_OTHER)

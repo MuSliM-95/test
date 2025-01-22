@@ -31,7 +31,7 @@ class InstallYookassaOauthWeb:
         app.add_api_route(
             path = "/yookassa/install",
             endpoint = create_oauth_view.__call__,
-            methods = ["POST"],
+            methods = ["GET"],
             status_code = status.HTTP_200_OK,
             tags = ["yookassa"]
         )
