@@ -1,21 +1,25 @@
+from typing import Union
 from sqlalchemy import select, insert, update
-
-from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthModel, OauthUpdateModel
-from apps.yookassa.models.OauthModelCredential import OauthModelCredential
+from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthUpdateModel
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
-import os
 from database.db import yookassa_install, database
 
 
 class YookassaOauthRepository(IYookassaOauthRepository):
 
-    async def get_oauth(self, cashbox: int) -> OauthBaseModel:
-        query = select(yookassa_install).where(
-            yookassa_install.c.cashbox_id == cashbox,
-            yookassa_install.c.is_delete == False
-        )
-        oauth = await database.fetch_one(query)
-        return OauthBaseModel(**oauth)
+    async def get_oauth(self, cashbox: int) -> Union[OauthBaseModel, None]:
+        try:
+            query = select(yookassa_install).where(
+                yookassa_install.c.cashbox_id == cashbox,
+                yookassa_install.c.is_deleted == False
+            )
+            oauth = await database.fetch_one(query)
+            if oauth:
+                return OauthBaseModel(**oauth)
+            else:
+                return None
+        except Exception as error:
+            raise Exception(f"ошибка БД: {str(error)}")
 
     async def update_oauth(self, cashbox: int, oauth: OauthUpdateModel):
         oauth_db_model = await self.get_oauth(cashbox)
@@ -24,7 +28,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
 
         query = update(yookassa_install).where(
             yookassa_install.c.cashbox_id == cashbox,
-            yookassa_install.c.is_delete == False
+            yookassa_install.c.is_deleted == False
         ).values(update_oauth.dict())\
             .returning(yookassa_install.c.id)
 
@@ -36,5 +40,4 @@ class YookassaOauthRepository(IYookassaOauthRepository):
 
     async def delete_oauth(self, cashbox: int):
         oauth = await self.get_oauth(cashbox)
-        print(oauth)
         await self.update_oauth(cashbox, OauthUpdateModel(**oauth.dict(), is_delete = True))

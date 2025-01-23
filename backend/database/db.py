@@ -100,6 +100,7 @@ yookassa_install = sqlalchemy.Table(
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime( timezone = True ), server_default = func.now()),
     sqlalchemy.Column("updated_at", DateTime( timezone = True ), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("is_deleted", Boolean),
 )
 
 

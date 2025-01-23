@@ -10,8 +10,8 @@ class OauthService(IOauthService):
     def __init__(
             self,
             oauth_repository: IYookassaOauthRepository,
-            request_repository = IYookassaRequestRepository,
-            get_oauth_credential_function = IGetOauthCredentialFunction
+            request_repository: IYookassaRequestRepository,
+            get_oauth_credential_function: IGetOauthCredentialFunction
     ):
 
         self.__oauth_repository = oauth_repository
@@ -19,26 +19,29 @@ class OauthService(IOauthService):
         self.__get_oauth_credential_function = get_oauth_credential_function
 
     async def oauth_link(self, cashbox: int) -> str:
+
         client_id, _ = self.__get_oauth_credential_function()
         return f'https://yookassa.ru/oauth/v2/authorize?client_id={client_id}&response_type=code&state={cashbox}'
 
     async def revoke_token(self, cashbox: int):
+
         client_id, client_secret = self.__get_oauth_credential_function()
-        try:
-            oauth = await self.__oauth_repository.get_oauth(cashbox)
-            if not oauth:
-                raise Exception("Отсутствует oauth2 по данному пользователю")
-            res = await self.__request_repository.revoke_token(token = oauth.access_token, client_id = client_id, client_secret = client_secret)
-            await self.__oauth_repository.delete_oauth(cashbox=cashbox)
-        except Exception as error:
-            print("error: ", error)
-            return error
+        oauth = await self.__oauth_repository.get_oauth(cashbox)
+
+        if not oauth:
+            raise Exception("Отсутствует oauth2 по данному пользователю")
+
+        await self.__request_repository.revoke_token(token = oauth.access_token, client_id = client_id, client_secret = client_secret)
+        await self.__oauth_repository.delete_oauth(cashbox=cashbox)
 
     async def get_access_token(self, code: str, state: int):
+
         client_id, client_secret = self.__get_oauth_credential_function()
+
         try:
             res = await self.__request_repository.token(code=code, client_id = client_id, client_secret = client_secret)
             oauth = await self.__oauth_repository.get_oauth(state)
+
             if oauth:
                 await self.__oauth_repository.update_oauth(
                     state,
@@ -47,6 +50,7 @@ class OauthService(IOauthService):
                 await self.__oauth_repository.insert_oauth(
                     state,
                     OauthBaseModel(cashbox = state, access_token = res.access_token))
+
         except Exception as error:
             raise error
 
