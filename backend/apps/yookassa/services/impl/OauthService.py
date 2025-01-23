@@ -49,7 +49,7 @@ class OauthService(IOauthService):
             else:
                 await self.__oauth_repository.insert_oauth(
                     state,
-                    OauthBaseModel(cashbox = state, access_token = res.access_token))
+                    OauthBaseModel(cashbox_id = state, access_token = res.access_token))
 
         except Exception as error:
             raise error

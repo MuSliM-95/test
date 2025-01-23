@@ -22,5 +22,5 @@ class CallbackOauthView:
         except Exception as error:
             raise HTTPException(
                 status_code = 432,
-                detail = f"ошибка при аторизации oauth2 в yookassa.ru: {str( error )}"
+                detail = f"ошибка при авторизации OAuth2 в yookassa.ru: {str(error)}"
             )

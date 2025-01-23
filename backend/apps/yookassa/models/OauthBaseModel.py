@@ -5,9 +5,9 @@ from pydantic import BaseModel
 
 
 class OauthBaseModel(BaseModel):
-    cashbox_id: int
+    cashbox_id: Optional[int] = None
     access_token: str
-    is_delete: bool = False
+    is_deleted: bool = False
 
 
 class OauthModel(OauthBaseModel):

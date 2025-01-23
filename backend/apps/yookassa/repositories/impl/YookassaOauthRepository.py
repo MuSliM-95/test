@@ -24,8 +24,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
     async def update_oauth(self, cashbox: int, oauth: OauthUpdateModel):
         oauth_db_model = await self.get_oauth(cashbox)
         update_data = oauth.dict(exclude_none = True)
-        update_oauth = oauth_db_model.copy(update_data = update_data)
-
+        update_oauth = oauth_db_model.copy(update = update_data)
         query = update(yookassa_install).where(
             yookassa_install.c.cashbox_id == cashbox,
             yookassa_install.c.is_deleted == False
@@ -35,7 +34,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
         return await database.execute(query)
 
     async def insert_oauth(self, cashbox: int, oauth: OauthBaseModel):
-        query = insert(yookassa_install).values(OauthBaseModel.dict()).returning(yookassa_install.c.id)
+        query = insert(yookassa_install).values(oauth.dict()).returning(yookassa_install.c.id)
         return await database.execute(query)
 
     async def delete_oauth(self, cashbox: int):
