@@ -95,6 +95,7 @@ from apps.evotor.routes import router as evotor_router
 from apps.module_bank.routes import router as module_bank_router
 from apps.booking.routers import router as booking_router
 from api.settings.amo_triggers.routers import router as triggers_router
+from api.trigger_notification.routers import router as triggers_notification
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
@@ -121,6 +122,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(triggers_notification)
 app.include_router(triggers_router)
 app.include_router(booking_router)
 app.include_router(evotor_router)

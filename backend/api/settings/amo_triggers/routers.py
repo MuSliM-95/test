@@ -1,12 +1,10 @@
-import json
-
 from fastapi import APIRouter, Request, Depends, HTTPException, Response
 from sqlalchemy import select, func, desc, case, and_, text, asc, update
-from database.db import database, amo_bots, table_triggers, table_triggers_events
+from database.db import database, amo_bots, table_triggers, table_triggers_events, amo_install_table_cashboxes
 from . import schemas
 from functions.helpers import get_user_by_token
 import uuid
-from database.enums import TriggerType, TriggerTime
+from database.enums import TriggerTime
 
 
 router = APIRouter(tags = ["amo_triggers"], prefix = "/settings")
@@ -27,7 +25,15 @@ async def get_triggers_list(token: str, limit: int = 5, offset: int = 0, user = 
         triggers = [
             schemas.ViewTrigger(**{
                 **trigger,
-                "amo_bot": await database.fetch_one(select(amo_bots).where(amo_bots.c.id == trigger.get("amo_bots_id"))),
+                "amo_bot": await database.fetch_one(
+                    select(amo_bots) \
+                    .join(amo_install_table_cashboxes,
+                               amo_install_table_cashboxes.c.amo_install_group_id == amo_bots.c.install_group_id) \
+                    .where(
+                        amo_bots.c.id == trigger.get("amo_bots_id"),
+                        amo_install_table_cashboxes.c.cashbox_id == user.get('cashbox_id')
+                           )
+                ),
                 "time": trigger.get("time")/60 if trigger.get("time_variant") == TriggerTime.minute
                     else trigger.get("time")/3600 if trigger.get("time_variant") == TriggerTime.hour
                     else trigger.get("time")/86400 if trigger.get("time_variant") == TriggerTime.day
@@ -51,7 +57,11 @@ async def get_amo_bots(token: str, filter: schemas.Filtersamobot = Depends(), us
     try:
         if filter.name:
             filters.append(amo_bots.c.name.ilike(f"%{filter.name}%"))
-        query = select(amo_bots).where(amo_bots.c.cashbox_id == user.get('cashbox_id')).filter(*filters)
+        query = select(amo_bots)\
+            .select_from(amo_bots)\
+            .join(amo_install_table_cashboxes,
+                  amo_install_table_cashboxes.c.amo_install_group_id == amo_bots.c.install_group_id)\
+            .where(amo_install_table_cashboxes.c.cashbox_id == user.get('cashbox_id')).filter(*filters).limit(5)
         bots = await database.fetch_all(query)
         return bots
     except Exception as e:
@@ -104,7 +114,6 @@ async def patch_trigger(token: str, idx: int, trigger: schemas.PatchTrigger, use
             else:
                 updated_item = {**stored_item_model.copy(update = update_data).dict()}
 
-            print(updated_item)
             await database.execute(update(table_triggers).values(
                 {**updated_item
                  }
