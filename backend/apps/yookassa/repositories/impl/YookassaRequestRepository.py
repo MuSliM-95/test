@@ -29,6 +29,10 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                     raise Exception(res)
                 return res
 
-    async def get_payments(self):
-        pass
-
+    async def get_payments(self, access_token: str):
+        async with aiohttp.ClientSession(
+            base_url = "https://api.yookassa.ru",
+            headers = {"Authorization": f"Bearer {access_token}"}
+        ) as http:
+            async with http.post(url = "/3/payments", data = {}) as r:
+                print(r.status)
