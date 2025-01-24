@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Literal, Union
 
 
 class AmountModel(BaseModel):
@@ -44,6 +44,22 @@ class InvoiceDetails(BaseModel):
     id: str = None
 
 
+class CardBank(BaseModel):
+    number: str
+    expiry_year: str
+    expiry_month: str
+
+
+class MethodBankCard(BaseModel):
+    type: Literal["bank_card"]
+    card: CardBank
+
+
+class MethodSbp(BaseModel):
+    type: Literal["sbp"]
+
+
+
 class PaymentCreateModel(BaseModel):
     amount: AmountModel
     description: str = None
@@ -51,6 +67,8 @@ class PaymentCreateModel(BaseModel):
     tax_system_code: int = None
     capture: bool = None
     merchant_customer_id: str = None
+    payment_method_data: Union[MethodBankCard, MethodSbp] = None
+    test: bool = True
 
 
 class PaymentBaseModel(PaymentCreateModel):
