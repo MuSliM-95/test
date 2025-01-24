@@ -52,11 +52,20 @@ class CardBank(BaseModel):
 
 class MethodBankCard(BaseModel):
     type: Literal["bank_card"]
-    card: CardBank
+    card: CardBank = None
 
 
 class MethodSbp(BaseModel):
     type: Literal["sbp"]
+
+
+class ConfirmationRedirect(BaseModel):
+    type: Literal["redirect"]
+    return_url: str
+
+
+class ConfirmationEmbedded(BaseModel):
+    type: Literal["embedded"]
 
 
 
@@ -69,6 +78,7 @@ class PaymentCreateModel(BaseModel):
     merchant_customer_id: str = None
     payment_method_data: Union[MethodBankCard, MethodSbp] = None
     test: bool = True
+    confirmation: Union[ConfirmationRedirect, ConfirmationEmbedded] = None
 
 
 class PaymentBaseModel(PaymentCreateModel):
