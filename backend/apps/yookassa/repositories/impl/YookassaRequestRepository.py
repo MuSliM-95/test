@@ -33,7 +33,7 @@ class YookassaRequestRepository(IYookassaRequestRepository):
     async def create_payments(self, access_token: str, payment: PaymentCreateModel):
         async with aiohttp.ClientSession(
             base_url = "https://api.yookassa.ru",
-            headers = {"Authorization": f"Bearer {access_token}"}
+            auth = BasicAuth(login = "1020107", password = access_token)
         ) as http:
             async with http.post(url = "/3/payments", data = payment) as r:
                 print(r.status)
