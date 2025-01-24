@@ -1,6 +1,7 @@
 
 from aiohttp import BasicAuth
 
+from apps.yookassa.models.PaymentModel import PaymentCreateModel
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 import aiohttp
 
@@ -29,10 +30,10 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                     raise Exception(res)
                 return res
 
-    async def get_payments(self, access_token: str):
+    async def create_payments(self, access_token: str, payment: PaymentCreateModel):
         async with aiohttp.ClientSession(
             base_url = "https://api.yookassa.ru",
             headers = {"Authorization": f"Bearer {access_token}"}
         ) as http:
-            async with http.post(url = "/3/payments", data = {}) as r:
+            async with http.post(url = "/3/payments", data = payment) as r:
                 print(r.status)
