@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, BeforeValidator
 from typing import List, Optional, Union, Annotated
 
@@ -33,6 +35,15 @@ class ReceiptModel(BaseModel):
     items: List[ItemModel]
 
 
+class RecipientModel(BaseModel):
+    account_id: str
+    gateway_id: str
+
+
+class InvoiceDetails(BaseModel):
+    id: str = None
+
+
 class PaymentCreateModel(BaseModel):
     amount: AmountModel
     description: str = None
@@ -45,6 +56,18 @@ class PaymentCreateModel(BaseModel):
 class PaymentBaseModel(PaymentCreateModel):
     id: str
     status: str
+    amount: AmountModel
+    income_amount: AmountModel
+    description: str = None
+    recipient: RecipientModel
+    captured_at: datetime = None
+    created_at: datetime
+    expires_at: datetime = None
+    test: bool
+    refundable: bool
+    receipt_registration: str
+    merchant_customer_id: str = None
+    invoice_details: InvoiceDetails = None
 
 
 
