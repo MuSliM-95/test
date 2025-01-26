@@ -1541,6 +1541,13 @@ amo_table_contacts = sqlalchemy.Table(
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
     sqlalchemy.Column("is_main", Boolean, server_default="true", nullable=False),
+    UniqueConstraint('amo_id'),
+    sqlalchemy.Index(
+        'uq_table_id_main',
+        'table_id',
+        unique=True,
+        postgresql_where=sqlalchemy.Column('is_main') == True
+    ),
     extend_existing=True
 )
 
