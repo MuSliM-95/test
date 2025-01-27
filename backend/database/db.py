@@ -90,12 +90,27 @@ class BookingEventStatus(str, ENUM):
 
 metadata = sqlalchemy.MetaData()
 
+
+yookassa_install = sqlalchemy.Table(
+    "yookassa_install",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key = True, index = True, autoincrement = True),
+    sqlalchemy.Column("access_token", String),
+    sqlalchemy.Column("expires_in", String),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("created_at", DateTime( timezone = True ), server_default = func.now()),
+    sqlalchemy.Column("updated_at", DateTime( timezone = True ), server_default = func.now(), onupdate = func.now()),
+    sqlalchemy.Column("is_deleted", Boolean),
+)
+
+
 booking_tags = sqlalchemy.Table(
     "booking_tags",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
     sqlalchemy.Column("booking_id", Integer, ForeignKey("bookikng.id")),
     sqlalchemy.Column("name", String, nullable=False)
+
 )
 
 booking = sqlalchemy.Table(
