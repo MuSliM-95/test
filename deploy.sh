@@ -60,6 +60,8 @@ deploy_new_version() {
     -e CHEQUES_TOKEN=$CHEQUES_TOKEN \
     -e ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL \
     -e ADMIN_ID=$ADMIN_ID \
+    -e YOOKASSA_OAUTH_APP_CLIENT_ID=$YOOKASSA_OAUTH_APP_CLIENT_ID \
+    -e YOOKASSA_OAUTH_APP_CLIENT_SECRET=$YOOKASSA_OAUTH_APP_CLIENT_SECRET \
     $IMAGE_NAME \
     /bin/bash -c "uvicorn main:app --host=0.0.0.0 --port 8000 --log-level=info"
 
