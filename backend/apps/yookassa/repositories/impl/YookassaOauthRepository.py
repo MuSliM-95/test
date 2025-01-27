@@ -17,7 +17,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
             if oauth:
                 return OauthBaseModel(**oauth)
             else:
-                return None
+                raise Exception("не найдена активная oauth2 c yookassa у пользователя")
         except Exception as error:
             raise Exception(f"ошибка БД: {str(error)}")
 

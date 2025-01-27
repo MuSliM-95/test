@@ -14,6 +14,9 @@ class YookassaApiService(IYookassaApiService):
         self.__request_repository = request_repository
         self.__oauth_repository = oauth_repository
 
-    async def api_create_payment(self, cashbox: int, payment: PaymentCreateModel) -> None:
-        oauth = await self.__oauth_repository.get_oauth(cashbox)
-        await self.__request_repository.create_payments(access_token = oauth.access_token, payment = payment)
+    async def api_create_payment(self, cashbox: int, payment: PaymentCreateModel):
+        try:
+            oauth = await self.__oauth_repository.get_oauth(cashbox)
+            return await self.__request_repository.create_payments(access_token = oauth.access_token, payment = payment)
+        except Exception as error:
+            raise Exception(f"ошибка создаия платежа: {str(error)}")
