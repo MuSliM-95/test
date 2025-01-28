@@ -2,7 +2,7 @@ import uuid
 
 from aiohttp import BasicAuth
 
-from apps.yookassa.models.PaymentModel import PaymentCreateModel
+from apps.yookassa.models.PaymentModel import PaymentCreateModel, PaymentBaseModel
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 import aiohttp
 import json
@@ -33,13 +33,16 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                     raise Exception(res)
                 return res
 
-    async def create_payments(self, access_token: str, payment: PaymentCreateModel):
+    async def create_payments(self, access_token: str, payment: PaymentCreateModel) -> PaymentBaseModel:
         payment_dict = payment.dict(exclude_none = True)
         async with aiohttp.ClientSession(
             base_url = "https://api.yookassa.ru",
             auth = BasicAuth(login = "1020107", password = access_token),
             headers = {"Content-Type": "application/json", "Idempotence-Key": str(uuid.uuid4())}
         ) as http:
-            async with http.post(url = "/v3/payments", data = json.dumps(payment_dict)) as r:
-                res = await r.json()
-                return res
+            try:
+                async with http.post(url = "/v3/payments", data = json.dumps(payment_dict)) as r:
+                    res = await r.json()
+                    return res
+            except Exception as error:
+                raise Exception(f"ошибка POST запроса к yookassa: {str(error)}")
