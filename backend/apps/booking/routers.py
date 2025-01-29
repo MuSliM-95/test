@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
     amo_leads, booking_tags, contragents, booking_events
-from sqlalchemy import or_, and_, select, func, desc
+from sqlalchemy import or_, and_, select, func, desc, update
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
     BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate, BookingFiltersList, BookingCreate
@@ -102,6 +102,7 @@ async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
             .outerjoin(tags_subquery, tags_subquery.c.booking_id == booking.c.id)  # Левое соединение с тегами
             .where(
                 booking.c.cashbox == user.cashbox_id,
+                booking.c.is_deleted.is_not(True),
                 *filter_result
             )
         )
@@ -126,7 +127,6 @@ async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
                 .select_from(booking_nomenclature)
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
             list_result.append({**item, "goods": list(map(dict, goods))})
-        print(list_result)
         return list_result
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
@@ -154,7 +154,6 @@ async def get_booking_by_idx(token: str, idx: int):
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
         dict_result = dict(result)
         dict_result['goods'] = list(map(dict, goods))
-        print(dict_result)
         return dict_result
     else:
         raise HTTPException(status_code = 404, detail = "not found")
@@ -370,5 +369,30 @@ async def create_booking(token: str, bookings: BookingEditList):
                                 response)
                             )
 
+    except Exception as e:
+        raise HTTPException(status_code = 432, detail = str(e))
+
+
+@database.transaction()
+@router.delete("/booking/{idx}")
+async def delete_booking(token: str, idx: int):
+    try:
+        user = await get_user_by_token(token)
+        booking_db = await database.fetch_one(
+            select(booking).where(and_(booking.c.id == idx, booking.c.cashbox == user.get("cashbox_id"))))
+        query_delete = \
+            update(booking).\
+            where(and_(booking.c.id == idx, booking.c.cashbox == user.get("cashbox_id"))).\
+            values({**dict(booking_db), "is_deleted": True}).returning(booking)
+
+        await database.execute(query_delete)
+        return JSONResponse(status_code = 200,
+                            content = jsonable_encoder(
+                                {
+                                    "status": "success delete",
+                                    "item": {**dict(booking_db), "is_deleted": True}
+                                }
+                            )
+                            )
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
