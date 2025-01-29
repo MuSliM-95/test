@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from api.pictures.routers import get_picture_link_by_id
-from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales,\
+from database.db import database, booking, users, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales,\
     amo_leads, booking_tags, contragents, booking_events, booking_events_photo, pictures
 from sqlalchemy import or_, and_, select, func, desc, update
 from functions.helpers import get_user_by_token
@@ -66,9 +66,12 @@ async def create_filters_list(filters: BookingFiltersList):
 async def get_events_by_nomenclature(token: str, idx: int, limit: int = 5, offset: int = 0):
     await get_user_by_token(token)
     try:
-        query = booking_events.select().\
+        query = select(booking_events, users.c.first_name,  users.c.last_name).\
             select_from(booking_events).\
-            join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)\
+            join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id).\
+            join(booking, booking.c.id == booking_nomenclature.c.booking_id)\
+            .select_from(booking).\
+            join(users, users.c.id == booking.c.booking_driver_id)\
             .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at))
         events_list = await database.fetch_all(query.limit(limit).offset(offset))
 
@@ -78,16 +81,22 @@ async def get_events_by_nomenclature(token: str, idx: int, limit: int = 5, offse
                 select(pictures.c.id, pictures.c.url).
                 join(pictures, booking_events_photo.c.photo_id == pictures.c.id).
                 where(booking_events_photo.c.booking_event_id == event.get("id")))
-            print([dict(photo) for photo in photo_event])
+
+            driver = {"first_name": event.get("first_name"), "last_name": event.get("last_name")}
+            event = dict(event)
+            del event["first_name"]
+            del event["last_name"]
             events_list_photo.append(
                 {
-                    **event,
+
+                    "driver": driver,
                     "photo": [
                         {
                             "id": photo.get("id"),
                             "name": photo.get("url").split("/")[1],
                             "url": (await get_picture_link_by_id(photo.get("url").split("/")[1])).get("data").get("url")
-                        } for photo in photo_event if photo is not None]
+                        } for photo in photo_event if photo is not None],
+                    **event,
                 }
             )
 
