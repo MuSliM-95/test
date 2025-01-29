@@ -3,8 +3,10 @@ from logging import exception
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
-    amo_leads, booking_tags, contragents, booking_events
+
+from api.pictures.routers import get_picture_link_by_id
+from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales,\
+    amo_leads, booking_tags, contragents, booking_events, booking_events_photo, pictures
 from sqlalchemy import or_, and_, select, func, desc, update
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
@@ -69,8 +71,28 @@ async def get_events_by_nomenclature(token: str, idx: int, limit: int = 5, offse
             join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)\
             .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at))
         events_list = await database.fetch_all(query.limit(limit).offset(offset))
+
+        events_list_photo = []
+        for event in events_list:
+            photo_event = await database.fetch_all(
+                select(pictures.c.id, pictures.c.url).
+                join(pictures, booking_events_photo.c.photo_id == pictures.c.id).
+                where(booking_events_photo.c.booking_event_id == event.get("id")))
+            print([dict(photo) for photo in photo_event])
+            events_list_photo.append(
+                {
+                    **event,
+                    "photo": [
+                        {
+                            "id": photo.get("id"),
+                            "name": photo.get("url").split("/")[1],
+                            "url": (await get_picture_link_by_id(photo.get("url").split("/")[1])).get("data").get("url")
+                        } for photo in photo_event if photo is not None]
+                }
+            )
+
         total = await database.fetch_val(select(func.count()).select_from(query))
-        return {"items": events_list, "pageSize": limit, "total": total}
+        return {"items": events_list_photo, "pageSize": limit, "total": total}
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
 
