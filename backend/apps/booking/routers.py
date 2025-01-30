@@ -3,9 +3,11 @@ from logging import exception
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from database.db import database, booking, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales, \
-    amo_leads, booking_tags, contragents, booking_events
-from sqlalchemy import or_, and_, select, func, desc
+
+from api.pictures.routers import get_picture_link_by_id
+from database.db import database, booking, users, booking_nomenclature, nomenclature, amo_leads_docs_sales_mapping, docs_sales,\
+    amo_leads, booking_tags, contragents, booking_events, booking_events_photo, pictures
+from sqlalchemy import or_, and_, select, func, desc, update
 from functions.helpers import get_user_by_token
 from apps.booking.schemas import ResponseCreate, BookingList, Booking, BookingCreateList, BookingEdit, \
     BookingEditList, NomenclatureBookingEdit, NomenclatureBookingCreate, BookingFiltersList, BookingCreate
@@ -63,16 +65,41 @@ async def create_filters_list(filters: BookingFiltersList):
 @router.get("/booking/events/nomenclature/{idx}")
 async def get_events_by_nomenclature(token: str, idx: int, limit: int = 5, offset: int = 0):
     await get_user_by_token(token)
-    try:
-        query = booking_events.select().\
-            select_from(booking_events).\
-            join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)\
-            .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at))
-        events_list = await database.fetch_all(query.limit(limit).offset(offset))
-        total = await database.fetch_val(select(func.count()).select_from(query))
-        return {"items": events_list, "pageSize": limit, "total": total}
-    except Exception as e:
-        raise HTTPException(status_code = 432, detail = str(e))
+
+    query = select(booking_events, users.c.first_name,  users.c.last_name).\
+        select_from(booking_events).\
+        join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id).\
+        join(booking, booking.c.id == booking_nomenclature.c.booking_id)\
+        .select_from(booking).\
+        join(users, users.c.id == booking.c.booking_driver_id)\
+        .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at))
+    events_list = await database.fetch_all(query.limit(limit).offset(offset))
+
+    photo_event = await database.fetch_all(
+            select(pictures.c.id, pictures.c.url, booking_events_photo.c.booking_event_id).
+            join(pictures, booking_events_photo.c.photo_id == pictures.c.id).
+            where(booking_events_photo.c.booking_event_id.in_([event.id for event in events_list])))
+    events_list_photo = []
+    for event in events_list:
+        driver = {"first_name": event.get("first_name"), "last_name": event.get("last_name")}
+        event = dict(event)
+        del event["first_name"]
+        del event["last_name"]
+        events_list_photo.append(
+            {
+                "driver": driver,
+                "photo": [
+                    {
+                        "id": photo.get("id"),
+                        "name": photo.get("url").split("/")[1],
+                        "url": (await get_picture_link_by_id(photo.get("url").split("/")[1])).get("data").get("url")
+                    } for photo in photo_event if photo.get("booking_event_id") == event.get("id")],
+                **event,
+            }
+        )
+    total = await database.fetch_val(select(func.count()).select_from(query))
+    return {"items": events_list_photo, "pageSize": limit, "total": total}
+
 
 @router.get("/booking/list", response_model = BookingList)
 async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
@@ -102,6 +129,7 @@ async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
             .outerjoin(tags_subquery, tags_subquery.c.booking_id == booking.c.id)  # Левое соединение с тегами
             .where(
                 booking.c.cashbox == user.cashbox_id,
+                booking.c.is_deleted.is_not(True),
                 *filter_result
             )
         )
@@ -126,7 +154,6 @@ async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
                 .select_from(booking_nomenclature)
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
             list_result.append({**item, "goods": list(map(dict, goods))})
-        print(list_result)
         return list_result
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
@@ -154,7 +181,6 @@ async def get_booking_by_idx(token: str, idx: int):
                 .join(nomenclature, nomenclature.c.id == booking_nomenclature.c.nomenclature_id))
         dict_result = dict(result)
         dict_result['goods'] = list(map(dict, goods))
-        print(dict_result)
         return dict_result
     else:
         raise HTTPException(status_code = 404, detail = "not found")
@@ -372,3 +398,25 @@ async def create_booking(token: str, bookings: BookingEditList):
 
     except Exception as e:
         raise HTTPException(status_code = 432, detail = str(e))
+
+
+@database.transaction()
+@router.delete("/booking/{idx}")
+async def delete_booking(token: str, idx: int):
+        user = await get_user_by_token(token)
+        booking_db = await database.fetch_one(
+            select(booking).where(and_(booking.c.id == idx, booking.c.cashbox == user.get("cashbox_id"))))
+        query_delete = \
+            update(booking).\
+            where(and_(booking.c.id == idx, booking.c.cashbox == user.get("cashbox_id"))).\
+            values({"is_deleted": True}).returning(booking)
+
+        await database.execute(query_delete)
+        return JSONResponse(status_code = 200,
+                            content = jsonable_encoder(
+                                {
+                                    "status": "success delete",
+                                    "item": {**dict(booking_db), "is_deleted": True}
+                                }
+                            )
+                            )
