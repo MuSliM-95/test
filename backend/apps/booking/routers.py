@@ -65,45 +65,41 @@ async def create_filters_list(filters: BookingFiltersList):
 @router.get("/booking/events/nomenclature/{idx}")
 async def get_events_by_nomenclature(token: str, idx: int, limit: int = 5, offset: int = 0):
     await get_user_by_token(token)
-    try:
-        query = select(booking_events, users.c.first_name,  users.c.last_name).\
-            select_from(booking_events).\
-            join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id).\
-            join(booking, booking.c.id == booking_nomenclature.c.booking_id)\
-            .select_from(booking).\
-            join(users, users.c.id == booking.c.booking_driver_id)\
-            .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at))
-        events_list = await database.fetch_all(query.limit(limit).offset(offset))
 
-        events_list_photo = []
-        for event in events_list:
-            photo_event = await database.fetch_all(
-                select(pictures.c.id, pictures.c.url).
-                join(pictures, booking_events_photo.c.photo_id == pictures.c.id).
-                where(booking_events_photo.c.booking_event_id == event.get("id")))
+    query = select(booking_events, users.c.first_name,  users.c.last_name).\
+        select_from(booking_events).\
+        join(booking_nomenclature, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id).\
+        join(booking, booking.c.id == booking_nomenclature.c.booking_id)\
+        .select_from(booking).\
+        join(users, users.c.id == booking.c.booking_driver_id)\
+        .where(booking_nomenclature.c.nomenclature_id == idx).order_by(desc(booking_events.c.created_at))
+    events_list = await database.fetch_all(query.limit(limit).offset(offset))
 
-            driver = {"first_name": event.get("first_name"), "last_name": event.get("last_name")}
-            event = dict(event)
-            del event["first_name"]
-            del event["last_name"]
-            events_list_photo.append(
-                {
+    photo_event = await database.fetch_all(
+            select(pictures.c.id, pictures.c.url, booking_events_photo.c.booking_event_id).
+            join(pictures, booking_events_photo.c.photo_id == pictures.c.id).
+            where(booking_events_photo.c.booking_event_id.in_([event.id for event in events_list])))
+    events_list_photo = []
+    for event in events_list:
+        driver = {"first_name": event.get("first_name"), "last_name": event.get("last_name")}
+        event = dict(event)
+        del event["first_name"]
+        del event["last_name"]
+        events_list_photo.append(
+            {
+                "driver": driver,
+                "photo": [
+                    {
+                        "id": photo.get("id"),
+                        "name": photo.get("url").split("/")[1],
+                        "url": (await get_picture_link_by_id(photo.get("url").split("/")[1])).get("data").get("url")
+                    } for photo in photo_event if photo.get("booking_event_id") == event.get("id")],
+                **event,
+            }
+        )
+    total = await database.fetch_val(select(func.count()).select_from(query))
+    return {"items": events_list_photo, "pageSize": limit, "total": total}
 
-                    "driver": driver,
-                    "photo": [
-                        {
-                            "id": photo.get("id"),
-                            "name": photo.get("url").split("/")[1],
-                            "url": (await get_picture_link_by_id(photo.get("url").split("/")[1])).get("data").get("url")
-                        } for photo in photo_event if photo is not None],
-                    **event,
-                }
-            )
-
-        total = await database.fetch_val(select(func.count()).select_from(query))
-        return {"items": events_list_photo, "pageSize": limit, "total": total}
-    except Exception as e:
-        raise HTTPException(status_code = 432, detail = str(e))
 
 @router.get("/booking/list", response_model = BookingList)
 async def get_list_booking(token: str, filters: BookingFiltersList = Depends()):
@@ -407,14 +403,13 @@ async def create_booking(token: str, bookings: BookingEditList):
 @database.transaction()
 @router.delete("/booking/{idx}")
 async def delete_booking(token: str, idx: int):
-    try:
         user = await get_user_by_token(token)
         booking_db = await database.fetch_one(
             select(booking).where(and_(booking.c.id == idx, booking.c.cashbox == user.get("cashbox_id"))))
         query_delete = \
             update(booking).\
             where(and_(booking.c.id == idx, booking.c.cashbox == user.get("cashbox_id"))).\
-            values({**dict(booking_db), "is_deleted": True}).returning(booking)
+            values({"is_deleted": True}).returning(booking)
 
         await database.execute(query_delete)
         return JSONResponse(status_code = 200,
@@ -425,5 +420,3 @@ async def delete_booking(token: str, idx: int):
                                 }
                             )
                             )
-    except Exception as e:
-        raise HTTPException(status_code = 432, detail = str(e))
