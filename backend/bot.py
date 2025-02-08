@@ -1,8 +1,10 @@
+import io
+
 import asyncio
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from typing import Optional
 
@@ -14,6 +16,7 @@ from aiogram.dispatcher.fsm.context import FSMContext
 from aiogram.types import PhotoSize, ContentType
 from sqlalchemy import and_
 
+
 import texts
 from api.articles.routers import new_article
 from api.articles.schemas import ArticleCreate
@@ -23,6 +26,7 @@ from api.payments.routers import create_payment
 from api.payments.schemas import PaymentCreate
 from api.pboxes.routers import create_paybox
 from api.pboxes.schemas import PayboxesCreate
+
 from const import DEMO, cheque_service_url
 import re
 
@@ -32,6 +36,8 @@ from database.db import database, cboxes, users, users_cboxes_relation, accounts
 from functions.cboxes import create_cbox, join_cbox
 from functions.helpers import gen_token
 from producer import produce_message
+
+from bot_routes.bills import get_bill_route
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(os.environ.get("TG_TOKEN"), parse_mode="HTML")
@@ -501,7 +507,8 @@ async def create_payment_from_cheque(cheque_info: dict, cbox) -> int:
 
 
 @router_comm.message(content_types=["photo"], state=Form.cheque_picture)
-async def new_cheque_pic(message: types.Message, state: FSMContext):
+async def new_cheque_pic(message: types.Message, state: FSMContext):\
+
     """
     New cheque picture
     :param message: Telegram message instance
@@ -925,7 +932,6 @@ async def message_to_chat_by_id(chat_id: str, message: str, picture):
         return False
     return True
 
-
 @router_add_migrate.message(F.migrate_to_chat_id)
 async def group_to_supegroup_migration(message: types.Message):
     query = users.update().where(users.c.chat_id == str(message.chat.id)).values(
@@ -945,7 +951,9 @@ async def main():
     dp = Dispatcher()
 
     await database.connect()
+    router = get_bill_route(bot)
     # Register handlers
+    dp.include_router(router)
     dp.include_router(router_comm)
     dp.include_router(router_add_migrate)
 
