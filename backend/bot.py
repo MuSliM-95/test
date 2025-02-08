@@ -507,8 +507,7 @@ async def create_payment_from_cheque(cheque_info: dict, cbox) -> int:
 
 
 @router_comm.message(content_types=["photo"], state=Form.cheque_picture)
-async def new_cheque_pic(message: types.Message, state: FSMContext):\
-
+async def new_cheque_pic(message: types.Message, state: FSMContext):
     """
     New cheque picture
     :param message: Telegram message instance
