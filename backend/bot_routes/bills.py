@@ -1,40 +1,25 @@
-import io
+
 import re
-import asyncio
 import logging
 import os
 import pytz
 import json
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from io import BytesIO
-from typing import Optional
+from datetime import datetime
 
-import pdfplumber
-import fitz
-import pytesseract
-from PIL import Image
-import tempfile
-from aiogram import Bot, Dispatcher, Router, types, F
+
+
+from aiogram import  Router, types, F
 from aiogram.client.session import aiohttp
-from aiogram.dispatcher.filters.command import CommandObject
+
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
-from aiogram.types import PhotoSize, ContentType
-from sqlalchemy import and_
 
-from database.db import database, bills, users
-from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
+from database.db import database,  users
+
 from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
 from bot_routes.pdf_reader import extract_text_from_pdf_images
 from bot_routes.bills_model import CreateBillData, UpdateBillData, CreateBillApproverData, UpdateBillApproverData, BillApproveStatus, BillStatus, get_approve_by_id_and_approver, get_approvers_by_bill, check_user_permissions, create_bill, format_bill_notification, get_bill, update_bill_status, update_bill, create_bill_approver, update_bill_approve
-
-
-import torch
-from transformers import pipeline
-
-
 
 timezone = pytz.timezone("Europe/Moscow")
 
@@ -44,87 +29,109 @@ class BillDateForm(StatesGroup):
     waiting_for_date = State()
 
 
-
-# Load the NER pipeline (replace with your chosen model)
-try:
-    ner_pipeline = pipeline("ner", model="DeepPavlov/rubert-base-cased", device=0 if torch.cuda.is_available() else -1)
-except Exception as e:
-    logging.exception("Failed to load NER pipeline")
-    ner_pipeline = None  # Set to None if loading fails
-
-async def extract_data_with_ner(text: str) -> dict:
+def convert_unicode_to_text(text):
     """
-    Extracts data from the text using a local NER pipeline.
-    """
-    if ner_pipeline is None:
-        logging.warning("NER pipeline is not available.")
-        return {}
-
-    try:
-        entities = ner_pipeline(text)
-        return {"entities": entities}
-    except Exception as e:
-        logging.exception("Error during NER extraction")
-        return {}
-
-def map_ner_entities_to_bill_data(ner_data: dict) -> dict:
-    """
-    Maps the extracted NER entities to the bill data structure.
-    This function needs to be adapted based on the specific NER model
-    and the entities it extracts.
-    """
-    bill_data = {}
-    # Example mapping (adjust based on your NER model's output)
-    for entity in ner_data.get("entities", []):
-        if entity["entity"] == "I-ORG" and "counterpartyName" not in bill_data:
-            bill_data["counterpartyName"] = entity["word"]
-        elif entity["entity"] == "I-PER" and "payerName" not in bill_data:
-            bill_data["payerName"] = entity["word"]
-        # Add more mappings based on your NER model's output and the
-        # desired bill data fields.
-    return bill_data
-
-def format_bill_data(bill_data):
-    """
-    Formats bill data extracted by the extract_data function into a human-readable string.
+    Converts Unicode escape sequences (like \\u0418) in a string to human-readable text.
+    Handles different input types (string, bytes).
 
     Args:
-        bill_data: A dictionary containing bill information, as returned by extract_data.
+        text: The string or bytes containing Unicode escape sequences.
 
     Returns:
-        A string representation of the bill data.
+        The string with Unicode escape sequences converted to text.
     """
-    lines = []
+    if isinstance(text, bytes):
+        text = text.decode('utf-8')  # Decode bytes to string
 
-    lines.append(f"Account Code: {bill_data.get('accountCode')}")
-    lines.append(f"Bank Code: {bill_data.get('bankCode')}")
-    lines.append(f"Payer INN: {bill_data.get('payerINN')}")
-    lines.append(f"Payer KPP: {bill_data.get('payerKPP')}")
-    lines.append(f"Counterparty Bank BIC: {bill_data.get('counterpartyBankBic')}")
-    lines.append(f"Counterparty Account Number: {bill_data.get('counterpartyAccountNumber')}")
-    lines.append(f"Counterparty INN: {bill_data.get('counterpartyINN')}")
-    lines.append(f"Counterparty KPP: {bill_data.get('counterpartyKPP')}")
-    lines.append(f"Counterparty Name: {bill_data.get('counterpartyName')}")
-    lines.append(f"Counterparty Bank Corr Account: {bill_data.get('counterpartyBankCorrAccount')}")
-    lines.append(f"Payment Amount: {bill_data.get('paymentAmount')}")
-    lines.append(f"Payment Date: {bill_data.get('paymentDate')}")
-    lines.append(f"Payment Number: {bill_data.get('paymentNumber')}")
-    lines.append(f"Payment Priority: {bill_data.get('paymentPriority')}")
-    lines.append(f"Payment Purpose: {bill_data.get('paymentPurpose')}")
-    lines.append(f"Code Purpose: {bill_data.get('codePurpose')}")
-    lines.append(f"Supplier Bill ID: {bill_data.get('supplierBillId')}")
-    lines.append(f"Tax Info Document Date: {bill_data.get('taxInfoDocumentDate')}")
-    lines.append(f"Tax Info Document Number: {bill_data.get('taxInfoDocumentNumber')}")
-    lines.append(f"Tax Info KBK: {bill_data.get('taxInfoKBK')}")
-    lines.append(f"Tax Info OKATO: {bill_data.get('taxInfoOKATO')}")
-    lines.append(f"Tax Info Period: {bill_data.get('taxInfoPeriod')}")
-    lines.append(f"Tax Info Reason Code: {bill_data.get('taxInfoReasonCode')}")
-    lines.append(f"Tax Info Status: {bill_data.get('taxInfoStatus')}")
-    lines.append(f"Budget Payment Code: {bill_data.get('budgetPaymentCode')}")
+    try:
+        return json.loads(f'"{text}"')
+    except json.JSONDecodeError:
+        # If the text is not a valid JSON string, return it as is
+        return text
+    
 
-    return "\n".join(lines)
 
-  
+def replace_newlines_with_spaces(text):
+    """Replaces all newline characters in a string with spaces.
+
+    Args:
+        text: The input string.
+
+    Returns:
+        The string with all newline characters replaced by spaces.
+    """
+    return text.replace('\n', ' ')
+
+def clean_text(text):
+    """Очищает текст от лишних символов и заменяет некоторые фразы."""
+    text = text.replace("|", "").replace("_", "").replace('—', "").replace("«", '\"').replace("»", '\"').replace("Сч. №", "Сч.№").replace("Счет на оплату №", "Счет_на_оплату_№")
+    text = text.replace("Банк получателя", "Банк_получателя").replace("Получатель.", "Получатель").replace("Поставщик.", "Поставщик").replace("Покупатель.", "Покупатель").replace("Основание:", "Основание").replace("Товары", "Товары").replace("Итого:", "Итого")
+    text = text.replace('\n', ' ')
+    text = text.replace('[', '').replace(']', '')
+    return replace_newlines_with_spaces(text)
+
+def extract_sections(text, sections, join=False):
+    """Разделяет текст на секции на основе ключевых слов."""
+    #words = re.findall(r'[^,\s]+(?: [^,\s]+)*', text)
+    words = re.findall(r'\"(.*?)\"|(\S+)', text)
+    words = [w[0] if w[0] else w[1] for w in words]
+
+    result = {section: {"words": []} for section in sections}  # Initialize "words" key
+
+    current_section = None
+
+    for word in words:
+        if word in sections:
+            current_section = word
+        elif current_section:
+            result[current_section]["words"].append(word)
+    if join:
+        for result_section, section_data in result.items():
+            section_data["words"] = ' '.join(section_data["words"])
+    return result
+
+
+
+def process_text(text):
+    """Обрабатывает текст счета, разделяя его на секции."""
+    cleaned_text = clean_text(text)
+
+    sections = {"Банк_получателя": {"words": [], "keys": ["ИНН", "БИК", "КПП", 'Сч.№', "ИП", "ПАО", "ООО"], "single_line": False}, 
+                "Получатель": {"words": [], "keys": ['Счет_на_оплату_№', 'Город'], "single_line": False},
+                "Поставщик":{"words": [], "keys": ["ИНН", "КПП", 'Сч.№', "ИП", "ПАО", "ООО"], "single_line": False},
+                "Покупатель":{"words": [], "keys": ["ИНН", "КПП", 'Сч.№', "ИП", "ПАО", "ООО"], "single_line": False},
+                "Основание":{"words": [], "keys": [], "single_line": True},
+               
+                "Итого":{"words": [], "keys": [], "single_line": True},
+               }
+
+    result = extract_sections(cleaned_text, sections, join=True)
+    for section, data in result.items():
+        data_words = data.get("words", [])
+        words = extract_sections(data_words, sections[section]["keys"])
+        data["words_parsed"] = words
+    bank = result.get("Банк_получателя", {}).get("words_parsed", None)
+    if bank:
+        inn = bank.get("ИНН", {}).get('words', [])[0]
+        bic = bank.get("БИК", {}).get('words', [])[0]
+        сс = bank.get("Сч.№", {}).get('words', [])[0]
+        if len(bank.get("ИП", []).get('words', [])) > 0:
+            reciever_name = 'ИП' + bank.get("ИП", []).get('words', [])[0]
+        elif len(bank.get("ПАО", []).get('words', [])) > 0:
+            reciever_name = 'ПАО' + bank.get("ПАО", []).get('words', [])[0]
+        elif len(bank.get("ООО", []).get('words', [])) > 0:
+            reciever_name = 'ООО' + bank.get("ООО", []).get('words', [])[0]
+        else:
+            reciever_name = None
+    reason = result.get("Получатель", {}).get("words", '')
+    buyer = result.get("Покупатель", {}).get("words_parsed", None)
+    if buyer:
+        buyer_inn = buyer.get("ИНН", {}).get('words', [])[0].replace(",", "")
+    bill = {"inn": inn, "bic": bic, "сс": сс, "reciever_name": reciever_name, "reason": reason, "buyer_inn": buyer_inn}
+    return bill
+
+
+
 
 # Функция для создания клавиатуры
 def create_bill_action_keyboard(bill):
@@ -418,9 +425,16 @@ def get_bill_route(bot):
                         await state.set_data({'file_url': file_url})
                         bill_text = extract_text_from_pdf_images(file_bytes)
                         if bill_text:
-                            extracted_data = await extract_data_with_ner(bill_text)
-                            #formatted_bill = format_bill_data(extracted_data)
-                            await message.reply(json.dumps(extracted_data))
+                            await message.reply(bill_text)
+                            extracted_data = process_text(bill_text)              
+                            if extracted_data:
+                                print("Extracted Data:")
+                                for key, value in extracted_data.items():
+                                    print(f"{key}: {value}")
+                            else:
+                                print("Failed to extract data from the invoice.")
+                          
+                            #await message.reply(extracted_data[])
                             #for admin_id in admin_list:
                                 #await bot.send_message(admin_id, response_text)
                             await state.set_state(BillDateForm.start)
