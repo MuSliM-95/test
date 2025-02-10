@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class OauthBaseModel(BaseModel):
     cashbox_id: Optional[int] = None
-    access_token: str
+    access_token: str = None
     is_deleted: bool = False
     warehouse_id: Optional[int] = None
 
@@ -21,4 +21,11 @@ class OauthUpdateModel(OauthBaseModel):
     cashbox_id: Optional[int] = None
     access_token: Optional[str] = None
     warehouse_id: Optional[int] = None
+
+
+class OauthWarehouseModel(BaseModel):
+    warehouse_name: str = None
+    warehouse_description: str = None
+    status: bool = None
+
 

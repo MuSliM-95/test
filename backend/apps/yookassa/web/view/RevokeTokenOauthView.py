@@ -1,9 +1,6 @@
-from apps.yookassa.functions.core.IGetOauthCredentialFunction import IGetOauthCredentialFunction
 from apps.yookassa.services.core.IOauthService import IOauthService
-
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
+
 
 from functions.helpers import get_user_by_token
 

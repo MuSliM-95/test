@@ -57,4 +57,10 @@ class OauthService(IOauthService):
         except Exception as error:
             raise error
 
+    async def get_install_oauth_by_user(self, cashbox: int, warehouse: int):
+
+        install_oauth_list = await self.__oauth_repository.get_oauth_list(cashbox, warehouse)
+
+        return install_oauth_list
+
 

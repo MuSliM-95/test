@@ -1,4 +1,6 @@
-from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthModel, OauthUpdateModel
+from typing import List
+
+from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthModel, OauthUpdateModel, OauthWarehouseModel
 
 
 class IYookassaOauthRepository:
@@ -13,5 +15,8 @@ class IYookassaOauthRepository:
         raise NotImplementedError
 
     async def get_oauth(self, cashbox: int, warehouse: int) -> OauthBaseModel:
+        raise NotImplementedError
+
+    async def get_oauth_list(self, cashbox: int, warehouse: int) -> List[OauthWarehouseModel]:
         raise NotImplementedError
 

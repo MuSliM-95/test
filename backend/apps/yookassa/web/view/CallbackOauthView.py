@@ -1,7 +1,6 @@
 import base64
 import os
 
-from apps.yookassa.functions.core.IGetOauthCredentialFunction import IGetOauthCredentialFunction
 from apps.yookassa.services.core.IOauthService import IOauthService
 
 from fastapi import HTTPException

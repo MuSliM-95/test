@@ -7,3 +7,6 @@ class IOauthService:
 
     async def get_access_token(self, code: str, cashbox: int, warehouse: int):
         raise NotImplementedError
+
+    async def get_install_oauth_by_user(self, cashbox: int, warehouse: int):
+        raise NotImplementedError

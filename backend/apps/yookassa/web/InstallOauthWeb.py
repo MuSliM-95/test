@@ -8,6 +8,7 @@ from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from apps.yookassa.web.view.CallbackOauthView import CallbackOauthView
 from apps.yookassa.web.view.CreateOauthView import CreateOauthView
 from apps.yookassa.web.view.CreatePaymentApiView import CreatePaymentApiView
+from apps.yookassa.web.view.GetInstallOauthListView import GetInstallOauthListView
 from apps.yookassa.web.view.RevokeTokenOauthView import RevokeTokenOauthView
 from common.utils.ioc.ioc import ioc
 
@@ -46,9 +47,17 @@ class InstallYookassaOauthWeb:
             )
         )
 
+        get_install_oauth_list = GetInstallOauthListView(
+            oauth_service = OauthService(
+                oauth_repository = ioc.get(IYookassaOauthRepository),
+                request_repository = ioc.get(IYookassaRequestRepository),
+                get_oauth_credential_function = GetOauthCredentialFunction()
+            )
+        )
+
         app.add_api_route(
-            path = "/yookassa/install",
-            endpoint = create_oauth_view.__call__,
+            path = "/yookassa/install/list",
+            endpoint = get_install_oauth_list.__call__,
             methods = ["GET"],
             status_code = status.HTTP_200_OK,
             tags = ["yookassa"]
@@ -75,5 +84,13 @@ class InstallYookassaOauthWeb:
             endpoint = create_payment_api_view.__call__,
             methods = ["POST"],
             status_code = status.HTTP_201_CREATED,
+            tags = ["yookassa"]
+        )
+
+        app.add_api_route(
+            path = "/yookassa/install",
+            endpoint = create_oauth_view.__call__,
+            methods = ["GET"],
+            status_code = status.HTTP_200_OK,
             tags = ["yookassa"]
         )

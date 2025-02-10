@@ -1,8 +1,8 @@
-from typing import Union
+from typing import Union, List
 from sqlalchemy import select, insert, update
-from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthUpdateModel
+from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthUpdateModel, OauthWarehouseModel
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
-from database.db import yookassa_install, database
+from database.db import yookassa_install, database, warehouses
 
 
 class YookassaOauthRepository(IYookassaOauthRepository):
@@ -42,3 +42,26 @@ class YookassaOauthRepository(IYookassaOauthRepository):
     async def delete_oauth(self, cashbox: int, warehouse: int):
         oauth = await self.get_oauth(cashbox, warehouse)
         await self.update_oauth(cashbox, warehouse, OauthUpdateModel(**oauth.dict(), is_delete = True))
+
+    async def get_oauth_list(self, cashbox: int, warehouse: int) -> Union[List[OauthWarehouseModel], None]:
+        try:
+            query = select(yookassa_install, warehouses).where(
+                yookassa_install.c.cashbox_id == cashbox,
+                yookassa_install.c.warehouse_id == warehouse,
+                yookassa_install.c.is_deleted == False
+            ).select_from(yookassa_install).join(warehouses, yookassa_install.c.warehouse_id == warehouses.c.id)
+            oauth_list = await database.fetch_all(query)
+            if oauth_list:
+                return [
+                    OauthWarehouseModel(
+                        cashbox=oauth.get("cashbox_id"),
+                        warehouse_name = oauth.get("name"),
+                        warehouse_description = oauth.get("description"),
+                        status = True if oauth.get("access_token") is not None else False,
+                    )
+                    for oauth in oauth_list
+                ]
+            else:
+                return None
+        except Exception as error:
+            raise Exception(f"ошибка БД: {str( error )}")
