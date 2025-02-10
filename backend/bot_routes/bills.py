@@ -115,6 +115,51 @@ def find_corr_account(text: str, control_number) -> str:
         
         return None, text
 
+
+def process_text_rus(text):
+    text = re.sub(r'(\d)\s+(\d)', r'\1\2', text)
+    text = text.replace(' — ', ': ')
+    text = text.replace('|', ' ')
+
+    print(text)
+    patterns = {
+        "reason_2": r"([^\n]+?)\s*№(?!\d)",
+        "reason": r"Основание:\s*([^\n]+)",
+        "sum":r"на сумму\s*([\d\s]+,\d{2})",
+        "supplier": r"(?:руб\.|копеек)\s*\n\s*([А-ЯЁ\s]+)\s*\n",
+        "supplier_2": r"Поставщик:?\s*([^,\n]+?)(?:,|\s+ИНН)"
+    }
+   
+    result = {}
+   
+ 
+    result["sum"] = re.search(patterns["sum"], text).group(1) if re.search(patterns["sum"], text) else None
+    if result["sum"]:
+        text = text.replace(result["sum"], '')
+        result["sum"] = result["sum"].replace(' ', '').replace(',', '.')
+        # Will return 16000.00 as float
+        result["sum"] = float(result["sum"])
+    result["reason"] = re.search(patterns["reason"], text).group(1) if re.search(patterns["reason"], text) else None
+    if result["reason"]:
+        text = text.replace(result["reason"], '')
+    else:
+        result["reason"] = re.search(patterns["reason_2"], text).group(1) if re.search(patterns["reason_2"], text) else None
+        if result["reason"]:
+            text = text.replace(result["reason"], '')
+        else:
+            result["reason"] = None
+    supplier_match = re.search(patterns["supplier"], text)
+    if supplier_match:
+        result["supplier"] = supplier_match.group(1).strip()
+    else:
+        supplier_match = re.search(patterns["supplier_2"], text)
+        if supplier_match:
+            result["supplier"] = supplier_match.group(1).strip()
+
+    return result
+
+    
+
 def process_text_test(text):
     text = re.sub(r'(\d)\s+(\d)', r'\1\2', text)
     text = text.replace('|', ' ')
@@ -124,7 +169,7 @@ def process_text_test(text):
         "pc": r"\s(\d{20})(?!\d)",
         "inn": r"\s(\d{10,12})(?!\d)",
     }
-
+   
     result = {}
    
     result["bic"] = re.search(patterns["bic"], text).group(1) if re.search(patterns["bic"], text) else None
@@ -147,6 +192,7 @@ def process_text_test(text):
     result["inn_buyer"] = re.search(patterns["inn"], text).group(1) if re.search(patterns["inn"], text) else None
     if result["inn_buyer"]:
         text = text.replace(result["inn_buyer"], '')
+ 
 
     return result
 
@@ -556,16 +602,27 @@ def get_bill_route(bot):
                         await state.set_data({'file_url': file_url})
                         bill_text = extract_text_from_pdf_images(file_bytes)
                         if bill_text:
-                            await message.reply(bill_text)
+                            message_str = 'Invoice data:\n'
                             extracted_data = process_text_test(bill_text)              
                             if extracted_data:
-                                print("Extracted Data:")
+
                                 for key, value in extracted_data.items():
+                                    message_str += f"{key}: {value}\n"
                                     print(f"{key}: {value}")
                             else:
-                                print("Failed to extract data from the invoice.")
-                          
-                            #await message.reply(extracted_data[])
+                                print("Failed to extract data from the invoice. eng")
+                            bill_text_rus = extract_text_from_pdf_images(file_bytes, lang='rus')
+                            if bill_text_rus:
+                                await message.reply(bill_text_rus)
+                                extracted_data = process_text_rus(bill_text_rus)              
+                                if extracted_data:
+
+                                    for key, value in extracted_data.items():
+                                        message_str += f"{key}: {value}\n"
+                                        print(f"{key}: {value}")
+                                else:
+                                    print("Failed to extract data from the invoice. rus")   
+                            await message.reply(message_str)
                             #for admin_id in admin_list:
                                 #await bot.send_message(admin_id, response_text)
                             await state.set_state(BillDateForm.start)
