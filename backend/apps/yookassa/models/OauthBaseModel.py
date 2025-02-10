@@ -26,6 +26,7 @@ class OauthUpdateModel(OauthBaseModel):
 class OauthWarehouseModel(BaseModel):
     warehouse_name: str = None
     warehouse_description: str = None
+    last_update: datetime = None
     status: bool = None
 
 

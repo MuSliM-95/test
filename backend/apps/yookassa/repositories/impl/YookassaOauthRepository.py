@@ -43,11 +43,10 @@ class YookassaOauthRepository(IYookassaOauthRepository):
         oauth = await self.get_oauth(cashbox, warehouse)
         await self.update_oauth(cashbox, warehouse, OauthUpdateModel(**oauth.dict(), is_delete = True))
 
-    async def get_oauth_list(self, cashbox: int, warehouse: int) -> Union[List[OauthWarehouseModel], None]:
+    async def get_oauth_list(self, cashbox: int) -> Union[List[OauthWarehouseModel], None]:
         try:
-            query = select(yookassa_install, warehouses).where(
+            query = select(yookassa_install, warehouses.c.name, warehouses.c.description).where(
                 yookassa_install.c.cashbox_id == cashbox,
-                yookassa_install.c.warehouse_id == warehouse,
                 yookassa_install.c.is_deleted == False
             ).select_from(yookassa_install).join(warehouses, yookassa_install.c.warehouse_id == warehouses.c.id)
             oauth_list = await database.fetch_all(query)
@@ -57,6 +56,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
                         cashbox=oauth.get("cashbox_id"),
                         warehouse_name = oauth.get("name"),
                         warehouse_description = oauth.get("description"),
+                        last_update = oauth.get("updated_at"),
                         status = True if oauth.get("access_token") is not None else False,
                     )
                     for oauth in oauth_list

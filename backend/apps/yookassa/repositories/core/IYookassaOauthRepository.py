@@ -17,6 +17,6 @@ class IYookassaOauthRepository:
     async def get_oauth(self, cashbox: int, warehouse: int) -> OauthBaseModel:
         raise NotImplementedError
 
-    async def get_oauth_list(self, cashbox: int, warehouse: int) -> List[OauthWarehouseModel]:
+    async def get_oauth_list(self, cashbox: int) -> List[OauthWarehouseModel]:
         raise NotImplementedError
 
