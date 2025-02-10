@@ -31,7 +31,7 @@ def extract_text_from_pdf_images(file_bytes: bytes) -> str:
     #images  = convert_from_path(temp_pdf.name)  # This will raise an exception if the file is not a valid PDF
     extracted_text = ''
     for i, image in enumerate(images):
-        text = pytesseract.image_to_string(image, lang='rus')
+        text = pytesseract.image_to_string(image)
         extracted_text += text
     return extracted_text
             

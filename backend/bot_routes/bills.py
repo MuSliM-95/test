@@ -5,7 +5,7 @@ import os
 import pytz
 import json
 from datetime import datetime
-
+import requests
 
 
 from aiogram import  Router, types, F
@@ -13,8 +13,9 @@ from aiogram.client.session import aiohttp
 
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
-
+from typing import Dict, Any
 from database.db import database,  users
+from typing import Dict, Any
 
 from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
@@ -62,74 +63,204 @@ def replace_newlines_with_spaces(text):
     """
     return text.replace('\n', ' ')
 
-def clean_text(text):
-    """Очищает текст от лишних символов и заменяет некоторые фразы."""
-    text = text.replace("|", "").replace("_", "").replace('—', "").replace("«", '\"').replace("»", '\"').replace("Сч. №", "Сч.№").replace("Счет на оплату №", "Счет_на_оплату_№")
-    text = text.replace("Банк получателя", "Банк_получателя").replace("Получатель.", "Получатель").replace("Поставщик.", "Поставщик").replace("Покупатель.", "Покупатель").replace("Основание:", "Основание").replace("Товары", "Товары").replace("Итого:", "Итого")
-    text = text.replace('\n', ' ')
-    text = text.replace('[', '').replace(']', '')
-    return replace_newlines_with_spaces(text)
+def validate_inn(inn: str) -> bool:
+    inn = ''.join(filter(str.isdigit, inn))
+    if len(inn) not in (10, 12):
+        return False
+    
+    weights_10 = [2, 4, 10, 3, 5, 9, 4, 6, 8]
+    weights_12 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8, 0]
+    
+    try:
+        if len(inn) == 10:
+            check = sum(int(c) * w for c, w in zip(inn[:9], weights_10)) % 11 % 10
+            return check == int(inn[9])
+        else:
+            # Проверка 11-й цифры
+            check11 = sum(int(c) * w for c, w in zip(inn[:10], weights_12)) % 11 % 10
+            # Проверка 12-й цифры
+            weights_12[-1] = 8
+            check12 = sum(int(c) * w for c, w in zip(inn[:11], weights_12)) % 11 % 10
+            return check11 == int(inn[10]) and check12 == int(inn[11])
+    except:
+        return False
 
-def extract_sections(text, sections, join=False):
-    """Разделяет текст на секции на основе ключевых слов."""
-    #words = re.findall(r'[^,\s]+(?: [^,\s]+)*', text)
-    words = re.findall(r'\"(.*?)\"|(\S+)', text)
-    words = [w[0] if w[0] else w[1] for w in words]
+def validate_bic_with_corr_account(bic: str, corr_account: str) -> bool:
+    bic_digits = ''.join(filter(str.isdigit, bic)).zfill(9)
+    corr_digits = ''.join(filter(str.isdigit, corr_account)).zfill(20)
+    
+    # Последние 3 цифры БИК должны совпадать с 9-11 цифрами коррсчета
+    if len(bic_digits) != 9 or len(corr_digits) != 20:
+        return False
+    
+    return bic_digits[-3:] == corr_digits[9:12]
 
-    result = {section: {"words": []} for section in sections}  # Initialize "words" key
+def validate_bic_region(bic: str) -> bool:
+    region_code = bic[4:6]
+    return region_code in []#VALID_REGION_CODES  # Загрузить справочник регионов
 
-    current_section = None
+def normalize_number(raw: str) -> str:
+    return ''.join(filter(str.isdigit, raw))
 
-    for word in words:
-        if word in sections:
-            current_section = word
-        elif current_section:
-            result[current_section]["words"].append(word)
-    if join:
-        for result_section, section_data in result.items():
-            section_data["words"] = ' '.join(section_data["words"])
+def find_corr_account(text: str, control_number) -> str:
+    # Найти строку, содержащую "Корр. счет"
+    match = re.search(r"(\d{20})", text)
+    if match:
+        text = text.replace(match.group(1), '')
+        if match.group(1)[-3:] == control_number:
+            return match.group(1), text
+        else:
+            return find_corr_account(text, control_number)
+    else:
+        
+        return None, text
+
+def process_text_test(text):
+    text = re.sub(r'(\d)\s+(\d)', r'\1\2', text)
+    text = text.replace('|', ' ')
+    patterns = {
+        "bic": r"\s(\d{9})(?!\d)",              # БИК
+        "corr_account": r"\s(\d{20})(?!\d)",  # Корр. счет
+        "pc": r"\s(\d{20})(?!\d)",
+        "inn": r"\s(\d{10,12})(?!\d)",
+    }
+
+    result = {}
+   
+    result["bic"] = re.search(patterns["bic"], text).group(1) if re.search(patterns["bic"], text) else None
+    if result["bic"]:
+        text = text.replace(result["bic"], '')
+    corr_account, text = find_corr_account(text, result["bic"][-3:])
+
+    if corr_account:
+        result["corr_account"] = corr_account
+    else:
+        result["corr_account"] = None
+
+    result["pc"] = re.search(patterns["pc"], text).group(1) if re.search(patterns["pc"], text) else None
+    if result["pc"]:
+        text = text.replace(result["pc"], '')
+
+    result["inn_seller"] = re.search(patterns["inn"], text).group(1) if re.search(patterns["inn"], text) else None
+    if result["inn_seller"]:
+        text = text.replace(result["inn_seller"], '')
+    result["inn_buyer"] = re.search(patterns["inn"], text).group(1) if re.search(patterns["inn"], text) else None
+    if result["inn_buyer"]:
+        text = text.replace(result["inn_buyer"], '')
+
     return result
 
-
+    
 
 def process_text(text):
-    """Обрабатывает текст счета, разделяя его на секции."""
-    cleaned_text = clean_text(text)
+    """
+    Извлечение данных из текста с использованием регулярных выражений.
+    
+    Аргументы:
+        text (str): Входной текст
+    
+    Возврат:
+        dict: Структурированные извлеченные данные
+    """
+    # Регулярные выражения для поиска данных
+    patterns = {
+        "seller": r"Продавец\s+(.*?ИНН \d+)",  # Продавец (ФИО) + ИНН
+        "seller_inn": r"ИНН\s+(\d{10,12})",   # ИНН продавца
+        "bank": r"АО\s+\"(.+?)\"",            # Название банка
+        "bic": r"БИК\s+(\d{9})",              # БИК
+        "corr_account": r"(\d{20})",  # Корр. счет
+        "payment_account": r"Расчетный счет\s+(\d{20})",  # Расчетный счет
+        "buyer": r"Индивидуальный предприниматель (.+?)\s+ИНН",  # Покупатель (ФИО)
+        "buyer_inn": r"ИНН\s+(\d{10,12})",    # ИНН покупателя
+        "invoice_number": r"Счёт на оплату №(\d+)",  # Номер счета
+        "invoice_date": r"от\s+(\d{1,2} \w+ \d{4})",  # Дата счета
+        "items": r"(\d+)\s+(.+?)\s+(\d+)\s+([\d\s]+,\d{2})\s+([\d\s]+,\d{2})", # Таблица товаров
+        "total": r"Итого к оплате:\s+([\d\s]+,\d{2})",  # Итоговая сумма
+        "total_words": r"([\w\s]+рублей \d{2} копеек)"  # Сумма прописью
+    }
+    
+    # Извлечение данных по регулярным выражениям
+    result = {}
+    result["seller"] = re.search(patterns["seller"], text, re.DOTALL).group(1).strip() if re.search(patterns["seller"], text, re.DOTALL) else None
+    if result["seller"]:
+        text = text.replace(result["seller"], '')
+    result["seller_inn"] = re.search(patterns["seller_inn"], text).group(1) if re.search(patterns["seller_inn"], text) else None
+    if result["seller_inn"]:
+        text = text.replace(result["seller_inn"], '')
+    result["bank_name"] = re.search(patterns["bank"], text).group(1) if re.search(patterns["bank"], text) else None
+    if result["bank_name"]:
+        text = text.replace(result["bank_name"], '')
+    result["bic"] = re.search(patterns["bic"], text).group(1) if re.search(patterns["bic"], text) else None
+    if result["bic"]:
+        text = text.replace(result["bic"], '')
+    result["corr_account"] = re.search(patterns["corr_account"], text).group(1) if re.search(patterns["corr_account"], text) else None
+    if result["corr_account"]:
+        text = text.replace(result["corr_account"], '')
+    result["payment_account"] = re.search(patterns["payment_account"], text).group(1) if re.search(patterns["payment_account"], text) else None
+    if result["payment_account"]:
+        text = text.replace(result["payment_account"], '')
+    result["buyer"] = re.search(patterns["buyer"], text, re.DOTALL).group(1).strip() if re.search(patterns["buyer"], text, re.DOTALL) else None
+    if result["buyer"]:
+        text = text.replace(result["buyer"], '')
+    result["buyer_inn"] = re.search(patterns["buyer_inn"], text).group(1) if re.search(patterns["buyer_inn"], text) else None
+    if result["buyer_inn"]:
+        text = text.replace(result["buyer_inn"], '')
+    result["invoice_number"] = re.search(patterns["invoice_number"], text).group(1) if re.search(patterns["invoice_number"], text) else None
+    if result["invoice_number"]:
+        text = text.replace(result["invoice_number"], '')    
+    result["invoice_date"] = re.search(patterns["invoice_date"], text).group(1) if re.search(patterns["invoice_date"], text) else None
+    result["total"] = re.search(patterns["total"], text).group(1).replace(' ', '') if re.search(patterns["total"], text) else None
+    result["total_words"] = re.search(patterns["total_words"], text).group(1) if re.search(patterns["total_words"], text) else None
 
-    sections = {"Банк_получателя": {"words": [], "keys": ["ИНН", "БИК", "КПП", 'Сч.№', "ИП", "ПАО", "ООО"], "single_line": False}, 
-                "Получатель": {"words": [], "keys": ['Счет_на_оплату_№', 'Город'], "single_line": False},
-                "Поставщик":{"words": [], "keys": ["ИНН", "КПП", 'Сч.№', "ИП", "ПАО", "ООО"], "single_line": False},
-                "Покупатель":{"words": [], "keys": ["ИНН", "КПП", 'Сч.№', "ИП", "ПАО", "ООО"], "single_line": False},
-                "Основание":{"words": [], "keys": [], "single_line": True},
-               
-                "Итого":{"words": [], "keys": [], "single_line": True},
-               }
+    # Извлечение данных из таблицы товаров
+    items_pattern = re.findall(patterns["items"], text, re.DOTALL)
+    result["items"] = []
+    if items_pattern:
+        for item in items_pattern:
+            result["items"].append({
+                "number": int(item[0]),
+                "description": item[1].strip(),
+                "quantity": int(item[2]),
+                "price": float(item[3].replace(' ', '').replace(',', '.')),
+                "amount": float(item[4].replace(' ', '').replace(',', '.'))
+            })
 
-    result = extract_sections(cleaned_text, sections, join=True)
-    for section, data in result.items():
-        data_words = data.get("words", [])
-        words = extract_sections(data_words, sections[section]["keys"])
-        data["words_parsed"] = words
-    bank = result.get("Банк_получателя", {}).get("words_parsed", None)
-    if bank:
-        inn = bank.get("ИНН", {}).get('words', [])[0]
-        bic = bank.get("БИК", {}).get('words', [])[0]
-        сс = bank.get("Сч.№", {}).get('words', [])[0]
-        if len(bank.get("ИП", []).get('words', [])) > 0:
-            reciever_name = 'ИП' + bank.get("ИП", []).get('words', [])[0]
-        elif len(bank.get("ПАО", []).get('words', [])) > 0:
-            reciever_name = 'ПАО' + bank.get("ПАО", []).get('words', [])[0]
-        elif len(bank.get("ООО", []).get('words', [])) > 0:
-            reciever_name = 'ООО' + bank.get("ООО", []).get('words', [])[0]
+    return result
+
+def process_text2(text: str) -> Dict[str, Any]:
+    patterns = {
+        "bik": r"БИК\s+(\d{9})",
+        "seller_inn": r"ИНН[:\s_]+(\d{10,12})",
+        "account_number": r"[Сс]ч[.\s№]+\s*(\d{20})",
+        "total_amount": r"Всего к оплате:\s+([\d\s]+,\d{2})",
+        "date": r"от (\d{1,2} \w+ \d{4}) г",
+        "contract_number": r"Договор заявка\s+([\w-]+)",
+        "seller": r"Поставщик[^\n]+\nИП ([^\n]+)",
+        "buyer": r"Покупатель[^\n]+\nИП ([^\n]+)",
+    }
+
+    result = {}
+    
+    # Основные поля
+    for field, pattern in patterns.items():
+        if isinstance(pattern, dict):
+            result[field] = {}
+            for sub_field, sub_pattern in pattern.items():
+                match = re.search(sub_pattern, text, re.IGNORECASE)
+                result[field][sub_field] = match.group(1).strip() if match else None
         else:
-            reciever_name = None
-    reason = result.get("Получатель", {}).get("words", '')
-    buyer = result.get("Покупатель", {}).get("words_parsed", None)
-    if buyer:
-        buyer_inn = buyer.get("ИНН", {}).get('words', [])[0].replace(",", "")
-    bill = {"inn": inn, "bic": bic, "сс": сс, "reciever_name": reciever_name, "reason": reason, "buyer_inn": buyer_inn}
-    return bill
+            match = re.search(pattern, text, re.IGNORECASE)
+            result[field] = match.group(1).strip() if match else None
 
+    # Обработка сумм
+    if result.get('total_amount'):
+        result['total_amount'] = float(
+            result['total_amount']
+            .replace(' ', '')
+            .replace(',', '.')
+        )
+
+    return result
 
 
 
@@ -426,7 +557,7 @@ def get_bill_route(bot):
                         bill_text = extract_text_from_pdf_images(file_bytes)
                         if bill_text:
                             await message.reply(bill_text)
-                            extracted_data = process_text(bill_text)              
+                            extracted_data = process_text_test(bill_text)              
                             if extracted_data:
                                 print("Extracted Data:")
                                 for key, value in extracted_data.items():
