@@ -3,15 +3,15 @@ from apps.yookassa.models.OauthBaseModel import OauthBaseModel, OauthModel, Oaut
 
 class IYookassaOauthRepository:
 
-    async def update_oauth(self, cashbox: int, oauth: OauthUpdateModel) -> None:
+    async def update_oauth(self, cashbox: int, warehouse: int, oauth: OauthUpdateModel) -> None:
         raise NotImplementedError
 
     async def insert_oauth(self, cashbox: int, oauth: OauthModel) -> None:
         raise NotImplementedError
 
-    async def delete_oauth(self, cashbox: int) -> None:
+    async def delete_oauth(self, cashbox: int, warehouse: int) -> None:
         raise NotImplementedError
 
-    async def get_oauth(self, cashbox: int) -> OauthBaseModel:
+    async def get_oauth(self, cashbox: int, warehouse: int) -> OauthBaseModel:
         raise NotImplementedError
 

@@ -1,9 +1,11 @@
+import base64
+import os
+
 from apps.yookassa.functions.core.IGetOauthCredentialFunction import IGetOauthCredentialFunction
 from apps.yookassa.services.core.IOauthService import IOauthService
 
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
+from fastapi.responses import RedirectResponse
 
 
 class CallbackOauthView:
@@ -15,10 +17,14 @@ class CallbackOauthView:
     ):
         self.__oauth_service = oauth_service
 
-    async def __call__(self, code: str, state: int):
+    async def __call__(self, code: str, state: str):
         try:
-            res = await self.__oauth_service.get_access_token(code = code, state = state)
-            return res
+            await self.__oauth_service.get_access_token(
+                code = code,
+                cashbox = int(base64.b64decode(state).decode("utf-8").split(":")[0]),
+                warehouse = int(base64.b64decode(state).decode("utf-8").split(":")[1]),
+            )
+            return RedirectResponse(url = f"{os.environ.get('APP_URL')}/integrations?token={base64.b64decode(state).decode('utf-8').split(':')[2]}")
         except Exception as error:
             raise HTTPException(
                 status_code = 432,
