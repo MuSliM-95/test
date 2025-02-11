@@ -94,6 +94,7 @@ class BillStatus(str, ENUM):
     approved = "approved"
     canceled = "canceled"
     rejected = "rejected"
+    requested = "requested"
     paid = "paid"
     error = "error"
 
@@ -1786,15 +1787,16 @@ bills = sqlalchemy.Table(
     sqlalchemy.Column("plain_text", String, nullable=False),
     sqlalchemy.Column("file_name", String , nullable=False),
     sqlalchemy.Column("tochka_bank_account_id", Integer, ForeignKey("tochka_bank_accounts.id"), nullable=True),
-    sqlalchemy.Column("amount", Float, nullable=False),
-    sqlalchemy.Column("pc", String, nullable=False),
-    sqlalchemy.Column("reason", String, nullable=False),
-    sqlalchemy.Column("bic", String, nullable=False),
-    sqlalchemy.Column("seller", String, nullable=False),
-    sqlalchemy.Column("inn_seller", String, nullable=False),
-    sqlalchemy.Column("inn_buyer", String, nullable=False),
-    sqlalchemy.Column("corr_account", String, nullable=False),
+    sqlalchemy.Column("amount", Float, nullable=True),
+    sqlalchemy.Column("pc", String, nullable=True),
+    sqlalchemy.Column("reason", String, nullable=True),
+    sqlalchemy.Column("bic", String, nullable=True),
+    sqlalchemy.Column("seller", String, nullable=True),
+    sqlalchemy.Column("inn_seller", String, nullable=True),
+    sqlalchemy.Column("inn_buyer", String, nullable=True),
+    sqlalchemy.Column("corr_account", String, nullable=True),
     sqlalchemy.Column("status", Enum(BillStatus), nullable=False),
+    sqlalchemy.Column("requestId", String, nullable=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("deleted_at", DateTime(timezone=True)),

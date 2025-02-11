@@ -9,6 +9,18 @@ class TochkaBankError(Exception):
         super().__init__(self.message)
 
 
+async def get_access_token(integration_id: int) -> dict:
+
+    url = "http://localhost:9001/apvi/v1/bank/refresh_token"
+    data = {
+        "integration_cashboxes": integration_id
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=data) as response:
+            return await response.json()
+          
+
 async def send_payment_to_tochka(
     account_code: str,
     bank_code: str,
@@ -18,11 +30,12 @@ async def send_payment_to_tochka(
     paymentDate: str,
     counterparty_name: str,
     payment_purpose: str,
+    auth: str
 ) -> dict:
     url = "https://enter.tochka.com/sandbox/v2/payment/v1.0/for-sign"
     
     headers = {
-        "Authorization": f"Bearer working_token",
+        "Authorization": f"Bearer {auth}",
         "Content-Type": "application/json"
     }
     

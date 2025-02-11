@@ -21,7 +21,8 @@ from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
 from bot_routes.pdf_reader import extract_text_from_pdf_images
 from bot_routes.bills_model import *
-from bot_routes.tochka_api import *
+from bot_routes.keyboards import *
+
 
 
 timezone = pytz.timezone("Europe/Moscow")
@@ -198,52 +199,6 @@ def process_text_test(text):
 
     return result
 
-
-
-# Функция для создания клавиатуры
-async def create_select_account_payment_keyboard(chat_id, bill_id):
-    accounts = await get_tochka_bank_accounts_by_chat_id(str(chat_id))
-    keyboard_keys = []
-    
-    for account in accounts:
-        keyboard_keys.append([
-            types.InlineKeyboardButton(
-                text=str(account.accountId), 
-                callback_data=f'{{"action": "select_tb_account", "account_id": {account.id}, "bill_id": {bill_id}}}'
-            )
-        ])
-    
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=keyboard_keys)
-    return keyboard
-
-# Функция для создания клавиатуры
-def create_bill_action_keyboard(bill):
-    error_keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(text="Сместить дату", callback_data=f'{{"action": "change_date", "bill_id": {bill.id}}}'),
-            ],
-            [
-                types.InlineKeyboardButton(text="Добавить сегодняшним числом", callback_data=f'{{"action": "update_bill_payment_date", "bill_id": {bill.id}}}'),
-            ],
-            [
-                types.InlineKeyboardButton(text="Отмена", callback_data=f'{{"action": "cancel_bill", "bill_id": {bill.id}}}'),
-            ]
-        ]
-    )
-    return error_keyboard
-
-def create_like_dislike_keyboard(bill_id: int):
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(text="👍 Like", callback_data=f'{{"action": "like", "bill_id": {bill_id}}}'),
-                types.InlineKeyboardButton(text="👎 Dislike", callback_data=f'{{"action": "dislike", "bill_id": {bill_id}}}'),
-            ]
-        ]
-    )
-    return keyboard
-
 async def get_user_from_db(user_id: str):
     """Fetches a user from the database based on user_id."""
     query = users.select().where(users.c.chat_id == user_id)
@@ -266,30 +221,6 @@ async def get_bill_approvers_data(bill_id: int):
         })
     return approvers
 
-async def update_bill_status_based_on_approvals(bill_id: int):
-    """
-    Updates the bill status based on the approval statuses and payment date.
-    """
-    bill = await get_bill(bill_id)
-    if not bill:
-        logging.warning(f"Bill with id {bill_id} not found.")
-        return
-
-    approvers = await get_approvers_by_bill(bill_id)
-    if not approvers:
-        # If there are no approvers, the bill is considered approved.
-        await update_bill_status(bill_id, BillStatus.approved)
-        return
-
-    all_approved = all(approver.status == BillApproveStatus.approved for approver in approvers)
-    any_rejected = any(approver.status == BillApproveStatus.canceled for approver in approvers)
-
-    if any_rejected:
-        await update_bill_status(bill_id, BillStatus.rejected)
-    elif all_approved:
-        await update_bill_status(bill_id, BillStatus.approved)
-    else:
-        await update_bill_status(bill_id, BillStatus.waiting_for_approval)
 
 # Функция для получения маршрута
 def get_bill_route(bot):
@@ -304,22 +235,23 @@ def get_bill_route(bot):
         return user
 
 
-    async def send_bill_notification(chat_id: int, notification_string: str, bill_id: int = None):
-        """Sends a bill notification message with optional like/dislike keyboard."""
-        if bill_id:
-            await bot.send_message(chat_id=chat_id, text=notification_string,
-                                reply_markup=create_like_dislike_keyboard(bill_id),
-                                parse_mode="html")
-        else:
-            await bot.send_message(chat_id=chat_id, text=notification_string, parse_mode="html")
+    
 
 
     @pdf_router.callback_query(lambda call: True)
-    async def callback_query(callback_query: types.CallbackQuery, state: FSMContext):
+    async def callback_q(callback_query: types.CallbackQuery, state: FSMContext):
         user_id = str(callback_query.from_user.id)
         await bot.answer_callback_query(callback_query.id)
         data = json.loads(callback_query.data)
-        bill_id = data['bill_id']
+        bill_id = int(data['bill_id'])
+
+        new_bill = await get_bill(bill_id)
+
+        if new_bill['status'] == BillStatus.canceled:
+            await bot.answer_callback_query(callback_query.id, text=f"Счет {bill_id} отменен")
+            return
+        old_bill = dict(new_bill)
+        approvers = await get_bill_approvers_data(new_bill.id)
 
         user_permissions = await check_user_permissions(user_id, bill_id)
         if not user_permissions:
@@ -328,68 +260,26 @@ def get_bill_route(bot):
             return
 
         await state.update_data(bill_id=bill_id)
-        old_bill = await get_bill(bill_id)
+
 
         if data['action'] == 'select_tb_account':
             await update_bill(bill_id, {"tochka_bank_account_id":data['account_id']})
-            new_bill = await get_bill(bill_id)
-            approvers = await get_bill_approvers_data(new_bill.id)
-            notification_string = await format_bill_notification(
-                created_by=new_bill.created_by,
-                approvers=approvers,
-                updated_by=user_id,
-                new_bill=new_bill,
-                old_bill=old_bill,
-            )
-            await state.set_state(None)
-            await callback_query.message.reply(notification_string, 
-                                    reply_markup=create_bill_action_keyboard(new_bill), 
-                                    parse_mode="HTML")    
         elif data['action'] == 'change_date':
-            await bot.answer_callback_query(callback_query.id)
-            await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
-            await state.set_state(BillDateForm.waiting_for_date)
+            if 'data' in data:
+                naive_date = datetime.strptime(data['data'], "%Y-%m-%d")
+                localized_date = timezone.localize(naive_date)
+                await update_bill(bill_id, {"payment_date":localized_date, "status": BillStatus.waiting_for_approval})
+            else:
+                await bot.answer_callback_query(callback_query.id)
+                await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
+                await state.set_state(BillDateForm.waiting_for_date)
 
-        elif data['action'] == 'update_bill_payment_date':
-            await bot.answer_callback_query(callback_query.id)  # Подтверждаем нажатие кнопки
-            state_data = await state.get_data()
-            naive_date =datetime.now()
-            localized_date = timezone.localize(naive_date)
-            await update_bill(state_data['bill_id'],{"payment_date": localized_date, "status": BillStatus.waiting_for_approval})
-            new_bill = await get_bill(bill_id)
-            approvers = await get_bill_approvers_data(new_bill.id)
-            await update_bill_status_based_on_approvals(new_bill.id)
-            notification_string = await format_bill_notification(
-                created_by=new_bill.created_by,
-
-                approvers=approvers,
-                updated_by=user_id,
-                new_bill=new_bill,
-                old_bill=old_bill,
-            )
-            await state.set_state(None)
-            await send_bill_notification(callback_query.message.chat.id, notification_string, new_bill.id)
 
         elif data['action'] == 'cancel_bill':
-            await bot.answer_callback_query(callback_query.id)  # Подтверждаем нажатие кнопки
-            state_data = await state.get_data()
-            await update_bill_status(state_data['bill_id'], "canceled")
             
-            new_bill = await get_bill(bill_id)
+            await update_bill_status(bill_id, BillStatus.canceled)
 
-            approvers = await get_bill_approvers_data(new_bill.id)
-            
-            notification_string = await format_bill_notification(
-                created_by=new_bill.created_by,
-
-                approvers=approvers,
-                updated_by=user_id,
-                new_bill=new_bill,
-                old_bill=old_bill,
-            )
-            await state.set_state(None)
-            await send_bill_notification(callback_query.message.chat.id, notification_string)
-
+          
         elif data['action'] == 'like':
             user = await check_user_registration(callback_query)
             if not user:
@@ -403,44 +293,9 @@ def get_bill_route(bot):
             if approve.status != BillApproveStatus.approved:
                 await update_bill_approve(approve.id, {'status':  BillApproveStatus.approved})
                 await update_bill_status_based_on_approvals(bill_id)
-                new_bill = await get_bill(bill_id)
 
                 approvers = await get_bill_approvers_data(new_bill.id)
 
-                notification_string = await format_bill_notification(
-                    created_by=new_bill.created_by,
-
-                    approvers=approvers,
-                    updated_by=user_id,
-                    new_bill=new_bill,
-                    old_bill=old_bill,
-                )
-
-                await send_bill_notification(callback_query.message.chat.id, notification_string)
-
-                if new_bill.status:
-                    await bot.send_message(chat_id=callback_query.message.chat.id, text="Счет утвержден.")
-                    account_arr = new_bill.accountId.split('/')
-                    try:
-                        result = await send_payment_to_tochka(
-                            account_code=account_arr[0],
-                            bank_code=account_arr[1],
-                            counterparty_bank_bic=new_bill.bic,
-                            counterparty_account_number=new_bill.corr_account,
-                            counterparty_name=new_bill.seller,
-                            paymentDate=new_bill.payment_date.strftime("%Y-%m-%d"),
-                            paymentAmount=new_bill.amount,
-                            payment_purpose=new_bill.reason
-                        )
-                        if result.success:
-                            await update_bill_status(bill_id, "paid")
-                            await bot.send_message(chat_id=callback_query.message.chat.id, text="Счет оплачен.")
-                        else:
-                            await bot.send_message(chat_id=callback_query.message.chat.id, text="Ошибка при оплате счета.")
-                    except TochkaBankError as e:
-                        detailed_errors = [f"{err['errorCode']}: {err['message']}" for err in e.errors]
-                        error_message = f"Bank API Error {e.code}: {e.message}\nDetailed errors: {detailed_errors}"
-                await state.set_state(None)
 
         elif data['action'] == 'dislike':
             user = await check_user_registration(callback_query)
@@ -448,25 +303,41 @@ def get_bill_route(bot):
                 return
 
             approve = await get_approve_by_id_and_approver(user.id, bill_id)
-            await update_bill_approve(approve.id, {'status':  BillApproveStatus.canceled})
-            await update_bill_status_based_on_approvals(bill_id)
             if not approve:
                 await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Не достпно для {user.username}, так как не является утверждающим.")
                 return
             
-            await bot.answer_callback_query(callback_query.id)
+            await update_bill_approve(approve.id, {'status':  BillApproveStatus.canceled})
+            await update_bill_status_based_on_approvals(bill_id)
+            
+            approvers = await get_bill_approvers_data(new_bill.id)
+            
             await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
-            await state.set_state(BillDateForm.waiting_for_date)
+        
+        elif data['action'] == 'send_bill':
+            await send_bill(new_bill, callback_query, bot)
+
+        new_bill = await get_bill(bill_id)
+        notification_string = await format_bill_notification(
+            created_by=new_bill.created_by,
+            approvers=approvers,
+            updated_by=user_id,
+            new_bill=new_bill,
+            old_bill=old_bill,
+        )
+        await callback_query.message.reply(notification_string, 
+                                    reply_markup=create_main_menu(new_bill["id"], new_bill['status']), 
+                                    parse_mode="HTML")    
 
     @pdf_router.message(state=BillDateForm.waiting_for_date)
     async def process_payment_date(message: types.Message, state: FSMContext):
         user_date = message.text
         user_id = message.from_user.id
+        
         try:
             state_data = await state.get_data()
             old_bill = await get_bill(state_data['bill_id'])
             datetime.strptime(user_date, "%Y-%m-%d")
-            state_data = await state.get_data()
             naive_date = datetime.strptime(user_date, "%Y-%m-%d")
             localized_date = timezone.localize(naive_date)
             await update_bill(state_data['bill_id'],{"payment_date": localized_date, "status": BillStatus.waiting_for_approval})
@@ -483,7 +354,9 @@ def get_bill_route(bot):
                 old_bill=old_bill,
             )
             await state.set_state(None)
-            await send_bill_notification(message.chat.id, notification_string, new_bill.id)
+            await message.reply(notification_string, 
+                                    reply_markup=create_main_menu(new_bill["id"], new_bill['status']), 
+                                    parse_mode="HTML")    
 
         except ValueError:
             await message.reply("Пожалуйста, введите дату в правильном формате (ГГГГ-ММ-ДД):")
@@ -593,7 +466,8 @@ def get_bill_route(bot):
                                     updated_by=user_id,
                                     new_bill=bill
                                 )
-                                keyboard = await create_select_account_payment_keyboard(chat_id=message.chat.id, bill_id=bill.id)
+                                accounts = await get_tochka_bank_accounts_by_chat_id(str(chat_id))
+                                keyboard = await create_select_account_payment_keyboard(bill.id, accounts)
                                 await message.reply(notification_string, 
                                     reply_markup=keyboard,
                                     parse_mode="HTML")    
