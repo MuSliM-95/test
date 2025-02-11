@@ -20,7 +20,9 @@ from typing import Dict, Any
 from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
 from bot_routes.pdf_reader import extract_text_from_pdf_images
-from bot_routes.bills_model import CreateBillData, UpdateBillData, CreateBillApproverData, UpdateBillApproverData, BillApproveStatus, BillStatus, get_approve_by_id_and_approver, get_approvers_by_bill, check_user_permissions, create_bill, format_bill_notification, get_bill, update_bill_status, update_bill, create_bill_approver, update_bill_approve
+from bot_routes.bills_model import *
+from bot_routes.tochka_api import *
+
 
 timezone = pytz.timezone("Europe/Moscow")
 
@@ -133,12 +135,12 @@ def process_text_rus(text):
     result = {}
    
  
-    result["sum"] = re.search(patterns["sum"], text).group(1) if re.search(patterns["sum"], text) else None
-    if result["sum"]:
-        text = text.replace(result["sum"], '')
-        result["sum"] = result["sum"].replace(' ', '').replace(',', '.')
+    result["amount"] = re.search(patterns["sum"], text).group(1) if re.search(patterns["sum"], text) else None
+    if result["amount"]:
+        text = text.replace(result["amount"], '')
+        result["amount"] = result["amount"].replace(' ', '').replace(',', '.')
         # Will return 16000.00 as float
-        result["sum"] = float(result["sum"])
+        result["amount"] = float(result["amount"])
     result["reason"] = re.search(patterns["reason"], text).group(1) if re.search(patterns["reason"], text) else None
     if result["reason"]:
         text = text.replace(result["reason"], '')
@@ -150,11 +152,11 @@ def process_text_rus(text):
             result["reason"] = None
     supplier_match = re.search(patterns["supplier"], text)
     if supplier_match:
-        result["supplier"] = supplier_match.group(1).strip()
+        result["seller"] = supplier_match.group(1).strip()
     else:
         supplier_match = re.search(patterns["supplier_2"], text)
         if supplier_match:
-            result["supplier"] = supplier_match.group(1).strip()
+            result["seller"] = supplier_match.group(1).strip()
 
     return result
 
@@ -196,119 +198,23 @@ def process_text_test(text):
 
     return result
 
+
+
+# Функция для создания клавиатуры
+async def create_select_account_payment_keyboard(chat_id, bill_id):
+    accounts = await get_tochka_bank_accounts_by_chat_id(str(chat_id))
+    keyboard_keys = []
     
-
-def process_text(text):
-    """
-    Извлечение данных из текста с использованием регулярных выражений.
+    for account in accounts:
+        keyboard_keys.append([
+            types.InlineKeyboardButton(
+                text=str(account.accountId), 
+                callback_data=f'{{"action": "select_tb_account", "account_id": {account.id}, "bill_id": {bill_id}}}'
+            )
+        ])
     
-    Аргументы:
-        text (str): Входной текст
-    
-    Возврат:
-        dict: Структурированные извлеченные данные
-    """
-    # Регулярные выражения для поиска данных
-    patterns = {
-        "seller": r"Продавец\s+(.*?ИНН \d+)",  # Продавец (ФИО) + ИНН
-        "seller_inn": r"ИНН\s+(\d{10,12})",   # ИНН продавца
-        "bank": r"АО\s+\"(.+?)\"",            # Название банка
-        "bic": r"БИК\s+(\d{9})",              # БИК
-        "corr_account": r"(\d{20})",  # Корр. счет
-        "payment_account": r"Расчетный счет\s+(\d{20})",  # Расчетный счет
-        "buyer": r"Индивидуальный предприниматель (.+?)\s+ИНН",  # Покупатель (ФИО)
-        "buyer_inn": r"ИНН\s+(\d{10,12})",    # ИНН покупателя
-        "invoice_number": r"Счёт на оплату №(\d+)",  # Номер счета
-        "invoice_date": r"от\s+(\d{1,2} \w+ \d{4})",  # Дата счета
-        "items": r"(\d+)\s+(.+?)\s+(\d+)\s+([\d\s]+,\d{2})\s+([\d\s]+,\d{2})", # Таблица товаров
-        "total": r"Итого к оплате:\s+([\d\s]+,\d{2})",  # Итоговая сумма
-        "total_words": r"([\w\s]+рублей \d{2} копеек)"  # Сумма прописью
-    }
-    
-    # Извлечение данных по регулярным выражениям
-    result = {}
-    result["seller"] = re.search(patterns["seller"], text, re.DOTALL).group(1).strip() if re.search(patterns["seller"], text, re.DOTALL) else None
-    if result["seller"]:
-        text = text.replace(result["seller"], '')
-    result["seller_inn"] = re.search(patterns["seller_inn"], text).group(1) if re.search(patterns["seller_inn"], text) else None
-    if result["seller_inn"]:
-        text = text.replace(result["seller_inn"], '')
-    result["bank_name"] = re.search(patterns["bank"], text).group(1) if re.search(patterns["bank"], text) else None
-    if result["bank_name"]:
-        text = text.replace(result["bank_name"], '')
-    result["bic"] = re.search(patterns["bic"], text).group(1) if re.search(patterns["bic"], text) else None
-    if result["bic"]:
-        text = text.replace(result["bic"], '')
-    result["corr_account"] = re.search(patterns["corr_account"], text).group(1) if re.search(patterns["corr_account"], text) else None
-    if result["corr_account"]:
-        text = text.replace(result["corr_account"], '')
-    result["payment_account"] = re.search(patterns["payment_account"], text).group(1) if re.search(patterns["payment_account"], text) else None
-    if result["payment_account"]:
-        text = text.replace(result["payment_account"], '')
-    result["buyer"] = re.search(patterns["buyer"], text, re.DOTALL).group(1).strip() if re.search(patterns["buyer"], text, re.DOTALL) else None
-    if result["buyer"]:
-        text = text.replace(result["buyer"], '')
-    result["buyer_inn"] = re.search(patterns["buyer_inn"], text).group(1) if re.search(patterns["buyer_inn"], text) else None
-    if result["buyer_inn"]:
-        text = text.replace(result["buyer_inn"], '')
-    result["invoice_number"] = re.search(patterns["invoice_number"], text).group(1) if re.search(patterns["invoice_number"], text) else None
-    if result["invoice_number"]:
-        text = text.replace(result["invoice_number"], '')    
-    result["invoice_date"] = re.search(patterns["invoice_date"], text).group(1) if re.search(patterns["invoice_date"], text) else None
-    result["total"] = re.search(patterns["total"], text).group(1).replace(' ', '') if re.search(patterns["total"], text) else None
-    result["total_words"] = re.search(patterns["total_words"], text).group(1) if re.search(patterns["total_words"], text) else None
-
-    # Извлечение данных из таблицы товаров
-    items_pattern = re.findall(patterns["items"], text, re.DOTALL)
-    result["items"] = []
-    if items_pattern:
-        for item in items_pattern:
-            result["items"].append({
-                "number": int(item[0]),
-                "description": item[1].strip(),
-                "quantity": int(item[2]),
-                "price": float(item[3].replace(' ', '').replace(',', '.')),
-                "amount": float(item[4].replace(' ', '').replace(',', '.'))
-            })
-
-    return result
-
-def process_text2(text: str) -> Dict[str, Any]:
-    patterns = {
-        "bik": r"БИК\s+(\d{9})",
-        "seller_inn": r"ИНН[:\s_]+(\d{10,12})",
-        "account_number": r"[Сс]ч[.\s№]+\s*(\d{20})",
-        "total_amount": r"Всего к оплате:\s+([\d\s]+,\d{2})",
-        "date": r"от (\d{1,2} \w+ \d{4}) г",
-        "contract_number": r"Договор заявка\s+([\w-]+)",
-        "seller": r"Поставщик[^\n]+\nИП ([^\n]+)",
-        "buyer": r"Покупатель[^\n]+\nИП ([^\n]+)",
-    }
-
-    result = {}
-    
-    # Основные поля
-    for field, pattern in patterns.items():
-        if isinstance(pattern, dict):
-            result[field] = {}
-            for sub_field, sub_pattern in pattern.items():
-                match = re.search(sub_pattern, text, re.IGNORECASE)
-                result[field][sub_field] = match.group(1).strip() if match else None
-        else:
-            match = re.search(pattern, text, re.IGNORECASE)
-            result[field] = match.group(1).strip() if match else None
-
-    # Обработка сумм
-    if result.get('total_amount'):
-        result['total_amount'] = float(
-            result['total_amount']
-            .replace(' ', '')
-            .replace(',', '.')
-        )
-
-    return result
-
-
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=keyboard_keys)
+    return keyboard
 
 # Функция для создания клавиатуры
 def create_bill_action_keyboard(bill):
@@ -424,7 +330,22 @@ def get_bill_route(bot):
         await state.update_data(bill_id=bill_id)
         old_bill = await get_bill(bill_id)
 
-        if data['action'] == 'change_date':
+        if data['action'] == 'select_tb_account':
+            await update_bill(bill_id, {"tochka_bank_account_id":data['account_id']})
+            new_bill = await get_bill(bill_id)
+            approvers = await get_bill_approvers_data(new_bill.id)
+            notification_string = await format_bill_notification(
+                created_by=new_bill.created_by,
+                approvers=approvers,
+                updated_by=user_id,
+                new_bill=new_bill,
+                old_bill=old_bill,
+            )
+            await state.set_state(None)
+            await callback_query.message.reply(notification_string, 
+                                    reply_markup=create_bill_action_keyboard(new_bill), 
+                                    parse_mode="HTML")    
+        elif data['action'] == 'change_date':
             await bot.answer_callback_query(callback_query.id)
             await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
             await state.set_state(BillDateForm.waiting_for_date)
@@ -435,22 +356,16 @@ def get_bill_route(bot):
             naive_date =datetime.now()
             localized_date = timezone.localize(naive_date)
             await update_bill(state_data['bill_id'],{"payment_date": localized_date, "status": BillStatus.waiting_for_approval})
-            
             new_bill = await get_bill(bill_id)
-
             approvers = await get_bill_approvers_data(new_bill.id)
             await update_bill_status_based_on_approvals(new_bill.id)
             notification_string = await format_bill_notification(
-                bill_id=old_bill.id,
-                created_by=old_bill.created_by,
-                s3_url=old_bill.s3_url,
-                file_name=old_bill.file_name,
+                created_by=new_bill.created_by,
+
                 approvers=approvers,
-                new_payment_date=new_bill.payment_date,
-                old_payment_date=old_bill.payment_date,
-                old_status=old_bill.old_status,
-                new_status=new_bill.status,
-                updated_by=user_id
+                updated_by=user_id,
+                new_bill=new_bill,
+                old_bill=old_bill,
             )
             await state.set_state(None)
             await send_bill_notification(callback_query.message.chat.id, notification_string, new_bill.id)
@@ -465,16 +380,12 @@ def get_bill_route(bot):
             approvers = await get_bill_approvers_data(new_bill.id)
             
             notification_string = await format_bill_notification(
-                bill_id=old_bill.id,
-                created_by=old_bill.created_by,
-                s3_url=old_bill.s3_url,
-                file_name=old_bill.file_name,
+                created_by=new_bill.created_by,
+
                 approvers=approvers,
-                new_payment_date=new_bill.payment_date,
-                old_payment_date=old_bill.payment_date,
-                old_status=old_bill.old_status,
-                new_status=new_bill.status,
-                updated_by=user_id
+                updated_by=user_id,
+                new_bill=new_bill,
+                old_bill=old_bill,
             )
             await state.set_state(None)
             await send_bill_notification(callback_query.message.chat.id, notification_string)
@@ -497,22 +408,38 @@ def get_bill_route(bot):
                 approvers = await get_bill_approvers_data(new_bill.id)
 
                 notification_string = await format_bill_notification(
-                    bill_id=old_bill.id,
-                    created_by=old_bill.created_by,
-                    s3_url=old_bill.s3_url,
-                    file_name=old_bill.file_name,
+                    created_by=new_bill.created_by,
+
                     approvers=approvers,
-                    new_payment_date=new_bill.payment_date,
-                    old_payment_date=old_bill.payment_date,
-                    old_status=old_bill.old_status,
-                    new_status=new_bill.status,
-                    updated_by=user_id
+                    updated_by=user_id,
+                    new_bill=new_bill,
+                    old_bill=old_bill,
                 )
 
                 await send_bill_notification(callback_query.message.chat.id, notification_string)
 
                 if new_bill.status:
                     await bot.send_message(chat_id=callback_query.message.chat.id, text="Счет утвержден.")
+                    account_arr = new_bill.accountId.split('/')
+                    try:
+                        result = await send_payment_to_tochka(
+                            account_code=account_arr[0],
+                            bank_code=account_arr[1],
+                            counterparty_bank_bic=new_bill.bic,
+                            counterparty_account_number=new_bill.corr_account,
+                            counterparty_name=new_bill.seller,
+                            paymentDate=new_bill.payment_date.strftime("%Y-%m-%d"),
+                            paymentAmount=new_bill.amount,
+                            payment_purpose=new_bill.reason
+                        )
+                        if result.success:
+                            await update_bill_status(bill_id, "paid")
+                            await bot.send_message(chat_id=callback_query.message.chat.id, text="Счет оплачен.")
+                        else:
+                            await bot.send_message(chat_id=callback_query.message.chat.id, text="Ошибка при оплате счета.")
+                    except TochkaBankError as e:
+                        detailed_errors = [f"{err['errorCode']}: {err['message']}" for err in e.errors]
+                        error_message = f"Bank API Error {e.code}: {e.message}\nDetailed errors: {detailed_errors}"
                 await state.set_state(None)
 
         elif data['action'] == 'dislike':
@@ -521,10 +448,12 @@ def get_bill_route(bot):
                 return
 
             approve = await get_approve_by_id_and_approver(user.id, bill_id)
+            await update_bill_approve(approve.id, {'status':  BillApproveStatus.canceled})
+            await update_bill_status_based_on_approvals(bill_id)
             if not approve:
                 await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Не достпно для {user.username}, так как не является утверждающим.")
                 return
-
+            
             await bot.answer_callback_query(callback_query.id)
             await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
             await state.set_state(BillDateForm.waiting_for_date)
@@ -547,16 +476,11 @@ def get_bill_route(bot):
             approvers = await get_bill_approvers_data(new_bill.id)
 
             notification_string = await format_bill_notification(
-                bill_id=old_bill.id,
-                created_by=old_bill.created_by,
-                s3_url=old_bill.s3_url,
-                file_name=old_bill.file_name,
+                created_by=new_bill.created_by,
                 approvers=approvers,
-                new_payment_date=new_bill.payment_date,
-                old_payment_date=old_bill.payment_date,
-                old_status=old_bill.old_status,
-                new_status=new_bill.status,
-                updated_by=user_id
+                updated_by=user_id,
+                new_bill=new_bill,
+                old_bill=old_bill,
             )
             await state.set_state(None)
             await send_bill_notification(message.chat.id, notification_string, new_bill.id)
@@ -603,10 +527,12 @@ def get_bill_route(bot):
                         bill_text = extract_text_from_pdf_images(file_bytes)
                         if bill_text:
                             message_str = 'Invoice data:\n'
+                            bill_data = {}
                             extracted_data = process_text_test(bill_text)              
                             if extracted_data:
 
                                 for key, value in extracted_data.items():
+                                    bill_data[key] = value
                                     message_str += f"{key}: {value}\n"
                                     print(f"{key}: {value}")
                             else:
@@ -618,6 +544,7 @@ def get_bill_route(bot):
                                 if extracted_data:
 
                                     for key, value in extracted_data.items():
+                                        bill_data[key] = value
                                         message_str += f"{key}: {value}\n"
                                         print(f"{key}: {value}")
                                 else:
@@ -633,11 +560,12 @@ def get_bill_route(bot):
                                 status='new',
                                 s3_url=file_url,
                                 file_name=file_name,
-                                plain_text=bill_text
+                                plain_text=bill_text_rus,
+                                **bill_data
                             )
                             try:
-                                bill = await create_bill(bill_data)
-                                bill = await get_bill(bill)
+                                bill_id = await create_bill(bill_data)
+                                bill = await get_bill(bill_id)
                                 bill_approvers = []
                                 if message.caption_entities:
                                     for entity in message.caption_entities:
@@ -660,21 +588,16 @@ def get_bill_route(bot):
                                                 })
                                         
                                 notification_string = await format_bill_notification(
-                                    bill_id=bill.id,
                                     created_by=bill.created_by,
-                                    s3_url=bill.s3_url,
-                                    file_name=bill.file_name,
                                     approvers=bill_approvers,
-                                    new_payment_date=bill.payment_date,
-                                    old_payment_date=bill.payment_date,
-                                    old_status=bill.old_status,
-                                    new_status=bill.status,
                                     updated_by=user_id,
-                                    new_bill=True
+                                    new_bill=bill
                                 )
+                                keyboard = await create_select_account_payment_keyboard(chat_id=message.chat.id, bill_id=bill.id)
                                 await message.reply(notification_string, 
-                                    reply_markup=create_bill_action_keyboard(bill), 
-                                    parse_mode="HTML")            
+                                    reply_markup=keyboard,
+                                    parse_mode="HTML")    
+                                        
                             except Exception as e:
                                 await message.reply(f"Произошла ошибка: {e}")
                                 return

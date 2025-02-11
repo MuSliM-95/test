@@ -1,7 +1,9 @@
+from hmac import new
+
 from typing import Any, TypedDict, Optional, List
 from datetime import datetime
-from sqlalchemy import Enum as SQLEnum
-from database.db import database, bills, bill_approvers, users
+from sqlalchemy import Enum as SQLEnum, select
+from database.db import database, bills, bill_approvers, users, pboxes, users_cboxes_relation, tochka_bank_accounts
 from enum import Enum
 
 class BillStatus(str, Enum):
@@ -25,6 +27,15 @@ class CreateBillData(TypedDict):
     plain_text: str
     file_name: str
     status: BillStatus
+    tochka_bank_account_id: Optional[int]
+    amount: float
+    pc: str
+    reason: str
+    bic: str
+    seller: str
+    inn_seller: str
+    inn_buyer: str
+    corr_account: str
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime]
@@ -35,6 +46,15 @@ class UpdateBillData(TypedDict):
     s3_url: Optional[str]
     plain_text: Optional[str]
     file_name: Optional[str]
+    amount: Optional[float]
+    pc: Optional[str]
+    reason: Optional[str]
+    bic: Optional[str]
+    seller: Optional[str]
+    inn_seller: Optional[str]
+    inn_buyer: Optional[str]
+    corr_account: Optional[str]
+    tochka_bank_account_id: Optional[int]
     status: Optional[BillStatus]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
@@ -81,40 +101,36 @@ async def check_user_permissions(user_id: str, bill_id: int) -> bool:
     return False
 
 
+def get_bill_changes(old_bill, new_bill):
+    changes = {}
+    for key, value in new_bill.items():
+        if key in ['created_at', 'updated_at', 'deleted_at']:
+            continue
+        else:
+            if old_bill.get(key, None) != new_bill.get(key, None):
+                changes[key] = f"{old_bill.get(key, None)} -> {new_bill.get(key, None)}"
+    return changes
+
+
 async def format_bill_notification(
-    bill_id: int,
-    created_by: int,
-    s3_url: str,
-    file_name: str,
-    approvers: List[dict],
-    new_payment_date: Optional[datetime],
-    new_status: Optional[BillStatus],
-    old_payment_date: Optional[datetime] = None,
-    old_status: Optional[BillStatus] = None,
-    updated_by: Optional[str] = None,
-    new_bill: Optional[bool] = False
-) -> str:
     
+    created_by: int,
+    approvers: List[dict],
+    updated_by: int,
+    new_bill: dict,
+    old_bill: dict = {},
+) -> str:
+    changes = get_bill_changes(old_bill, new_bill)
+    message_parts = [f"Создан новый счёт №{new_bill['id']}:"]
+
     query = users.select().where(users.c.id == created_by)
     user = await database.fetch_one(query)
     query = users.select().where(users.c.chat_id == str(updated_by))
     updated_by = await database.fetch_one(query)
-    if new_bill == True:
-        message_parts = [f"Создан новый счёт №{bill_id}:"]
+    if old_bill.get('id', None) is  None:
+        message_parts = [f"Создан новый счёт №{new_bill.id}:"]
     else:
-        message_parts = [f"Счёт №{bill_id} был обновлён:"]
-
-    if old_status and new_status != old_status:
-        message_parts.append(f"  - Статус изменён с '{old_status}' на '{new_status}'")
-
-    if new_payment_date and old_payment_date and new_payment_date != old_payment_date:
-        message_parts.append(f"  - Дата оплаты изменена с '{old_payment_date.strftime('%Y-%m-%d %H:%M:%S')}' на '{new_payment_date.strftime('%Y-%m-%d %H:%M:%S')}'")
-
-    message_parts.append(f"  - Текущий статус: {new_status}")
-    if new_payment_date:
-        message_parts.append(f"  - Дата оплаты: {new_payment_date.strftime('%Y-%m-%d %H:%M:%S')}")
-    else:
-        message_parts.append(f"  - Дата оплаты: Не указана")
+        message_parts = [f"Счёт №{new_bill.id} был обновлён:"]
 
     for approver in approvers:
         if approver['status'] == BillApproveStatus.approved:
@@ -123,12 +139,37 @@ async def format_bill_notification(
             message_parts.append(f"  - Отклонён пользователем: {approver['username']}")
         elif approver['status'] == BillApproveStatus.new:
             message_parts.append(f"  - Необходимо одобрение пользователя: {approver['username']}")
+    for key, value in new_bill.items():
+        if key in ['created_by','created_at', 'updated_at', 'deleted_at', 'plain_text', 'tochka_bank_account_id']:
+            continue
+        else:
+            message_parts.append(f"  - {key}: {value}")
+    if changes:
+        message_parts.append("Изменения:")
+        for key, value in changes.items():
+            message_parts.append(f"  - {key}: {value}")
     message_parts.append(f"  - Создан пользователем: {user.first_name}")
     message_parts.append(f"  - Обновлён пользователем: {updated_by.first_name if updated_by else 'Система'}")
-    message_parts.append(f"  - Файл: {file_name}")
-    message_parts.append(f"  - Ссылка: {s3_url}")
 
     return "\n".join(message_parts)
+
+async def get_payboxes_by_chat_id(chat_id: str):
+    query = users.select().join(users_cboxes_relation, users.c.id == users_cboxes_relation.c.user).join(pboxes, pboxes.c.cashbox == users_cboxes_relation.c.cashbox_id).where(bills.c.chat_id == chat_id)
+    return await database.fetch_all(query)
+
+
+async def get_tochka_bank_accounts_by_chat_id(chat_id: str):
+    query = (
+        select([tochka_bank_accounts])
+        .select_from(tochka_bank_accounts)
+        .join(pboxes, tochka_bank_accounts.c.payboxes_id == pboxes.c.id)
+        .join(users_cboxes_relation, pboxes.c.cashbox == users_cboxes_relation.c.cashbox_id)
+        .join(users, users.c.id == users_cboxes_relation.c.user)
+        .where(users.c.chat_id == chat_id)
+    )
+
+
+    return await database.fetch_all(query)
 
 async def create_bill(bill_data: CreateBillData):
     required_fields = [ "created_by", "s3_url", "file_name", "status", "plain_text"]
@@ -140,7 +181,12 @@ async def create_bill(bill_data: CreateBillData):
     return await database.execute(query)
 
 async def get_bill(bill_id: int):
-    query = bills.select().where(bills.c.id == bill_id)
+    query = (
+        select([bills, tochka_bank_accounts.c.accountId])
+        .select_from(bills)
+        .outerjoin(tochka_bank_accounts, bills.c.tochka_bank_account_id == tochka_bank_accounts.c.id)
+        .where(bills.c.id == bill_id)
+    )
     return await database.fetch_one(query)
 
 async def get_all_bills():
