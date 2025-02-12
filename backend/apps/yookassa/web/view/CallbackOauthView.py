@@ -23,7 +23,7 @@ class CallbackOauthView:
                 cashbox = int(base64.b64decode(state).decode("utf-8").split(":")[0]),
                 warehouse = int(base64.b64decode(state).decode("utf-8").split(":")[1]),
             )
-            return RedirectResponse(url = f"https://{os.environ.get('APP_URL')}/integrations?token={base64.b64decode(state).decode('utf-8').split(':')[2]}")
+            return RedirectResponse(url = f"https://{os.environ.get('APP_URL')}/integrations?token={base64.b64decode(state).decode('utf-8').split(':')[2]}&yookassa=show")
         except Exception as error:
             raise HTTPException(
                 status_code = 432,
