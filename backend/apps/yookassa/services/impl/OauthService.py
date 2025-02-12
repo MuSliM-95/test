@@ -48,7 +48,7 @@ class OauthService(IOauthService):
                 await self.__oauth_repository.update_oauth(
                     cashbox,
                     warehouse,
-                    OauthUpdateModel(access_token = res.get("access_token"), warehouse_id = warehouse))
+                    OauthUpdateModel(access_token = res.get("access_token"), warehouse_id = warehouse, is_daleted = False))
             else:
                 await self.__oauth_repository.insert_oauth(
                     cashbox,
