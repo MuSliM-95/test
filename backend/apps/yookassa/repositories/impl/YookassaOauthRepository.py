@@ -40,7 +40,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
 
     async def delete_oauth(self, cashbox: int, warehouse: int):
         oauth = await self.get_oauth(cashbox, warehouse)
-        await self.update_oauth(cashbox, warehouse, OauthUpdateModel(is_deleted = True, access_token = ""))
+        await self.update_oauth(cashbox, warehouse, OauthUpdateModel(is_deleted = True))
 
     async def get_oauth_list(self, cashbox: int) -> Union[List[OauthWarehouseModel], None]:
         try:
@@ -56,7 +56,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
                         warehouse_id = oauth.get("id"),
                         warehouse_description = oauth.get("description"),
                         last_update = oauth.get("updated_at"),
-                        status = True if oauth.get("access_token") is not None else False,
+                        status = True if not oauth.get("is_deleted") else False,
                     )
                     for oauth in oauth_list
                 ]
