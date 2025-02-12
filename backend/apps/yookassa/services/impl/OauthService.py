@@ -34,7 +34,7 @@ class OauthService(IOauthService):
             raise Exception("Отсутствует oauth2 по данному пользователю")
 
         await self.__request_repository.revoke_token(token = oauth.access_token, client_id = client_id, client_secret = client_secret)
-        await self.__oauth_repository.delete_oauth(cashbox=cashbox)
+        await self.__oauth_repository.delete_oauth(cashbox=cashbox, warehouse=warehouse)
 
     async def get_access_token(self, code: str, cashbox: int, warehouse: int):
 
