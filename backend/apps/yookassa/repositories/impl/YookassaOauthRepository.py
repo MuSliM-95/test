@@ -12,7 +12,6 @@ class YookassaOauthRepository(IYookassaOauthRepository):
             query = select(yookassa_install).where(
                 yookassa_install.c.cashbox_id == cashbox,
                 yookassa_install.c.warehouse_id == warehouse,
-                yookassa_install.c.is_deleted == False
             )
             oauth = await database.fetch_one(query)
             if oauth:
