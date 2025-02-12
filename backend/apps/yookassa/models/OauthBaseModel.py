@@ -21,6 +21,7 @@ class OauthUpdateModel(OauthBaseModel):
     cashbox_id: Optional[int] = None
     access_token: Optional[str] = None
     warehouse_id: Optional[int] = None
+    is_deleted: bool = None
 
 
 class OauthWarehouseModel(BaseModel):
