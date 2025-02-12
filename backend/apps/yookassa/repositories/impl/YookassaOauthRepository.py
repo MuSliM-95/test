@@ -28,7 +28,6 @@ class YookassaOauthRepository(IYookassaOauthRepository):
         query = update(yookassa_install).where(
             yookassa_install.c.cashbox_id == cashbox,
             yookassa_install.c.warehouse_id == warehouse,
-            yookassa_install.c.is_deleted == False
         ).values(update_oauth.dict())\
             .returning(yookassa_install.c.id)
 
