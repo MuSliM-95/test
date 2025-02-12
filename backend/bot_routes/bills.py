@@ -105,15 +105,15 @@ def validate_bic_region(bic: str) -> bool:
 def normalize_number(raw: str) -> str:
     return ''.join(filter(str.isdigit, raw))
 
-def find_corr_account(text: str, control_number) -> str:
+def find_counterparty_account_number(text: str, control_number) -> str:
     # Найти строку, содержащую "Корр. счет"
     match = re.search(r"(\d{20})", text)
     if match:
         text = text.replace(match.group(1), '')
-        if match.group(1)[-3:] == control_number:
+        if match.group(1)[-3:] != control_number:
             return match.group(1), text
         else:
-            return find_corr_account(text, control_number)
+            return find_counterparty_account_number(text, control_number)
     else:
         
         return None, text
@@ -128,7 +128,7 @@ def process_text_rus(text):
     patterns = {
         "reason_2": r"([^\n]+?)\s*№(?!\d)",
         "reason": r"Основание:\s*([^\n]+)",
-        "sum":r"на сумму\s*([\d\s]+,\d{2})",
+        "sum": r"(?:на сумму|(?:итог )?к оплате:)\s*([\d\s]+[.,]\d{2})",
         "supplier": r"(?:руб\.|копеек)\s*\n\s*([А-ЯЁ\s]+)\s*\n",
         "supplier_2": r"Поставщик:?\s*([^,\n]+?)(?:,|\s+ИНН)"
     }
@@ -136,28 +136,28 @@ def process_text_rus(text):
     result = {}
    
  
-    result["amount"] = re.search(patterns["sum"], text).group(1) if re.search(patterns["sum"], text) else None
-    if result["amount"]:
-        text = text.replace(result["amount"], '')
-        result["amount"] = result["amount"].replace(' ', '').replace(',', '.')
+    result["payment_amount"] = re.search(patterns["sum"], text).group(1) if re.search(patterns["sum"], text) else None
+    if result["payment_amount"]:
+        text = text.replace(result["payment_amount"], '')
+        result["payment_amount"] = result["payment_amount"].replace(' ', '').replace(',', '.')
         # Will return 16000.00 as float
-        result["amount"] = float(result["amount"])
-    result["reason"] = re.search(patterns["reason"], text).group(1) if re.search(patterns["reason"], text) else None
-    if result["reason"]:
-        text = text.replace(result["reason"], '')
+        result["payment_amount"] = float(result["payment_amount"])
+    result["payment_purpose"] = re.search(patterns["reason"], text).group(1) if re.search(patterns["reason"], text) else None
+    if result["payment_purpose"]:
+        text = text.replace(result["payment_purpose"], '')
     else:
-        result["reason"] = re.search(patterns["reason_2"], text).group(1) if re.search(patterns["reason_2"], text) else None
-        if result["reason"]:
-            text = text.replace(result["reason"], '')
+        result["payment_purpose"] = re.search(patterns["reason_2"], text).group(1) if re.search(patterns["reason_2"], text) else None
+        if result["payment_purpose"]:
+            text = text.replace(result["payment_purpose"], '')
         else:
-            result["reason"] = None
+            result["payment_purpose"] = None
     supplier_match = re.search(patterns["supplier"], text)
     if supplier_match:
-        result["seller"] = supplier_match.group(1).strip()
+        result["counterparty_name"] = supplier_match.group(1).strip()
     else:
         supplier_match = re.search(patterns["supplier_2"], text)
         if supplier_match:
-            result["seller"] = supplier_match.group(1).strip()
+            result["counterparty_name"] = supplier_match.group(1).strip()
 
     return result
 
@@ -175,29 +175,24 @@ def process_text_test(text):
    
     result = {}
    
-    result["bic"] = re.search(patterns["bic"], text).group(1) if re.search(patterns["bic"], text) else None
-    if result["bic"]:
-        text = text.replace(result["bic"], '')
-    corr_account, text = find_corr_account(text, result["bic"][-3:])
+    result["counterparty_bank_bic"] = re.search(patterns["bic"], text).group(1) if re.search(patterns["bic"], text) else None
+    if result["counterparty_bank_bic"]:
+        text = text.replace(result["counterparty_bank_bic"], '')
+    counterparty_account_number, text = find_counterparty_account_number(text, result["counterparty_bank_bic"][-3:])
 
-    if corr_account:
-        result["corr_account"] = corr_account
+    if counterparty_account_number:
+        result["counterparty_account_number"] = counterparty_account_number
     else:
-        result["corr_account"] = None
+        result["counterparty_account_number"] = None
 
-    result["pc"] = re.search(patterns["pc"], text).group(1) if re.search(patterns["pc"], text) else None
-    if result["pc"]:
-        text = text.replace(result["pc"], '')
-
-    result["inn_seller"] = re.search(patterns["inn"], text).group(1) if re.search(patterns["inn"], text) else None
-    if result["inn_seller"]:
-        text = text.replace(result["inn_seller"], '')
-    result["inn_buyer"] = re.search(patterns["inn"], text).group(1) if re.search(patterns["inn"], text) else None
-    if result["inn_buyer"]:
-        text = text.replace(result["inn_buyer"], '')
- 
-
+    #result["inn_seller"] = re.search(patterns["inn"], text).group(1) if re.search(patterns["inn"], text) else None
+    #if result["inn_seller"]:
+    #    text = text.replace(result["inn_seller"], '')
+    #result["inn_buyer"] = re.search(patterns["inn"], text).group(1) if re.search(patterns["inn"], text) else None
+    #if result["inn_buyer"]:
+    #    text = text.replace(result["inn_buyer"], '')
     return result
+ 
 
 async def get_user_from_db(user_id: str):
     """Fetches a user from the database based on user_id."""
@@ -273,7 +268,7 @@ def get_bill_route(bot):
                 await bot.answer_callback_query(callback_query.id)
                 await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
                 await state.set_state(BillDateForm.waiting_for_date)
-
+                return
 
         elif data['action'] == 'cancel_bill':
             
@@ -316,7 +311,7 @@ def get_bill_route(bot):
         
         elif data['action'] == 'send_bill':
             await send_bill(new_bill, callback_query, bot)
-
+ 
         new_bill = await get_bill(bill_id)
         notification_string = await format_bill_notification(
             created_by=new_bill.created_by,

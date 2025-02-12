@@ -55,6 +55,12 @@ def create_main_menu(bill_id: int, status: BillStatus):
     inline_keyboard = [  [
                 types.InlineKeyboardButton(text="Отменить платёж", callback_data=f'{{"action": "cancel_bill", "bill_id": {bill_id}}}')
             ]]
+    if status == BillStatus.canceled:
+        inline_keyboard = [
+            [
+            
+            ]
+        ]
     if status == BillStatus.new:
         inline_keyboard = [
             [

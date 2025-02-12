@@ -34,14 +34,13 @@ class CreateBillData(TypedDict):
     file_name: str
     status: BillStatus
     tochka_bank_account_id: Optional[int]
-    amount: float
-    pc: str
-    reason: str
-    bic: str
-    seller: str
-    inn_seller: str
-    inn_buyer: str
-    corr_account: str
+    payment_amount: Optional[float]
+    counterpart_account_number: Optional[str]
+    payment_purpose: Optional[str]
+    counterparty_bank_bic: Optional[str]
+    counterparty_name: Optional[str]
+    counterparty_inn: Optional[str]
+    counterpart_account_number: Optional[str]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime]
@@ -52,14 +51,12 @@ class UpdateBillData(TypedDict):
     s3_url: Optional[str]
     plain_text: Optional[str]
     file_name: Optional[str]
-    amount: Optional[float]
-    pc: Optional[str]
-    reason: Optional[str]
-    bic: Optional[str]
-    seller: Optional[str]
-    inn_seller: Optional[str]
-    inn_buyer: Optional[str]
-    corr_account: Optional[str]
+    payment_amount: Optional[float]
+    counterpart_account_number: Optional[str]
+    payment_purpose: Optional[str]
+    counterparty_bank_bic: Optional[str]
+    counterparty_name: Optional[str]
+    counterparty_inn: Optional[str]
     tochka_bank_account_id: Optional[int]
     status: Optional[BillStatus]
     created_at: Optional[datetime]
@@ -198,7 +195,7 @@ async def get_chat_owner(chat_id: str):
     return res
 
 
-async def send_bill(new_bill, callback_query,  bot):
+async def send_bill(new_bill, callback_query,  bot, try_count=1):
     if new_bill.status:
 
         account_arr = new_bill.accountId.split('/')
@@ -206,6 +203,8 @@ async def send_bill(new_bill, callback_query,  bot):
             auth = None
             integration = await get_integration_to_cashbox_by_chat_id(str(callback_query.message.chat.id))
             tokens = await get_access_token(new_bill['tochka_bank_account_id'])
+            if try_count == 0:
+                res = await refresh_token(integration["id"])
             if 'access_token' in tokens:
                 auth = tokens['access_token']
             else:
@@ -216,23 +215,25 @@ async def send_bill(new_bill, callback_query,  bot):
             result = await send_payment_to_tochka(
                 account_code=account_arr[0],
                 bank_code=account_arr[1],
-                counterparty_bank_bic=new_bill.bic,
-                counterparty_account_number=new_bill.corr_account,
-                counterparty_name=new_bill.seller,
-                paymentDate=new_bill.payment_date.strftime("%Y-%m-%d"),
-                paymentAmount=new_bill.amount,
-                payment_purpose=new_bill.reason,
+                counterparty_bank_bic=new_bill.counterparty_bank_bic,
+                counterparty_account_number=new_bill.counterparty_account_number,
+                counterparty_name=new_bill.counterparty_name,
+                payment_date=new_bill.payment_date.strftime("%Y-%m-%d"),
+                payment_amount=new_bill.payment_amount,
+                payment_purpose=new_bill.payment_purpose,
                 auth=auth
             )
             if result["success"]:
-                await update_bill(new_bill['id'], { 'requestId': result["request_id"] })
+                await update_bill(new_bill['id'], { 'request_id': result["request_id"] })
                 await update_bill_status(new_bill['id'], BillStatus.requested)
                 await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Счет оплачен. запрос: {result['request_id']}")
             else:
                 await bot.send_message(chat_id=callback_query.message.chat.id, text="Ошибка при оплате счета.")
                 await update_bill_status(new_bill['id'], BillStatus.error)
         except TochkaBankError as e:
-            detailed_errors = [f"{err['errorCode']}: {err['message']}" for err in e.errors]
+            detailed_errors = ''
+            if e.errors is not None:
+                detailed_errors = [f"{err['errorCode']}: {err['message']}" for err in e.errors]
             error_message = f"Bank API Error {e.code}: {e.message}\nDetailed errors: {detailed_errors}"
             await update_bill_status(new_bill['id'], BillStatus.error)
             await bot.send_message(chat_id=callback_query.message.chat.id, text=error_message)

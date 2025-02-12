@@ -1,7 +1,7 @@
 import aiohttp
 
 class TochkaBankError(Exception):
-    def __init__(self, code: str, message: str, error_id: str, errors: list):
+    def __init__(self, code: str, message: str, error_id: str, errors: list=[]):
         self.code = code
         self.message = message
         self.error_id = error_id
@@ -9,15 +9,18 @@ class TochkaBankError(Exception):
         super().__init__(self.message)
 
 
-async def get_access_token(integration_id: int) -> dict:
+async def refresh_token(integration_cashboxes: int) -> dict:
 
-    url = "http://localhost:9001/apvi/v1/bank/refresh_token"
-    data = {
-        "integration_cashboxes": integration_id
+    url = f"http://localhost/api/v1/bank/refresh_token"
+
+    headers = {
+        "Content-Type": "application/json"
     }
-
+    payload = { 
+        "integration_cashboxes": integration_cashboxes,
+    }
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=data) as response:
+        async with session.post(url, json=payload, headers=headers) as response:
             return await response.json()
           
 
@@ -26,13 +29,13 @@ async def send_payment_to_tochka(
     bank_code: str,
     counterparty_bank_bic: str,
     counterparty_account_number: str,
-    paymentAmount: float,
-    paymentDate: str,
+    payment_amount: float,
+    payment_date: str,
     counterparty_name: str,
     payment_purpose: str,
     auth: str
 ) -> dict:
-    url = "https://enter.tochka.com/sandbox/v2/payment/v1.0/for-sign"
+    url = "https://enter.tochka.com/uapi/payment/v1.0/for-sign"
     
     headers = {
         "Authorization": f"Bearer {auth}",
@@ -43,8 +46,8 @@ async def send_payment_to_tochka(
         "Data": {
             "accountCode": account_code,
             "bankCode": bank_code,
-            "paymentAmount": paymentAmount,
-            "paymentDate": paymentDate,
+            "paymentAmount": payment_amount,
+            "paymentDate": payment_date,
             "counterpartyBankBic": counterparty_bank_bic,
             "counterpartyAccountNumber": counterparty_account_number,
             "counterpartyName": counterparty_name,
@@ -78,5 +81,6 @@ async def send_payment_to_tochka(
             raise TochkaBankError(
                 code=error_code,
                 message=error_mapping.get(error_code, error_message),
-                error_id=error_id
+                error_id=error_id,
+                errors=response_data.get("Errors")
             )
