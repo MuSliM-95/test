@@ -52,7 +52,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
                     OauthWarehouseModel(
                         cashbox=oauth.get("cashbox_id"),
                         warehouse_name = oauth.get("name"),
-                        warehouse_id = oauth.get("id"),
+                        warehouse_id = oauth.get("warehouse_id"),
                         warehouse_description = oauth.get("description"),
                         last_update = oauth.get("updated_at"),
                         status = True if not oauth.get("is_deleted") else False,
