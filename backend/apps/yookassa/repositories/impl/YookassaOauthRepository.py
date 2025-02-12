@@ -60,6 +60,6 @@ class YookassaOauthRepository(IYookassaOauthRepository):
                     for oauth in oauth_list
                 ]
             else:
-                return None
+                return []
         except Exception as error:
             raise Exception(f"ошибка БД: {str( error )}")
