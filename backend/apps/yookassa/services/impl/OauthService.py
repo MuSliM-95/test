@@ -1,7 +1,9 @@
 import base64
+import os
 
 from apps.yookassa.functions.core.IGetOauthCredentialFunction import IGetOauthCredentialFunction
 from apps.yookassa.models.OauthBaseModel import OauthUpdateModel, OauthModel, OauthBaseModel
+from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 from apps.yookassa.services.core.IOauthService import IOauthService
@@ -26,15 +28,24 @@ class OauthService(IOauthService):
         return f'https://yookassa.ru/oauth/v2/authorize?client_id={client_id}&response_type=code&state={base64.b64encode(f"{cashbox}:{warehouse}:{token}".encode("utf-8")).decode("utf-8")}'
 
     async def revoke_token(self, cashbox: int, warehouse: int):
+        try:
 
-        client_id, client_secret = self.__get_oauth_credential_function()
-        oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
+            client_id, client_secret = self.__get_oauth_credential_function()
+            oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
 
-        if not oauth:
-            raise Exception("Отсутствует oauth2 по данному пользователю")
+            if not oauth:
+                raise Exception("Отсутствует oauth2 по данному пользователю")
 
-        await self.__request_repository.revoke_token(token = oauth.access_token, client_id = client_id, client_secret = client_secret)
-        await self.__oauth_repository.delete_oauth(cashbox=cashbox, warehouse=warehouse)
+            await self.__request_repository.revoke_token(token = oauth.access_token, client_id = client_id, client_secret = client_secret)
+            await self.__oauth_repository.delete_oauth(cashbox=cashbox, warehouse=warehouse)
+
+            webhook_list = await self.__request_repository.get_webhook_list(access_token = oauth.access_token)
+
+            for webhook in webhook_list:
+                await self.__request_repository.delete_webhook(access_token = oauth.access_token, webhook_id = webhook.id)
+
+        except Exception as error:
+            raise error
 
     async def get_access_token(self, code: str, cashbox: int, warehouse: int):
 
@@ -53,6 +64,27 @@ class OauthService(IOauthService):
                 await self.__oauth_repository.insert_oauth(
                     cashbox,
                     OauthBaseModel(cashbox_id = cashbox, access_token = res.get("access_token"), warehouse_id = warehouse))
+
+            await self.__request_repository.create_webhook(
+                access_token = res.get("access_token"),
+                webhook = WebhookBaseModel(
+                    event = "payment.waiting_for_capture",
+                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/payments/webhook/waiting_for_capture")
+            )
+
+            await self.__request_repository.create_webhook(
+                access_token = res.get("access_token"),
+                webhook = WebhookBaseModel(
+                    event = "payment.succeeded",
+                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/payments/webhook/succeeded")
+            )
+
+            await self.__request_repository.create_webhook(
+                access_token = res.get("access_token"),
+                webhook = WebhookBaseModel(
+                    event = "payment.canceled",
+                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/payments/webhook/canceled")
+            )
 
         except Exception as error:
             raise error

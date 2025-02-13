@@ -3,6 +3,7 @@ import uuid
 from aiohttp import BasicAuth
 
 from apps.yookassa.models.PaymentModel import PaymentCreateModel, PaymentBaseModel
+from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel,WebhookViewModel
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 import aiohttp
 import json
@@ -46,3 +47,62 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                     return res
             except Exception as error:
                 raise Exception(f"ошибка POST запроса к yookassa: {str(error)}")
+
+    async def create_webhook(self, access_token: str, webhook: WebhookViewModel) -> WebhookBaseModel:
+        async with aiohttp.ClientSession(
+                base_url = "https://api.yookassa.ru",
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                    "Idempotence-Key": str(uuid.uuid4())}
+        ) as http:
+            print(json.dumps(webhook.dict(exclude_none = True)))
+            try:
+                async with http.post(url = "/v3/webhooks", data = json.dumps(webhook.dict(exclude_none = True))
+                                     ) as r:
+                    res = await r.json()
+                    if res.get("type") == "error":
+                        raise Exception(res)
+                    return WebhookBaseModel(**res)
+            except Exception as error:
+                raise Exception(f"ошибка POST запроса к yookassa: {str(error)}")
+
+    async def get_webhook_list(self, access_token: str) -> list[WebhookBaseModel]:
+        async with aiohttp.ClientSession(
+                base_url = "https://api.yookassa.ru",
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                    "Idempotence-Key": str(uuid.uuid4())}
+        ) as http:
+
+            try:
+                async with http.get(url = "/v3/webhooks") as r:
+                    res = await r.json()
+                    if res.get("type") == "error":
+                        raise Exception(res)
+                    print(res)
+                    return [WebhookBaseModel(**item) for item in res.get("items")]
+            except Exception as error:
+                raise Exception(f"ошибка GET запроса к yookassa: {str(error)}")
+
+    async def delete_webhook(self, access_token: str, webhook_id: str):
+        async with aiohttp.ClientSession(
+                base_url = "https://api.yookassa.ru",
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                    "Idempotence-Key": str(uuid.uuid4())}
+        ) as http:
+
+            try:
+                async with http.delete(url = f"/v3/webhooks/{webhook_id}") as r:
+                    res = await r.json()
+                    if res.get("type") == "error":
+                        raise Exception(res)
+                    print(res)
+                    return res
+            except Exception as error:
+                raise Exception(f"ошибка DELETE запроса к yookassa: {str(error)}")
+
+
