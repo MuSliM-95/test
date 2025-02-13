@@ -17,37 +17,6 @@ async def create_select_account_payment_keyboard(bill_id, accounts):
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=keyboard_keys)
     return keyboard
 
-# Функция для создания клавиатуры
-def create_bill_action_keyboard(bill):
-    error_keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(text="Сместить дату", callback_data=f'{{"route": "bills", "action": "change_date", "bill_id": {bill.id}}}'),
-            ],
-            [
-                types.InlineKeyboardButton(text="Добавить сегодняшним числом", callback_data=f'{{"route": "bills", "action": "update_bill_payment_date", "bill_id": {bill.id}}}'),
-            ],
-            [
-                types.InlineKeyboardButton(text="Отмена", callback_data=f'{{"route": "bills", "action": "cancel_bill", "bill_id": {bill.id}}}'),
-            ]
-        ]
-    )
-    return error_keyboard
-
-def create_like_dislike_keyboard(bill_id: int):
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(text="👍 Like", callback_data=f'{{"route": "bills", "action": "like", "bill_id": {bill_id}}}'),
-                types.InlineKeyboardButton(text="👎 Dislike", callback_data=f'{{"route": "bills", "action": "dislike", "bill_id": {bill_id}}}'),
-            ]
-        ]
-    )
-    return keyboard
-
-
-
-
 
 def create_main_menu(bill_id: int, status: BillStatus):
     today = datetime.now()
