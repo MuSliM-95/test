@@ -64,4 +64,6 @@ def downgrade() -> None:
     op.drop_table('bill_approvers')
     op.drop_index(op.f('ix_bills_id'), table_name='bills')
     op.drop_table('bills')
+    op.execute("DROP TYPE billstatus")
+    op.execute("DROP TYPE billapprovestatus")
     # ### end Alembic commands ###

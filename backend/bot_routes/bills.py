@@ -17,8 +17,7 @@ from typing import Dict, Any
 from database.db import database,  users
 from typing import Dict, Any
 
-from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
-from common.s3_service.models.S3SettingsModel import S3SettingsModel
+
 from bot_routes.pdf_reader import extract_text_from_pdf_images
 from bot_routes.bills_model import *
 from bot_routes.keyboards import *
@@ -199,26 +198,8 @@ async def get_user_from_db(user_id: str):
     query = users.select().where(users.c.chat_id == user_id)
     return await database.fetch_one(query)
 
-
-async def get_bill_approvers_data(bill_id: int):
-    """Retrieves and formats bill approvers data."""
-    approvers_db = await get_approvers_by_bill(bill_id)
-    approvers = []
-    for approver in approvers_db:
-        query = users.select().where(users.c.id == approver.approver_id)
-        result = await database.fetch_one(query)
-        approvers.append({
-            "id": approver.id,
-            "approver_id": approver.approver_id,
-            "bill_id": approver.bill_id,
-            "status": approver.status,
-            "username": result.username,
-        })
-    return approvers
-
-
 # Функция для получения маршрута
-def get_bill_route(bot):
+def get_bill_route(bot, s3_client):
     pdf_router = Router()
 
     async def check_user_registration(callback_query: types.CallbackQuery):
@@ -229,11 +210,9 @@ def get_bill_route(bot):
             return False
         return user
 
-
     
 
-
-    @pdf_router.callback_query(lambda call: True)
+    @pdf_router.callback_query(F.data.startswith('{"action":'))
     async def callback_q(callback_query: types.CallbackQuery, state: FSMContext):
         user_id = str(callback_query.from_user.id)
         await bot.answer_callback_query(callback_query.id)
@@ -246,7 +225,7 @@ def get_bill_route(bot):
             await bot.answer_callback_query(callback_query.id, text=f"Счет {bill_id} отменен")
             return
         old_bill = dict(new_bill)
-        approvers = await get_bill_approvers_data(new_bill.id)
+        approvers = await get_approvers_extended_by_bill(new_bill.id)
 
         user_permissions = await check_user_permissions(user_id, bill_id)
         if not user_permissions:
@@ -289,7 +268,7 @@ def get_bill_route(bot):
                 await update_bill_approve(approve.id, {'status':  BillApproveStatus.approved})
                 await update_bill_status_based_on_approvals(bill_id)
 
-                approvers = await get_bill_approvers_data(new_bill.id)
+                approvers = await get_approvers_extended_by_bill(new_bill.id)
 
 
         elif data['action'] == 'dislike':
@@ -305,7 +284,7 @@ def get_bill_route(bot):
             await update_bill_approve(approve.id, {'status':  BillApproveStatus.canceled})
             await update_bill_status_based_on_approvals(bill_id)
             
-            approvers = await get_bill_approvers_data(new_bill.id)
+            approvers = await get_approvers_extended_by_bill(new_bill.id)
             
             await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
         
@@ -339,7 +318,7 @@ def get_bill_route(bot):
             await update_bill_status_based_on_approvals(old_bill.id)
             new_bill = await get_bill(state_data['bill_id'])
 
-            approvers = await get_bill_approvers_data(new_bill.id)
+            approvers = await get_approvers_extended_by_bill(new_bill.id)
 
             notification_string = await format_bill_notification(
                 created_by=new_bill.created_by,
@@ -363,6 +342,19 @@ def get_bill_route(bot):
     async def process_invalid_date(message: types.Message):
         await message.reply("Пожалуйста, введите дату в правильном формате (ГГГГ-ММ-ДД):")
 
+    async def download_telegram_file(file_id: str,  token: str) -> bytes:
+        file_info = await bot.get_file(file_id)
+        file_path = file_info.file_path
+        file_url = f'https://api.telegram.org/file/bot{token}/{file_path}'
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as response:
+                if response.status == 200:
+                    file_content = await response.read()
+                    return file_content
+                else:
+                    raise Exception(f"Failed to download file. Status code: {response.status}")
+
     @pdf_router.message(F.document.mime_type == "application/pdf")
     async def handle_pdf(message: types.Message, state: FSMContext):
         chat_id = message.chat.id
@@ -372,113 +364,96 @@ def get_bill_route(bot):
             file_id = message.document.file_id
             file_name = message.document.file_name
             file = await bot.get_file(file_id)
-
+            file_bytes = await download_telegram_file(file_id, bot.token)
             # Получаем URL для скачивания файла
-            file_url = f'https://api.telegram.org/file/bot{bot.token}/{file.file_path}'
-            s3_factory = S3ServiceFactory(
-                s3_settings=S3SettingsModel(
-                    aws_access_key_id=os.getenv('S3_ACCESS'),
-                    aws_secret_access_key=os.getenv('S3_SECRET'),
-                    endpoint_url=os.getenv('S3_URL')
-                )
-            )
+            await s3_client.upload_file_object(file_bytes=file_bytes, bucket_name='tg-bills', file_key=file_id)
+            file_url=f'{os.getenv("S3_URL")}/tg-bills/{file_id}'
+            await state.set_data({'file_url': file_url})
 
-            # Скачиваем файл
-            async with aiohttp.ClientSession() as session:
-                async with session.get(file_url) as response:
-                    if response.status == 200:
-                        file_bytes = await response.read()
-                        s3_client = s3_factory()
-                        await s3_client.upload_file_object(file_bytes=file_bytes, bucket_name='tg-bills', file_key=file_id)
-                        file_url=f'{os.getenv("S3_URL")}/tg-bills/{file_id}'
-                        await state.set_data({'file_url': file_url})
-                        bill_text = extract_text_from_pdf_images(file_bytes)
-                        if bill_text:
-                            message_str = 'Invoice data:\n'
-                            bill_data = {}
-                            extracted_data = process_text_test(bill_text)              
-                            if extracted_data:
+            bill_text = extract_text_from_pdf_images(file_bytes)
+            if bill_text:
+                message_str = 'Invoice data:\n'
+                bill_data = {}
+                extracted_data = process_text_test(bill_text)              
+                if extracted_data:
 
-                                for key, value in extracted_data.items():
-                                    bill_data[key] = value
-                                    message_str += f"{key}: {value}\n"
-                                    print(f"{key}: {value}")
-                            else:
-                                print("Failed to extract data from the invoice. eng")
-                            bill_text_rus = extract_text_from_pdf_images(file_bytes, lang='rus')
-                            if bill_text_rus:
-                                await message.reply(bill_text_rus)
-                                extracted_data = process_text_rus(bill_text_rus)              
-                                if extracted_data:
+                    for key, value in extracted_data.items():
+                        bill_data[key] = value
+                        message_str += f"{key}: {value}\n"
+                        print(f"{key}: {value}")
+                else:
+                    print("Failed to extract data from the invoice. eng")
+                bill_text_rus = extract_text_from_pdf_images(file_bytes, lang='rus')
+                if bill_text_rus:
+                    await message.reply(bill_text_rus)
+                    extracted_data = process_text_rus(bill_text_rus)              
+                    if extracted_data:
 
-                                    for key, value in extracted_data.items():
-                                        bill_data[key] = value
-                                        message_str += f"{key}: {value}\n"
-                                        print(f"{key}: {value}")
-                                else:
-                                    print("Failed to extract data from the invoice. rus")   
-                            await message.reply(message_str)
-                            #for admin_id in admin_list:
-                                #await bot.send_message(admin_id, response_text)
-                            await state.set_state(BillDateForm.start)
-                            query = users.select().where(users.c.chat_id == str(user_id))
-                            user = await database.fetch_one(query)
-                            bill_data: CreateBillData = dict(
-                                created_by=user.id,
-                                status='new',
-                                s3_url=file_url,
-                                file_name=file_name,
-                                plain_text=bill_text_rus,
-                                **bill_data
-                            )
-                            try:
-                                bill_id = await create_bill(bill_data)
-                                bill = await get_bill(bill_id)
-                                bill_approvers = []
-                                if message.caption_entities:
-                                    for entity in message.caption_entities:
-                                        if entity.type == "mention":
-                                            user_id = message.caption[entity.offset+1:entity.offset+entity.length]
-                                            query = users.select().where(users.c.username == str(user_id) and users.c.chat_id == users.c.owner_id)
-                                            user = await database.fetch_one(query)
-                                            if user:
-                                                bill_approver = CreateBillApproverData(
-                                                    bill_id=bill.id,
-                                                    approver_id=user.id,
-                                                    status='new'
-                                                )
-                                                approve_id = await create_bill_approver(bill_approver)
-                                                bill_approvers.append({
-                                                    'approver_id': user.id,
-                                                    'username': user.username,
-                                                    'id': approve_id,
-                                                    'status': 'new'
-                                                })
-                                        
-                                notification_string = await format_bill_notification(
-                                    created_by=bill.created_by,
-                                    approvers=bill_approvers,
-                                    updated_by=user_id,
-                                    new_bill=bill
-                                )
-                                accounts = await get_tochka_bank_accounts_by_chat_id(str(chat_id))
-                                keyboard = await create_select_account_payment_keyboard(bill.id, accounts)
-                                await message.reply(notification_string, 
-                                    reply_markup=keyboard,
-                                    parse_mode="HTML")    
-                                        
-                            except Exception as e:
-                                await message.reply(f"Произошла ошибка: {e}")
-                                return
-                           
-                            
-                        else:
-                            await message.reply("Не удалось извлечь текст из файла.")
+                        for key, value in extracted_data.items():
+                            bill_data[key] = value
+                            message_str += f"{key}: {value}\n"
+                            print(f"{key}: {value}")
                     else:
-                        await message.reply("Не удалось скачать файл.")
-                        return
+                        print("Failed to extract data from the invoice. rus")   
+                await message.reply(message_str)
+
+                await state.set_state(BillDateForm.start)
+                query = users.select().where(users.c.chat_id == str(user_id))
+                user = await database.fetch_one(query)
+                bill_data: CreateBillData = dict(
+                    created_by=user.id,
+                    status='new',
+                    s3_url=file_url,
+                    file_name=file_name,
+                    plain_text=bill_text_rus,
+                    **bill_data
+                )
+                try:
+                    bill_id = await create_bill(bill_data)
+                    bill = await get_bill(bill_id)
+                    bill_approvers = []
+                    if message.caption_entities:
+                        for entity in message.caption_entities:
+                            if entity.type == "mention":
+                                user_id = message.caption[entity.offset+1:entity.offset+entity.length]
+                                query = users.select().where(users.c.username == str(user_id) and users.c.chat_id == users.c.owner_id)
+                                user = await database.fetch_one(query)
+                                if user:
+                                    bill_approver = CreateBillApproverData(
+                                        bill_id=bill.id,
+                                        approver_id=user.id,
+                                        status='new'
+                                    )
+                                    approve_id = await create_bill_approver(bill_approver)
+                                    bill_approvers.append({
+                                        'approver_id': user.id,
+                                        'username': user.username,
+                                        'id': approve_id,
+                                        'status': 'new'
+                                    })
+                            
+                    notification_string = await format_bill_notification(
+                        created_by=bill.created_by,
+                        approvers=bill_approvers,
+                        updated_by=user_id,
+                        new_bill=bill
+                    )
+                    accounts = await get_tochka_bank_accounts_by_chat_id(str(chat_id))
+                    keyboard = await create_select_account_payment_keyboard(bill.id, accounts)
+                    await message.reply(notification_string, 
+                        reply_markup=keyboard,
+                        parse_mode="HTML")    
+                            
+                except Exception as e:
+                    await message.reply(f"Произошла ошибка: {e}")
+                    return
+                
+                
+            else:
+                print("Не удалось извлечь текст из файла.")
+
 
         except Exception as e:
-            await message.reply(f"Произошла ошибка: {e}")
+            print(f"Произошла ошибка: {e}")
 
     return pdf_router

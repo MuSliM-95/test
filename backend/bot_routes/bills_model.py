@@ -336,6 +336,15 @@ async def get_approvers_by_bill(bill_id: int):
     query = bill_approvers.select().where(bill_approvers.c.bill_id == bill_id)
     return await database.fetch_all(query)
 
+async def get_approvers_extended_by_bill(bill_id: int):
+    query = (
+        select([bill_approvers, users.c.username])
+        .select_from(bill_approvers)
+        .join(users, bill_approvers.c.approver_id == users.c.id)
+        .where(bill_approvers.c.id == bill_id)
+    )
+    return await database.fetch_all(query)
+
 async def update_bill_approve(id: int, approver_data: UpdateBillApproverData):
     query = bill_approvers.update().where(bill_approvers.c.id == id).values(**approver_data)
     return await database.execute(query)

@@ -22,13 +22,13 @@ def create_bill_action_keyboard(bill):
     error_keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                types.InlineKeyboardButton(text="Сместить дату", callback_data=f'{{"action": "change_date", "bill_id": {bill.id}}}'),
+                types.InlineKeyboardButton(text="Сместить дату", callback_data=f'{{"route": "bills", "action": "change_date", "bill_id": {bill.id}}}'),
             ],
             [
-                types.InlineKeyboardButton(text="Добавить сегодняшним числом", callback_data=f'{{"action": "update_bill_payment_date", "bill_id": {bill.id}}}'),
+                types.InlineKeyboardButton(text="Добавить сегодняшним числом", callback_data=f'{{"route": "bills", "action": "update_bill_payment_date", "bill_id": {bill.id}}}'),
             ],
             [
-                types.InlineKeyboardButton(text="Отмена", callback_data=f'{{"action": "cancel_bill", "bill_id": {bill.id}}}'),
+                types.InlineKeyboardButton(text="Отмена", callback_data=f'{{"route": "bills", "action": "cancel_bill", "bill_id": {bill.id}}}'),
             ]
         ]
     )
@@ -38,8 +38,8 @@ def create_like_dislike_keyboard(bill_id: int):
     keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                types.InlineKeyboardButton(text="👍 Like", callback_data=f'{{"action": "like", "bill_id": {bill_id}}}'),
-                types.InlineKeyboardButton(text="👎 Dislike", callback_data=f'{{"action": "dislike", "bill_id": {bill_id}}}'),
+                types.InlineKeyboardButton(text="👍 Like", callback_data=f'{{"route": "bills", "action": "like", "bill_id": {bill_id}}}'),
+                types.InlineKeyboardButton(text="👎 Dislike", callback_data=f'{{"route": "bills", "action": "dislike", "bill_id": {bill_id}}}'),
             ]
         ]
     )

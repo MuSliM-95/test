@@ -35,12 +35,23 @@ from database.db import database, cboxes, users, users_cboxes_relation, accounts
     articles, cheques, contragents, messages
 from functions.cboxes import create_cbox, join_cbox
 from functions.helpers import gen_token
+from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
+from common.s3_service.models.S3SettingsModel import S3SettingsModel
 from producer import produce_message
 
 from bot_routes.bills import get_bill_route
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(os.environ.get("TG_TOKEN"), parse_mode="HTML")
+
+s3_factory = S3ServiceFactory(
+    s3_settings=S3SettingsModel(
+        aws_access_key_id=os.getenv('S3_ACCESS'),
+        aws_secret_access_key=os.getenv('S3_SECRET'),
+        endpoint_url=os.getenv('S3_URL')
+    )
+)
+s3_client = s3_factory()
 
 app_url = os.environ.get("APP_URL")
 
@@ -950,7 +961,7 @@ async def main():
     dp = Dispatcher()
 
     await database.connect()
-    router = get_bill_route(bot)
+    router = get_bill_route(bot, s3_client)
     # Register handlers
     dp.include_router(router)
     dp.include_router(router_comm)
