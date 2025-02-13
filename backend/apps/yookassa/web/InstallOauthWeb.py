@@ -8,7 +8,10 @@ from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from apps.yookassa.web.view.CallbackOauthView import CallbackOauthView
 from apps.yookassa.web.view.CreateOauthView import CreateOauthView
 from apps.yookassa.web.view.CreatePaymentApiView import CreatePaymentApiView
+from apps.yookassa.web.view.CreateWebhookView import CreateWebhookView
+from apps.yookassa.web.view.DeleteWebhookView import DeleteWebhookView
 from apps.yookassa.web.view.GetInstallOauthListView import GetInstallOauthListView
+from apps.yookassa.web.view.GetWebhookListView import GetWebhookListView
 from apps.yookassa.web.view.RevokeTokenOauthView import RevokeTokenOauthView
 from common.utils.ioc.ioc import ioc
 
@@ -53,6 +56,51 @@ class InstallYookassaOauthWeb:
                 request_repository = ioc.get(IYookassaRequestRepository),
                 get_oauth_credential_function = GetOauthCredentialFunction()
             )
+        )
+
+        create_webhook = CreateWebhookView(
+            yookassa_api_service = YookassaApiService(
+                request_repository = ioc.get(IYookassaRequestRepository),
+                oauth_repository = ioc.get(IYookassaOauthRepository)
+            )
+        )
+
+        get_webhook_list = GetWebhookListView(
+            yookassa_api_service = YookassaApiService(
+                request_repository = ioc.get(IYookassaRequestRepository),
+                oauth_repository = ioc.get(IYookassaOauthRepository)
+            )
+        )
+
+        delete_webhook = DeleteWebhookView(
+            yookassa_api_service = YookassaApiService(
+                request_repository = ioc.get(IYookassaRequestRepository),
+                oauth_repository = ioc.get(IYookassaOauthRepository)
+            )
+        )
+
+        app.add_api_route(
+            path = "/yookassa/webhook/delete",
+            endpoint = delete_webhook.__call__,
+            methods = ["DELETE"],
+            status_code = status.HTTP_200_OK,
+            tags = ["yookassa"]
+        )
+
+        app.add_api_route(
+            path = "/yookassa/webhook/list",
+            endpoint = get_webhook_list.__call__,
+            methods = ["GET"],
+            status_code = status.HTTP_200_OK,
+            tags = ["yookassa"]
+        )
+
+        app.add_api_route(
+            path = "/yookassa/webhook/create",
+            endpoint = create_webhook.__call__,
+            methods = ["POST"],
+            status_code = status.HTTP_200_OK,
+            tags = ["yookassa"]
         )
 
         app.add_api_route(
