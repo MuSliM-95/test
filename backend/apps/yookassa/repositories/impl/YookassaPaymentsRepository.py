@@ -12,10 +12,10 @@ class YookassaPaymentsRepository(IYookassaPaymentsRepository):
         query = insert(yookassa_payments).values({
             "payment_id": payment.id,
             "status": payment.status,
-            "amount_value": payment.amount.value,
+            "amount_value": float(payment.amount.value),
             "amount_currency": payment.amount.currency,
-            "income_amount_value": payment.income_amount.value,
-            "income_amount_currency": payment.income_amount.value,
+            "income_amount_value": float(payment.income_amount.value) if payment.income_amount else None,
+            "income_amount_currency": payment.income_amount.currency if payment.income_amount else None,
             "description": payment.description,
             "is_deleted": False,
             "confirmation_url": payment.confirmation.confirmation_url
