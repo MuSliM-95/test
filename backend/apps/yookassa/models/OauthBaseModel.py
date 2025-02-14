@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 
 class OauthBaseModel(BaseModel):
+    id: int = None
     cashbox_id: Optional[int] = None
     access_token: str = None
     is_deleted: bool = False
@@ -12,7 +13,6 @@ class OauthBaseModel(BaseModel):
 
 
 class OauthModel(OauthBaseModel):
-    id: int
     created_at: datetime
     updated_at: datetime
 

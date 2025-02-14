@@ -2,6 +2,7 @@ from fastapi import FastAPI, status
 
 from apps.yookassa.functions.impl.GetOauthCredentialFunction import GetOauthCredentialFunction
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
+from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
@@ -46,7 +47,8 @@ class InstallYookassaOauthWeb:
         create_payment_api_view = CreatePaymentApiView(
             yookassa_api_service = YookassaApiService(
                 request_repository = ioc.get(IYookassaRequestRepository),
-                oauth_repository = ioc.get(IYookassaOauthRepository)
+                oauth_repository = ioc.get(IYookassaOauthRepository),
+                payments_repository = ioc.get(IYookassaPaymentsRepository)
             )
         )
 
@@ -61,21 +63,24 @@ class InstallYookassaOauthWeb:
         create_webhook = CreateWebhookView(
             yookassa_api_service = YookassaApiService(
                 request_repository = ioc.get(IYookassaRequestRepository),
-                oauth_repository = ioc.get(IYookassaOauthRepository)
+                oauth_repository = ioc.get(IYookassaOauthRepository),
+                payments_repository = ioc.get(IYookassaPaymentsRepository)
             )
         )
 
         get_webhook_list = GetWebhookListView(
             yookassa_api_service = YookassaApiService(
                 request_repository = ioc.get(IYookassaRequestRepository),
-                oauth_repository = ioc.get(IYookassaOauthRepository)
+                oauth_repository = ioc.get(IYookassaOauthRepository),
+                payments_repository = ioc.get(IYookassaPaymentsRepository)
             )
         )
 
         delete_webhook = DeleteWebhookView(
             yookassa_api_service = YookassaApiService(
                 request_repository = ioc.get(IYookassaRequestRepository),
-                oauth_repository = ioc.get(IYookassaOauthRepository)
+                oauth_repository = ioc.get(IYookassaOauthRepository),
+                payments_repository = ioc.get(IYookassaPaymentsRepository)
             )
         )
 

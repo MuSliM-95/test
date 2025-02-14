@@ -2,6 +2,7 @@ import json
 import os
 import time
 
+import aiohttp
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -22,8 +23,10 @@ from apps.booking.nomenclature.infrastructure.repositories.impl.BookingNomenclat
     BookingNomenclatureRepository
 from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
+from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
+from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
 from apps.yookassa.web.InstallOauthWeb import InstallYookassaOauthWeb
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
@@ -268,6 +271,7 @@ async def startup():
     ioc.set(IWidgetInstallerRepository, WidgetInstallerRepository())
     ioc.set(IYookassaOauthRepository, YookassaOauthRepository())
     ioc.set(IYookassaRequestRepository, YookassaRequestRepository())
+    ioc.set(IYookassaPaymentsRepository, YookassaPaymentsRepository())
 
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)

@@ -13,17 +13,15 @@ class CreatePaymentApiView:
     ):
         self.__yookassa_api_service = yookassa_api_service
 
-    async def __call__(self, token: str, payment: PaymentCreateModel):
+    async def __call__(self, token: str, warehouse: int, payment: PaymentCreateModel):
         try:
             user = await get_user_by_token(token)
             payment_yookassa = await self.__yookassa_api_service.api_create_payment(
                 cashbox = user.cashbox_id,
-                payment = payment
+                payment = payment,
+                warehouse = warehouse
             )
-            if payment_yookassa is not None:
-                return payment_yookassa
-            else:
-                raise Exception("пустой ответ от сервера yookassa")
+            return payment_yookassa
         except Exception as error:
             raise HTTPException(detail = f"Платеж не создан: {str(error)}", status_code = 432)
 

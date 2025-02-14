@@ -44,7 +44,6 @@ class OauthService(IOauthService):
             await self.__request_repository.revoke_token(token = oauth.access_token, client_id = client_id, client_secret = client_secret)
             await self.__oauth_repository.delete_oauth(cashbox=cashbox, warehouse=warehouse)
 
-
         except Exception as error:
             raise error
 
