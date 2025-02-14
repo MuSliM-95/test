@@ -65,12 +65,16 @@ class ConfirmationRedirect(BaseModel):
 
 
 class ConfirmationEmbedded(BaseModel):
-    type: Literal["embedded"]
+    type: Literal["embedded"] = None
 
+
+class ConfirmationRedirectResponce(BaseModel):
+    type: Literal["redirect"]
+    confirmation_url: str
 
 
 class PaymentCreateModel(BaseModel):
-    amount: AmountModel
+    amount: AmountModel = None
     description: str = None
     receipt: ReceiptModel = None
     tax_system_code: int = None
@@ -78,22 +82,22 @@ class PaymentCreateModel(BaseModel):
     merchant_customer_id: str = None
     payment_method_data: Union[MethodBankCard, MethodSbp] = None
     test: bool = True
-    confirmation: Union[ConfirmationRedirect, ConfirmationEmbedded] = None
+    confirmation: Union[ConfirmationRedirect, ConfirmationEmbedded, ConfirmationRedirectResponce] = None
 
 
 class PaymentBaseModel(PaymentCreateModel):
-    id: str
-    status: str
-    amount: AmountModel
-    income_amount: AmountModel
+    id: str = None
+    status: str = None
+    amount: AmountModel = None
+    income_amount: AmountModel = None
     description: str = None
-    recipient: RecipientModel
+    recipient: RecipientModel = None
     captured_at: datetime = None
-    created_at: datetime
+    created_at: datetime = None
     expires_at: datetime = None
     test: bool
-    refundable: bool
-    receipt_registration: str
+    refundable: bool = None
+    receipt_registration: str = None
     merchant_customer_id: str = None
     invoice_details: InvoiceDetails = None
 

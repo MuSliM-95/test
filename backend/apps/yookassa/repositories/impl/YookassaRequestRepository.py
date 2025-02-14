@@ -7,7 +7,6 @@ from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel,WebhookViewMo
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 import aiohttp
 import json
-from uuid import UUID
 
 
 class YookassaRequestRepository(IYookassaRequestRepository):
@@ -33,20 +32,6 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                 if res.get("error"):
                     raise Exception(res)
                 return res
-
-    async def create_payments(self, access_token: str, payment: PaymentCreateModel) -> PaymentBaseModel:
-        payment_dict = payment.dict(exclude_none = True)
-        async with aiohttp.ClientSession(
-            base_url = "https://api.yookassa.ru",
-            auth = BasicAuth(login = "1020107", password = access_token),
-            headers = {"Content-Type": "application/json", "Idempotence-Key": str(uuid.uuid4())}
-        ) as http:
-            try:
-                async with http.post(url = "/v3/payments", data = json.dumps(payment_dict)) as r:
-                    res = await r.json()
-                    return res
-            except Exception as error:
-                raise Exception(f"ошибка POST запроса к yookassa: {str(error)}")
 
     async def create_webhook(self, access_token: str, webhook: WebhookViewModel) -> WebhookBaseModel:
         async with aiohttp.ClientSession(
@@ -104,5 +89,25 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                     return res
             except Exception as error:
                 raise Exception(f"ошибка DELETE запроса к yookassa: {str(error)}")
+
+    async def create_payments(self, access_token: str, payment: PaymentCreateModel) -> PaymentBaseModel:
+        payment_dict = payment.dict(exclude_none = True)
+        async with aiohttp.ClientSession(
+            base_url = "https://api.yookassa.ru",
+            headers = {
+                "Content-Type": "application/json",
+                "Idempotence-Key": str(uuid.uuid4()),
+                "Authorization": f"Bearer {access_token}",
+            }
+        ) as http:
+            try:
+                async with http.post(url = "/v3/payments", data = json.dumps(payment_dict)) as r:
+                    res = await r.json()
+                    print(res)
+                    if r.status in [400, 401, 403, 404]:
+                        raise Exception(res)
+                    return PaymentBaseModel(**res)
+            except Exception as error:
+                raise Exception(f"ошибка POST запроса к yookassa: {str(error)}")
 
 

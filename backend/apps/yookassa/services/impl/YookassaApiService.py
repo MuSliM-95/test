@@ -1,6 +1,7 @@
 from apps.yookassa.models.PaymentModel import PaymentCreateModel, PaymentBaseModel
 from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel,WebhookViewModel
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
+from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 from apps.yookassa.services.core.IYookassaApiService import IYookassaApiService
 
@@ -10,18 +11,12 @@ class YookassaApiService(IYookassaApiService):
     def __init__(
             self,
             request_repository: IYookassaRequestRepository,
-            oauth_repository: IYookassaOauthRepository
+            oauth_repository: IYookassaOauthRepository,
+            payments_repository: IYookassaPaymentsRepository
     ):
         self.__request_repository = request_repository
         self.__oauth_repository = oauth_repository
-
-    async def api_create_payment(self, cashbox: int, warehouse: int, payment: PaymentCreateModel):
-        try:
-            oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
-            response = await self.__request_repository.create_payments(access_token = oauth.access_token, payment = payment)
-            return response
-        except Exception as error:
-            raise Exception(f"ошибка создания платежа: {str(error)}")
+        self.__payments_repository = payments_repository
 
     async def api_create_webhook(self, cashbox: int, warehouse: int, webhook: WebhookViewModel):
         try:
@@ -54,4 +49,14 @@ class YookassaApiService(IYookassaApiService):
             return response
         except Exception as error:
             raise Exception(f"ошибка удаления webhook: {str(error)}")
+
+    async def api_create_payment(self, cashbox: int, warehouse: int, payment: PaymentCreateModel):
+        try:
+            oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
+            response = await self.__request_repository.create_payments(access_token = oauth.access_token, payment = payment)
+
+            await self.__payments_repository.insert(oauth_id = oauth.id, payment = PaymentBaseModel(**response.dict()))
+            return response
+        except Exception as error:
+            raise Exception(f"ошибка создания платежа: {str(error)}")
 
