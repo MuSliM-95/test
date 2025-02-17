@@ -62,7 +62,7 @@ class TgBillApproversService:
                         bill_approver = ITgBillApproversCreate(
                             bill_id=bill_id,
                             approver_id=user.id,
-                            status='new'
+                            status=TgBillApproveStatus.NEW
                         )
                         approve_id = await self.bill_approvers_repository.insert(bill_approver)
                         bill_approvers.append({

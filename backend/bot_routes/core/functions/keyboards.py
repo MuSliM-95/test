@@ -23,7 +23,7 @@ def create_main_menu(bill_id: int, status: TgBillStatus) -> types.InlineKeyboard
     today = datetime.now().strftime("%Y-%m-%d")
 
     if status == TgBillStatus.CANCELED:
-        return types.InlineKeyboardMarkup()
+        return None
 
     keyboard_buttons: List[List[types.InlineKeyboardButton]] = []
 

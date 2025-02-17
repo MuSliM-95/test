@@ -12,7 +12,7 @@ from aiogram.client.session import aiohttp
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
 from typing import Dict, Any
-from database.db import database, tg_bot_bill_approvers,  users
+from database.db import database, tg_bot_bill_approvers,  users, tg_bot_bills, tochka_bank_accounts
 
 from bot_routes.core.functions.keyboards import *
 
@@ -40,7 +40,7 @@ class BillDateForm(StatesGroup):
 def get_bill_route(bot, s3_client):
 
     pdf_router = Router()
-    tg_bill_repository = TgBillsRepository()
+    tg_bill_repository = TgBillsRepository(database, tg_bot_bills, tochka_bank_accounts)
     tg_bill_approvers_repository = TgBillApproversRepository(database, tg_bot_bill_approvers, users)
     tg_bill_service = TgBillsService(tg_bill_repository, tg_bill_approvers_repository, s3_client, s3_bucket_name='tg-bills')
     
