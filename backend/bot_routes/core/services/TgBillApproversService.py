@@ -33,7 +33,7 @@ class TgBillApproversService:
             return []
         return approvers
 
-    async def like(self, bill_id: int, tg_id_updated_by: str):
+    async def approve(self, bill_id: int, tg_id_updated_by: str):
 
         user = await get_user_from_db(tg_id_updated_by)
         approve = await self.bill_approvers_repository.get_approve_by_bill_id_and_approver_id(bill_id, user.id)
@@ -43,15 +43,16 @@ class TgBillApproversService:
         if approve.status != TgBillApproveStatus.APPROVED:
             await self.bill_approvers_repository.update(approve.id, ITgBillApproversUpdate(status=TgBillApproveStatus.APPROVED))
             return True, "Вы подтвердили счет"
+        return False, "Вы уже подтвердили этот счет"
 
-    async def dislike(self, bill_id: int, tg_id_updated_by: str):
+    async def rejet(self, bill_id: int, tg_id_updated_by: str):
 
         user = await get_user_from_db(tg_id_updated_by)
         approve = await self.bill_approvers_repository.get_approve_by_bill_id_and_approver_id(bill_id, user.id)
         if not approve:
             return False, "Вы не можете отклонить этот счет"
 
-        await self.bill_approvers_repository.update(approve.id, bill_id(status=TgBillApproveStatus.CANCELED))
+        await self.bill_approvers_repository.update(approve.id, ITgBillApproversUpdate(status=TgBillApproveStatus.CANCELED))
         return True, "Вы отклонили счет"
 
     async def create_bill_approvers(self, message: types.Message, bill_id: int):

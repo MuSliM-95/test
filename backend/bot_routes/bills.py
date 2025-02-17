@@ -47,7 +47,7 @@ def get_bill_route(bot, s3_client):
     tg_bill_approvers_service = TgBillApproversService(tg_bill_approvers_repository)
 
 
-    @pdf_router.callback_query(lambda c: create_select_account_payment_callback.filter()(c))
+    @pdf_router.callback_query_handler(lambda c: create_select_account_payment_callback.filter()(c))
     async def select_account_payment_handler(callback_query: types.CallbackQuery):
         data = create_select_account_payment_callback.parse(callback_query.data)
         tg_id_updated_by = str(callback_query.from_user.id)
@@ -61,9 +61,10 @@ def get_bill_route(bot, s3_client):
         await bot.answer_callback_query(callback_query.id)
         await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Выбран счет {account_id}", reply_markup=create_main_menu(bill_id, bill['status']))
 
-    @pdf_router.callback_query(lambda c: change_payment_date_bill_callback.filter()(c))
-    async def change_payment_date_handler(callback_query: types.CallbackQuery, callback_data: dict = Depends(change_payment_date_bill_callback.parse), state: FSMContext = None):
-        bill_id = int(callback_data['bill_id'])
+    @pdf_router.callback_query_handler(lambda c: change_payment_date_bill_callback.filter()(c))
+    async def change_payment_date_handler(callback_query: types.CallbackQuery, state: FSMContext = None):
+        callback_data = change_payment_date_bill_callback.parse(callback_query.data)
+        bill_id = callback_data['bill_id']
         tg_id_updated_by = str(callback_query.from_user.id)
         if 'data' in callback_data and callback_data["data"]:
             datetime.strptime(callback_data["data"], "%Y-%m-%d")
@@ -71,19 +72,23 @@ def get_bill_route(bot, s3_client):
             if not bill:
                 await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
             await bot.send_message(chat_id=callback_query.message.chat.id, text=msg, reply_markup=create_main_menu(bill_id, bill['status']))
+            await bot.answer_callback_query(callback_query.id)
         else:
-
+            await state.set_data({'bill_id': bill_id})
             await bot.answer_callback_query(callback_query.id)
             await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
             await state.set_state(BillDateForm.waiting_for_date)
 
 
-    @pdf_router.callback_query(lambda c: bills_callback.filter()(c))
-    async def bills_callback_handler(callback_query: types.CallbackQuery, callback_data: dict = Depends(bills_callback.parse)):
-        action = callback_data['action']
-        bill_id = callback_data['bill_id']
+    @pdf_router.callback_query_handler(lambda c: bills_callback.filter()(c))
+    async def bills_callback_handler(callback_query: types.CallbackQuery):
+        data = bills_callback.parse(callback_query.data)
+        action = data['action']
+        bill_id = data['bill_id']
         tg_id_updated_by = str(callback_query.from_user.id)
-        user, message = tg_bill_service.check_user_registration(tg_id_updated_by)
+        user, message = await tg_bill_service.check_user_registration(tg_id_updated_by)
+        bill = await tg_bill_service.get_bill(bill_id)
+        msg = 'Действие не возможно\не нейдено'
         if not user:
             await bot.answer_callback_query(callback_query.id, text=message)
             return
@@ -91,50 +96,53 @@ def get_bill_route(bot, s3_client):
         if not res:
             await bot.answer_callback_query(callback_query.id, text=message)
             return
-        msg = ''
-
         if action == 'cancel_bill':
-            bill, msg = await tg_bill_service.update_bill(bill_id, {"status": TgBillStatus.CANCELLED})
+            bill, msg = await tg_bill_service.update_bill(bill_id, ITgBillsUpdate(status=TgBillStatus.CANCELED), tg_id_updated_by)
             if not bill:
                 await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
                 return
+            msg = await tg_bill_service.format_bill_notification(tg_id_updated_by=tg_id_updated_by, old_bill=bill,new_bill=bill)       
         if action == 'send_bill':
-            bill, msg = await tg_bill_service.send_bill(bill_id)
-            if not bill:
+            res, msg = await tg_bill_service.send_bill(bill_id, tg_id_updated_by)
+            if not res:
                 await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
                 return
-        if action == 'like':
+            bill = await tg_bill_service.update_bill_status_based_on_approvals(bill_id, approvers)
+            msg = await tg_bill_service.format_bill_notification(tg_id_updated_by=tg_id_updated_by, old_bill=bill,new_bill=bill)       
+        if action == 'approve':
             user_permissions, msg = await tg_bill_service.check_user_permissions(bill_id, tg_id_updated_by)
             if user_permissions:
               
-                approve = await tg_bill_approvers_service.get_approve_by_bill_id_and_approver_id(user.id, bill_id)
+                approve = await tg_bill_approvers_service.get_approve_by_bill_id_and_approver_id(bill_id, user.id)
                 if not approve:
                     await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Не достпно для {user.username}, так как не является утверждающим.")
                     return
-                res, msg = await tg_bill_approvers_service.like(approve.id, tg_id_updated_by)
+                res, msg = await tg_bill_approvers_service.approve(bill_id, tg_id_updated_by)
                 if not res:
                     await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
                     return
                 approvers = await tg_bill_approvers_service.get_bill_approvers(bill_id)
                 bill = await tg_bill_service.update_bill_status_based_on_approvals(bill_id, approvers)
+             
+                msg = await tg_bill_service.format_bill_notification(tg_id_updated_by=tg_id_updated_by, old_bill=bill,new_bill=bill)       
 
-
-        if action == 'dislike':
+        if action == 'reject':
             user_permissions, msg = await tg_bill_service.check_user_permissions(bill_id, tg_id_updated_by)
             if user_permissions:
-                approve = await tg_bill_approvers_service.get_approve_by_bill_id_and_approver_id(user.id, bill_id)
+                approve = await tg_bill_approvers_service.get_approve_by_bill_id_and_approver_id(bill_id, user.id)
                 if not approve:
                     await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Не достпно для {user.username}, так как не является утверждающим.")
                     return
-                res, msg = await tg_bill_approvers_service.dislike(approve.id, tg_id_updated_by)
+                res, msg = await tg_bill_approvers_service.rejet(bill_id, tg_id_updated_by)
                 if not res:
                     await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
                     return
                 approvers = await tg_bill_approvers_service.get_bill_approvers(bill_id)
                 bill = await tg_bill_service.update_bill_status_based_on_approvals(bill_id, approvers)
-
+                new_bill = await tg_bill_service.get_bill(bill.id)
+                msg = await tg_bill_service.format_bill_notification(tg_id_updated_by=tg_id_updated_by, old_bill=bill,new_bill=new_bill)
         
-        
+        await bot.answer_callback_query(callback_query.id)
         await bot.send_message(chat_id=callback_query.message.chat.id, text=msg, reply_markup=create_main_menu(bill_id, bill['status']))
     
 

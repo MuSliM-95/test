@@ -2,12 +2,11 @@ import json
 from typing import Dict, Any, Optional, Union, Callable
 from aiogram.types import CallbackQuery
 class CallbackData:
-    def __init__(self, prefix: str, *args: str):
-        self.prefix = prefix
+    def __init__(self, *args: str):
         self.fields = args
 
     def new(self, **kwargs: Any) -> str:
-        data = {'action': self.prefix}
+        data = {}
         for key in self.fields:
             if key not in kwargs:
                 raise ValueError(f"Missing required field: {key}")
@@ -17,8 +16,6 @@ class CallbackData:
     def parse(self, callback_data: str) -> Dict[str, Any]:
         try:
             data = json.loads(callback_data)
-            if data.get('action') != self.prefix:
-                raise ValueError("Invalid prefix")
             for key in self.fields:
                 if key not in data:
                     raise ValueError(f"Missing required field: {key}")

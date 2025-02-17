@@ -49,6 +49,7 @@ async def send_payment_to_tochka(
     payment_purpose: str,
     auth: str
 ) -> dict:
+    #url = 'https://enter.tochka.com/sandbox/v2/payment/v1.0/for-sign'
     url = "https://enter.tochka.com/uapi/payment/v1.0/for-sign"
     
     headers = {

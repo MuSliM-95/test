@@ -2,6 +2,7 @@ import json
 import os
 import re
 from datetime import datetime
+import time
 from aiogram import  Router, types, F
 import aiohttp
 
@@ -29,7 +30,7 @@ class TgBillsService:
         user = await database.fetch_one(query)
         if not user:
             return False, "Вы не зарегистрированы"
-        return user
+        return user, ''
     
     async def check_user_permissions(self, bill_id: int, tg_id_updated_by: str) -> tuple[dict, str]:
         user = await get_user_from_db(tg_id_updated_by)
@@ -199,9 +200,13 @@ class TgBillsService:
         old_bill = await self.tg_bills_repository.get_by_id(bill_id)
         if old_bill['status'] == TgBillStatus.CANCELED:
             return False, "Счет отменен"
-        old_bill['payment_date'] = new_date
-        old_bill['status'] = TgBillStatus.WAITING_FOR_APPROVAL
-        await self.tg_bills_repository.update(old_bill.id, data)
+        payment_date = datetime.strptime(new_date, "%Y-%m-%d")
+
+        data = {
+            "status": TgBillStatus.WAITING_FOR_APPROVAL,
+            "payment_date": payment_date,
+        }
+        await self.tg_bills_repository.update(old_bill.id, ITgBillsUpdate(**data))
         new_bill = await self.tg_bills_repository.get_by_id(bill_id)
         message = await self.format_bill_notification(
             tg_id_updated_by=tg_id_updated_by,
@@ -293,7 +298,7 @@ class TgBillsService:
     
 
                 try:
-                    await self.tg_bills_repository.update(bill['id'], {'status': TgBillStatus.ERROR})
+                    await self.tg_bills_repository.update(bill['id'],  ITgBillsUpdate(status=TgBillStatus.ERROR))
                 except Exception as e:
                     return False, "Ошибка при отправке счёта в банк. Не найден токен аccess_token."
                 
@@ -309,21 +314,23 @@ class TgBillsService:
                     auth=auth
                 )
                 if result["success"]:
-                    await self.tg_bills_repository.update((bill['id'], { 'request_id': result["request_id"], 'status': TgBillStatus.REQUESTED }))
+                    await self.tg_bills_repository.update(bill['id'], ITgBillsUpdate(request_id=result["request_id"], status=TgBillStatus.REQUESTED ))
                     return True, "Счёт отправлен в банк. Запрос на оплату: " + result["request_id"]
                 else:
-                    await self.tg_bills_repository.update((bill['id'], { 'status': TgBillStatus.ERROR }))
+                    await self.tg_bills_repository.update(bill['id'], ITgBillsUpdate(status=TgBillStatus.ERROR))
                     return False, "Ошибка при отправке счёта в банк. " + result["message"]
             except TochkaBankError as e:
                 detailed_errors = ''
                 if e.errors is not None:
                     detailed_errors = [f"{err['errorCode']}: {err['message']}" for err in e.errors]
                 error_message = f"Bank API Error {e.code}: {e.message}\nDetailed errors: {detailed_errors}"
-                await self.tg_bills_repository.update((bill['id'], { 'status': TgBillStatus.ERROR }))
+                await self.tg_bills_repository.update(bill['id'],  ITgBillsUpdate(status=TgBillStatus.ERROR))
                 return False, error_message
             except Exception as e:
-                await self.tg_bills_repository.update((bill['id'], { 'status': TgBillStatus.ERROR }))
+                await self.tg_bills_repository.update(bill['id'], ITgBillsUpdate(status=TgBillStatus.ERROR))
                 return False, "Ошибка при отправке счёта в банк. " + str(e)
+        else:
+            return False, "Счет не может быть отправлен в банк, так как его статус: " + bill.status
             
 
     async def update_bill_status_based_on_approvals(self, bill_id: int, approvers = []):
@@ -331,11 +338,11 @@ class TgBillsService:
         any_canceled = any(approver.status == TgBillApproveStatus.CANCELED for approver in approvers)
 
         if any_canceled:
-            await self.tg_bills_repository.update(bill_id, {'status': TgBillStatus.WAITING_FOR_APPROVAL})
+            await self.tg_bills_repository.update(bill_id, ITgBillsUpdate(status=TgBillStatus.WAITING_FOR_APPROVAL))
         elif all_approved:
-            await self.tg_bills_repository.update(bill_id, {'status': TgBillStatus.APPROVED})
+            await self.tg_bills_repository.update(bill_id,  ITgBillsUpdate(status=TgBillStatus.APPROVED))
         else:
-            await self.tg_bills_repository.update(bill_id, {'status': TgBillStatus.WAITING_FOR_APPROVAL})
+            await self.tg_bills_repository.update(bill_id, ITgBillsUpdate(status=TgBillStatus.WAITING_FOR_APPROVAL))
         bill = await self.tg_bills_repository.get_by_id(bill_id)
         return bill
     

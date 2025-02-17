@@ -35,8 +35,8 @@ def create_main_menu(bill_id: int, status: TgBillStatus) -> types.InlineKeyboard
 
     elif status == TgBillStatus.WAITING_FOR_APPROVAL:
         keyboard_buttons.append([
-            types.InlineKeyboardButton(text="👍 Like", callback_data=bills_callback.new(action="like", bill_id=bill_id)),
-            types.InlineKeyboardButton(text="👎 Dislike", callback_data=bills_callback.new(action="dislike", bill_id=bill_id))
+            types.InlineKeyboardButton(text="👍 Like", callback_data=bills_callback.new(action="approve", bill_id=bill_id)),
+            types.InlineKeyboardButton(text="👎 Dislike", callback_data=bills_callback.new(action="reject", bill_id=bill_id))
         ])
 
     elif status == TgBillStatus.APPROVED:
@@ -53,5 +53,8 @@ def create_main_menu(bill_id: int, status: TgBillStatus) -> types.InlineKeyboard
 
     if status != TgBillStatus.CANCELED:
         keyboard_buttons.append([types.InlineKeyboardButton(text="Отменить платёж", callback_data=bills_callback.new(action="cancel_bill", bill_id=bill_id))])
-    return types.InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    if len(keyboard_buttons) == 0:
+        return types.InlineKeyboardMarkup()
+    else:
+        return None
 
