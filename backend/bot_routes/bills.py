@@ -12,7 +12,7 @@ from aiogram.client.session import aiohttp
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
 from typing import Dict, Any
-from database.db import database,  users,  bills, tochka_bank_accounts, bill_approvers
+from database.db import database, tg_bot_bill_approvers,  users
 
 from bot_routes.core.functions.keyboards import *
 
@@ -41,7 +41,7 @@ def get_bill_route(bot, s3_client):
 
     pdf_router = Router()
     tg_bill_repository = TgBillsRepository()
-    tg_bill_approvers_repository = TgBillApproversRepository(database, bill_approvers, users)
+    tg_bill_approvers_repository = TgBillApproversRepository(database, tg_bot_bill_approvers, users)
     tg_bill_service = TgBillsService(tg_bill_repository, tg_bill_approvers_repository, s3_client, s3_bucket_name='tg-bills')
     
     tg_bill_approvers_service = TgBillApproversService(tg_bill_approvers_repository)
@@ -58,8 +58,9 @@ def get_bill_route(bot, s3_client):
             await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
             await bot.answer_callback_query(callback_query.id)
             return
+        
+        await bot.send_message(chat_id=callback_query.message.chat.id, text=msg, reply_markup=create_main_menu(bill_id, bill['status']))
         await bot.answer_callback_query(callback_query.id)
-        await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Выбран счет {account_id}", reply_markup=create_main_menu(bill_id, bill['status']))
 
     @pdf_router.callback_query_handler(lambda c: change_payment_date_bill_callback.filter()(c))
     async def change_payment_date_handler(callback_query: types.CallbackQuery, state: FSMContext = None):

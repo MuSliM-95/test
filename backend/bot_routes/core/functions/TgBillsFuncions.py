@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from database.db import database, users
-from database.db import database, bills, bill_approvers, users, integrations_to_cashbox, cboxes,pboxes,  users_cboxes_relation, tochka_bank_accounts, integrations, tochka_bank_credentials
+from database.db import database,  users,  cboxes,pboxes,   tochka_bank_accounts
 
 async def get_tochka_bank_accounts_by_chat_id(chat_id: str):
     chat_owner= await get_chat_owner(chat_id)

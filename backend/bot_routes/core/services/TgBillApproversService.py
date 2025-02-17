@@ -3,19 +3,15 @@ from aiogram import types
 
 from bot_routes.core.models.ITgBillApprovers import  ITgBillApproversCreate, ITgBillApproversUpdate
 from bot_routes.core.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
-from bot_routes.core.repositories.core.ITgBillsRepository import ITgBillsRepository
 
-from bot_routes.core.repositories.impl import TgBillsRepository
-
-from bot_routes.core.models.TgBillApproverStatus import TgBillApproveStatus
 from bot_routes.core.functions.TgBillsFuncions import get_user_from_db_by_username, get_user_from_db
+from database.db import TgBillApproveStatus
 
 
 class TgBillApproversService:
     def __init__(
         self,
         bill_approvers_repository: TgBillApproversRepository,
-
     ):
         self.bill_approvers_repository = bill_approvers_repository
 

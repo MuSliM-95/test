@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from pydantic import BaseModel, Field
 
-from bot_routes.core.models.TgBillStatus import TgBillStatus
+from database.db import TgBillStatus
 
 class ITgBillsBase(BaseModel):
     payment_date: Optional[datetime] = None

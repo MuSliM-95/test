@@ -9,9 +9,7 @@ import aiohttp
 from bot_routes.core.repositories.impl.TgBillsRepository import ITgBillsCreate, ITgBillsUpdate, TgBillsRepository
 from bot_routes.core.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
 from bot_routes.core.functions.tochka_api import TochkaBankError, get_access_token, send_payment_to_tochka
-from bot_routes.core.models.ITgBillApprovers import ITgBillApprovers, TgBillApproveStatus
-from bot_routes.core.models.ITgBills import TgBillStatus
-from database.db import database, users
+from database.db import TgBillApproveStatus, database, users,TgBillStatus
 from bot_routes.core.functions.pdf_reader import extract_text_from_pdf_images
 from bot_routes.core.functions.TgBillsFuncions import get_user_from_db, get_tochka_bank_accounts_by_chat_id
 
@@ -334,6 +332,7 @@ class TgBillsService:
             
 
     async def update_bill_status_based_on_approvals(self, bill_id: int, approvers = []):
+
         all_approved = all(approver.status == TgBillApproveStatus.APPROVED for approver in approvers)
         any_canceled = any(approver.status == TgBillApproveStatus.CANCELED for approver in approvers)
 

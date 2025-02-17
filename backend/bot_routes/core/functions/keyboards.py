@@ -4,7 +4,7 @@ from typing import List, Any
 from aiogram import types
 
 from bot_routes.core.functions.callbacks import change_payment_date_bill_callback, create_select_account_payment_callback, bills_callback
-from bot_routes.core.models.TgBillStatus import TgBillStatus
+from database.db import TgBillStatus
 
 def create_select_account_payment_keyboard(bill_id: int, accounts: List[Any]) -> types.InlineKeyboardMarkup:
     keyboard_buttons = [
@@ -54,7 +54,8 @@ def create_main_menu(bill_id: int, status: TgBillStatus) -> types.InlineKeyboard
     if status != TgBillStatus.CANCELED:
         keyboard_buttons.append([types.InlineKeyboardButton(text="Отменить платёж", callback_data=bills_callback.new(action="cancel_bill", bill_id=bill_id))])
     if len(keyboard_buttons) == 0:
-        return types.InlineKeyboardMarkup()
+        None
     else:
-        return None
+        return types.InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    
 

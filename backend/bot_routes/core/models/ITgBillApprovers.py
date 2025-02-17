@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from bot_routes.core.models.TgBillApproverStatus import TgBillApproveStatus
+from database.db import TgBillApproveStatus
 
 
 
