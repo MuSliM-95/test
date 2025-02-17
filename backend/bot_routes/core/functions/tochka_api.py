@@ -1,4 +1,7 @@
 import aiohttp
+from sqlalchemy import select
+
+from database.db import tochka_bank_credentials, tochka_bank_accounts, database
 
 class TochkaBankError(Exception):
     def __init__(self, code: str, message: str, error_id: str, errors: list=[]):
@@ -7,6 +10,17 @@ class TochkaBankError(Exception):
         self.error_id = error_id
         self.errors = errors
         super().__init__(self.message)
+
+
+async def get_access_token(tochka_bank_accounts_id: int):
+    query = (
+        select([tochka_bank_credentials])
+        .select_from(tochka_bank_credentials)
+        .join(tochka_bank_accounts, tochka_bank_accounts.c.tochka_bank_credential_id == tochka_bank_credentials.c.id)
+        .where( tochka_bank_accounts.c.id == tochka_bank_accounts_id)
+
+    )
+    return await database.fetch_one(query)
 
 
 async def refresh_token(integration_cashboxes: int) -> dict:
