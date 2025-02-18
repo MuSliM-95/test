@@ -234,7 +234,22 @@ class TgBillsService:
                     if old_bill.get(key, None) != new_bill.get(key, None):
                         changes[key] = f"{old_bill.get(key, None)} -> {new_bill.get(key, None)}"
             return changes
-
+        attribute_translation = {
+            "id": "id",
+            "payment_date": "Дата платежа",
+            "accountId": "Аккаунт в точка банке",
+            "s3_url": "Ссылка S3",
+            "file_name": "Имя файла",
+            "payment_amount": "Сумма платежа",
+            "counterparty_account_number": "Номер счёта контрагента",
+            "payment_purpose": "Назначение платежа",
+            "counterparty_bank_bic": "БИК банка контрагента",
+            "counterparty_name": "Наименование контрагента",
+            "corr_account": "Корреспондентский счет",
+            "status": "Статус",
+            "request_id": "ID запроса",
+            "tochka_bank_account_id": "accountId",
+        }
         changes = get_bill_changes(old_bill, new_bill)
         message_parts = [f"Создан новый счёт №{new_bill['id']}:"]
 
@@ -255,10 +270,14 @@ class TgBillsService:
             elif approver['status'] == TgBillApproveStatus.NEW:
                 message_parts.append(f"  - Необходимо одобрение пользователя: {approver['username']}")
         for key, value in new_bill.items():
-            if key in ['created_by','created_at', 'updated_at', 'deleted_at', 'plain_text', 'tochka_bank_account_id']:
+            # Skip certain keys that are not needed in the notification
+            if key in ['created_by','created_at', 'updated_at', 'deleted_at', 'plain_text']:
                 continue
             else:
-                message_parts.append(f"  - {key}: {value}")
+                # Use translation if defined; otherwise fall back to the key name.
+                translated_key = attribute_translation.get(key, key)
+                message_parts.append(f"  - {translated_key}: {value}")
+
         if changes:
             message_parts.append("Изменения:")
             for key, value in changes.items():
