@@ -31,6 +31,12 @@ from bot_routes.core.repositories.impl.TgBillApproversRepository import TgBillAp
 
 timezone = pytz.timezone("Europe/Moscow")
 
+
+class Form(StatesGroup):
+    year = State()
+    month = State()
+    day = State()
+
 # Определение состояний для FSM
 class BillDateForm(StatesGroup):
     start = State()
@@ -43,8 +49,80 @@ def get_bill_route(bot, s3_client):
     tg_bill_repository = TgBillsRepository(database, tg_bot_bills, tochka_bank_accounts)
     tg_bill_approvers_repository = TgBillApproversRepository(database, tg_bot_bill_approvers, users)
     tg_bill_service = TgBillsService(tg_bill_repository, tg_bill_approvers_repository, s3_client, s3_bucket_name='tg-bills')
-    
     tg_bill_approvers_service = TgBillApproversService(tg_bill_approvers_repository)
+
+
+    @pdf_router.callback_query_handler(lambda c: c.data.startswith('year_'), state=Form.year)
+    async def process_year(callback_query: types.CallbackQuery, state: FSMContext):
+        year = int(callback_query.data.split('_')[1])
+        await state.update_data(year=year)
+        data = await state.get_data()
+        bill_id = data['bill_id']
+        inline_keyboard = []
+        month_buttons = [types.InlineKeyboardButton(text=str(month), callback_data=f'month_{year}_{month}') for month in range(1, 13)]
+
+        # Split the buttons into rows of 4
+        for i in range(0, len(month_buttons), 4):
+            inline_keyboard.append(month_buttons[i:i + 4])
+
+        keyboard = types.InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+        await bot.answer_callback_query(callback_query.id)
+        await bot.send_message(callback_query.message.chat.id, f"Счёт № {bill_id}. Выберите месяц:", reply_markup=keyboard)
+        await state.set_state(Form.month)
+
+
+    # Обработка выбора месяца
+    @pdf_router.callback_query_handler(lambda c: c.data.startswith('month_'), state=Form.month)
+    async def process_month(callback_query: types.CallbackQuery, state: FSMContext):
+        year, month = map(int, callback_query.data.split('_')[1:])
+        await state.update_data(month=month)
+        data = await state.get_data()
+        bill_id = data['bill_id']
+        # Определение количества дней в месяце
+        if month in [4, 6, 9, 11]:
+            days_in_month = 30
+        elif month == 2:
+            data = await state.get_data()
+            year = data.get('year')
+            days_in_month = 29 if (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) else 28
+        else:
+            days_in_month = 31
+
+        inline_keyboard = []
+        days_buttons = [types.InlineKeyboardButton(text=str(day), callback_data=f'day_{year}_{month}_{day}') for day in range(1, days_in_month + 1)]
+        
+        # Split the buttons into rows of 4
+        for i in range(0, len(days_buttons), 4):
+            inline_keyboard.append(days_buttons[i:i+4])
+
+        keyboard = types.InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+        await bot.answer_callback_query(callback_query.id)
+        await bot.send_message(callback_query.message.chat.id, f"Счёт № {bill_id}. Выберите день:", reply_markup=keyboard)
+        await state.set_state(Form.day)
+
+
+
+    # Обработка выбора дня
+    @pdf_router.callback_query_handler(lambda c: c.data.startswith('day_'), state=Form.day)
+    async def process_day(callback_query: types.CallbackQuery, state: FSMContext):
+        year, month, day = map(int, callback_query.data.split('_')[1:])
+        data = await state.get_data()
+        bill_id = data['bill_id']
+        tg_id_updated_by = callback_query.from_user.id
+        await bot.answer_callback_query(callback_query.id)
+        await bot.send_message(callback_query.message.chat.id, f'Вы выбрали дату: {day}.{month}.{year}')
+        await state.set_state(None)
+        user_date = f"{year}-{month}-{day}"
+        datetime.strptime(user_date, "%Y-%m-%d")
+
+        bill, msg = await tg_bill_service.change_bill_date(bill_id, user_date, str(tg_id_updated_by))
+        if not bill:
+            await callback_query.message.reply(msg)
+    
+        await state.set_state(None)
+        await callback_query.message.reply(msg, reply_markup=create_main_menu(bill_id, bill['status']), 
+                                parse_mode="HTML")    
+
 
 
     @pdf_router.callback_query_handler(lambda c: create_select_account_payment_callback.filter()(c))
@@ -77,8 +155,18 @@ def get_bill_route(bot, s3_client):
         else:
             await state.set_data({'bill_id': bill_id})
             await bot.answer_callback_query(callback_query.id)
-            await callback_query.message.reply("Введите новую дату в формате ГГГГ-ММ-ДД:")
-            await state.set_state(BillDateForm.waiting_for_date)
+
+            inline_keyboard = []
+            year_buttons = [types.InlineKeyboardButton(text=str(year), callback_data=f'year_{year}') for year in range(2020, 2031)]
+
+            # Split the buttons into rows of 4
+            for i in range(0, len(year_buttons), 4):
+                inline_keyboard.append(year_buttons[i:i + 4])
+
+            keyboard = types.InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+            await callback_query.message.answer(f"Счёт № {bill_id}. Выберите год:", reply_markup=keyboard)
+            await state.set_state(Form.year)
+
 
 
     @pdf_router.callback_query_handler(lambda c: bills_callback.filter()(c))
