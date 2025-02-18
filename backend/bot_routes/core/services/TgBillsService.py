@@ -271,7 +271,7 @@ class TgBillsService:
                 message_parts.append(f"  - Необходимо одобрение пользователя: {approver['username']}")
         for key, value in new_bill.items():
             # Skip certain keys that are not needed in the notification
-            if key in ['created_by','created_at', 'updated_at', 'deleted_at', 'plain_text']:
+            if key in ['created_by','created_at', 'updated_at', 'deleted_at', 'plain_text', 'accountId']:
                 continue
             else:
                 # Use translation if defined; otherwise fall back to the key name.
