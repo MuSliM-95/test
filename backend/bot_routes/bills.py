@@ -48,7 +48,7 @@ def get_bill_route(bot, s3_client):
     pdf_router = Router()
     tg_bill_repository = TgBillsRepository(database, tg_bot_bills, tochka_bank_accounts)
     tg_bill_approvers_repository = TgBillApproversRepository(database, tg_bot_bill_approvers, users)
-    tg_bill_service = TgBillsService(tg_bill_repository, tg_bill_approvers_repository, s3_client, s3_bucket_name='tg-bills')
+    tg_bill_service = TgBillsService(tg_bill_repository, tg_bill_approvers_repository, s3_client, s3_bucket_name='5075293c-docs_generated')
     tg_bill_approvers_service = TgBillApproversService(tg_bill_approvers_repository)
 
 
