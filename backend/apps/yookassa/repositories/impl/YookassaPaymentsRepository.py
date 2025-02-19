@@ -7,8 +7,9 @@ from database.db import database, yookassa_payments
 
 class YookassaPaymentsRepository(IYookassaPaymentsRepository):
 
-    async def insert(self, oauth_id: int, payment: PaymentBaseModel):
+    async def insert(self, oauth_id: int, payment: PaymentBaseModel, payment_crm_id: int):
         query = insert(yookassa_payments).values({
+            "payment_crm_id": payment_crm_id,
             "payment_id": payment.id,
             "status": payment.status,
             "amount_value": float(payment.amount.value),

@@ -108,6 +108,7 @@ yookassa_payments = sqlalchemy.Table(
     "yookassa_payments",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key = True, index = True, autoincrement = True),
+    sqlalchemy.Column("payment_crm_id", Integer, ForeignKey("payments.id")),
     sqlalchemy.Column("payment_id", String),
     sqlalchemy.Column("status", String),
     sqlalchemy.Column("amount_value", Float),

@@ -50,12 +50,12 @@ class YookassaApiService(IYookassaApiService):
         except Exception as error:
             raise Exception(f"ошибка удаления webhook: {str(error)}")
 
-    async def api_create_payment(self, cashbox: int, warehouse: int, payment: PaymentCreateModel):
+    async def api_create_payment(self, cashbox: int, warehouse: int, payment_crm_id: int, payment: PaymentCreateModel):
         try:
             oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
             response = await self.__request_repository.create_payments(access_token = oauth.access_token, payment = payment)
 
-            await self.__payments_repository.insert(oauth_id = oauth.id, payment = PaymentBaseModel(**response.dict()))
+            await self.__payments_repository.insert(oauth_id = oauth.id, payment = PaymentBaseModel(**response.dict()), payment_crm_id = payment_crm_id)
             return response
         except Exception as error:
             raise Exception(f"ошибка создания платежа: {str(error)}")

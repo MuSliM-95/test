@@ -4,7 +4,7 @@ from apps.yookassa.models.WebhookBaseModel import WebhookViewModel, WebhookBaseM
 
 class IYookassaApiService:
 
-    async def api_create_payment(self, cashbox: int, warehouse: int, payment: PaymentCreateModel):
+    async def api_create_payment(self, cashbox: int, warehouse: int, payment_crm_id: int, payment: PaymentCreateModel):
         raise NotImplementedError
 
     async def api_create_webhook(self, cashbox: int, warehouse: int, webhook: WebhookViewModel):
