@@ -1,6 +1,6 @@
 from sqlalchemy import insert,select,update
 
-from apps.yookassa.models.PaymentModel import PaymentBaseModel
+from apps.yookassa.models.PaymentModel import PaymentBaseModel,AmountModel
 from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from database.db import database, yookassa_payments
 
@@ -29,15 +29,27 @@ class YookassaPaymentsRepository(IYookassaPaymentsRepository):
                 yookassa_payments.c.payment_id == payment_id
             )
         )
-        return PaymentBaseModel(**payment_db)
+        return PaymentBaseModel(
+            id = payment_db.payment_id,
+            status = payment_db.status,
+            amount = AmountModel(
+                value = payment_db.amount_value,
+                currency = payment_db.amount_currency,
+            ),
+            income_amount = AmountModel(
+                value = payment_db.income_amount_value,
+                currency = payment_db.income_amount_currency,
+            ),
+        )
 
     async def update(self, payment: PaymentBaseModel):
-        payment_db_model = await self.fetch_one(payment.id)
-        update_data = payment.dict(exclude_none = True)
-        update_payment = payment_db_model.copy(update = update_data)
         query = update(yookassa_payments).where(
             yookassa_payments.c.payment_id == payment.id
-        ).values(update_payment.dict())\
+        ).values({
+            "status": payment.status,
+            "income_amount_value": float(payment.income_amount.value) if payment.income_amount else None,
+            "income_amount_currency": payment.income_amount.currency if payment.income_amount else None,
+        })\
             .returning(yookassa_payments.c.id)
 
         return await database.execute(query)

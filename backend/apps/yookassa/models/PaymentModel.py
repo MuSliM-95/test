@@ -101,7 +101,7 @@ class PaymentBaseModel(PaymentCreateModel):
     captured_at: datetime = None
     created_at: datetime = None
     expires_at: datetime = None
-    test: bool
+    test: bool = None
     refundable: bool = None
     receipt_registration: str = None
     merchant_customer_id: str = None

@@ -18,10 +18,7 @@ class EventWebhookView:
 
         print(event.dict(exclude_none = True))
 
-        try:
-            payment_updated = await self.__api_service.api_update_payment(event.object)
-            print(payment_updated)
-            return Response(status_code=200)
-        except Exception as error:
-            raise HTTPException(detail = f"Webhook не обработан: {str(error)}", status_code = 432)
+        payment_updated = await self.__api_service.api_update_payment(event.object)
+        print(payment_updated)
+        return Response(status_code=200)
 
