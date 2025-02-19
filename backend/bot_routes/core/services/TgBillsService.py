@@ -12,9 +12,6 @@ from bot_routes.core.functions.tochka_api import TochkaBankError, get_access_tok
 from database.db import TgBillApproveStatus, database, users,TgBillStatus
 from bot_routes.core.functions.pdf_reader import extract_text_from_pdf_images
 from bot_routes.core.functions.TgBillsFuncions import get_user_from_db, get_tochka_bank_accounts_by_chat_id
-from bot_routes.core.services.GigachatService import GigachatService
-
-
 
 class TgBillsService:
 
@@ -398,13 +395,7 @@ class TgBillsService:
 
             bill_text = extract_text_from_pdf_images(file_bytes)
             bill_text_rus = extract_text_from_pdf_images(file_bytes, lang='rus')
-            #token = ""
-            #service = GigachatService(token)
-            #try:
-            #    result = service.send_invoice_parsing_request(bill_text)
-            #    print(json.dumps(result, ensure_ascii=False, indent=2))
-            #except Exception as err:
-            #    print(f"Ошибка: {err}")
+
             bill_data = self.extract_bill_data(bill_text, bill_text_rus)
 
             user = await get_user_from_db(str(tg_id_updated_by))
