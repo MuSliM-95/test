@@ -1,7 +1,7 @@
 """tg bot bills
 
 Revision ID: 03681c4be0e8
-Revises: a2eed5d94a9e
+Revises: 1c6b9cf07506
 Create Date: 2025-02-18 19:21:56.272722
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '03681c4be0e8'
-down_revision = 'a2eed5d94a9e'
+down_revision = '1c6b9cf07506'
 branch_labels = None
 depends_on = None
 
