@@ -398,7 +398,7 @@ class TgBillsService:
 
             bill_text = extract_text_from_pdf_images(file_bytes)
             bill_text_rus = extract_text_from_pdf_images(file_bytes, lang='rus')
-            #token = "ZjIxNjk2ZDktNmQ0Yy00ODU0LTgxMjgtODVkMzFmOGNkNzk1OmRlZWExMjc0LTg5MGEtNDAyOC1iNzA4LTFhZmU5MTgyZWY2OA=="
+            #token = ""
             #service = GigachatService(token)
             #try:
             #    result = service.send_invoice_parsing_request(bill_text)
