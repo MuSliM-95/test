@@ -6,3 +6,9 @@ class IYookassaPaymentsRepository:
     async def insert(self, oauth_id: int, payment: PaymentBaseModel):
         raise NotImplementedError
 
+    async def update(self, payment: PaymentBaseModel):
+        raise NotImplementedError
+
+    async def fetch_one(self, payment_id: str) -> PaymentBaseModel:
+        raise NotImplementedError
+

@@ -60,3 +60,9 @@ class YookassaApiService(IYookassaApiService):
         except Exception as error:
             raise Exception(f"ошибка создания платежа: {str(error)}")
 
+    async def api_update_payment(self, payment: PaymentBaseModel):
+        try:
+            return await self.__payments_repository.update(payment)
+        except Exception as error:
+            raise Exception(f"ошибка обновления платежа: {str(error)}")
+

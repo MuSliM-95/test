@@ -85,7 +85,12 @@ class InstallYookassaOauthWeb:
             )
         )
 
-        event_webhook = EventWebhookView()
+        event_webhook = EventWebhookView(
+            yookassa_api_service = YookassaApiService(
+                request_repository = ioc.get(IYookassaRequestRepository),
+                oauth_repository = ioc.get(IYookassaOauthRepository),
+                payments_repository = ioc.get(IYookassaPaymentsRepository)
+            ))
 
         app.add_api_route(
             path = "/yookassa/webhook/event",

@@ -2,6 +2,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 from typing import List, Literal, Union
+from enum import Enum
+
+class EventWebhookPayment(str, Enum):
+    succeeded = "payment.succeeded"
+    waiting_for_capture = "payment.waiting_for_capture"
+    canceled = "payment.canceled"
 
 
 class AmountModel(BaseModel):
@@ -100,6 +106,12 @@ class PaymentBaseModel(PaymentCreateModel):
     receipt_registration: str = None
     merchant_customer_id: str = None
     invoice_details: InvoiceDetails = None
+
+
+class PaymentWebhookEventModel(BaseModel):
+    type: str
+    event: EventWebhookPayment
+    object: PaymentBaseModel
 
 
 

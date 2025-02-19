@@ -1,16 +1,27 @@
-import base64
-import os
+from fastapi import HTTPException
 
-from apps.yookassa.services.core.IOauthService import IOauthService
-
-from fastapi import  Request, Depends
+from apps.yookassa.models.PaymentModel import PaymentWebhookEventModel
 from fastapi.responses import Response
+from apps.yookassa.services.core.IYookassaApiService import IYookassaApiService
 
 
 class EventWebhookView:
 
-    async def __call__(self, request: Request):
+    def __init__(
+            self,
+            yookassa_api_service: IYookassaApiService,
 
-        print(await request.json())
+    ):
+        self.__api_service = yookassa_api_service
 
-        return Response(status_code=200)
+    async def __call__(self, event: PaymentWebhookEventModel):
+
+        print(event.dict(exclude_none = True))
+
+        try:
+            payment_updated = await self.__api_service.api_update_payment(event.object)
+            print(payment_updated)
+            return Response(status_code=200)
+        except Exception as error:
+            raise HTTPException(detail = f"Webhook не обработан: {str(error)}", status_code = 432)
+
