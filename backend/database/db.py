@@ -88,6 +88,21 @@ class BookingEventStatus(str, ENUM):
     take = "Привез"
 
 
+class TgBillStatus(str, ENUM):
+    NEW = "NEW"
+    WAITING_FOR_APPROVAL = "WAITING_FOR_APPROVAL"
+    APPROVED = "APPROVED"
+    CANCELED = "CANCELED"
+    REJECTED = "REJECTED"
+    REQUESTED = "REQUESTED"
+    PAID = "PAID"
+    ERROR = "ERROR"
+
+class TgBillApproveStatus(str, ENUM):
+    NEW = "NEW"
+    APPROVED = "APPROVED"
+    CANCELED = "CANCELED"
+
 metadata = sqlalchemy.MetaData()
 
 
@@ -1776,6 +1791,47 @@ amo_entity_custom_fields = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint('custom_field_id', 'lead_id', 'contact_id'),
     extend_existing=True
 )
+
+
+
+
+tg_bot_bills = sqlalchemy.Table(
+    "tg_bot_bills",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("payment_date", DateTime(timezone=False)),
+    sqlalchemy.Column("created_by", Integer, ForeignKey("tg_accounts.id"), nullable=False),
+    sqlalchemy.Column("s3_url", String , nullable=False),
+    sqlalchemy.Column("plain_text", String, nullable=False),
+    sqlalchemy.Column("file_name", String , nullable=False),
+    sqlalchemy.Column("tochka_bank_account_id", Integer, ForeignKey("tochka_bank_accounts.id"), nullable=True),
+    sqlalchemy.Column("payment_amount", Float, nullable=True),
+    sqlalchemy.Column("counterparty_account_number", String, nullable=True),
+    sqlalchemy.Column("payment_purpose", String, nullable=True),
+    sqlalchemy.Column("counterparty_bank_bic", String, nullable=True),
+    sqlalchemy.Column("counterparty_name", String, nullable=True),
+    sqlalchemy.Column("corr_account", String, nullable=True),
+    sqlalchemy.Column("status", Enum(TgBillStatus), nullable=False),
+    sqlalchemy.Column("request_id", String, nullable=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
+    extend_existing=True
+)
+tg_bot_bill_approvers = sqlalchemy.Table(
+    "tg_bot_bill_approvers",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("approver_id", Integer, ForeignKey("tg_accounts.id"), nullable=False),
+    sqlalchemy.Column("bill_id", Integer, ForeignKey("tg_bot_bills.id"), nullable=False),
+    sqlalchemy.Column("status", Enum(TgBillApproveStatus), nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
+    extend_existing=True
+)
+
+
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
