@@ -12,6 +12,7 @@ from bot_routes.core.functions.tochka_api import TochkaBankError, get_access_tok
 from database.db import TgBillApproveStatus, database, users,TgBillStatus
 from bot_routes.core.functions.pdf_reader import extract_text_from_pdf_images
 from bot_routes.core.functions.TgBillsFuncions import get_user_from_db, get_tochka_bank_accounts_by_chat_id
+from bot_routes.core.services.GigachatService import GigachatService
 
 
 
@@ -377,7 +378,10 @@ class TgBillsService:
     
     def extract_bill_data(self, bill_text, bill_text_rus):
         bill_data = {}
+        def remove_spaces_between_digits(text: str) -> str:
+            return re.sub(r'(?<=\d)\s+(?=\d)', '', text)
         if bill_text:
+            bill_text = remove_spaces_between_digits(bill_text)
             extracted_data = self.process_text_test(bill_text)
             bill_data.update(extracted_data)
         if bill_text_rus:
@@ -388,13 +392,19 @@ class TgBillsService:
     async def process_and_save_bill(self, file_id, file_name, tg_id_updated_by, bot_token, file_path):
         """Processes the uploaded PDF bill and saves it."""
         try:
-
             file_bytes = await self.download_telegram_file( file_path, bot_token)
-            await self.s3_client.upload_file_object(file_bytes=file_bytes, bucket_name=self.s3_bucket_name, file_key=file_id)
-            file_url = f'{os.getenv("S3_URL")}/{self.s3_bucket_name}{file_id}'
+            await self.s3_client.upload_file_object(file_bytes=file_bytes, bucket_name=self.s3_bucket_name, file_key=f"tg-bills/{file_id}")
+            file_url = f'{os.getenv("S3_URL")}/{self.s3_bucket_name}/tg-bills/{file_id}'
 
             bill_text = extract_text_from_pdf_images(file_bytes)
             bill_text_rus = extract_text_from_pdf_images(file_bytes, lang='rus')
+            #token = "ZjIxNjk2ZDktNmQ0Yy00ODU0LTgxMjgtODVkMzFmOGNkNzk1OmRlZWExMjc0LTg5MGEtNDAyOC1iNzA4LTFhZmU5MTgyZWY2OA=="
+            #service = GigachatService(token)
+            #try:
+            #    result = service.send_invoice_parsing_request(bill_text)
+            #    print(json.dumps(result, ensure_ascii=False, indent=2))
+            #except Exception as err:
+            #    print(f"Ошибка: {err}")
             bill_data = self.extract_bill_data(bill_text, bill_text_rus)
 
             user = await get_user_from_db(str(tg_id_updated_by))
@@ -414,4 +424,3 @@ class TgBillsService:
 
         except Exception as e:
             return None, "Ошибка при обработке счёта."
-
