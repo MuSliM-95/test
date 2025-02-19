@@ -11,6 +11,7 @@ from apps.yookassa.web.view.CreateOauthView import CreateOauthView
 from apps.yookassa.web.view.CreatePaymentApiView import CreatePaymentApiView
 from apps.yookassa.web.view.CreateWebhookView import CreateWebhookView
 from apps.yookassa.web.view.DeleteWebhookView import DeleteWebhookView
+from apps.yookassa.web.view.EventWebhookView import EventWebhookView
 from apps.yookassa.web.view.GetInstallOauthListView import GetInstallOauthListView
 from apps.yookassa.web.view.GetWebhookListView import GetWebhookListView
 from apps.yookassa.web.view.RevokeTokenOauthView import RevokeTokenOauthView
@@ -82,6 +83,20 @@ class InstallYookassaOauthWeb:
                 oauth_repository = ioc.get(IYookassaOauthRepository),
                 payments_repository = ioc.get(IYookassaPaymentsRepository)
             )
+        )
+
+        event_webhook = EventWebhookView(
+            yookassa_api_service = YookassaApiService(
+                request_repository = ioc.get(IYookassaRequestRepository),
+                oauth_repository = ioc.get(IYookassaOauthRepository),
+                payments_repository = ioc.get(IYookassaPaymentsRepository)
+            ))
+
+        app.add_api_route(
+            path = "/yookassa/webhook/event",
+            endpoint = event_webhook.__call__,
+            methods = ["POST"],
+            tags = ["yookassa"]
         )
 
         app.add_api_route(

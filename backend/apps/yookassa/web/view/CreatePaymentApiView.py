@@ -13,11 +13,12 @@ class CreatePaymentApiView:
     ):
         self.__yookassa_api_service = yookassa_api_service
 
-    async def __call__(self, token: str, warehouse: int, payment: PaymentCreateModel):
+    async def __call__(self, token: str, warehouse: int,   payment: PaymentCreateModel, payment_crm_id: int = None):
         try:
             user = await get_user_by_token(token)
             payment_yookassa = await self.__yookassa_api_service.api_create_payment(
                 cashbox = user.cashbox_id,
+                payment_crm_id = payment_crm_id,
                 payment = payment,
                 warehouse = warehouse
             )
