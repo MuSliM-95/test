@@ -69,21 +69,21 @@ class OauthService(IOauthService):
                 access_token = res.get("access_token"),
                 webhook = WebhookViewModel(
                     event = "payment.waiting_for_capture",
-                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/payments/webhook/waiting_for_capture")
+                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/webhook/event")
             )
 
             await self.__request_repository.create_webhook(
                 access_token = res.get("access_token"),
                 webhook = WebhookViewModel(
                     event = "payment.succeeded",
-                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/payments/webhook/succeeded")
+                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/webhook/event")
             )
 
             await self.__request_repository.create_webhook(
                 access_token = res.get("access_token"),
                 webhook = WebhookViewModel(
                     event = "payment.canceled",
-                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/payments/webhook/canceled")
+                    url = f"https://{os.environ.get('APP_URL')}/api/v1/yookassa/webhook/event")
             )
 
         except Exception as error:
