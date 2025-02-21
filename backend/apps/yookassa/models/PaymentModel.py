@@ -5,6 +5,7 @@ from typing import List, Literal, Union
 from enum import Enum
 
 class EventWebhookPayment(str, Enum):
+    pending = "pending"
     succeeded = "payment.succeeded"
     waiting_for_capture = "payment.waiting_for_capture"
     canceled = "payment.canceled"
@@ -75,8 +76,8 @@ class ConfirmationEmbedded(BaseModel):
 
 
 class ConfirmationRedirectResponce(BaseModel):
-    type: Literal["redirect"]
-    confirmation_url: str
+    type: Literal["redirect"] = None
+    confirmation_url: str = None
 
 
 class PaymentCreateModel(BaseModel):
