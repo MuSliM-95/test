@@ -294,6 +294,5 @@ def get_bill_route(bot, s3_client):
                  
         except Exception as e:
             logging.exception("Ошибка при обработке PDF-файла")
-            print(f"Произошла ошибка: {e}")
 
     return pdf_router
