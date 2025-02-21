@@ -1,10 +1,12 @@
+from typing import Optional
+
 from apps.yookassa.models.PaymentModel import PaymentCreateModel,PaymentBaseModel
 from apps.yookassa.models.WebhookBaseModel import WebhookViewModel, WebhookBaseModel
 
 
 class IYookassaApiService:
 
-    async def api_create_payment(self, cashbox: int, warehouse: int, payment_crm_id: int, payment: PaymentCreateModel):
+    async def api_create_payment(self, cashbox: int, warehouse: int, payment_crm_id: Optional[int], doc_sales_id: Optional[int], payment: PaymentCreateModel):
         raise NotImplementedError
 
     async def api_create_webhook(self, cashbox: int, warehouse: int, webhook: WebhookViewModel):
@@ -17,5 +19,8 @@ class IYookassaApiService:
         raise NotImplementedError
 
     async def api_update_payment(self, payment: PaymentBaseModel):
+        raise NotImplementedError
+
+    async def api_get_payment_by_docs_sales_id(self, docs_sales_id: int) -> Optional[PaymentBaseModel]:
         raise NotImplementedError
 
