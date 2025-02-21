@@ -5,13 +5,15 @@ from datetime import datetime
 import time
 from aiogram import  Router, types, F
 import aiohttp
-
+import logging
 from bot_routes.core.repositories.impl.TgBillsRepository import ITgBillsCreate, ITgBillsUpdate, TgBillsRepository
 from bot_routes.core.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
 from bot_routes.core.functions.tochka_api import TochkaBankError, get_access_token, send_payment_to_tochka
 from database.db import TgBillApproveStatus, database, users,TgBillStatus
 from bot_routes.core.functions.pdf_reader import extract_text_from_pdf_images
 from bot_routes.core.functions.TgBillsFuncions import get_user_from_db, get_tochka_bank_accounts_by_chat_id
+
+logging.basicConfig(level=logging.ERROR)
 
 class TgBillsService:
 
@@ -309,13 +311,15 @@ class TgBillsService:
                     else:
                         return False, "Ошибка при отправке счёта в банк. Не найден токен аccess_token."
                 except Exception as e:
+                    logging.exception("Ошибка при отправке счёта в банк. Не найден токен аccess_token.")
                     return False, "Ошибка при отправке счёта в банк. Не найден токен аccess_token."
     
 
                 try:
                     await self.tg_bills_repository.update(bill['id'],  ITgBillsUpdate(status=TgBillStatus.ERROR))
                 except Exception as e:
-                    return False, "Ошибка при отправке счёта в банк. Не найден токен аccess_token."
+                    logging.exception("Ошибка при отправке счёта в банк.")
+                    return False, "Ошибка при отправке счёта в банк."
                 
                 result = await send_payment_to_tochka(
                     account_code=account_arr[0],
@@ -335,6 +339,7 @@ class TgBillsService:
                     await self.tg_bills_repository.update(bill['id'], ITgBillsUpdate(status=TgBillStatus.ERROR))
                     return False, "Ошибка при отправке счёта в банк. " + result["message"]
             except TochkaBankError as e:
+                logging.exception("Bank API Error ")
                 detailed_errors = ''
                 if e.errors is not None:
                     detailed_errors = [f"{err['errorCode']}: {err['message']}" for err in e.errors]
@@ -342,6 +347,7 @@ class TgBillsService:
                 await self.tg_bills_repository.update(bill['id'],  ITgBillsUpdate(status=TgBillStatus.ERROR))
                 return False, error_message
             except Exception as e:
+                logging.exception("Ошибка при отправке счёта в банк. ")
                 await self.tg_bills_repository.update(bill['id'], ITgBillsUpdate(status=TgBillStatus.ERROR))
                 return False, "Ошибка при отправке счёта в банк. " + str(e)
         else:
@@ -390,8 +396,8 @@ class TgBillsService:
         """Processes the uploaded PDF bill and saves it."""
         try:
             file_bytes = await self.download_telegram_file( file_path, bot_token)
-            await self.s3_client.upload_file_object(file_bytes=file_bytes, bucket_name=self.s3_bucket_name, file_key=f"tg-bills/{file_id}")
-            file_url = f'{os.getenv("S3_URL")}/{self.s3_bucket_name}/tg-bills/{file_id}'
+            await self.s3_client.upload_file_object(file_bytes=file_bytes, bucket_name=self.s3_bucket_name, file_key=f"tg-bills/{file_id}.pdf")
+            file_url = f'{os.getenv("S3_URL")}/{self.s3_bucket_name}/tg-bills/{file_id}.pdf'
 
             bill_text = extract_text_from_pdf_images(file_bytes)
             bill_text_rus = extract_text_from_pdf_images(file_bytes, lang='rus')
@@ -414,4 +420,5 @@ class TgBillsService:
             return bill, msg
 
         except Exception as e:
+            logging.exception("Ошибка при обработке счёта.")
             return None, "Ошибка при обработке счёта."
