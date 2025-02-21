@@ -3,7 +3,7 @@ import logging
 import os
 from fastapi.params import Depends
 import pytz
-import json
+import logging
 from datetime import datetime
 
 from aiogram import  Router, types, F
@@ -26,7 +26,7 @@ from bot_routes.core.services.TgBillApproversService import  TgBillApproversServ
 from bot_routes.core.repositories.impl.TgBillsRepository import TgBillsRepository
 from bot_routes.core.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
 
-
+logging.basicConfig(level=logging.ERROR)
 
 
 timezone = pytz.timezone("Europe/Moscow")
@@ -284,12 +284,16 @@ def get_bill_route(bot, s3_client):
             new_bill = await tg_bill_service.get_bill(bill.id)
             notification_string = await tg_bill_service.format_bill_notification(tg_id_updated_by=str(user_id), old_bill=bill,new_bill=new_bill)
             accounts = await get_tochka_bank_accounts_by_chat_id(str(message.chat.id))
+            if not accounts:
+                await message.reply(chat_id=chat_id, text="У вас нет привязанных счетов в банке. Пожалуйста, свяжитесь с администратором.")
+                return
             keyboard = create_select_account_payment_keyboard(bill.id, accounts)
             await message.reply(notification_string,
                                 reply_markup=keyboard,
                                 parse_mode="HTML")
                  
         except Exception as e:
+            logging.exception("Ошибка при обработке PDF-файла")
             print(f"Произошла ошибка: {e}")
 
     return pdf_router
