@@ -1018,7 +1018,7 @@ amo_install_groups = sqlalchemy.Table(
     "amo_install_groups",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("referrer", String),
+    sqlalchemy.Column("referrer", String, unique=True),
     sqlalchemy.Column("pair_token", String),
     sqlalchemy.Column("setup_custom_fields", Boolean, server_default="false")
 )
