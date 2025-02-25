@@ -1,4 +1,7 @@
+import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException, Request
+from phonenumbers import geocoder
+
 from database.db import database, loyality_cards, contragents, organizations, loyality_settings, users, users_cboxes_relation
 import api.loyality_cards.schemas as schemas
 from sqlalchemy import desc, or_
@@ -174,12 +177,23 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
             q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
             loyality_card_contr = await database.fetch_one(q)
             if not loyality_card_contr:
+                phone_code = None
+                is_phone_formatted = False
+                try:
+                    number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                    phone_number = phonenumbers.format_number(number_phone_parsed, phonenumbers.PhoneNumberFormat.E164)
+                    phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                    is_phone_formatted = True
+                except:
+                    pass
                 time = int(datetime.now().timestamp())
                 q = contragents.insert().values(
                     {
                         "name": contr_name if contr_name else "",
                         "external_id": "",
-                        "phone": str(clear_phone_number(phone_number=phone_number)),
+                        "phone": phone_number,
+                        "phone_code": phone_code,
+                        "is_phone_formatted": is_phone_formatted,
                         "inn": "",
                         "description": "",
                         "cashbox": user.cashbox_id,
