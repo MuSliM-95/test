@@ -34,7 +34,7 @@ class YookassaOauthRepository(IYookassaOauthRepository):
         return await database.execute(query)
 
     async def insert_oauth(self, cashbox: int, oauth: OauthBaseModel):
-        query = insert(yookassa_install).values(oauth.dict()).returning(yookassa_install.c.id)
+        query = insert(yookassa_install).values(oauth.dict(exclude_none = True)).returning(yookassa_install.c.id)
         return await database.execute(query)
 
     async def delete_oauth(self, cashbox: int, warehouse: int):
