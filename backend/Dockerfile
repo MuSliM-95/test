@@ -10,7 +10,8 @@ RUN apt-get update && \
     libjpeg62-turbo \
     libxrender1 \
     tesseract-ocr \
-    tesseract-ocr-rus
+    tesseract-ocr-rus\
+    poppler-utils
 
 RUN mkdir "tmp"
 
