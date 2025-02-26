@@ -1,15 +1,14 @@
 from typing import Union
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-from database.db import tg_bot_bills, tochka_bank_accounts, database
+from database.db import tg_bot_bills
 
-from bot_routes.core.repositories.core.ITgBillsRepository import ITgBillsRepository
-from bot_routes.core.models.ITgBills import (
-    ITgBillsUpdate,
-    ITgBillsCreate,
-    ITgBillsExtended,
+from bot_routes.repositories.core.ITgBillsRepository import ITgBillsRepository
+from bot_routes.models.TgBillsModels import (
+    TgBillsUpdateModel,
+    TgBillsCreateModel,
+    TgBillsExtendedModel,
 )
-
 
 class TgBillsRepository(ITgBillsRepository):
 
@@ -18,7 +17,7 @@ class TgBillsRepository(ITgBillsRepository):
         self.tg_bot_bills = tg_bot_bills
         self.tochka_bank_accounts = tochka_bank_accounts
 
-    async def update(self, id, bill: ITgBillsUpdate) -> None:
+    async def update(self, id, bill: TgBillsUpdateModel) -> None:
         try:
             query = (
                 self.tg_bot_bills.update()
@@ -29,7 +28,7 @@ class TgBillsRepository(ITgBillsRepository):
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}") 
 
-    async def insert(self, bill: ITgBillsCreate) -> int:
+    async def insert(self, bill: TgBillsCreateModel) -> int:
         try:
             query = self.tg_bot_bills.insert().values(**bill.dict())
             result = await self.database.execute(query)
@@ -45,7 +44,7 @@ class TgBillsRepository(ITgBillsRepository):
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
 
-    async def get_by_id(self, id: int) -> Union[ITgBillsExtended, None]:
+    async def get_by_id(self, id: int) -> Union[TgBillsExtendedModel, None]:
         try:
             query = (
                 select([self.tg_bot_bills, self.tochka_bank_accounts.c.accountId])

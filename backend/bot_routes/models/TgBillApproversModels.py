@@ -8,20 +8,20 @@ from database.db import TgBillApproveStatus
 
 
 
-class ITgBillApproversBase(BaseModel):
+class TgBillApproversBaseModel(BaseModel):
     approver_id: int
     bill_id: int
     status: TgBillApproveStatus
 
-class ITgBillApproversCreate(ITgBillApproversBase):
+class TgBillApproversCreateModel(TgBillApproversBaseModel):
     pass
   
-class ITgBillApproversUpdate(ITgBillApproversBase):
+class TgBillApproversUpdateModel(TgBillApproversBaseModel):
     approver_id: Optional[int] = None
     bill_id: Optional[int] = None
     status: Optional[TgBillApproveStatus] = None
 
-class ITgBillApproversInDBBase(ITgBillApproversBase):
+class TgBillApproversInDBBaseModel(TgBillApproversBaseModel):
     id: int
     created_at: datetime
     updated_at: datetime
@@ -30,10 +30,10 @@ class ITgBillApproversInDBBase(ITgBillApproversBase):
     class Config:
         orm_mode = True
 
-class ITgBillApprovers(ITgBillApproversInDBBase):
+class TgBillApproversModel(TgBillApproversInDBBaseModel):
     pass
 
 
-class ITgBillApproversExtended(ITgBillApprovers):
+class TgBillApproversExtendedModel(TgBillApproversModel):
     username: str
 

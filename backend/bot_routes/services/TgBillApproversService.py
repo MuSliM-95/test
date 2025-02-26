@@ -1,10 +1,10 @@
 from math import e
 from aiogram import types
 
-from bot_routes.core.models.ITgBillApprovers import  ITgBillApproversCreate, ITgBillApproversUpdate
-from bot_routes.core.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
+from bot_routes.models.TgBillApproversModels import TgBillApproversCreateModel, TgBillApproversUpdateModel
+from bot_routes.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
 
-from bot_routes.core.functions.TgBillsFuncions import get_user_from_db_by_username, get_user_from_db
+from bot_routes.functions.TgBillsFuncions import get_user_from_db_by_username, get_user_from_db
 from database.db import TgBillApproveStatus
 
 
@@ -37,7 +37,7 @@ class TgBillApproversService:
             return False, "Вы не можете подтвердить этот счет"
 
         if approve.status != TgBillApproveStatus.APPROVED:
-            await self.bill_approvers_repository.update(approve.id, ITgBillApproversUpdate(status=TgBillApproveStatus.APPROVED))
+            await self.bill_approvers_repository.update(approve.id, TgBillApproversUpdateModel(status=TgBillApproveStatus.APPROVED))
             return True, "Вы подтвердили счет"
         return False, "Вы уже подтвердили этот счет"
 
@@ -48,7 +48,7 @@ class TgBillApproversService:
         if not approve:
             return False, "Вы не можете отклонить этот счет"
 
-        await self.bill_approvers_repository.update(approve.id, ITgBillApproversUpdate(status=TgBillApproveStatus.CANCELED))
+        await self.bill_approvers_repository.update(approve.id, TgBillApproversUpdateModel(status=TgBillApproveStatus.CANCELED))
         return True, "Вы отклонили счет"
 
     async def create_bill_approvers(self, message: types.Message, bill_id: int):
@@ -59,7 +59,7 @@ class TgBillApproversService:
                     username = message.caption[entity.offset + 1:entity.offset + entity.length]
                     user = await get_user_from_db_by_username(username)
                     if user:
-                        bill_approver = ITgBillApproversCreate(
+                        bill_approver = TgBillApproversCreateModel(
                             bill_id=bill_id,
                             approver_id=user.id,
                             status=TgBillApproveStatus.NEW
