@@ -2,12 +2,12 @@ from typing import List, Union
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from bot_routes.core.repositories.core.ITgBillApproversRepository import ITgBillApproversRepository
-from bot_routes.core.models.ITgBillApprovers import (
-    ITgBillApproversCreate,
-    ITgBillApproversUpdate,
-    ITgBillApprovers,
-    ITgBillApproversExtended,
+from bot_routes.repositories.core.ITgBillApproversRepository import ITgBillApproversRepository
+from bot_routes.models.TgBillApproversModels import (
+    TgBillApproversCreateModel,
+    TgBillApproversUpdateModel,
+    TgBillApproversModel,
+    TgBillApproversExtendedModel,
 )
 
 
@@ -17,7 +17,7 @@ class TgBillApproversRepository(ITgBillApproversRepository):
         self.users = users
         self.tg_bot_bill_approvers = tg_bot_bill_approvers
 
-    async def update(self, id: int, bill: ITgBillApproversUpdate) -> None:
+    async def update(self, id: int, bill: TgBillApproversUpdateModel) -> None:
         try:
             query = (
                 self.tg_bot_bill_approvers
@@ -29,7 +29,7 @@ class TgBillApproversRepository(ITgBillApproversRepository):
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
 
-    async def insert(self, bill: ITgBillApproversCreate) -> int:
+    async def insert(self, bill: TgBillApproversCreateModel) -> int:
         try:
             query = self.tg_bot_bill_approvers.insert().values(**bill.dict())
             result = await self.database.execute(query)
@@ -45,7 +45,7 @@ class TgBillApproversRepository(ITgBillApproversRepository):
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
 
-    async def get_by_id(self, id: int) -> Union[ITgBillApprovers, None]:
+    async def get_by_id(self, id: int) -> Union[TgBillApproversModel, None]:
         try:
             query = self.tg_bot_bill_approvers.select().where(self.tg_bot_bill_approvers.c.id == id)
             result = await self.database.fetch_one(query)
@@ -53,7 +53,7 @@ class TgBillApproversRepository(ITgBillApproversRepository):
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
 
-    async def get_approve_by_bill_id_and_approver_id(self, bill_id: int, approver_id: int) -> Union[ITgBillApprovers, None]:
+    async def get_approve_by_bill_id_and_approver_id(self, bill_id: int, approver_id: int) -> Union[TgBillApproversModel, None]:
         try:
             query = self.tg_bot_bill_approvers.select().where(
                 self.tg_bot_bill_approvers.c.bill_id == bill_id,
@@ -64,7 +64,7 @@ class TgBillApproversRepository(ITgBillApproversRepository):
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
 
-    async def get_approvers_by_bill_id(self, bill_id: int) -> List[ITgBillApprovers]:
+    async def get_approvers_by_bill_id(self, bill_id: int) -> List[TgBillApproversModel]:
         try:
             query = self.tg_bot_bill_approvers.select().where(self.tg_bot_bill_approvers.c.bill_id == bill_id)
             result = await self.database.fetch_all(query)
@@ -72,7 +72,7 @@ class TgBillApproversRepository(ITgBillApproversRepository):
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
 
-    async def get_approvers_extended_by_bill_id(self, bill_id: int) -> List[Union[ITgBillApproversExtended, None]]:
+    async def get_approvers_extended_by_bill_id(self, bill_id: int) -> List[Union[TgBillApproversExtendedModel, None]]:
         try:
             query = (
                 select([self.tg_bot_bill_approvers, self.users.c.username])

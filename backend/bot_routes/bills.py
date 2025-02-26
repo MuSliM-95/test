@@ -14,17 +14,17 @@ from aiogram.dispatcher.fsm.context import FSMContext
 from typing import Dict, Any
 from database.db import database, tg_bot_bill_approvers,  users, tg_bot_bills, tochka_bank_accounts
 
-from bot_routes.core.functions.keyboards import *
+from bot_routes.functions.keyboards import *
 
-from bot_routes.core.functions.callbacks import (
+from bot_routes.functions.callbacks import (
     bills_callback,
     change_payment_date_bill_callback,
     create_select_account_payment_callback,
 )
-from bot_routes.core.services.TgBillsService import ITgBillsUpdate, TgBillsService, get_tochka_bank_accounts_by_chat_id
-from bot_routes.core.services.TgBillApproversService import  TgBillApproversService
-from bot_routes.core.repositories.impl.TgBillsRepository import TgBillsRepository
-from bot_routes.core.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
+from bot_routes.services.TgBillsService import TgBillsUpdateModel, TgBillsService, get_tochka_bank_accounts_by_chat_id
+from bot_routes.services.TgBillApproversService import  TgBillApproversService
+from bot_routes.repositories.impl.TgBillsRepository import TgBillsRepository
+from bot_routes.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -131,7 +131,7 @@ def get_bill_route(bot, s3_client):
         tg_id_updated_by = str(callback_query.from_user.id)
         account_id = data['account_id']
         bill_id = data['bill_id']
-        bill, msg = await tg_bill_service.update_bill(bill_id, ITgBillsUpdate(tochka_bank_account_id=account_id), tg_id_updated_by)
+        bill, msg = await tg_bill_service.update_bill(bill_id, TgBillsUpdateModel(tochka_bank_account_id=account_id), tg_id_updated_by)
         if not bill:
             await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
             await bot.answer_callback_query(callback_query.id)
@@ -186,7 +186,7 @@ def get_bill_route(bot, s3_client):
             await bot.answer_callback_query(callback_query.id, text=message)
             return
         if action == 'cancel_bill':
-            bill, msg = await tg_bill_service.update_bill(bill_id, ITgBillsUpdate(status=TgBillStatus.CANCELED), tg_id_updated_by)
+            bill, msg = await tg_bill_service.update_bill(bill_id, TgBillsUpdateModel(status=TgBillStatus.CANCELED), tg_id_updated_by)
             if not bill:
                 await bot.send_message(chat_id=callback_query.message.chat.id, text=msg)
                 return

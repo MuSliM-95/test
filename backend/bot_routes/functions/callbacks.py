@@ -1,4 +1,4 @@
-from bot_routes.core.classes.CallbackData import CallbackData
+from bot_routes.classes.CallbackData import CallbackData
 
 
 bills_callback = CallbackData("action", "bill_id")

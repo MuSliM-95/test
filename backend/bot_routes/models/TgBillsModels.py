@@ -1,12 +1,9 @@
 from datetime import datetime
-from enum import Enum
-from typing import Optional, List
-
-from pydantic import BaseModel, Field
-
+from typing import Optional
+from pydantic import BaseModel
 from database.db import TgBillStatus
 
-class ITgBillsBase(BaseModel):
+class TgBillsBaseModel(BaseModel):
     payment_date: Optional[datetime] = None
     created_by: int
     s3_url: str
@@ -21,10 +18,10 @@ class ITgBillsBase(BaseModel):
 
     tochka_bank_account_id: Optional[int] = None
 
-class ITgBillsCreate(ITgBillsBase):
+class TgBillsCreateModel(TgBillsBaseModel):
     pass
 
-class ITgBillsUpdate(ITgBillsBase):
+class TgBillsUpdateModel(TgBillsBaseModel):
     payment_date: Optional[datetime] = None
     created_by: Optional[int] = None
     s3_url: Optional[str] = None
@@ -39,7 +36,7 @@ class ITgBillsUpdate(ITgBillsBase):
     tochka_bank_account_id: Optional[int] = None
 
 
-class ITgBillsInDBBase(ITgBillsBase):
+class TgBillsInDBBaseModel(TgBillsBaseModel):
     id: int
     created_at: datetime
     updated_at: datetime
@@ -48,11 +45,11 @@ class ITgBillsInDBBase(ITgBillsBase):
     class Config:
         orm_mode = True
 
-class ITgBills(ITgBillsInDBBase):
+class TgBillsModel(TgBillsInDBBaseModel):
     pass
 
 
-class ITgBillsExtended(ITgBills): 
+class TgBillsExtendedModel(TgBillsModel): 
     accountId: Optional[str] = None 
     request_id: Optional[str] = None
 

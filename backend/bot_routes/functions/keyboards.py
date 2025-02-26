@@ -3,7 +3,7 @@ from typing import List, Any
 
 from aiogram import types
 
-from bot_routes.core.functions.callbacks import change_payment_date_bill_callback, create_select_account_payment_callback, bills_callback
+from bot_routes.functions.callbacks import change_payment_date_bill_callback, create_select_account_payment_callback, bills_callback
 from database.db import TgBillStatus
 
 def create_select_account_payment_keyboard(bill_id: int, accounts: List[Any]) -> types.InlineKeyboardMarkup:
