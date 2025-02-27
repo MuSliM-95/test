@@ -78,12 +78,28 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
 
                 if phone_number:
                     try:
-                        number_phone_parsed = phonenumbers.parse(phone_number, "RU")
-                        phone_number = phonenumbers.format_number(number_phone_parsed, phonenumbers.PhoneNumberFormat.E164)
+                        phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+                        number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+                        phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                                  phonenumbers.PhoneNumberFormat.E164)
                         phone_code = geocoder.description_for_number(number_phone_parsed, "en")
                         is_phone_formatted = True
+                        if not phone_code:
+                            phone_number = update_dict['phone']
+                            is_phone_formatted = False
                     except:
-                        pass
+                        try:
+                            number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                            phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                                      phonenumbers.PhoneNumberFormat.E164)
+                            phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                            is_phone_formatted = True
+                            if not phone_code:
+                                phone_number = update_dict['phone']
+                                is_phone_formatted = False
+                        except:
+                            phone_number = update_dict['phone']
+                            is_phone_formatted = False
 
                     q = (
                         contragents.select()
