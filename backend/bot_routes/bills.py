@@ -285,7 +285,7 @@ def get_bill_route(bot, s3_client):
             notification_string = await tg_bill_service.format_bill_notification(tg_id_updated_by=str(user_id), old_bill=bill,new_bill=new_bill)
             accounts = await get_tochka_bank_accounts_by_chat_id(str(message.chat.id))
             if not accounts:
-                await message.reply(chat_id=chat_id, text="У вас нет привязанных счетов в банке. Пожалуйста, свяжитесь с администратором.")
+                await message.reply( text="У вас нет привязанных счетов в банке. Пожалуйста, свяжитесь с администратором.")
                 return
             keyboard = create_select_account_payment_keyboard(bill.id, accounts)
             await message.reply(notification_string,
