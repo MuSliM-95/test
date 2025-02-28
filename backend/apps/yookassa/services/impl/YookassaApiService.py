@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import Optional,List
 
-from apps.yookassa.models.PaymentModel import PaymentCreateModel,PaymentBaseModel,EventWebhookPayment
+from apps.yookassa.models.PaymentModel import PaymentCreateModel,PaymentBaseModel,EventWebhookPayment,ReceiptModel,\
+    CustomerModel,ItemModel
 from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel,WebhookViewModel
 from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import IYookassaCrmPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
@@ -71,7 +72,14 @@ class YookassaApiService(IYookassaApiService):
             if not oauth:
                 raise Exception("для склада продажи не установлена интеграция с Юkassa")
             payment_db = await self.__payments_repository.fetch_one_by_crm_payment_id(payment_crm_id)
-            print(payment_db)
+
+            settings = await self.__request_repository.oauth_settings(access_token = oauth.access_token)
+            if settings:
+                payment.test = settings.test
+                if settings.fiscalization.enabled:
+                    if settings.fiscalization.enabled:
+                        payment.receipt = ReceiptModel(customer = CustomerModel(), items = List[ItemModel])
+
             response = await self.__request_repository.create_payments(
                 access_token = oauth.access_token,
                 payment = payment

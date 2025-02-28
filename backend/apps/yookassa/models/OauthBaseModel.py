@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional,Literal,List
 
 from pydantic import BaseModel
 
@@ -30,5 +30,33 @@ class OauthWarehouseModel(BaseModel):
     last_update: datetime = None
     warehouse_id: int = None
     status: bool = None
+
+
+class SettingsFiscalization(BaseModel):
+    provider: Literal[
+        "a_qsi",
+        "atol",
+        "business_ru",
+        "digital_kassa",
+        "evotor",
+        "first_ofd",
+        "kit_invest",
+        "komtet",
+        "life_pay",
+        "mertrade",
+        "modul_kassa",
+        "rocket",
+        "shtrih_m"
+    ]
+    enabled: bool
+
+
+class OauthSettings(BaseModel):
+    account_id: str
+    test: bool
+    fiscalization: Optional[SettingsFiscalization] = None
+    fiscalization_enabled: bool | None = None
+    payment_methods: List[str] = None
+    status: Literal["enabled", "disabled"]
 
 

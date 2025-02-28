@@ -1,7 +1,9 @@
 import uuid
+from typing import Optional
 
 from aiohttp import BasicAuth
 
+from apps.yookassa.models.OauthBaseModel import OauthSettings
 from apps.yookassa.models.PaymentModel import PaymentCreateModel, PaymentBaseModel
 from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel,WebhookViewModel
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
@@ -66,7 +68,6 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                     res = await r.json()
                     if res.get("type") == "error":
                         raise Exception(res)
-                    print(res)
                     return [WebhookBaseModel(**item) for item in res.get("items")]
             except Exception as error:
                 raise Exception(f"ошибка GET запроса к yookassa: {str(error)}")
@@ -85,7 +86,6 @@ class YookassaRequestRepository(IYookassaRequestRepository):
                     res = await r.json()
                     if res.get("type") == "error":
                         raise Exception(res)
-                    print(res)
                     return res
             except Exception as error:
                 raise Exception(f"ошибка DELETE запроса к yookassa: {str(error)}")
@@ -103,11 +103,28 @@ class YookassaRequestRepository(IYookassaRequestRepository):
             try:
                 async with http.post(url = "/v3/payments", data = json.dumps(payment_dict)) as r:
                     res = await r.json()
-                    print(res)
                     if r.status in [400, 401, 403, 404]:
                         raise Exception(res)
                     return PaymentBaseModel(**res)
             except Exception as error:
                 raise Exception(f"ошибка POST запроса к yookassa: {str(error)}")
+
+    async def oauth_settings(self, access_token: str) -> Optional[OauthSettings]:
+        async with aiohttp.ClientSession(
+                base_url = "https://api.yookassa.ru",
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                    }
+        ) as http:
+
+            try:
+                async with http.get(url = f"/v3/me") as r:
+                    res = await r.json()
+                    if res.get("type") == "error":
+                        raise Exception(res)
+                    return OauthSettings(**res)
+            except Exception as error:
+                raise Exception(f"ошибка /me запроса к yookassa: {str(error)}")
 
 

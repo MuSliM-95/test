@@ -1,5 +1,6 @@
-from typing import Union
+from typing import Union,Optional
 
+from apps.yookassa.models.OauthBaseModel import OauthSettings
 from apps.yookassa.models.PaymentModel import PaymentCreateModel, PaymentBaseModel
 from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel, WebhookViewModel
 
@@ -21,6 +22,9 @@ class IYookassaRequestRepository:
     async def get_webhook_list(self, access_token: str) -> list[WebhookBaseModel]:
         raise NotImplementedError
 
-    async def delete_webhook(self,access_token: str,webhook_id: str):
+    async def delete_webhook(self, access_token: str, webhook_id: str):
+        raise NotImplementedError
+
+    async def oauth_settings(self, access_token: str) -> Optional[OauthSettings]:
         raise NotImplementedError
 
