@@ -278,8 +278,8 @@ def get_bill_route(bot, s3_client):
                 await bot.send_message(chat_id=chat_id, text=msg)
                 return
             
-            bill_approvers, msg = await tg_bill_approvers_service.create_bill_approvers(message, bill.id)
-            if not bill_approvers:
+            result, msg = await tg_bill_approvers_service.create_bill_approvers(message, bill.id)
+            if result is False:
                 await bot.send_message(chat_id=chat_id, text=msg)
                 return
             new_bill = await tg_bill_service.get_bill(bill.id)
@@ -290,7 +290,7 @@ def get_bill_route(bot, s3_client):
                 return
             accounts = await get_tochka_bank_accounts_by_chat_owner(chat_owner['id'])
             if not accounts:
-                await message.reply( text=f"У {chat_owner} нет привязанных счетов в банке. Пожалуйста, свяжитесь с администратором.")
+                await message.reply( text=f"У {chat_owner['id']} нет привязанных счетов в банке. Пожалуйста, свяжитесь с администратором.")
                 return
             keyboard = create_select_account_payment_keyboard(bill.id, accounts)
             await message.reply(notification_string,
