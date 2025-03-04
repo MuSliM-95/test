@@ -1801,7 +1801,7 @@ tg_bot_bills = sqlalchemy.Table(
     "tg_bot_bills",
     metadata,
     sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("payment_date", DateTime(timezone=False)),
+    sqlalchemy.Column("payment_date", Date),
     sqlalchemy.Column("created_by", Integer, ForeignKey("tg_accounts.id"), nullable=False),
     sqlalchemy.Column("s3_url", String , nullable=False),
     sqlalchemy.Column("plain_text", String, nullable=False),
