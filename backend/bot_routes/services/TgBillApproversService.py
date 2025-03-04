@@ -71,7 +71,9 @@ class TgBillApproversService:
                             'id': approve_id,
                             'status': 'new'
                         })
-            return bill_approvers, 'Успешно'
+                    else:
+                        return False, "Пользователь не найден"
+            return True, 'Успешно'
         else:
             return False, "Не указаны пользователи"
     
