@@ -21,10 +21,11 @@ from bot_routes.functions.callbacks import (
     change_payment_date_bill_callback,
     create_select_account_payment_callback,
 )
-from bot_routes.services.TgBillsService import TgBillsUpdateModel, TgBillsService, get_tochka_bank_accounts_by_chat_id
+from bot_routes.services.TgBillsService import TgBillsUpdateModel, TgBillsService
 from bot_routes.services.TgBillApproversService import  TgBillApproversService
 from bot_routes.repositories.impl.TgBillsRepository import TgBillsRepository
 from bot_routes.repositories.impl.TgBillApproversRepository import TgBillApproversRepository
+from bot_routes.functions.TgBillsFuncions import get_chat_owner, get_tochka_bank_accounts_by_chat_owner
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -283,9 +284,13 @@ def get_bill_route(bot, s3_client):
                 return
             new_bill = await tg_bill_service.get_bill(bill.id)
             notification_string = await tg_bill_service.format_bill_notification(tg_id_updated_by=str(user_id), old_bill=bill,new_bill=new_bill)
-            accounts = await get_tochka_bank_accounts_by_chat_id(str(message.chat.id))
+            chat_owner = await get_chat_owner(str(chat_id))
+            if not chat_owner:
+                await message.reply(text=f"Не найден владелец чата {chat_id}")
+                return
+            accounts = await get_tochka_bank_accounts_by_chat_owner(chat_owner['id'])
             if not accounts:
-                await message.reply( text="У вас нет привязанных счетов в банке. Пожалуйста, свяжитесь с администратором.")
+                await message.reply( text=f"У {chat_owner} нет привязанных счетов в банке. Пожалуйста, свяжитесь с администратором.")
                 return
             keyboard = create_select_account_payment_keyboard(bill.id, accounts)
             await message.reply(notification_string,

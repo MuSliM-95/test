@@ -11,7 +11,7 @@ from bot_routes.repositories.impl.TgBillApproversRepository import TgBillApprove
 from bot_routes.functions.tochka_api import TochkaBankError, get_access_token, send_payment_to_tochka
 from database.db import TgBillApproveStatus, database, users,TgBillStatus
 from bot_routes.functions.pdf_reader import extract_text_from_pdf_images
-from bot_routes.functions.TgBillsFuncions import get_user_from_db, get_tochka_bank_accounts_by_chat_id
+from bot_routes.functions.TgBillsFuncions import get_user_from_db
 
 logging.basicConfig(level=logging.ERROR)
 
