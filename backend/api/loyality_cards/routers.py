@@ -49,7 +49,7 @@ async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: sc
         )
 
     if filters_dict.get("phone_number"):
-        q = contragents.select().where(contragents.c.phone.ilike(f'%{filters_dict.get("phone_number")}%'), contragents.c.cashbox == user.cashbox_id)
+        q = contragents.select().where(contragents.c.phone.ilike(f'%{filters_dict.get("phone_number").strip()}%'), contragents.c.cashbox == user.cashbox_id)
         finded_contrs = await database.fetch_all(q)
         
         filters.append(
