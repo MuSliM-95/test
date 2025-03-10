@@ -49,9 +49,21 @@ async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: sc
         )
 
     if filters_dict.get("phone_number"):
-        q = contragents.select().where(contragents.c.phone.ilike(f'%{filters_dict.get("phone_number").strip()}%'), contragents.c.cashbox == user.cashbox_id)
+        phone_number = filters_dict.get("phone_number")
+        phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+        try:
+            number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+            phone_number = number_phone_parsed.national_number
+        except:
+            try:
+                number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                phone_number = number_phone_parsed.national_number
+            except:
+                pass
+        q = contragents.select().where(contragents.c.phone.ilike(f'%{phone_number}%'),
+                                       contragents.c.cashbox == user.cashbox_id)
         finded_contrs = await database.fetch_all(q)
-        
+
         filters.append(
             loyality_cards.c.contragent_id.in_([contr.id for contr in finded_contrs])
         )
