@@ -67,6 +67,7 @@ async def create_loyality_setting(token: str, settings_body: schemas.CreateSetti
         "end_period": datetime.fromtimestamp(settings_body.end_period),
         "max_withdraw_percentage": settings_body.max_withdraw_percentage,
         "max_percentage": settings_body.max_percentage,
+        "lifetime": settings_body.lifetime
     }
 
     if settings_body.organization is not None:
