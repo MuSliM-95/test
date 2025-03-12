@@ -19,12 +19,13 @@ class GetPaymentApiView:
             payment_yookassa = await self.__yookassa_api_service.api_get_payment_by_docs_sales_id(
                 docs_sales_id = doc_sales_id,
             )
-            if payment_yookassa.status == EventWebhookPayment.pending:
-                return payment_yookassa.dict(exclude_unset = True)
-            else:
-                payment = payment_yookassa.dict(exclude_unset = True)
-                del payment["confirmation"]
-                return payment
+            if payment_yookassa:
+                if payment_yookassa.status == EventWebhookPayment.pending:
+                    return payment_yookassa.dict(exclude_unset = True)
+                else:
+                    payment = payment_yookassa.dict(exclude_unset = True)
+                    del payment["confirmation"]
+                    return payment
         except Exception as error:
-            raise HTTPException(detail = f"Платеж не создан: {str(error)}", status_code = 432)
+            raise HTTPException(detail = f"Ошибка получения платежа: {str(error)}", status_code = 432)
 

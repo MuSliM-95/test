@@ -55,7 +55,7 @@ class OauthSettings(BaseModel):
     account_id: str
     test: bool
     fiscalization: Optional[SettingsFiscalization] = None
-    fiscalization_enabled: bool | None = None
+    fiscalization_enabled: Optional[bool] = None
     payment_methods: List[str] = None
     status: Literal["enabled", "disabled"]
 
