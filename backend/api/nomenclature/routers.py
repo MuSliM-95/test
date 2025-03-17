@@ -148,16 +148,6 @@ async def delete_barcode_to_nomenclature(token: str, idx: int, barcode: schemas.
     await database.execute(query)
 
 
-@router.get("/nomenclature/{idx}/", response_model=schemas.NomenclatureGet)
-async def get_nomenclature_by_id(token: str, idx: int):
-    """Получение категории по ID"""
-    user = await get_user_by_token(token)
-    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
-    nomenclature_db = datetime_to_timestamp(nomenclature_db)
-    nomenclature_db = await nomenclature_unit_id_to_name(nomenclature_db)
-    return nomenclature_db
-
-
 @router.post("/nomenclatures/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example=[1, 2, 3]), with_prices: bool = False, with_balance: bool = False):
     """Получение списка номенклатур по списку ID категорий"""
