@@ -4,9 +4,10 @@ from typing import List, Optional
 from starlette import status
 
 import api.nomenclature.schemas as schemas
+from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
     warehouse_register_movement, warehouses, units, warehouse_balances
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body
 
 from functions.helpers import (
@@ -230,8 +231,17 @@ async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example
 
 
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
-async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Optional[str] = None, category: Optional[int] = None, limit: int = 100,
-                           offset: int = 0, with_prices: bool = False, with_balance: bool = False, in_warehouse: int = None):
+async def get_nomenclature(
+        token: str,
+        name: Optional[str] = None,
+        barcode: Optional[str] = None,
+        category: Optional[int] = None,
+        limit: int = 100,
+        offset: int = 0,
+        with_prices: bool = False,
+        with_balance: bool = False,
+        filters_query: NomenclatureFilter = Depends(),
+):
     start_time = time.time()
     """Получение списка категорий"""
     user = await get_user_by_token(token)
@@ -263,7 +273,15 @@ async def get_nomenclature(token: str, name: Optional[str] = None, barcode: Opti
     if category:
         filters.append(nomenclature.c.category == category)
 
-    query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id, units.c.convent_national_view).order_by(asc(nomenclature.c.id))
+    order_by_condition = asc(nomenclature.c.id)
+
+    if filters_query.order_created_at:
+        if filters_query.order_created_at == SortOrder.ASC:
+            order_by_condition = asc(nomenclature.c.created_at)
+        elif filters_query.order_created_at == SortOrder.DESC:
+            order_by_condition = desc(nomenclature.c.created_at)
+
+    query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id, units.c.convent_national_view).order_by(order_by_condition)
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
