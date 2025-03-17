@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from api.nomenclature.web.InstallNomenclatureWeb import InstallNomenclatureWeb
 from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
 from apps.amocrm.installer.infrastructure.repositories.impl.WidgetInstallerRepository import \
@@ -276,6 +277,7 @@ async def startup():
     ioc.set(IYookassaPaymentsRepository, YookassaPaymentsRepository())
     ioc.set(IYookassaCrmPaymentsRepository, YookassaCrmPaymentsRepository())
 
+    InstallNomenclatureWeb()(app=app)
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
     InstallWidgetInstallerInfoWeb()(app=app)
