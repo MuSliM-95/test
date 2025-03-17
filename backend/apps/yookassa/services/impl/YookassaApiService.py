@@ -74,7 +74,7 @@ class YookassaApiService(IYookassaApiService):
             payment_db = await self.__payments_repository.fetch_one_by_crm_payment_id(payment_crm_id)
 
             settings = await self.__request_repository.oauth_settings(access_token = oauth.access_token)
-            print(settings)
+
             if settings:
                 payment.test = settings.test
                 if settings.fiscalization:
@@ -85,7 +85,7 @@ class YookassaApiService(IYookassaApiService):
                 access_token = oauth.access_token,
                 payment = payment
             )
-            print(response)
+
             if not payment_db:
                 await self.__payments_repository.insert(
                     oauth_id = oauth.id,

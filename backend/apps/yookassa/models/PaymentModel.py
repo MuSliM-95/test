@@ -1,8 +1,9 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-from typing import List, Literal, Union
+from typing import List,Literal,Union,Optional
 from enum import Enum
+
 
 class EventWebhookPayment(str, Enum):
     pending = "pending"
@@ -13,7 +14,7 @@ class EventWebhookPayment(str, Enum):
 
 class AmountModel(BaseModel):
     value: str
-    currency: str = "RUB"
+    currency: Literal["RUB"]
 
 
 class CustomerModel(BaseModel):
@@ -31,12 +32,12 @@ class MarkQuantityModel(BaseModel):
 class ItemModel(BaseModel):
     description: str
     amount: AmountModel
-    vat_code: int
+    vat_code: int = Field(ge = 1, le = 10)
     quantity: float
-    measure: str = None
-    mark_quantity: MarkQuantityModel = None
-    payment_subject: str = None
-    payment_mode: str = None
+    measure: Optional[str] = None
+    mark_quantity: Optional[MarkQuantityModel] = None
+    payment_subject: Optional[str] = None
+    payment_mode: Optional[str] = None
 
 
 class ReceiptModel(BaseModel):
@@ -85,7 +86,7 @@ class ConfirmationRedirectResponce(BaseModel):
 class PaymentCreateModel(BaseModel):
     amount: AmountModel = None
     description: str = None
-    receipt: ReceiptModel = None
+    receipt: Optional[ReceiptModel] = None
     tax_system_code: int = None
     capture: bool = None
     merchant_customer_id: str = None
