@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import Optional, List
 
-from apps.yookassa.models.PaymentModel import PaymentCreateModel,PaymentBaseModel,EventWebhookPayment
+from apps.yookassa.models.PaymentModel import PaymentCreateModel, PaymentBaseModel, EventWebhookPayment, ReceiptModel,\
+    CustomerModel, ItemModel
 from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel,WebhookViewModel
 from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import IYookassaCrmPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
@@ -71,22 +72,30 @@ class YookassaApiService(IYookassaApiService):
             if not oauth:
                 raise Exception("для склада продажи не установлена интеграция с Юkassa")
             payment_db = await self.__payments_repository.fetch_one_by_crm_payment_id(payment_crm_id)
-            print(payment_db)
+
+            settings = await self.__request_repository.oauth_settings(access_token = oauth.access_token)
+            print(settings)
+            if settings:
+                payment.test = settings.test
+                if settings.fiscalization:
+                    if settings.fiscalization.enabled:
+                        payment.receipt = ReceiptModel(customer = CustomerModel(), items = List[ItemModel])
+
             response = await self.__request_repository.create_payments(
                 access_token = oauth.access_token,
                 payment = payment
             )
-
+            print(response)
             if not payment_db:
                 await self.__payments_repository.insert(
                     oauth_id = oauth.id,
-                    payment = PaymentBaseModel(**response.dict()),
-                    payment_crm_id = payment_crm_id
+                    payment = PaymentBaseModel(**response.dict(exclude_none = True), capture = payment.capture),
+                    payment_crm_id = payment_crm_id,
                 )
                 return response
             elif payment_db.status == EventWebhookPayment.pending:
                 await self.__payments_repository.update(
-                    PaymentBaseModel(**response.dict()),
+                    PaymentBaseModel(**response.dict(exclude_none = True), capture = payment.capture),
                     from_webhook = False,
                     payment_id_db = payment_db.id
                 )

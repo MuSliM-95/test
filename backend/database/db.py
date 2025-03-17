@@ -131,6 +131,7 @@ yookassa_payments = sqlalchemy.Table(
     sqlalchemy.Column("income_amount_value", Float),
     sqlalchemy.Column("income_amount_currency", String),
     sqlalchemy.Column("confirmation_url", String),
+    sqlalchemy.Column("payment_capture", Boolean),
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone = True), server_default = func.now()),

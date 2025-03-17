@@ -35,6 +35,8 @@ class ItemModel(BaseModel):
     quantity: float
     measure: str = None
     mark_quantity: MarkQuantityModel = None
+    payment_subject: str = None
+    payment_mode: str = None
 
 
 class ReceiptModel(BaseModel):

@@ -20,7 +20,8 @@ class YookassaPaymentsRepository(IYookassaPaymentsRepository):
             "income_amount_currency": payment.income_amount.currency if payment.income_amount else None,
             "description": payment.description,
             "is_deleted": False,
-            "confirmation_url": payment.confirmation.confirmation_url
+            "confirmation_url": payment.confirmation.confirmation_url,
+            "payment_capture": payment.capture
 
         }).returning(yookassa_payments.c.id)
         return await database.execute(query)
@@ -44,6 +45,7 @@ class YookassaPaymentsRepository(IYookassaPaymentsRepository):
                     value = payment_db.income_amount_value,
                     currency = payment_db.income_amount_currency,
                 ),
+                capture = payment_db.payment_capture,
                 created_at = payment_db.updated_at,
                 confirmation = ConfirmationRedirectResponce(confirmation_url = payment_db.confirmation_url)
             )
@@ -66,6 +68,7 @@ class YookassaPaymentsRepository(IYookassaPaymentsRepository):
                     currency = payment_db.amount_currency,
                 ),
                 created_at = payment_db.updated_at,
+                capture = payment_db.payment_capture,
                 confirmation = ConfirmationRedirectResponce(confirmation_url = payment_db.confirmation_url, type = "redirect")
             )
         else:
@@ -83,7 +86,8 @@ class YookassaPaymentsRepository(IYookassaPaymentsRepository):
                 "payment_id": payment.id,
                 "amount_value": float(payment.amount.value),
                 "amount_currency": payment.amount.currency,
-                "confirmation_url": payment.confirmation.confirmation_url
+                "confirmation_url": payment.confirmation.confirmation_url,
+                "payment_capture": payment.capture
             }
         payment_query = payment.id if payment_id_db is None else payment_id_db
         query = update(yookassa_payments).where(
