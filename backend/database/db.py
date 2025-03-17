@@ -547,6 +547,7 @@ categories = sqlalchemy.Table(
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("code", Integer),
+    sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), nullable=True),
     sqlalchemy.Column("parent", Integer, ForeignKey("categories.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
