@@ -25,18 +25,31 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
 
     query = (
         select(
-            amo_install,
-            amo_install_groups.c.id
+            amo_install
         )
-        .select_from(amo_install)
-        .outerjoin(amo_install_groups, amo_install.c.install_group_id == amo_install_groups.c.id)
         .where(and_(
             amo_install.c.referrer == referer,
             amo_install.c.from_widget == setting_info.id
         ))
     )
-
     install = await database.fetch_one(query)
+
+    if install:
+        install_group = install.install_group_id
+    else:
+        query = (
+            select(
+                amo_install_groups
+            )
+            .where(
+                amo_install_groups.c.referrer == referer
+            )
+        )
+        install_group_info = await database.fetch_one(query)
+        if install_group_info:
+            install_group = install_group_info.id
+        else:
+            install_group = None
 
     async with aiohttp.ClientSession() as session:
 
@@ -62,8 +75,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
             "active": True,
             "from_widget": setting_info.id,
         }
-
-        if not (False if not install else install.id_1):
+        if not install_group:
             query = (
                 amo_install_groups.insert()
                 .values(
@@ -74,6 +86,7 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
             amo_install_group_return = await database.fetch_one(query)
             amo_install_group = amo_install_group_return.id
             values_dict["install_group_id"] = amo_install_group
+
 
         if install:
             query = amo_install.update().where(and_(
@@ -86,32 +99,31 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
         await database.execute(query)
 
         if install:
-            if install.id_1:
-                query = (
-                    amo_install_table_cashboxes.select()
-                    .where(amo_install_table_cashboxes.c.amo_install_group_id == install.id_1)
+            query = (
+                amo_install_table_cashboxes.select()
+                .where(amo_install_table_cashboxes.c.amo_install_group_id == install_group)
+            )
+            pair_info = await database.fetch_one(query)
+
+            if pair_info:
+                await create_custom_fields_contacts(
+                    cashbox_id=pair_info.cashbox_id,
+                    referer=referer,
+                    access_token=amo_crm_install.access_token
                 )
-                pair_info = await database.fetch_one(query)
 
-                if pair_info:
-                    await create_custom_fields_contacts(
-                        cashbox_id=pair_info.cashbox_id,
-                        referer=referer,
-                        access_token=amo_crm_install.access_token
-                    )
+                await create_custom_fields_leads(
+                    cashbox_id=pair_info.cashbox_id,
+                    referer=referer,
+                    access_token=amo_crm_install.access_token
+                )
 
-                    await create_custom_fields_leads(
-                        cashbox_id=pair_info.cashbox_id,
-                        referer=referer,
-                        access_token=amo_crm_install.access_token
-                    )
-
-                    query = (
-                        amo_install_table_cashboxes.update()
-                        .where(amo_install_table_cashboxes.c.amo_install_group_id == install.id_1)
-                        .values({"status": True})
-                    )
-                    await database.execute(query)
+                query = (
+                    amo_install_table_cashboxes.update()
+                    .where(amo_install_table_cashboxes.c.amo_install_group_id == install_group)
+                    .values({"status": True})
+                )
+                await database.execute(query)
 
 
 @router.get("/amo_disconnect")

@@ -1,4 +1,7 @@
+import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException, Request
+from phonenumbers import geocoder
+
 from database.db import database, loyality_cards, contragents, organizations, loyality_settings, users, users_cboxes_relation
 import api.loyality_cards.schemas as schemas
 from sqlalchemy import desc, or_
@@ -46,9 +49,21 @@ async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: sc
         )
 
     if filters_dict.get("phone_number"):
-        q = contragents.select().where(contragents.c.phone.ilike(f'%{filters_dict.get("phone_number")}%'), contragents.c.cashbox == user.cashbox_id)
+        phone_number = filters_dict.get("phone_number")
+        phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+        try:
+            number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+            phone_number = number_phone_parsed.national_number
+        except:
+            try:
+                number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                phone_number = number_phone_parsed.national_number
+            except:
+                pass
+        q = contragents.select().where(contragents.c.phone.ilike(f'%{phone_number}%'),
+                                       contragents.c.cashbox == user.cashbox_id)
         finded_contrs = await database.fetch_all(q)
-        
+
         filters.append(
             loyality_cards.c.contragent_id.in_([contr.id for contr in finded_contrs])
         )
@@ -171,15 +186,45 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                 else:
                     loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
         else:
+            phone_code = None
+            is_phone_formatted = False
+            try:
+                phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+                number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+                phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                          phonenumbers.PhoneNumberFormat.E164)
+                phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                is_phone_formatted = True
+                if not phone_code:
+                    phone_number = loyality_cards_values.get("phone_number")
+                    is_phone_formatted = False
+            except:
+                try:
+                    number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                    phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                              phonenumbers.PhoneNumberFormat.E164)
+                    phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                    is_phone_formatted = True
+                    if not phone_code:
+                        phone_number = loyality_cards_values.get("phone_number")
+                        is_phone_formatted = False
+                except:
+                    phone_number = loyality_cards_values.get("phone_number")
+                    is_phone_formatted = False
+
             q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
             loyality_card_contr = await database.fetch_one(q)
+
             if not loyality_card_contr:
+
                 time = int(datetime.now().timestamp())
                 q = contragents.insert().values(
                     {
                         "name": contr_name if contr_name else "",
                         "external_id": "",
-                        "phone": str(clear_phone_number(phone_number=phone_number)),
+                        "phone": phone_number,
+                        "phone_code": phone_code,
+                        "is_phone_formatted": is_phone_formatted,
                         "inn": "",
                         "description": "",
                         "cashbox": user.cashbox_id,
