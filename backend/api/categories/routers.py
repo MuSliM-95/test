@@ -1,6 +1,6 @@
 import api.categories.schemas as schemas
 from asyncpg import ForeignKeyViolationError, IntegrityConstraintViolationError
-from database.db import categories, database, nomenclature
+from database.db import categories, database, nomenclature, pictures
 from fastapi import APIRouter, HTTPException
 from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token
 from sqlalchemy import func, select
@@ -21,33 +21,6 @@ async def get_category_by_id(token: str, idx: int):
     category_db = await get_entity_by_id(categories, idx, user.id)
     category_db = datetime_to_timestamp(category_db)
     return category_db
-
-
-@router.get("/categories/", response_model=schemas.CategoryListGet)
-async def get_categories(token: str, limit: int = 100, offset: int = 0):
-    """Получение списка категорий"""
-    user = await get_user_by_token(token)
-    query = (
-        categories.select()
-        .where(
-            categories.c.cashbox == user.cashbox_id,
-            categories.c.is_deleted.is_not(True),
-        )
-        .limit(limit)
-        .offset(offset)
-    )
-
-    categories_db = await database.fetch_all(query)
-    categories_db = [*map(datetime_to_timestamp, categories_db)]
-
-    query = select(func.count(categories.c.id)).where(
-        categories.c.owner == user.id,
-        categories.c.is_deleted.is_not(True),
-    )
-
-    categories_db_count = await database.fetch_one(query)
-
-    return {"result": categories_db, "count": categories_db_count.count_1}
 
 
 async def build_hierarchy(data, parent_id = None, name = None):
@@ -82,87 +55,6 @@ async def build_hierarchy(data, parent_id = None, name = None):
     tasks = [build_children(parent_id)]
     results = await asyncio.gather(*tasks)
     return results[0]
-
-
-@router.get("/categories_tree/", response_model=schemas.CategoryTreeGet)
-async def get_categories(token: str, nomenclature_name: Optional[str] = None):
-    """Получение древа списка категорий"""
-    user = await get_user_by_token(token)
-    query = (
-        categories.select()
-        .where(
-            categories.c.cashbox == user.cashbox_id,
-            categories.c.is_deleted.is_not(True),
-            categories.c.parent == None
-        )
-    )
-
-    categories_db = await database.fetch_all(query)
-    result = []
-
-    nomenclature_list = []
-    if nomenclature_name != None:
-        q = nomenclature.select().where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category != None)
-        nomenclature_list = await database.fetch_all(q)
-
-    for category in categories_db:
-        category_dict = dict(category)
-        category_dict['key'] = category_dict['id']
-
-        if nomenclature_name is not None:
-            nomenclature_in_category = await database.fetch_all(
-                nomenclature.select().
-                where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"), nomenclature.c.category == category.get("id")))
-            category_dict["nom_count"] = len(nomenclature_in_category)
-        else:
-            category_dict["nom_count"] = 0
-
-        category_dict['expanded_flag'] = False
-        query = (
-            f"""
-                with recursive categories_hierarchy as (
-                select id, name, parent, description, code, status, updated_at, created_at, 1 as lvl
-                from categories where parent = {category.id}
-
-                union
-                select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, H.lvl+1
-                from categories_hierarchy as H
-                join categories as F on F.parent = H.id
-                ) 
-                select * from categories_hierarchy 
-            """
-        )
-        childrens = await database.fetch_all(query)
-        if childrens:
-            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id, nomenclature_name)
-        else:
-            category_dict['children'] = []
-        
-        flag = True
-        if nomenclature_name != None:
-            flag = False
-            cats_ids = [child.parent for child in childrens]
-            if len(childrens) != 0:
-                cats_ids.append(childrens[-1].id)
-            else:
-                cats_ids = [category.id]
-            for nomenclature_entity in nomenclature_list:
-                if nomenclature_entity.category in cats_ids:
-                    flag = True
-                    break
-
-        if flag is True:
-            result.append(category_dict)
-
-    categories_db = [*map(datetime_to_timestamp, result)]
-
-    query = select(func.count(categories.c.id)).where(
-        categories.c.cashbox == user.cashbox_id,
-        categories.c.is_deleted.is_not(True),
-    )
-
-    categories_db_count = await database.fetch_one(query)
-    return {"result": categories_db, "count": categories_db_count.count_1}
 
 
 @router.post("/categories/", response_model=schemas.CategoryList)
