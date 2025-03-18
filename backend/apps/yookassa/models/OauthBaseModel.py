@@ -34,6 +34,8 @@ class OauthWarehouseModel(BaseModel):
 
 class SettingsFiscalization(BaseModel):
     provider: Literal[
+        "avanpost",
+        "fns",
         "a_qsi",
         "atol",
         "business_ru",

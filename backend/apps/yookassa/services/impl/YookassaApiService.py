@@ -8,6 +8,7 @@ from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOa
 from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
 from apps.yookassa.services.core.IYookassaApiService import IYookassaApiService
+from ws_manager import manager
 
 
 class YookassaApiService(IYookassaApiService):
@@ -74,18 +75,18 @@ class YookassaApiService(IYookassaApiService):
             payment_db = await self.__payments_repository.fetch_one_by_crm_payment_id(payment_crm_id)
 
             settings = await self.__request_repository.oauth_settings(access_token = oauth.access_token)
-            print(settings)
+
             if settings:
                 payment.test = settings.test
                 if settings.fiscalization:
-                    if settings.fiscalization.enabled:
-                        payment.receipt = ReceiptModel(customer = CustomerModel(), items = List[ItemModel])
+                    if not settings.fiscalization.enabled:
+                        del payment.receipt
 
             response = await self.__request_repository.create_payments(
                 access_token = oauth.access_token,
                 payment = payment
             )
-            print(response)
+
             if not payment_db:
                 await self.__payments_repository.insert(
                     oauth_id = oauth.id,
@@ -122,4 +123,11 @@ class YookassaApiService(IYookassaApiService):
             return await self.__payments_repository.fetch_one_by_crm_payment_id(crm_payment.id)
         except Exception as error:
             raise Exception(f"ошибка обновления платежа: {str(error)}")
+
+    async def api_update_crm_payment_from_webhook_success(self, payment_id: str):
+        try:
+            payment_db = await self.__payments_repository.fetch_one(payment_id)
+            await self.__crm_payments_repository.update_crm_payments_by_webhook_success(payment_db.payment_crm_id)
+        except Exception as error:
+            raise Exception(f"ошибка обновления платежа crm: {str(error)}")
 

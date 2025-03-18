@@ -14,3 +14,8 @@ class YookassaCrmPaymentsRepository(IYookassaCrmPaymentsRepository):
             join(docs_sales, docs_sales.c.id == payments.c.docs_sales_id).
             where(payments.c.docs_sales_id == doc_sales_id)
         )
+
+    async def update_crm_payments_by_webhook_success(self, payment_id: int):
+        return await database.execute(
+            update(payments).where(payments.c.id == payment_id).values({"status": True})
+        )
