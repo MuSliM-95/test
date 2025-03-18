@@ -99,7 +99,6 @@ class OauthService(IOauthService):
         try:
             oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
             settings = await self.__request_repository.oauth_settings(oauth.access_token)
-            print(settings)
             if settings:
                 return True
         except Exception as error:
