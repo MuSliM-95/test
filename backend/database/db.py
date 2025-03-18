@@ -519,9 +519,6 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description_short", String),
     sqlalchemy.Column("description_long", String),
-    sqlalchemy.Column('web_description', String, nullable=True),
-    sqlalchemy.Column("minimum_order", Integer, nullable=True),
-    sqlalchemy.Column("tags", ARRAY(item_type=String)),
     sqlalchemy.Column("cashback_percent", Integer),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
@@ -534,44 +531,28 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-nomenclature_relations = sqlalchemy.Table(
-    "nomenclature_relations",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id", ondelete="CASCADE"), nullable=False),
-    sqlalchemy.Column("group_id", Integer, ForeignKey("nomenclature_groups.id", ondelete="CASCADE"), nullable=False),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("nomenclature_id", name="uq_variant_per_nomenclature"),
-)
-
-nomenclature_groups = sqlalchemy.Table(
-    "nomenclature_groups",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-)
-
 nomenclature_attributes = sqlalchemy.Table(
     "nomenclature_attributes",
     metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("alias", String, nullable=True),
-    sqlalchemy.Column("cash_box", Integer, nullable=False),
+    sqlalchemy.Column("cashbox", Integer, nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("name", name="uq_attribute_name")
+    sqlalchemy.UniqueConstraint("name", "cashbox", name="uq_attribute_name_cashbox")
 )
 
 nomenclature_attributes_value = sqlalchemy.Table(
     "nomenclature_attributes_value",
     metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
     sqlalchemy.Column("attribute_id", Integer, ForeignKey("nomenclature_attributes.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("value", String, nullable=False),
+    sqlalchemy.UniqueConstraint("nomenclature_id", name="uq_attribute_nomenclature_id")
 )
 
 nomenclature_barcodes = sqlalchemy.Table(
@@ -1140,7 +1121,6 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("parent_docs_sales", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("settings", Integer, ForeignKey("docs_sales_settings.id")),
     sqlalchemy.Column("autorepeat", Boolean, default=False),
-    sqlalchemy.Column("delivery_address", String, nullable=True),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("tax_included", Boolean),
     sqlalchemy.Column("tax_active", Boolean),
