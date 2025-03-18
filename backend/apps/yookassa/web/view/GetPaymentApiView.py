@@ -16,6 +16,7 @@ class GetPaymentApiView:
     async def __call__(self, token: str, doc_sales_id: int):
         try:
             user = await get_user_by_token(token)
+
             payment_yookassa = await self.__yookassa_api_service.api_get_payment_by_docs_sales_id(
                 docs_sales_id = doc_sales_id,
             )
