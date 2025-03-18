@@ -78,8 +78,8 @@ class YookassaApiService(IYookassaApiService):
             if settings:
                 payment.test = settings.test
                 if settings.fiscalization:
-                    if settings.fiscalization.enabled:
-                        payment.receipt = ReceiptModel(customer = CustomerModel(), items = List[ItemModel])
+                    if not settings.fiscalization.enabled:
+                        del payment.receipt
 
             response = await self.__request_repository.create_payments(
                 access_token = oauth.access_token,
