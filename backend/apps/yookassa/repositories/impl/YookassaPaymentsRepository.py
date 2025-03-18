@@ -47,6 +47,7 @@ class YookassaPaymentsRepository(IYookassaPaymentsRepository):
                 ),
                 capture = payment_db.payment_capture,
                 created_at = payment_db.updated_at,
+                payment_crm_id = payment_db.payment_crm_id,
                 confirmation = ConfirmationRedirectResponce(confirmation_url = payment_db.confirmation_url)
             )
         else:

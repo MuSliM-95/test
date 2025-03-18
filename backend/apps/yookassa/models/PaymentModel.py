@@ -110,6 +110,7 @@ class PaymentBaseModel(PaymentCreateModel):
     receipt_registration: str = None
     merchant_customer_id: str = None
     invoice_details: InvoiceDetails = None
+    payment_crm_id: Optional[int] = None
 
 
 class PaymentWebhookEventModel(BaseModel):

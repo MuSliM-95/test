@@ -24,3 +24,8 @@ class IYookassaApiService:
     async def api_get_payment_by_docs_sales_id(self, docs_sales_id: int) -> Optional[PaymentBaseModel]:
         raise NotImplementedError
 
+    async def api_update_crm_payment_from_webhook_success(self, payment_id: str):
+        raise NotImplementedError
+
+
+
