@@ -50,7 +50,6 @@ class Create(BaseModel):
     client: Optional[int]
     contragent: Optional[int]
     contract: Optional[int]
-    delivery_address: Optional[str]
     organization: int
     loyality_card_id: Optional[int]
     warehouse: Optional[int]
