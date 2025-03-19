@@ -537,22 +537,25 @@ nomenclature_attributes = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("alias", String, nullable=True),
-    sqlalchemy.Column("cashbox", Integer, nullable=False),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("name", "cashbox", name="uq_attribute_name_cashbox")
+    sqlalchemy.UniqueConstraint("name", "cashbox", name="uq_nomenclature_attributes_name_cashbox")
 )
 
 nomenclature_attributes_value = sqlalchemy.Table(
     "nomenclature_attributes_value",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("attribute_id", Integer, ForeignKey("nomenclature_attributes.id", ondelete="CASCADE"), nullable=False),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("attribute_id", Integer, ForeignKey("nomenclature_attributes.id"), nullable=False),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("value", String, nullable=False),
-    sqlalchemy.UniqueConstraint("attribute_id", "nomenclature_id", name="uq_attribute_nomenclature_id")
+    sqlalchemy.UniqueConstraint(
+        "attribute_id", "nomenclature_id",
+        name="uq_nomenclature_attributes_value_attribute_id_nomenclature_id"
+    )
 )
 
 nomenclature_barcodes = sqlalchemy.Table(
