@@ -341,6 +341,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
     article_db = await database.fetch_one(article_q)
 
     for index, instance_values in enumerate(docs_sales_data.dict()["__root__"]):
+
         instance_values["created_by"] = user.id
         instance_values["sales_manager"] = user.id
         instance_values["is_deleted"] = False
