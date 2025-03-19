@@ -552,7 +552,7 @@ nomenclature_attributes_value = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("value", String, nullable=False),
-    sqlalchemy.UniqueConstraint("nomenclature_id", name="uq_attribute_nomenclature_id")
+    sqlalchemy.UniqueConstraint("attribute_id", "nomenclature_id", name="uq_attribute_nomenclature_id")
 )
 
 nomenclature_barcodes = sqlalchemy.Table(

@@ -1,6 +1,8 @@
+import api.nomenclature_attributes.schemas as schemas
+
 from typing import List
 from sqlalchemy.exc import IntegrityError
-import api.nomenclature_attributes.schemas as schemas
+
 from database.db import database, nomenclature, nomenclature_attributes, nomenclature_attributes_value
 from fastapi import APIRouter, HTTPException
 
@@ -17,21 +19,16 @@ async def new_nomenclature_attributes(
 ) -> schemas.AttributeCreateResponse:
 
     user = await get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Недействительный токен")
 
-    query = select(nomenclature_attributes).where(nomenclature_attributes.c.name == attribute_data.name)
-    existing_attribute = await database.fetch_one(query)
-
-    if existing_attribute:
+    try:
+        query = nomenclature_attributes.insert().values(
+            name=attribute_data.name,
+            alias=attribute_data.alias,
+            cashbox=user.cashbox_id,
+        )
+        new_attribute_id = await database.execute(query)
+    except IntegrityError:
         raise HTTPException(status_code=400, detail=f"Атрибут с именем '{attribute_data.name}' уже существует.")
-
-    query = nomenclature_attributes.insert().values(
-        name=attribute_data.name,
-        alias=attribute_data.alias,
-        cash_box=user.cashbox_id,
-    )
-    new_attribute_id = await database.execute(query)
 
     return schemas.AttributeCreateResponse(id=new_attribute_id, name=attribute_data.name, alias=attribute_data.alias)
 
@@ -42,13 +39,14 @@ async def new_nomenclature_attribute_value(
     attribute_value_data: schemas.AttributeValueCreate
 ):
     user = await get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Недействительный токен")
 
-    query = select(nomenclature.c.id).where(and_(
-        nomenclature.c.id == attribute_value_data.nomenclature_id,
-        nomenclature.c.cashbox == user.cashbox_id,
-    ))
+    query = (
+        select(nomenclature.c.id)
+        .where(and_(
+            nomenclature.c.id == attribute_value_data.nomenclature_id,
+            nomenclature.c.cashbox == user.cashbox_id,
+        ))
+    )
 
     nomenclature_record = await database.fetch_one(query)
     if not nomenclature_record:
@@ -57,7 +55,16 @@ async def new_nomenclature_attribute_value(
         )
 
     attribute_ids = [attribute.attribute_id for attribute in attribute_value_data.attributes]
-    query = select(nomenclature_attributes.c.id).where(nomenclature_attributes.c.id.in_(attribute_ids))
+
+    query = (
+        select(
+            nomenclature_attributes.c.id
+        )
+        .where(and_(
+            nomenclature_attributes.c.id.in_(attribute_ids),
+            nomenclature_attributes.c.cashbox == user.cashbox_id
+        ))
+    )
     existing_attribute_ids = {record["id"] for record in await database.fetch_all(query)}
 
     query = select(nomenclature_attributes_value.c.attribute_id, nomenclature_attributes_value.c.value).where(
@@ -107,8 +114,6 @@ async def new_nomenclature_attribute_value(
 @router.get("/nomenclature/{nomenclature_id}/attributes", response_model=List[schemas.NomenclatureAttribute])
 async def get_nomenclature_attributes(nomenclature_id: int, token: str):
     user = await get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Недействительный токен")
 
     query = (
         select(
