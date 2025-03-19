@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import api.nomenclature_attributes.schemas as schemas
 
 from typing import List
@@ -7,7 +9,7 @@ from database.db import database, nomenclature, nomenclature_attributes, nomencl
 from fastapi import APIRouter, HTTPException
 
 from functions.helpers import get_user_by_token
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 
 router = APIRouter(tags=["nomenclature_attributes"])
 
@@ -111,14 +113,16 @@ async def new_nomenclature_attribute_value(
     )
 
 
-@router.get("/nomenclature/{nomenclature_id}/attributes", response_model=List[schemas.NomenclatureAttribute])
+@router.get("/nomenclature/{nomenclature_id}/attributes", response_model=schemas.NomenclatureWithAttributesResponse)
 async def get_nomenclature_attributes(nomenclature_id: int, token: str):
     user = await get_user_by_token(token)
 
     query = (
         select(
-            nomenclature_attributes.c.name.label("attribute_name"),
-            nomenclature_attributes_value.c.value.label("attribute_value"),
+            nomenclature_attributes.c.id,
+            nomenclature_attributes.c.name,
+            nomenclature_attributes.c.alias,
+            func.array_agg(nomenclature_attributes_value.c.value).label("attribute_values"),
         )
         .select_from(
             nomenclature_attributes_value
@@ -126,9 +130,21 @@ async def get_nomenclature_attributes(nomenclature_id: int, token: str):
                 nomenclature_attributes,
                 nomenclature_attributes_value.c.attribute_id == nomenclature_attributes.c.id,
             )
+            .join(
+                nomenclature,
+                nomenclature_attributes_value.c.nomenclature_id == nomenclature.c.id
+            )
         )
-        .where(nomenclature_attributes_value.c.nomenclature_id == nomenclature_id)
-        .order_by(nomenclature_attributes.c.name)
+        .where(and_(
+            nomenclature_attributes_value.c.nomenclature_id == nomenclature_id,
+            nomenclature.c.cashbox == user.cashbox_id,
+            nomenclature_attributes.c.cashbox == user.cashbox_id
+        ))
+        .group_by(
+            nomenclature_attributes.c.id,
+            nomenclature_attributes.c.name,
+            nomenclature_attributes.c.alias,
+        )
     )
 
     results = await database.fetch_all(query)
@@ -136,10 +152,14 @@ async def get_nomenclature_attributes(nomenclature_id: int, token: str):
     if not results:
         raise HTTPException(status_code=404, detail=f"Номенклатура с ID {nomenclature_id} не найдена или не имеет атрибутов.")
 
-    # Преобразуем результаты в ожидаемый формат
-    attributes = [
-        schemas.NomenclatureAttribute(name=row["attribute_name"], value=row["attribute_value"])
-        for row in results
-    ]
-
-    return attributes
+    return schemas.NomenclatureWithAttributesResponse(
+        nomenclature_id=nomenclature_id,
+        attributes=[
+            schemas.AttributeResponse(
+                id=result.id,
+                name=result.name,
+                alias=result.alias,
+                values=result.attribute_values,
+            ) for result in results
+        ]
+    )
