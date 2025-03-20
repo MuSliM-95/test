@@ -16,7 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger, BIGINT,
+    UniqueConstraint, SmallInteger, BIGINT, text,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -556,6 +556,32 @@ nomenclature_attributes_value = sqlalchemy.Table(
         "attribute_id", "nomenclature_id",
         name="uq_nomenclature_attributes_value_attribute_id_nomenclature_id"
     )
+)
+
+nomenclature_groups_value = sqlalchemy.Table(
+    "nomenclature_groups_value",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column("group_id", Integer, ForeignKey("nomenclature_groups.id"), nullable=False),
+    sqlalchemy.Column("is_main", Boolean, nullable=False, server_default="false"),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint("nomenclature_id", name="uq_nomenclature_groups_value_nomenclature_id"),
+    sqlalchemy.Index(
+        "uq_nomenclature_groups_value_group_id_is_main",
+        "group_id",
+        unique=True,
+        postgresql_where=text("is_main IS TRUE")
+    ),
+)
+
+nomenclature_groups = sqlalchemy.Table(
+    "nomenclature_groups",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("name", String, nullable=True)
 )
 
 nomenclature_barcodes = sqlalchemy.Table(
