@@ -6,6 +6,20 @@ from database.db import nomenclature, database, prices, price_types, units
 
 class NomenclatureReader(INomenclatureReader):
 
+    async def get_by_id(self, id: int, cashbox_id: int):
+        query = (
+            select(
+                nomenclature
+            )
+            .where(
+                nomenclature.c.id == id,
+                nomenclature.c.cashbox == cashbox_id,
+                nomenclature.c.is_deleted.is_not(True)
+            )
+        )
+        nomenclature_info = await database.fetch_one(query)
+        return nomenclature_info
+
     async def get_by_id_with_prices(self, id: int, cashbox_id: int):
         query = (
             select(

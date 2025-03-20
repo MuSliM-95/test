@@ -8,7 +8,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from api.categories.web.InstallCategoriesWeb import InstallCategoriesWeb
+from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
+from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import NomenclatureReader
 from api.nomenclature.web.InstallNomenclatureWeb import InstallNomenclatureWeb
+from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import \
+    IAddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import \
+    ICreateNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IDelNomenclatureFromGroupFunction import \
+    IDelNomenclatureFromGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IDeleteNomenclatureGroupFunction import \
+    IDeleteNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IPatchNomenclatureGroupFunction import \
+    IPatchNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.AddNomenclatureToGroupFunction import \
+    AddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.CreateNomenclatureGroupFunction import \
+    CreateNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.DelNomenclatureFromGroupFunction import \
+    DelNomenclatureFromGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.DeleteNomenclatureGroupFunction import \
+    DeleteNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.PatchNomenclatureGroupFunction import \
+    PatchNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
+from api.nomenclature_groups.infrastructure.readers.impl.NomenclatureGroupsReader import NomenclatureGroupsReader
+from api.nomenclature_groups.web.InstallNomenclatureGroupsWeb import InstallNomenclatureGroupsWeb
 from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
 from apps.amocrm.installer.infrastructure.repositories.impl.WidgetInstallerRepository import \
@@ -280,12 +305,21 @@ async def startup():
     ioc.set(IYookassaPaymentsRepository, YookassaPaymentsRepository())
     ioc.set(IYookassaCrmPaymentsRepository, YookassaCrmPaymentsRepository())
 
+    ioc.set(INomenclatureReader, NomenclatureReader())
+    ioc.set(INomenclatureGroupsReader, NomenclatureGroupsReader())
+    ioc.set(IAddNomenclatureToGroupFunction, AddNomenclatureToGroupFunction())
+    ioc.set(ICreateNomenclatureGroupFunction, CreateNomenclatureGroupFunction())
+    ioc.set(IDeleteNomenclatureGroupFunction, DeleteNomenclatureGroupFunction())
+    ioc.set(IPatchNomenclatureGroupFunction, PatchNomenclatureGroupFunction())
+    ioc.set(IDelNomenclatureFromGroupFunction, DelNomenclatureFromGroupFunction())
+
     InstallCategoriesWeb()(app=app)
     InstallNomenclatureWeb()(app=app)
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
     InstallWidgetInstallerInfoWeb()(app=app)
     InstallYookassaOauthWeb()(app=app)
+    InstallNomenclatureGroupsWeb()(app=app)
 
     init_db()
     await database.connect()

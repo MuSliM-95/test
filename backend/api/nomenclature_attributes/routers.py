@@ -1,8 +1,5 @@
-from collections import defaultdict
-
 import api.nomenclature_attributes.schemas as schemas
 
-from typing import List
 from sqlalchemy.exc import IntegrityError
 
 from database.db import database, nomenclature, nomenclature_attributes, nomenclature_attributes_value
