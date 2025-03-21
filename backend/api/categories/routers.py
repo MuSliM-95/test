@@ -33,14 +33,19 @@ async def build_hierarchy(data, parent_id = None, name = None):
             item['children'] = []
             item['key'] = item['id']
 
-            if name is not None:
-                nomenclature_in_category = await database.fetch_all(
-                    nomenclature.select().
-                    where( nomenclature.c.name.ilike(f"%{name}%"),
-                           nomenclature.c.category == item.get("id")))
-                item["nom_count"] = len(nomenclature_in_category)
-            else:
-                item["nom_count"] = 0
+            nomenclature_in_category = (
+                select(
+                    func.count(nomenclature.c.id).label("nom_count")
+                )
+                .where(
+                    nomenclature.c.category == item.get("id"),
+                    nomenclature.c.name.ilike(f"%{name}%") if name else True
+                )
+                .group_by(nomenclature.c.category)
+            )
+            nomenclature_in_category_result = await database.fetch_one(nomenclature_in_category)
+
+            item["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
 
             item['expanded_flag'] = False
             if item['parent'] == parent_id:
