@@ -21,5 +21,5 @@ class InstallNomenclatureWeb:
             methods=["GET"],
             status_code=status.HTTP_200_OK,
             response_model=schemas.NomenclatureGet,
-            tags=["nomenclature"]
+            tags=["manufacturers"]
         )
