@@ -1,13 +1,27 @@
-from fastapi import HTTPException
-from sqlalchemy import select, and_
-from sqlalchemy.exc import IntegrityError
+from collections import defaultdict
 
+from asyncpg import UniqueViolationError
+from fastapi import HTTPException
+from sqlalchemy import select
+from starlette import status
+
+from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
+from api.nomenclature_attributes.infrastructure.readers.core.INomenclatureAttributesReader import \
+    INomenclatureAttributesReader
 from api.nomenclature_attributes.web.models import schemas
-from database.db import nomenclature, database, nomenclature_attributes, nomenclature_attributes_value
+from database.db import database, nomenclature_attributes_value
 from functions.helpers import get_user_by_token
 
 
 class AddNomenclatureAttributeValueView:
+
+    def __init__(
+        self,
+        nomenclature_reader: INomenclatureReader,
+        nomenclature_attributes_reader: INomenclatureAttributesReader,
+    ):
+        self.__nomenclature_reader = nomenclature_reader
+        self.__nomenclature_attributes_reader = nomenclature_attributes_reader
 
     async def __call__(
         self,
@@ -16,32 +30,22 @@ class AddNomenclatureAttributeValueView:
     ):
         user = await get_user_by_token(token)
 
-        query = (
-            select(nomenclature.c.id)
-            .where(and_(
-                nomenclature.c.id == attribute_value_data.nomenclature_id,
-                nomenclature.c.cashbox == user.cashbox_id,
-            ))
+        nomenclature_info = await self.__nomenclature_reader.get_by_id(
+            id=attribute_value_data.nomenclature_id,
+            cashbox_id=user.cashbox_id
         )
 
-        nomenclature_record = await database.fetch_one(query)
-        if not nomenclature_record:
+        if not nomenclature_info:
             raise HTTPException(
                 status_code=404, detail=f"Номенклатура с ID '{attribute_value_data.nomenclature_id}' не найдена"
             )
 
         attribute_ids = [attribute.attribute_id for attribute in attribute_value_data.attributes]
 
-        query = (
-            select(
-                nomenclature_attributes.c.id
-            )
-            .where(and_(
-                nomenclature_attributes.c.id.in_(attribute_ids),
-                nomenclature_attributes.c.cashbox == user.cashbox_id
-            ))
+        existing_attribute_ids = await self.__nomenclature_attributes_reader.get_ids_by_ids(
+            ids=attribute_ids,
+            cashbox_id=user.cashbox_id
         )
-        existing_attribute_ids = {record["id"] for record in await database.fetch_all(query)}
 
         query = select(nomenclature_attributes_value.c.attribute_id, nomenclature_attributes_value.c.value).where(
             nomenclature_attributes_value.c.nomenclature_id == attribute_value_data.nomenclature_id
@@ -60,28 +64,44 @@ class AddNomenclatureAttributeValueView:
                 raise HTTPException(
                     status_code=404, detail=f"Атрибут с ID '{attribute.attribute_id}' не найден"
                 )
-            for single_value in attribute.value:
-                if single_value in existing_values_map.get(attribute.attribute_id, set()):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Значение '{single_value}' для атрибута с ID '{attribute.attribute_id}' уже существует."
-                    )
-                attributes_to_insert.append({
-                    "nomenclature_id": attribute_value_data.nomenclature_id,
-                    "attribute_id": attribute.attribute_id,
-                    "value": single_value
-                })
+            if attribute.value in existing_values_map.get(attribute.attribute_id, set()):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Значение '{attribute.value}' для атрибута с ID '{attribute.attribute_id}' уже существует."
+                )
+            attributes_to_insert.append({
+                "nomenclature_id": attribute_value_data.nomenclature_id,
+                "attribute_id": attribute.attribute_id,
+                "value": attribute.value
+            })
 
         try:
-            query = nomenclature_attributes_value.insert()
-            await database.execute_many(query, attributes_to_insert)
-        except IntegrityError:
-            raise HTTPException(
-                status_code=400,
-                detail="Ошибка: Уже существует значение для этого атрибута и номенклатуры."
+            query = (
+                nomenclature_attributes_value.insert()
+                .values(attributes_to_insert)
+                .returning(nomenclature_attributes_value.c.id)
             )
+            result = await database.fetch_all(query)
+        except UniqueViolationError as error:
+            if error.constraint_name == "uq_nomenclature_attributes_value_attribute_id_nomenclature_id": # type: ignore
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ошибка: Уже существует значение для этого атрибута и номенклатуры."
+                )
+            else:
+                raise error
+
+        attributes = defaultdict(list)
+        for record in zip(result, attributes_to_insert):
+            attributes[record[1]["attribute_id"]].append({
+                "attribute_value_id": record[0].id,
+                "value": record[1]["value"]
+            })
 
         return schemas.AttributeValueResponse(
             nomenclature_id=attribute_value_data.nomenclature_id,
-            attributes=attribute_value_data.attributes
+            attributes=[{
+                "attribute_id": attribute.attribute_id,
+                "attribute_value": attributes.get(attribute.attribute_id, [])
+            } for attribute in attribute_value_data.attributes]
         )

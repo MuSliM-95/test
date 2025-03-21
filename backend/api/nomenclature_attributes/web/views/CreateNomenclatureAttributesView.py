@@ -1,29 +1,38 @@
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
+from starlette import status
 
-from api.nomenclature_attributes.web.models import schemas
-from database.db import nomenclature_attributes, database
+from api.nomenclature_attributes.infrastructure.exceptions.NomenclatureAttributeNameAlreadyExistError import \
+    NomenclatureAttributeNameAlreadyExistError
+from api.nomenclature_attributes.infrastructure.functions.core.IInsertNomenclatureAttributesFunction import \
+    IInsertNomenclatureAttributesFunction
+from api.nomenclature_attributes.web.models.schemas import AttributeCreateResponse, AttributeCreate
 from functions.helpers import get_user_by_token
 
 
 class CreateNomenclatureAttributesView:
 
+    def __init__(
+        self,
+        insert_nomenclature_attributes_function: IInsertNomenclatureAttributesFunction
+    ):
+        self.__insert_nomenclature_attributes_function = insert_nomenclature_attributes_function
+
     async def __call__(
         self,
         token: str,
-        attribute_data: schemas.AttributeCreate,
+        attribute_data: AttributeCreate,
     ):
         user = await get_user_by_token(token)
 
         try:
-            query = nomenclature_attributes.insert().values(
+            nomenclature_attribute_id = await self.__insert_nomenclature_attributes_function(
                 name=attribute_data.name,
                 alias=attribute_data.alias,
-                cashbox=user.cashbox_id,
+                cashbox_id=user.cashbox_id
             )
-            new_attribute_id = await database.execute(query)
-        except IntegrityError:
-            raise HTTPException(status_code=400, detail=f"Атрибут с именем '{attribute_data.name}' уже существует.")
+        except NomenclatureAttributeNameAlreadyExistError as error:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=error.title)
 
-        return schemas.AttributeCreateResponse(id=new_attribute_id, name=attribute_data.name,
+        return AttributeCreateResponse(id=nomenclature_attribute_id, name=attribute_data.name,
                                                alias=attribute_data.alias)
