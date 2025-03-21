@@ -40,6 +40,8 @@ class GetCategoriesTreeView:
                 categories.c.is_deleted.is_not(True),
                 categories.c.parent == None
             )
+            .limit(limit)
+            .offset(offset)
         )
 
         categories_db = await database.fetch_all(query)
