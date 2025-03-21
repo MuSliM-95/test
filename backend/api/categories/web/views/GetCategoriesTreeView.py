@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Optional, Annotated
 
+from fastapi import Query
 from sqlalchemy import select, func
 
 from api.categories.routers import build_hierarchy
@@ -18,7 +19,9 @@ class GetCategoriesTreeView:
 
     async def __call__(
         self,
-        token: str, nomenclature_name: Optional[str] = None
+        token: str, nomenclature_name: Optional[str] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=100)] = 100,
     ):
         """Получение древа списка категорий"""
         user = await get_user_by_token(token)
@@ -37,6 +40,8 @@ class GetCategoriesTreeView:
                 categories.c.is_deleted.is_not(True),
                 categories.c.parent == None
             )
+            .limit(limit)
+            .offset(offset)
         )
 
         categories_db = await database.fetch_all(query)
