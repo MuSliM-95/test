@@ -24,6 +24,9 @@ from sqlalchemy.sql import func
 
 from database.enums import Repeatability, Gender, ContragentType, TriggerType, TriggerTime
 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class OperationType(str, ENUM):
     plus = "+"
@@ -1169,6 +1172,17 @@ docs_sales_tags = sqlalchemy.Table(
     sqlalchemy.Column("name", String, index=True),
 )
 
+docs_sales_delivery_info = sqlalchemy.Table(
+    "docs_sales_delivery_info",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
+    sqlalchemy.Column("address", String),
+    sqlalchemy.Column("delivery_date", DateTime(timezone=True)),
+    sqlalchemy.Column("recipient", JSON),
+    sqlalchemy.Column("note", String),
+)
+
 docs_sales_goods = sqlalchemy.Table(
     "docs_sales_goods",
     metadata,
@@ -1888,7 +1902,23 @@ tg_bot_bill_approvers = sqlalchemy.Table(
     extend_existing=True
 )
 
-
+utm_tags = sqlalchemy.Table(
+    "utm_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
+    sqlalchemy.Column("utm_source", String),
+    sqlalchemy.Column("utm_medium", String),
+    sqlalchemy.Column("utm_campaign", String),
+    sqlalchemy.Column("utm_term", ARRAY(item_type=String)),
+    sqlalchemy.Column("utm_content", String),
+    sqlalchemy.Column("utm_name", String),
+    sqlalchemy.Column("utm_phone", String),
+    sqlalchemy.Column("utm_email", String),
+    sqlalchemy.Column("utm_leadid", String),
+    sqlalchemy.Column("utm_yclientid", String),
+    sqlalchemy.Column("utm_gaclientid", String),
+)
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
