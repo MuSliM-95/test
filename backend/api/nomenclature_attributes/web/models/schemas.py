@@ -15,8 +15,15 @@ class AttributeCreateResponse(BaseModel):
 
 class AttributeValue(BaseModel):
     attribute_id: int
-    value: List[str]
+    value: str
 
+class AttributeValues(BaseModel):
+    attribute_value_id: int
+    value: str
+
+class ResponseAttributeValue(BaseModel):
+    attribute_id: int
+    attribute_value: List[AttributeValues]
 
 class AttributeValueCreate(BaseModel):
     nomenclature_id: int
@@ -25,14 +32,14 @@ class AttributeValueCreate(BaseModel):
 
 class AttributeValueResponse(BaseModel):
     nomenclature_id: int
-    attributes: List[AttributeValue]
+    attributes: List[ResponseAttributeValue]
 
 
 class AttributeResponse(BaseModel):
     id: int
     name: str
     alias: str
-    values: List[str]
+    values: str
 
 
 class NomenclatureWithAttributesResponse(BaseModel):

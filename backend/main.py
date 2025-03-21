@@ -11,6 +11,19 @@ from api.categories.web.InstallCategoriesWeb import InstallCategoriesWeb
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
 from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import NomenclatureReader
 from api.nomenclature.web.InstallNomenclatureWeb import InstallNomenclatureWeb
+from api.nomenclature_attributes.infrastructure.functions.core.IDeleteNomenclatureAttributesFunction import \
+    IDeleteNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.core.IInsertNomenclatureAttributesFunction import \
+    IInsertNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.impl.DeleteNomenclatureAttributesFunction import \
+    DeleteNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.impl.InsertNomenclatureAttributesFunction import \
+    InsertNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.readers.core.INomenclatureAttributesReader import \
+    INomenclatureAttributesReader
+from api.nomenclature_attributes.infrastructure.readers.impl.NomenclatureAttributesReader import \
+    NomenclatureAttributesReader
+from api.nomenclature_attributes.web.InstallNomenclatureAttributesWeb import InstallNomenclatureAttributesWeb
 from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import \
     IAddNomenclatureToGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import \
@@ -96,7 +109,6 @@ from api.manufacturers.routers import router as manufacturers_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.nomenclature.routers import router as nomenclature_router
-from api.nomenclature_attributes.routers import router as nomenclature_attributes_router
 from api.pictures.routers import router as pictures_router
 from api.functions.routers import router as entity_functions_router
 from api.units.routers import router as units_router
@@ -183,7 +195,6 @@ app.include_router(manufacturers_router)
 app.include_router(price_types_router)
 app.include_router(prices_router)
 app.include_router(nomenclature_router)
-app.include_router(nomenclature_attributes_router)
 app.include_router(pictures_router)
 app.include_router(entity_functions_router)
 app.include_router(units_router)
@@ -313,6 +324,10 @@ async def startup():
     ioc.set(IPatchNomenclatureGroupFunction, PatchNomenclatureGroupFunction())
     ioc.set(IDelNomenclatureFromGroupFunction, DelNomenclatureFromGroupFunction())
 
+    ioc.set(IInsertNomenclatureAttributesFunction, InsertNomenclatureAttributesFunction())
+    ioc.set(INomenclatureAttributesReader, NomenclatureAttributesReader())
+    ioc.set(IDeleteNomenclatureAttributesFunction, DeleteNomenclatureAttributesFunction())
+
     InstallCategoriesWeb()(app=app)
     InstallNomenclatureWeb()(app=app)
     InstallBookingRepeatWeb()(app=app)
@@ -320,6 +335,7 @@ async def startup():
     InstallWidgetInstallerInfoWeb()(app=app)
     InstallYookassaOauthWeb()(app=app)
     InstallNomenclatureGroupsWeb()(app=app)
+    InstallNomenclatureAttributesWeb()(app=app)
 
     init_db()
     await database.connect()

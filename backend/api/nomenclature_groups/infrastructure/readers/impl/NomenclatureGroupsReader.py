@@ -13,8 +13,10 @@ class NomenclatureGroupsReader(INomenclatureGroupsReader):
     async def get_nomen_with_attr(self, group_id: int, cashbox_id: int):
         query = (
             select(
-                nomenclature.c.id,
+                nomenclature.c.id.label("nomenclature_id"),
+                nomenclature_attributes_value.c.id.label("attribute_value_id"),
                 nomenclature_attributes_value.c.value,
+                nomenclature_attributes.c.id.label("attribute_id"),
                 nomenclature_attributes.c.name,
                 nomenclature_attributes.c.alias
             )
