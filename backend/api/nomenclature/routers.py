@@ -280,6 +280,26 @@ async def get_nomenclature(
             order_by_condition = asc(nomenclature.c.created_at)
         elif filters_query.order_created_at == SortOrder.DESC:
             order_by_condition = desc(nomenclature.c.created_at)
+    elif filters_query.order_price:
+        price_subquery = (
+            select(
+                prices.c.nomenclature.label("nomenclature_id"),
+                func.min(prices.c.price).label("min_price")
+            )
+            .group_by(prices.c.nomenclature)
+            .subquery()
+        )
+        query = query.outerjoin(price_subquery, price_subquery.c.nomenclature_id == nomenclature.c.id).group_by(price_subquery.c.min_price)
+
+        if filters_query.order_price == SortOrder.ASC:
+            order_by_condition = asc(price_subquery.c.min_price)
+        else:
+            order_by_condition = desc(price_subquery.c.min_price)
+    elif filters_query.order_name:
+        if filters_query.order_name == SortOrder.ASC:
+            order_by_condition = asc(func.upper(func.left(nomenclature.c.name, 1)))
+        elif filters_query.order_name == SortOrder.DESC:
+            order_by_condition = desc(func.upper(func.left(nomenclature.c.name, 1)))
 
     query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id, units.c.convent_national_view).order_by(order_by_condition)
     nomenclature_db = await database.fetch_all(query)
