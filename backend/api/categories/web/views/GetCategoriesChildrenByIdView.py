@@ -1,7 +1,8 @@
 from fastapi import HTTPException
+from sqlalchemy import select, func
 
 from api.categories.routers import build_hierarchy
-from database.db import categories, database
+from database.db import categories, database, nomenclature
 from functions.helpers import get_user_by_token, datetime_to_timestamp
 
 
@@ -20,7 +21,20 @@ class GetCategoriesChildrenByIdView:
         category_dict = dict(categories_db)
         category_dict['key'] = category_dict['id']
         category_dict['expanded_flag'] = False
-        category_dict["nom_count"] = 0
+
+        nomenclature_in_category = (
+            select(
+                func.count(nomenclature.c.id).label("nom_count")
+            )
+            .where(
+                nomenclature.c.category == category_dict['id']
+            )
+            .group_by(nomenclature.c.category)
+        )
+        nomenclature_in_category_result = await database.fetch_one(nomenclature_in_category)
+
+        category_dict["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
+
         query = (
             f"""
                     with recursive categories_hierarchy as (
@@ -37,8 +51,7 @@ class GetCategoriesChildrenByIdView:
         )
         childrens = await database.fetch_all(query)
         if childrens:
-            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category_dict['id'],
-                                                              None)
+            category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category_dict['id'])
         else:
             category_dict['children'] = []
 

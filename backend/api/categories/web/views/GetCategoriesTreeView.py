@@ -67,14 +67,18 @@ class GetCategoriesTreeView:
             except Exception as e:
                 print(e)
 
-            if nomenclature_name is not None:
-                nomenclature_in_category = await database.fetch_all(
-                    nomenclature.select().
-                    where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"),
-                          nomenclature.c.category == category.get("id")))
-                category_dict["nom_count"] = len(nomenclature_in_category)
-            else:
-                category_dict["nom_count"] = 0
+            nomenclature_in_category = (
+                select(
+                    func.count(nomenclature.c.id).label("nom_count")
+                )
+                .where(
+                    nomenclature.c.category == category.get("id"),
+                    nomenclature.c.name.ilike(f"%{nomenclature_name}%") if nomenclature_name else True
+                )
+                .group_by(nomenclature.c.category)
+            )
+            nomenclature_in_category_result = await database.fetch_one(nomenclature_in_category)
+            category_dict["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
 
             category_dict['expanded_flag'] = False
             query = (
