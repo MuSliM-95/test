@@ -13,6 +13,7 @@ from database.db import (
     docs_sales,
     organizations,
     docs_sales_goods,
+    docs_sales_delivery_info,
     contracts,
     loyality_cards,
     loyality_transactions,
@@ -46,11 +47,13 @@ from functions.helpers import (
     check_period_blocked,
     add_nomenclature_count,
     raschet_oplat,
-    add_docs_sales_settings
+    add_docs_sales_settings,
+    add_delivery_info_to_doc
 )
 from functions.helpers import get_user_by_token
 
 from ws_manager import manager
+
 
 router = APIRouter(tags=["docs_sales"])
 
@@ -126,6 +129,7 @@ async def get_by_id(token: str, idx: int):
     goods_db = [await instance for instance in goods_db]
 
     instance_db["goods"] = goods_db
+    instance_db = await add_delivery_info_to_doc(instance_db)
 
     return instance_db
 
@@ -1064,3 +1068,42 @@ async def delete(token: str, idx: int):
         )
 
     return items_db
+
+
+@router.post("/docs_sales/{idx}/delivery_info/", response_model=schemas.View)
+async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
+    """Добавление информации о доставке в заказу"""
+
+    user = await get_user_by_token(token)
+
+    check_query = (docs_sales.select()
+                   .join(organizations)
+                   .where(and_(docs_sales.c.id == idx,
+                               organizations.c.owner == user.id)))
+
+    item_db = await database.fetch_one(check_query)
+    if not item_db:
+        raise HTTPException(404, "Документ не найден!")
+
+    check_delivery_info_query = (
+        docs_sales_delivery_info.select()
+        .where(docs_sales_delivery_info.c.docs_sales_id == idx)
+    )
+    delivery_info_db = await database.fetch_one(check_delivery_info_query)
+    if delivery_info_db:
+        raise HTTPException(400, "Данные доставки уже добавлены.")
+    try:
+        data = data.dict()
+        data["docs_sales_id"] = idx
+        if data.get("delivery_date") or data.get("delivery_date") == 0:
+            data["delivery_date"] = datetime.datetime.fromtimestamp(data["delivery_date"])
+        insert_query = docs_sales_delivery_info.insert().values(
+            data
+        )
+        await database.execute(insert_query)
+        doc_sales = await get_by_id(token, idx)
+        return doc_sales
+    except Exception:
+        raise HTTPException(400, "Ошибка при добавлении данных доставки.")
+
+

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Union
 
 from database.enums import Repeatability
+from sqlalchemy import JSON
 
 
 class Item(BaseModel):
@@ -87,6 +88,18 @@ class CreateMass(BaseModel):
     class Config:
         orm_mode = True
 
+class RecipientInfoSchema(BaseModel):
+    name: Optional[str]
+    surname: Optional[str]
+    phone: Optional[str]
+
+
+class DeliveryInfoSchema(BaseModel):
+    address: Optional[str]
+    delivery_date: Optional[int]
+    recipient: Optional[RecipientInfoSchema]
+    note: Optional[str]
+
 
 class ViewInList(BaseModel):
     id: int
@@ -115,6 +128,7 @@ class ViewInList(BaseModel):
     tax_active: Optional[bool]
     sales_manager: Optional[int]
     goods: Optional[List[Item]]
+    delivery_info: Optional[DeliveryInfoSchema]
     updated_at: int
     created_at: int
 

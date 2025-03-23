@@ -19,6 +19,7 @@ from database.db import (
     contragents,
     payments,
     docs_sales_goods,
+    docs_sales_delivery_info,
     loyality_transactions,
     organizations,
     units,
@@ -705,3 +706,16 @@ async def init_statement(statement_data: dict, access_token: str):
                 init_statement_json = {"Data": {"Statement": {"status": "error"}}}
         await session.close()
     return init_statement_json
+
+
+async def add_delivery_info_to_doc(doc: dict) -> dict:
+    delivery_info_query = docs_sales_delivery_info.select().where(docs_sales_delivery_info.c.docs_sales_id == doc.get('id'))
+    delivery_info = await database.fetch_one(delivery_info_query)
+    if delivery_info:
+        doc["delivery_info"] = {
+            "address": delivery_info.get('address'),
+            "delivery_date": delivery_info['delivery_date'].timestamp() if delivery_info.get('delivery_date') else None,
+            "recipient": delivery_info.get('recipient'),
+            "note": delivery_info.get('note'),
+        }
+    return doc
