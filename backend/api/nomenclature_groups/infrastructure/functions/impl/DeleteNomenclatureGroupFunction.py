@@ -12,21 +12,20 @@ class DeleteNomenclatureGroupFunction(IDeleteNomenclatureGroupFunction):
         group_id: int,
         cashbox_id: int
     ) -> None:
-        async with database.transaction() as transaction:
-            query = (
-                nomenclature_groups_value.delete()
-                .where(and_(
-                    nomenclature_groups_value.c.group_id == group_id
-                ))
-            )
-            await database.execute(query)
+        async with database.connection() as connection:
+            async with connection.transaction():
+                query = (
+                    nomenclature_groups_value.delete()
+                    .where(and_(
+                        nomenclature_groups_value.c.group_id == group_id
+                    ))
+                )
+                await database.execute(query)
 
-            query = (
-                nomenclature_groups.delete()
-                .where(and_(
-                    nomenclature_groups.c.id == group_id
-                ))
-            )
-            await database.execute(query)
-
-            await transaction.commit()
+                query = (
+                    nomenclature_groups.delete()
+                    .where(and_(
+                        nomenclature_groups.c.id == group_id
+                    ))
+                )
+                await database.execute(query)
