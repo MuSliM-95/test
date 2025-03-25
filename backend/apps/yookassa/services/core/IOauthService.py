@@ -10,3 +10,6 @@ class IOauthService:
 
     async def get_install_oauth_by_user(self, cashbox: int):
         raise NotImplementedError
+
+    async def validation_oauth(self, cashbox: int, warehouse: int):
+        raise NotImplementedError
