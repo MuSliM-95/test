@@ -27,6 +27,8 @@ from api.nomenclature_attributes.infrastructure.readers.impl.NomenclatureAttribu
 from api.nomenclature_attributes.web.InstallNomenclatureAttributesWeb import InstallNomenclatureAttributesWeb
 from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import \
     IAddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import \
+    IChangeMainNomenclGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import \
     ICreateNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.IDelNomenclatureFromGroupFunction import \
@@ -37,6 +39,8 @@ from api.nomenclature_groups.infrastructure.functions.core.IPatchNomenclatureGro
     IPatchNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.impl.AddNomenclatureToGroupFunction import \
     AddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.ChangeMainNomenclGroupFunction import \
+    ChangeMainNomenclGroupFunction
 from api.nomenclature_groups.infrastructure.functions.impl.CreateNomenclatureGroupFunction import \
     CreateNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.impl.DelNomenclatureFromGroupFunction import \
@@ -326,6 +330,7 @@ async def startup():
     ioc.set(IInsertNomenclatureAttributesFunction, InsertNomenclatureAttributesFunction())
     ioc.set(INomenclatureAttributesReader, NomenclatureAttributesReader())
     ioc.set(IDeleteNomenclatureAttributesFunction, DeleteNomenclatureAttributesFunction())
+    ioc.set(IChangeMainNomenclGroupFunction, ChangeMainNomenclGroupFunction())
 
     InstallCategoriesWeb()(app=app)
     InstallNomenclatureWeb()(app=app)

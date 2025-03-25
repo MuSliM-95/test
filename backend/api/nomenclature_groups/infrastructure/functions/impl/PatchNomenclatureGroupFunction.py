@@ -10,13 +10,14 @@ class PatchNomenclatureGroupFunction(IPatchNomenclatureGroupFunction):
     async def __call__(
         self,
         group_id: int,
-        name: str
+        name: str,
+        cashbox_id: int
     ):
         query = (
             nomenclature_groups.update()
             .where(and_(
                 nomenclature_groups.c.id == group_id,
-                nomenclature_groups.c.cashbox == cashbox
+                nomenclature_groups.c.cashbox == cashbox_id
             ))
             .values(name=name)
         )
