@@ -650,6 +650,7 @@ manufacturers = sqlalchemy.Table(
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), nullable=True),
+    sqlalchemy.Column("external_id", String, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
