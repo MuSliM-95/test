@@ -9,6 +9,7 @@ class CategoryCreate(BaseModel):
     parent: Optional[int]
     status: bool = True
     photo_id: Optional[int]
+    external_id: Optional[str]
 
     class Config:
         orm_mode = True
