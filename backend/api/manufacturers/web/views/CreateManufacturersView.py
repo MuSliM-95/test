@@ -13,6 +13,7 @@ class CreateManufacturersView:
         inserted_ids = set()
         for manufacturer_values in manufacturers_data.dict()["__root__"]:
             manufacturer_values["owner"] = user.id
+            manufacturer_values["cashbox"] = user.cashbox_id
 
             query = manufacturers.insert().values(manufacturer_values)
             manufacturer_id = await database.execute(query)
