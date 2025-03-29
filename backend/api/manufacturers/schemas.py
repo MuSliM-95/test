@@ -5,6 +5,7 @@ from typing import Optional, List
 class ManufacturerCreate(BaseModel):
     name: str
     photo_id: Optional[int]
+    external_id: Optional[str]
 
     class Config:
         orm_mode = True
