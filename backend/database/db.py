@@ -1,6 +1,7 @@
 import os
 from enum import Enum as ENUM
 import databases
+from dotenv import load_dotenv
 import sqlalchemy
 from sqlalchemy.pool import NullPool
 from sqlalchemy import (
@@ -22,8 +23,10 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from database.enums import Repeatability, Gender, ContragentType, TriggerType, TriggerTime
+from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
 
+
+load_dotenv()
 
 class OperationType(str, ENUM):
     plus = "+"
@@ -864,6 +867,7 @@ articles = sqlalchemy.Table(
     sqlalchemy.Column("distribute_for", String),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("dc", Enum(DebitCreditType), nullable=True),
 )
 
 payments = sqlalchemy.Table(

@@ -310,6 +310,9 @@ def get_filters_articles(table, filters):
         if filter == "name":
             if value:
                 filters_list.append(table.c.name.ilike(f"%{value}%"))
+        if filter == "dc":
+            if value:
+                filters_list.append(table.c.dc.cast(String).ilike(f"%{value}%"))
     return filters_list
 
 
