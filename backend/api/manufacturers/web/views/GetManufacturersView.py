@@ -26,7 +26,7 @@ class GetManufacturersView:
             .outerjoin(pictures, manufacturers.c.photo_id == pictures.c.id)
             .where(
                 manufacturers.c.owner == user.id,
-                manufacturers.c.cashbox_id == user.cashbox_id,
+                manufacturers.c.cashbox == user.cashbox_id,
                 manufacturers.c.is_deleted.is_not(True),
             )
             .limit(limit)
