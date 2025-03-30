@@ -16,7 +16,7 @@ class GetNomenclatureAttributesView:
                 nomenclature_attributes.c.id,
                 nomenclature_attributes.c.name,
                 nomenclature_attributes.c.alias,
-                func.array_agg(nomenclature_attributes_value.c.value).label("attribute_values"),
+                nomenclature_attributes_value.c.value.label("attribute_values"),
             )
             .select_from(
                 nomenclature_attributes_value
@@ -34,11 +34,6 @@ class GetNomenclatureAttributesView:
                 nomenclature.c.cashbox == user.cashbox_id,
                 nomenclature_attributes.c.cashbox == user.cashbox_id
             ))
-            .group_by(
-                nomenclature_attributes.c.id,
-                nomenclature_attributes.c.name,
-                nomenclature_attributes.c.alias,
-            )
         )
 
         results = await database.fetch_all(query)
