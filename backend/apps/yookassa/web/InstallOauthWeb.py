@@ -5,6 +5,7 @@ from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import IYook
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
 from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
+from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import IYookasssaAmoTableCrmRepository
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from apps.yookassa.web.view.CallbackOauthView import CallbackOauthView
@@ -53,7 +54,8 @@ class InstallYookassaOauthWeb:
                 request_repository = ioc.get(IYookassaRequestRepository),
                 oauth_repository = ioc.get(IYookassaOauthRepository),
                 payments_repository = ioc.get(IYookassaPaymentsRepository),
-                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository)
+                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository),
+                amo_table_crm_repository = ioc.get(IYookasssaAmoTableCrmRepository)
             )
         )
 
@@ -70,7 +72,8 @@ class InstallYookassaOauthWeb:
                 request_repository = ioc.get(IYookassaRequestRepository),
                 oauth_repository = ioc.get(IYookassaOauthRepository),
                 payments_repository = ioc.get(IYookassaPaymentsRepository),
-                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository)
+                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository),
+                amo_table_crm_repository = ioc.get(IYookasssaAmoTableCrmRepository)
             )
         )
 
@@ -79,7 +82,8 @@ class InstallYookassaOauthWeb:
                 request_repository = ioc.get(IYookassaRequestRepository),
                 oauth_repository = ioc.get(IYookassaOauthRepository),
                 payments_repository = ioc.get(IYookassaPaymentsRepository),
-                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository)
+                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository),
+                amo_table_crm_repository = ioc.get(IYookasssaAmoTableCrmRepository)
             )
         )
 
@@ -88,7 +92,8 @@ class InstallYookassaOauthWeb:
                 request_repository = ioc.get(IYookassaRequestRepository),
                 oauth_repository = ioc.get(IYookassaOauthRepository),
                 payments_repository = ioc.get(IYookassaPaymentsRepository),
-                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository)
+                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository),
+                amo_table_crm_repository = ioc.get(IYookasssaAmoTableCrmRepository)
             )
         )
 
@@ -97,7 +102,9 @@ class InstallYookassaOauthWeb:
                 request_repository = ioc.get(IYookassaRequestRepository),
                 oauth_repository = ioc.get(IYookassaOauthRepository),
                 payments_repository = ioc.get(IYookassaPaymentsRepository),
-                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository)
+                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository),
+                amo_table_crm_repository = ioc.get(IYookasssaAmoTableCrmRepository)
+
             ))
 
         get_payment_api_view = GetPaymentApiView(
@@ -105,7 +112,8 @@ class InstallYookassaOauthWeb:
                 request_repository = ioc.get(IYookassaRequestRepository),
                 oauth_repository = ioc.get(IYookassaOauthRepository),
                 payments_repository = ioc.get(IYookassaPaymentsRepository),
-                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository)
+                crm_payments_repository = ioc.get(IYookassaCrmPaymentsRepository),
+                amo_table_crm_repository = ioc.get(IYookasssaAmoTableCrmRepository)
             ))
 
         get_me_api_view = GetMeApiView(
