@@ -1,9 +1,22 @@
-from typing import Union, Dict, Any, Optional
+import os
+from typing import Union,Dict,Any,Optional,Literal
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import desc, func, and_, select
 from sqlalchemy.dialects import postgresql
 
+from apps.yookassa.functions.core.IGetOauthCredentialFunction import IGetOauthCredentialFunction
+from apps.yookassa.functions.impl.GetOauthCredentialFunction import GetOauthCredentialFunction
+from apps.yookassa.models.PaymentModel import PaymentCreateModel,AmountModel,ReceiptModel,CustomerModel,ItemModel,\
+    ConfirmationRedirect
+from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
+from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
+from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
+from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
+from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
+from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
+from apps.yookassa.services.impl.OauthService import OauthService
+from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from database.db import (
     database,
     articles,
@@ -350,6 +363,8 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
         goods: Union[list, None] = instance_values.pop("goods", None)
 
+        goods_tmp = goods
+
         paid_rubles = instance_values.pop("paid_rubles", 0)
         paid_rubles = 0 if not paid_rubles else paid_rubles
 
@@ -534,6 +549,55 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 pboxes.update().where(pboxes.c.id == paybox).values({"balance": pboxes.c.balance - paid_rubles})
             )
 
+            # Юкасса
+
+            yookassa_oauth_service = OauthService(
+                oauth_repository = YookassaOauthRepository(),
+                request_repository = YookassaRequestRepository(),
+                get_oauth_credential_function = GetOauthCredentialFunction()
+            )
+
+            yookassa_api_service = YookassaApiService(
+                request_repository = YookassaRequestRepository(),
+                oauth_repository = YookassaOauthRepository(),
+                payments_repository = YookassaPaymentsRepository(),
+                crm_payments_repository = YookassaCrmPaymentsRepository()
+            )
+
+            if await yookassa_oauth_service.validation_oauth(user.cashbox_id,instance_values['warehouse']):
+                await yookassa_api_service.api_create_payment(
+                    user.cashbox_id,
+                    instance_values['warehouse'],
+                    instance_id,
+                    payment_id,
+                    PaymentCreateModel(
+                        amount = AmountModel(
+                            value = str(round(paid_rubles, 2)),
+                            currency = "RUB"
+                        ),
+                        description = f"Оплата по документу {instance_values['number']}",
+                        capture = True,
+                        receipt = ReceiptModel(
+                            customer = CustomerModel(),
+                            items = [ItemModel(
+                                description = good.get("nomenclature_name") or "",
+                                amount = AmountModel(
+                                    value = good.get("price"),
+                                    currency = "RUB"
+                                ),
+                                quantity = good.get("quantity"),
+                                vat_code = "1"
+                            ) for good in goods_tmp],
+                        ),
+                        confirmation = ConfirmationRedirect(
+                            type = "redirect",
+                            return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+                        )
+                    )
+                )
+
+            # юкасса
+
             await database.execute(entity_to_entity.insert().values(
                 {
                     "from_entity": 7,
@@ -662,9 +726,15 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             body['to_warehouse'] = None
             await create_warehouse_docs(token, body, user.cashbox_id)
 
+
+
     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
     docs_sales_db = await database.fetch_all(query)
     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
+
+
+
+
 
     await manager.send_message(
         token,
