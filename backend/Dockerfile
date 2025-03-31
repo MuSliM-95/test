@@ -8,7 +8,10 @@ RUN apt-get update && \
     xvfb \
     libfontconfig \
     libjpeg62-turbo \
-    libxrender1
+    libxrender1 \
+    tesseract-ocr \
+    tesseract-ocr-rus\
+    poppler-utils
 
 RUN mkdir "tmp"
 

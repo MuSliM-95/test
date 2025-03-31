@@ -4,7 +4,7 @@ from sqlalchemy.sql.functions import coalesce
 from database.db import database, loyality_transactions, loyality_cards
 import api.loyality_transactions.schemas as schemas
 from typing import Optional, Dict, Any
-from sqlalchemy import desc, func, select, case
+from sqlalchemy import desc, func, select, case, and_
 
 from functions.helpers import datetime_to_timestamp, get_filters_transactions, \
     get_entity_by_id_cashbox, clear_phone_number, get_entity_by_id_and_created_by
@@ -102,8 +102,15 @@ async def create_loyality_transaction(token: str, loyality_transaction_data: sch
             loyality_card_number = clear_phone_number(
                 phone_number=loyality_transaction_data.loyality_card_number
             )
-            q = loyality_cards.select().where(loyality_cards.c.card_number == loyality_card_number,
-                                              loyality_cards.c.cashbox_id == user.cashbox_id)
+            q = (
+                loyality_cards.select()
+                .where(and_(
+                    loyality_cards.c.card_number == loyality_card_number,
+                    loyality_cards.c.cashbox_id == user.cashbox_id,
+                    loyality_cards.c.is_deleted == False
+                ))
+            )
+
             card = await database.fetch_one(q)
             if not card:
                 raise HTTPException(status_code=400,

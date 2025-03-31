@@ -55,6 +55,8 @@ class NomenclatureGet(NomenclatureCreate):
     barcodes: Optional[List[str]]
     prices: Optional[List[PriceGetWithNomenclature]]
     balances: Optional[List[WarehouseWithNomenclature]]
+    group_id: Optional[int]
+    is_main: Optional[bool]
     updated_at: int
     created_at: int
 
