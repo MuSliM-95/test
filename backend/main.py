@@ -112,7 +112,6 @@ from api.organizations.routers import router as organizations_router
 from api.contracts.routers import router as contracts_router
 from api.categories.routers import router as categories_router
 from api.warehouses.routers import router as warehouses_router
-from api.manufacturers.routers import router as manufacturers_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.nomenclature.routers import router as nomenclature_router
@@ -198,7 +197,6 @@ app.include_router(organizations_router)
 app.include_router(contracts_router)
 app.include_router(categories_router)
 app.include_router(warehouses_router)
-app.include_router(manufacturers_router)
 app.include_router(price_types_router)
 app.include_router(prices_router)
 app.include_router(nomenclature_router)
