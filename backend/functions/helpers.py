@@ -315,7 +315,7 @@ def get_filters_articles(table, filters):
                 filters_list.append(table.c.name.ilike(f"%{value}%"))
         if filter == "dc":
             if value:
-                filters_list.append(table.c.dc.cast(String).ilike(f"%{value}%"))
+                filters_list.append(table.c.dc == value)
     return filters_list
 
 
