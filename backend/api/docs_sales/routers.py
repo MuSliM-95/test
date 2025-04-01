@@ -1076,7 +1076,7 @@ async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
 
     user = await get_user_by_token(token)
 
-    check_query = (docs_sales.select()
+    check_query = (select(docs_sales.c.id)
                    .join(organizations)
                    .where(and_(docs_sales.c.id == idx,
                                organizations.c.owner == user.id)))
@@ -1086,7 +1086,7 @@ async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
         raise HTTPException(404, "Документ не найден!")
 
     check_delivery_info_query = (
-        docs_sales_delivery_info.select()
+        select(docs_sales_delivery_info.c.id)
         .where(docs_sales_delivery_info.c.docs_sales_id == idx)
     )
     delivery_info_db = await database.fetch_one(check_delivery_info_query)
