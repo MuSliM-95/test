@@ -13,3 +13,6 @@ class SortOrder(str, Enum):
 @dataclass
 class NomenclatureFilter:
     order_created_at: Optional[SortOrder] = Query(None, alias="order[created_at]")
+    order_price: Optional[SortOrder] = Query(None, alias="order[price]")
+    order_name: Optional[SortOrder] = Query(None, alias="order[name]")
+

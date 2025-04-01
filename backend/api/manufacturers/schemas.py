@@ -4,6 +4,8 @@ from typing import Optional, List
 
 class ManufacturerCreate(BaseModel):
     name: str
+    photo_id: Optional[int]
+    external_id: Optional[str]
 
     class Config:
         orm_mode = True
@@ -24,6 +26,7 @@ class Manufacturer(ManufacturerCreate):
     id: int
     updated_at: int
     created_at: int
+    picture: Optional[str]
 
     class Config:
         orm_mode = True

@@ -32,7 +32,8 @@ class PatchNomenclatureGroupView:
 
         await self.__patch_nomenclature_group_function(
             group_id=id,
-            name=data.name
+            name=data.name,
+            cashbox_id=user.cashbox_id
         )
 
         return ResponsePatchNomenclatureGroupModel(

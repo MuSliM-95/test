@@ -1,4 +1,6 @@
 from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
+from api.nomenclature_groups.web.models.ResponseGroupWithAttrModel import ResponseGroupWithAttrModel, \
+    NomenclatureWithAttrModel, NomenclatureAttrModel, NomenclatureAttrValueModel
 from functions.helpers import get_user_by_token
 
 
@@ -18,4 +20,18 @@ class GetNomWithAttrFromGroupsView:
             cashbox_id=user.cashbox_id,
         )
 
-        return group_info
+        return ResponseGroupWithAttrModel(
+            group_id=group_id,
+            nomenclatures=[NomenclatureWithAttrModel(
+                nomenclature_id=element.nomenclature_id,
+                attribute=NomenclatureAttrModel(
+                    attribute_id=element.attribute_id,
+                    attribute_name=element.name,
+                    attribute_alias=element.alias,
+                    attribute_value=NomenclatureAttrValueModel(
+                        attribute_value_id=element.attribute_value_id,
+                        value=element.value,
+                    )
+                )
+            ) for element in group_info],
+        )

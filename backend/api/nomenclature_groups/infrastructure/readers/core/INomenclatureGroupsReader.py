@@ -5,6 +5,9 @@ from api.nomenclature_groups.infrastructure.models.NomenclatureGroupModel import
 
 class INomenclatureGroupsReader:
 
+    async def get_group_nomenclatures(self, group_id: int, cashbox_id: int):
+        raise NotImplementedError()
+
     async def get_nomen_with_attr(self, group_id: int, cashbox_id: int):
         raise NotImplementedError()
 

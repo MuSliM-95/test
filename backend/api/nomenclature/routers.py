@@ -6,7 +6,7 @@ from starlette import status
 import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
-    warehouse_register_movement, warehouses, units, warehouse_balances
+    warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body
 
@@ -18,7 +18,7 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null
+from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_
 from sqlalchemy.sql.functions import coalesce
 from ws_manager import manager
 import memoization
@@ -240,6 +240,7 @@ async def get_nomenclature(
         offset: int = 0,
         with_prices: bool = False,
         with_balance: bool = False,
+        only_main_from_group: bool = False,
         filters_query: NomenclatureFilter = Depends(),
 ):
     start_time = time.time()
@@ -253,10 +254,13 @@ async def get_nomenclature(
     query = (
         select(
             nomenclature,
+            nomenclature_groups_value.c.group_id,
+            nomenclature_groups_value.c.is_main,
             units.c.convent_national_view.label("unit_name"),
             func.array_remove(func.array_agg(func.distinct(nomenclature_barcodes.c.code)), None).label("barcodes")
         )
         .select_from(nomenclature)
+        .outerjoin(nomenclature_groups_value, nomenclature_groups_value.c.nomenclature_id == nomenclature.c.id)
         .join(units, units.c.id == nomenclature.c.unit, full=True)
         .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, full=True)
     )
@@ -272,6 +276,11 @@ async def get_nomenclature(
         filters.append(nomenclature_barcodes.c.code == barcode)
     if category:
         filters.append(nomenclature.c.category == category)
+    if only_main_from_group:
+        filters.append(or_(
+            nomenclature_groups_value.c.is_main.is_(True),
+            nomenclature_groups_value.c.is_main.is_(None),
+        ))
 
     order_by_condition = asc(nomenclature.c.id)
 
@@ -280,8 +289,33 @@ async def get_nomenclature(
             order_by_condition = asc(nomenclature.c.created_at)
         elif filters_query.order_created_at == SortOrder.DESC:
             order_by_condition = desc(nomenclature.c.created_at)
+    elif filters_query.order_price:
+        price_subquery = (
+            select(
+                prices.c.nomenclature.label("nomenclature_id"),
+                func.min(prices.c.price).label("min_price")
+            )
+            .group_by(prices.c.nomenclature)
+            .subquery()
+        )
+        query = query.outerjoin(price_subquery, price_subquery.c.nomenclature_id == nomenclature.c.id).group_by(price_subquery.c.min_price)
 
-    query = query.where(*filters).limit(limit).offset(offset).group_by(nomenclature.c.id, units.c.convent_national_view).order_by(order_by_condition)
+        if filters_query.order_price == SortOrder.ASC:
+            order_by_condition = asc(price_subquery.c.min_price)
+        else:
+            order_by_condition = desc(price_subquery.c.min_price)
+    elif filters_query.order_name:
+        if filters_query.order_name == SortOrder.ASC:
+            order_by_condition = asc(func.upper(func.left(nomenclature.c.name, 1)))
+        elif filters_query.order_name == SortOrder.DESC:
+            order_by_condition = desc(func.upper(func.left(nomenclature.c.name, 1)))
+
+    query = query.where(*filters).limit(limit).offset(offset).group_by(
+        nomenclature.c.id,
+        units.c.convent_national_view,
+        nomenclature_groups_value.c.group_id,
+        nomenclature_groups_value.c.is_main
+    ).order_by(order_by_condition)
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 

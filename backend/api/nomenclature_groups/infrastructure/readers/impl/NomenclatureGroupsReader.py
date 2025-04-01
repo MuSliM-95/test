@@ -1,7 +1,10 @@
 from typing import List
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, func, literal, cast, literal_column
+from sqlalchemy.dialects.postgresql import JSON
 
+from api.nomenclature_groups.infrastructure.models.GroupModelWithNomenclaturesModel import \
+    GroupModelWithNomenclaturesModel, Nomenclature
 from api.nomenclature_groups.infrastructure.models.NomenclatureGroupModel import NomenclatureGroupModel
 from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
 from database.db import nomenclature_groups, database, nomenclature, nomenclature_groups_value, \
@@ -10,11 +13,37 @@ from database.db import nomenclature_groups, database, nomenclature, nomenclatur
 
 class NomenclatureGroupsReader(INomenclatureGroupsReader):
 
-    async def get_nomen_with_attr(self, group_id: int, cashbox_id: int):
+    async def get_group_nomenclatures(self, group_id: int, cashbox_id: int):
         query = (
             select(
                 nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature_groups_value.c.is_main
+            )
+            .select_from(nomenclature_groups_value)
+            .join(nomenclature, nomenclature_groups_value.c.nomenclature_id == nomenclature.c.id)
+            .join(nomenclature_groups, nomenclature_groups_value.c.group_id == nomenclature_groups.c.id)
+            .where(and_(
+                nomenclature_groups.c.cashbox == cashbox_id,
+                nomenclature_groups.c.id == group_id
+            ))
+        )
+        results = await database.fetch_all(query)
+        return [
+            Nomenclature(
+                id=result.id,
+                name=result.name,
+                is_main=result.is_main,
+            ) for result in results
+        ]
+
+    async def get_nomen_with_attr(self, group_id: int, cashbox_id: int):
+        query = (
+            select(
+                nomenclature.c.id.label("nomenclature_id"),
+                nomenclature_attributes_value.c.id.label("attribute_value_id"),
                 nomenclature_attributes_value.c.value,
+                nomenclature_attributes.c.id.label("attribute_id"),
                 nomenclature_attributes.c.name,
                 nomenclature_attributes.c.alias
             )

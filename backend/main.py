@@ -8,11 +8,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from api.categories.web.InstallCategoriesWeb import InstallCategoriesWeb
+from api.manufacturers.web.InstallManufacturersWeb import InstallManufacturersWeb
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
 from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import NomenclatureReader
 from api.nomenclature.web.InstallNomenclatureWeb import InstallNomenclatureWeb
+from api.nomenclature_attributes.infrastructure.functions.core.IDeleteNomenclatureAttributesFunction import \
+    IDeleteNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.core.IInsertNomenclatureAttributesFunction import \
+    IInsertNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.impl.DeleteNomenclatureAttributesFunction import \
+    DeleteNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.impl.InsertNomenclatureAttributesFunction import \
+    InsertNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.readers.core.INomenclatureAttributesReader import \
+    INomenclatureAttributesReader
+from api.nomenclature_attributes.infrastructure.readers.impl.NomenclatureAttributesReader import \
+    NomenclatureAttributesReader
+from api.nomenclature_attributes.web.InstallNomenclatureAttributesWeb import InstallNomenclatureAttributesWeb
 from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import \
     IAddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import \
+    IChangeMainNomenclGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import \
     ICreateNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.IDelNomenclatureFromGroupFunction import \
@@ -23,6 +39,8 @@ from api.nomenclature_groups.infrastructure.functions.core.IPatchNomenclatureGro
     IPatchNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.impl.AddNomenclatureToGroupFunction import \
     AddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.ChangeMainNomenclGroupFunction import \
+    ChangeMainNomenclGroupFunction
 from api.nomenclature_groups.infrastructure.functions.impl.CreateNomenclatureGroupFunction import \
     CreateNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.impl.DelNomenclatureFromGroupFunction import \
@@ -92,11 +110,9 @@ from api.organizations.routers import router as organizations_router
 from api.contracts.routers import router as contracts_router
 from api.categories.routers import router as categories_router
 from api.warehouses.routers import router as warehouses_router
-from api.manufacturers.routers import router as manufacturers_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.nomenclature.routers import router as nomenclature_router
-from api.nomenclature_attributes.routers import router as nomenclature_attributes_router
 from api.pictures.routers import router as pictures_router
 from api.functions.routers import router as entity_functions_router
 from api.units.routers import router as units_router
@@ -180,11 +196,9 @@ app.include_router(organizations_router)
 app.include_router(contracts_router)
 app.include_router(categories_router)
 app.include_router(warehouses_router)
-app.include_router(manufacturers_router)
 app.include_router(price_types_router)
 app.include_router(prices_router)
 app.include_router(nomenclature_router)
-app.include_router(nomenclature_attributes_router)
 app.include_router(pictures_router)
 app.include_router(entity_functions_router)
 app.include_router(units_router)
@@ -315,6 +329,11 @@ async def startup():
     ioc.set(IPatchNomenclatureGroupFunction, PatchNomenclatureGroupFunction())
     ioc.set(IDelNomenclatureFromGroupFunction, DelNomenclatureFromGroupFunction())
 
+    ioc.set(IInsertNomenclatureAttributesFunction, InsertNomenclatureAttributesFunction())
+    ioc.set(INomenclatureAttributesReader, NomenclatureAttributesReader())
+    ioc.set(IDeleteNomenclatureAttributesFunction, DeleteNomenclatureAttributesFunction())
+    ioc.set(IChangeMainNomenclGroupFunction, ChangeMainNomenclGroupFunction())
+
     InstallCategoriesWeb()(app=app)
     InstallNomenclatureWeb()(app=app)
     InstallBookingRepeatWeb()(app=app)
@@ -322,6 +341,8 @@ async def startup():
     InstallWidgetInstallerInfoWeb()(app=app)
     InstallYookassaOauthWeb()(app=app)
     InstallNomenclatureGroupsWeb()(app=app)
+    InstallNomenclatureAttributesWeb()(app=app)
+    InstallManufacturersWeb()(app=app)
 
     init_db()
     await database.connect()

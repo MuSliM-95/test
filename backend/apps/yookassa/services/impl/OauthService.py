@@ -95,4 +95,13 @@ class OauthService(IOauthService):
 
         return install_oauth_list
 
+    async def validation_oauth(self, cashbox: int, warehouse: int):
+        try:
+            oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
+            settings = await self.__request_repository.oauth_settings(oauth.access_token)
+            if settings:
+                return True
+        except Exception as error:
+            return False
+
 

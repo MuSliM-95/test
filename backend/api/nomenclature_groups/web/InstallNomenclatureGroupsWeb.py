@@ -6,6 +6,8 @@ from starlette import status
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
 from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import \
     IAddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import \
+    IChangeMainNomenclGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import \
     ICreateNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.IDelNomenclatureFromGroupFunction import \
@@ -14,16 +16,20 @@ from api.nomenclature_groups.infrastructure.functions.core.IDeleteNomenclatureGr
     IDeleteNomenclatureGroupFunction
 from api.nomenclature_groups.infrastructure.functions.core.IPatchNomenclatureGroupFunction import \
     IPatchNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.models.GroupModelWithNomenclaturesModel import \
+    GroupModelWithNomenclaturesModel
 from api.nomenclature_groups.infrastructure.models.NomenclatureGroupModel import NomenclatureGroupModel
 from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
 from api.nomenclature_groups.web.models.ResponseAddNomenclatureToGroup import ResponseAddNomenclatureToGroup
 from api.nomenclature_groups.web.models.ResponseCreateNomenclatureGroupModel import ResponseCreateNomenclatureGroupModel
 from api.nomenclature_groups.web.models.ResponsePatchNomenclatureGroupModel import ResponsePatchNomenclatureGroupModel
 from api.nomenclature_groups.web.views.AddNomenclatureToGroupView import AddNomenclatureToGroupView
+from api.nomenclature_groups.web.views.ChangeMainNomenclGroupView import ChangeMainNomenclGroupView
 from api.nomenclature_groups.web.views.CreateNomenclatureGroupView import CreateNomenclatureGroupView
 from api.nomenclature_groups.web.views.DelNomenclatureFromGroupView import DelNomenclatureFromGroupView
 from api.nomenclature_groups.web.views.DeleteNomenclatureGroupView import DeleteNomenclatureGroupView
 from api.nomenclature_groups.web.views.GetNomWithAttrFromGroupsView import GetNomWithAttrFromGroupsView
+from api.nomenclature_groups.web.views.GetNomenclatureGroupByIdView import GetNomenclatureGroupByIdView
 from api.nomenclature_groups.web.views.GetNomenclatureGroupsView import GetNomenclatureGroupsView
 from api.nomenclature_groups.web.views.PatchNomenclatureGroupView import PatchNomenclatureGroupView
 from common.utils.ioc.ioc import ioc
@@ -66,6 +72,15 @@ class InstallNomenclatureGroupsWeb:
             nomenclature_group_reader=ioc.get(INomenclatureGroupsReader),
         )
 
+        get_nomenclature_group_by_id_view = GetNomenclatureGroupByIdView(
+            nomenclature_group_reader=ioc.get(INomenclatureGroupsReader),
+        )
+
+        change_main_nomenclature_group_view = ChangeMainNomenclGroupView(
+            nomenclatures_group_reader=ioc.get(INomenclatureGroupsReader),
+            change_main_nomenclature_group_function=ioc.get(IChangeMainNomenclGroupFunction)
+        )
+
         app.add_api_route(
             path="/nomenclature/group",
             endpoint=create_nomenclature_group_view.__call__,
@@ -81,6 +96,23 @@ class InstallNomenclatureGroupsWeb:
             methods=["GET"],
             status_code=status.HTTP_200_OK,
             response_model=List[NomenclatureGroupModel],
+            tags=["nomenclature_groups"]
+        )
+
+        app.add_api_route(
+            path="/nomenclature/group/{group_id}",
+            endpoint=get_nomenclature_group_by_id_view.__call__,
+            methods=["GET"],
+            status_code=status.HTTP_200_OK,
+            response_model=GroupModelWithNomenclaturesModel,
+            tags=["nomenclature_groups"]
+        )
+
+        app.add_api_route(
+            path="/nomenclature/group/{group_id}/select_main",
+            endpoint=change_main_nomenclature_group_view.__call__,
+            methods=["PATCH"],
+            status_code=status.HTTP_200_OK,
             tags=["nomenclature_groups"]
         )
 
