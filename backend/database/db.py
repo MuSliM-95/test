@@ -1865,9 +1865,6 @@ amo_entity_custom_fields = sqlalchemy.Table(
     extend_existing=True
 )
 
-
-
-
 tg_bot_bills = sqlalchemy.Table(
     "tg_bot_bills",
     metadata,

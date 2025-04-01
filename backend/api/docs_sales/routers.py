@@ -1070,16 +1070,20 @@ async def delete(token: str, idx: int):
     return items_db
 
 
-@router.post("/docs_sales/{idx}/delivery_info/", response_model=schemas.View)
+@router.post("/docs_sales/{idx}/delivery_info/", response_model=schemas.ResponseDeliveryInfoSchema)
 async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
     """Добавление информации о доставке в заказу"""
 
     user = await get_user_by_token(token)
 
-    check_query = (select(docs_sales.c.id)
-                   .join(organizations)
-                   .where(and_(docs_sales.c.id == idx,
-                               organizations.c.owner == user.id)))
+    check_query = (
+        select(docs_sales.c.id)
+        .where(and_(
+            docs_sales.c.id == idx,
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales.c.is_deleted == False
+        ))
+    )
 
     item_db = await database.fetch_one(check_query)
     if not item_db:
@@ -1092,18 +1096,20 @@ async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
     delivery_info_db = await database.fetch_one(check_delivery_info_query)
     if delivery_info_db:
         raise HTTPException(400, "Данные доставки уже добавлены.")
-    try:
-        data = data.dict()
-        data["docs_sales_id"] = idx
-        if data.get("delivery_date") or data.get("delivery_date") == 0:
-            data["delivery_date"] = datetime.datetime.fromtimestamp(data["delivery_date"])
-        insert_query = docs_sales_delivery_info.insert().values(
-            data
-        )
-        await database.execute(insert_query)
-        doc_sales = await get_by_id(token, idx)
-        return doc_sales
-    except Exception:
-        raise HTTPException(400, "Ошибка при добавлении данных доставки.")
+
+    data_dict = data.dict()
+    data_dict["docs_sales_id"] = idx
+    if data_dict.get("delivery_date") or data_dict.get("delivery_date") == 0:
+        data_dict["delivery_date"] = datetime.datetime.fromtimestamp(data_dict["delivery_date"])
+    insert_query = docs_sales_delivery_info.insert().values(
+        data_dict
+    )
+    inserted_entity_id = await database.execute(insert_query)
+
+    return schemas.ResponseDeliveryInfoSchema(
+        id=inserted_entity_id,
+        docs_sales_id=idx,
+        **data.dict()
+    )
 
 

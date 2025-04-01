@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel
@@ -100,6 +101,9 @@ class DeliveryInfoSchema(BaseModel):
     recipient: Optional[RecipientInfoSchema]
     note: Optional[str]
 
+class ResponseDeliveryInfoSchema(DeliveryInfoSchema):
+    id: int
+    docs_sales_id: int
 
 class ViewInList(BaseModel):
     id: int

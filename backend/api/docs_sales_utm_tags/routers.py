@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from api.utm_tags import schemas
+from api.docs_sales_utm_tags import schemas
 from database.db import cboxes, database, docs_sales, docs_sales_utm_tags
 from functions.helpers import get_user_by_token, check_entity_exists
 from sqlalchemy import select, and_
@@ -16,7 +16,8 @@ async def create_utm_tag(token: str, idx: int, utm_tags_data: schemas.CreateUTMT
         select(docs_sales.c.id)
         .where(and_(
             docs_sales.c.id == idx,
-            docs_sales.c.cashbox == user.cashbox_id
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales.c.is_deleted == False
         ))
     )
 

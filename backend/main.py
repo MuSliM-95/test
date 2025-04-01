@@ -145,7 +145,7 @@ from apps.module_bank.routes import router as module_bank_router
 from apps.booking.routers import router as booking_router
 from api.settings.amo_triggers.routers import router as triggers_router
 from api.trigger_notification.routers import router as triggers_notification
-from api.utm_tags.routers import router as utm_router
+from api.docs_sales_utm_tags.routers import router as utm_router
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
