@@ -3,6 +3,8 @@ from enum import Enum
 from pydantic import BaseModel
 from typing import Optional, List
 
+from database.enums import DebitCreditType
+
 
 class ExpensesFor(str, Enum):
     buying = "При приобретении"
@@ -33,6 +35,7 @@ class Article(BaseModel):
     distribute_according: Optional[str]
     created_at: int
     updated_at: int
+    dc: Optional[DebitCreditType]
 
     class Config:
         orm_mode = True
@@ -48,6 +51,7 @@ class ArticleEdit(BaseModel):
     expenses_for: Optional[ExpensesFor]
     distribute_for: Optional[DistributeFor]
     distribute_according: Optional[DistributeAccording]
+    dc: Optional[DebitCreditType]
 
     class Config:
         orm_mode = True
@@ -61,6 +65,7 @@ class ArticleCreate(BaseModel):
     expenses_for: Optional[ExpensesFor]
     distribute_for: Optional[DistributeFor]
     distribute_according: Optional[DistributeAccording]
+    dc: Optional[DebitCreditType]
 
     class Config:
         orm_mode = True

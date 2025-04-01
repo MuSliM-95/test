@@ -10,6 +10,8 @@ from databases.backends.postgres import Record
 from fastapi import HTTPException
 from sqlalchemy import Table, cast, String, and_
 
+from database.db import articles
+
 from const import PaymentType
 from database.db import (
     users_cboxes_relation,
@@ -311,6 +313,9 @@ def get_filters_articles(table, filters):
         if filter == "name":
             if value:
                 filters_list.append(table.c.name.ilike(f"%{value}%"))
+        if filter == "dc":
+            if value:
+                filters_list.append(table.c.dc == value)
     return filters_list
 
 
@@ -719,3 +724,13 @@ async def add_delivery_info_to_doc(doc: dict) -> dict:
             "note": delivery_info.get('note'),
         }
     return doc
+
+
+async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
+    check_query = articles.select().where(and_(
+        articles.c.name == name,
+        articles.c.cashbox == user_cashbox_id,
+        articles.c.dc == dc_type
+    ))
+    article_exists = await database.fetch_all(check_query)
+    return True if article_exists else False

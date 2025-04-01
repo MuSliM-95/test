@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional, List
 
+from database.enums import DebitCreditType
+
 class PaymentFiltersQuery(BaseModel):
     name: Optional[str]
     tags: Optional[str]
@@ -35,6 +37,7 @@ class ProjectsFiltersQuery(BaseModel):
 
 class ArticlesFiltersQuery(BaseModel):
     name: Optional[str]
+    dc: Optional[DebitCreditType]
 
 class UsersFiltersQuery(BaseModel):
     external_id: Optional[str]

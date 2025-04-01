@@ -28,3 +28,8 @@ class TriggerTime(str, Enum):
     minute = "минуты"
     hour = "часы"
     day = "дни"
+
+
+class DebitCreditType(str, Enum):
+    debit = "debit"
+    credit = "credit"
