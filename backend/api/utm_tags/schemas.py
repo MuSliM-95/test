@@ -3,7 +3,6 @@ from typing import Optional, List
 
 
 class CreateUTMTag(BaseModel):
-    docs_sales_id: int
     utm_source: Optional[str]
     utm_medium: Optional[str]
     utm_campaign: Optional[str]
@@ -22,3 +21,4 @@ class CreateUTMTag(BaseModel):
 
 class UtmTag(CreateUTMTag):
     id: int
+    docs_sales_id: int

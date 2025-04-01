@@ -1904,8 +1904,8 @@ tg_bot_bill_approvers = sqlalchemy.Table(
     extend_existing=True
 )
 
-utm_tags = sqlalchemy.Table(
-    "utm_tags",
+docs_sales_utm_tags = sqlalchemy.Table(
+    "docs_sales_utm_tags",
     metadata,
     sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
