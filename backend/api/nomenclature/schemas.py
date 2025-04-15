@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from api.prices.schemas import PriceInList, PriceGetWithNomenclature
 from api.warehouse_balances.schemas import WarehouseWithNomenclature
+from database.db import NomenclatureCashbackType
 
 
 class NomenclatureBarcodeCreate(BaseModel):
@@ -18,7 +19,8 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
-    cashback_percent: Optional[int]
+    cashback_type: Optional[NomenclatureCashbackType] = NomenclatureCashbackType.no_cashback
+    cashback_value: Optional[int] = 0
     external_id: Optional[str]
 
     class Config:

@@ -35,7 +35,7 @@ from database.db import (
     price_types, warehouse_balances,
     nomenclature,
     docs_warehouse, docs_sales_tags, amo_leads, amo_install_table_cashboxes, amo_leads_docs_sales_mapping,
-    docs_sales_settings, contragents,
+    docs_sales_settings, contragents, NomenclatureCashbackType,
 
 )
 import datetime
@@ -475,14 +475,28 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
             if lcard:
                 nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == item['nomenclature']))
+                calculated_share = paid_rubles / (paid_rubles + paid_lt)
                 if nomenclature_db:
-                    if nomenclature_db.cashback_percent is not None:
-                        if nomenclature_db.cashback_percent != 0:
-                            cashback_sum += item["price"] * item["quantity"] * (nomenclature_db.cashback_percent / 100)
+                    if nomenclature_db.cashback_type == NomenclatureCashbackType.no_cashback:
+                        pass
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.percent:
+                        current_percent = item["price"] * item["quantity"] * (nomenclature_db.cashback_value / 100)
+                        cashback_sum += calculated_share * current_percent
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.const:
+                        cashback_sum += item["quantity"] * nomenclature_db.cashback_value
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.lcard_cashback:
+                        current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        print(current_percent)
+                        print(lcard.cashback_percent)
+                        print(calculated_share)
+                        print(calculated_share * current_percent)
+                        cashback_sum += calculated_share * current_percent
                     else:
-                        cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        cashback_sum += calculated_share * current_percent
                 else:
-                    cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                    current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                    cashback_sum += calculated_share * current_percent
 
             if instance_values.get("warehouse") is not None:
                 query = (
@@ -616,9 +630,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             ))
             if lcard:
                 if cashback_sum > 0:
-                    calculated_share = paid_rubles / (paid_rubles + paid_lt)
-                    calculated_cashback_sum = round((calculated_share * cashback_sum), 2)
-
+                    calculated_cashback_sum = round((cashback_sum), 2)
                     if calculated_cashback_sum > 0:
                         rubles_body = {
                             "loyality_card_id": lt,
@@ -887,7 +899,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         "loyality_card_number": lcard.card_number,
                         "type": "accrual",
                         "name": f"Кешбек по документу {instance_values['number']}",
-                        "amount": round((paid_rubles * (lcard.cashback_percent / 100)), 2),
+                        "amount": round((paid_rubles * (lcard.cashback_value / 100)), 2),
                         "created_by_id": user.id,
                         "card_balance": lcard.balance,
                         "tags": instance_values.get("tags", ""),
