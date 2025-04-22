@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import FastAPI
 from starlette import status
 
@@ -14,6 +16,7 @@ from api.nomenclature_attributes.web.views.AddNomenclatureAttributeValueView imp
 from api.nomenclature_attributes.web.views.CreateNomenclatureAttributesView import CreateNomenclatureAttributesView
 from api.nomenclature_attributes.web.views.DelNomenclatureAttributeValueView import DelNomenclatureAttributeValueView
 from api.nomenclature_attributes.web.views.DeleteNomenclatureAttributeView import DeleteNomenclatureAttributeView
+from api.nomenclature_attributes.web.views.GetAttributeTypesView import GetAttributeTypesView
 from api.nomenclature_attributes.web.views.GetNomenclatureAttributesView import GetNomenclatureAttributesView
 from common.utils.ioc.ioc import ioc
 
@@ -40,6 +43,10 @@ class InstallNomenclatureAttributesWeb:
         )
 
         get_nomenclature_attributes_view = GetNomenclatureAttributesView()
+
+        get_attribute_types_view = GetAttributeTypesView(
+            nomenclature_attributes_reader=ioc.get(INomenclatureAttributesReader)
+        )
 
         app.add_api_route(
             path="/nomenclature/attributes",
@@ -81,5 +88,14 @@ class InstallNomenclatureAttributesWeb:
             methods=["GET"],
             status_code=status.HTTP_200_OK,
             response_model=NomenclatureWithAttributesResponse,
+            tags=["nomenclature_attributes"]
+        )
+
+        app.add_api_route(
+            path="/nomenclature/attributes/types",
+            endpoint=get_attribute_types_view.__call__,
+            methods=["GET"],
+            status_code=status.HTTP_200_OK,
+            response_model=List[AttributeCreateResponse],
             tags=["nomenclature_attributes"]
         )

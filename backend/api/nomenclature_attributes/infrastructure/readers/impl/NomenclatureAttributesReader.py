@@ -9,6 +9,18 @@ from database.db import nomenclature_attributes, database, nomenclature_attribut
 
 class NomenclatureAttributesReader(INomenclatureAttributesReader):
 
+    async def get_types(self, limit: int, offset: int, cashbox_id: int):
+        query = (
+            select(
+                nomenclature_attributes
+            )
+            .where(nomenclature_attributes.c.cashbox == cashbox_id)
+            .limit(limit)
+            .offset(offset)
+        )
+        attribute_types = await database.fetch_all(query)
+        return attribute_types
+
     async def get_values_ids_by_ids(self, attribute_value_ids: List[int], cashbox_id: int) -> Set[int]:
         query = (
             select(

@@ -10,6 +10,8 @@ from databases.backends.postgres import Record
 from fastapi import HTTPException
 from sqlalchemy import Table, cast, String, and_
 
+from database.db import articles
+
 from const import PaymentType
 from database.db import (
     users_cboxes_relation,
@@ -19,6 +21,7 @@ from database.db import (
     contragents,
     payments,
     docs_sales_goods,
+    docs_sales_delivery_info,
     loyality_transactions,
     organizations,
     units,
@@ -310,6 +313,9 @@ def get_filters_articles(table, filters):
         if filter == "name":
             if value:
                 filters_list.append(table.c.name.ilike(f"%{value}%"))
+        if filter == "dc":
+            if value:
+                filters_list.append(table.c.dc == value)
     return filters_list
 
 
@@ -705,3 +711,26 @@ async def init_statement(statement_data: dict, access_token: str):
                 init_statement_json = {"Data": {"Statement": {"status": "error"}}}
         await session.close()
     return init_statement_json
+
+
+async def add_delivery_info_to_doc(doc: dict) -> dict:
+    delivery_info_query = docs_sales_delivery_info.select().where(docs_sales_delivery_info.c.docs_sales_id == doc.get('id'))
+    delivery_info = await database.fetch_one(delivery_info_query)
+    if delivery_info:
+        doc["delivery_info"] = {
+            "address": delivery_info.get('address'),
+            "delivery_date": delivery_info['delivery_date'].timestamp() if delivery_info.get('delivery_date') else None,
+            "recipient": delivery_info.get('recipient'),
+            "note": delivery_info.get('note'),
+        }
+    return doc
+
+
+async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
+    check_query = articles.select().where(and_(
+        articles.c.name == name,
+        articles.c.cashbox == user_cashbox_id,
+        articles.c.dc == dc_type
+    ))
+    article_exists = await database.fetch_all(check_query)
+    return True if article_exists else False

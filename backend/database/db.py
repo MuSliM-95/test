@@ -1,6 +1,7 @@
 import os
 from enum import Enum as ENUM
 import databases
+from dotenv import load_dotenv
 import sqlalchemy
 from sqlalchemy.pool import NullPool
 from sqlalchemy import (
@@ -22,8 +23,13 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from database.enums import Repeatability, Gender, ContragentType, TriggerType, TriggerTime
+from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+load_dotenv()
 
 class OperationType(str, ENUM):
     plus = "+"
@@ -102,6 +108,12 @@ class TgBillApproveStatus(str, ENUM):
     NEW = "NEW"
     APPROVED = "APPROVED"
     CANCELED = "CANCELED"
+
+class NomenclatureCashbackType(str, ENUM):
+    percent = "percent"
+    const = "const"
+    no_cashback = "no_cashback"
+    lcard_cashback = "lcard_cashback"
 
 metadata = sqlalchemy.MetaData()
 
@@ -519,7 +531,8 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description_short", String),
     sqlalchemy.Column("description_long", String),
-    sqlalchemy.Column("cashback_percent", Integer),
+    sqlalchemy.Column("cashback_type", Enum(NomenclatureCashbackType), nullable=False, server_default="no_cashback"),
+    sqlalchemy.Column("cashback_value", Integer),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
     sqlalchemy.Column("category", Integer, ForeignKey("categories.id")),
@@ -865,6 +878,7 @@ articles = sqlalchemy.Table(
     sqlalchemy.Column("distribute_for", String),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("dc", Enum(DebitCreditType), nullable=True),
 )
 
 payments = sqlalchemy.Table(
@@ -1169,6 +1183,17 @@ docs_sales_tags = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
     sqlalchemy.Column("name", String, index=True),
+)
+
+docs_sales_delivery_info = sqlalchemy.Table(
+    "docs_sales_delivery_info",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
+    sqlalchemy.Column("address", String),
+    sqlalchemy.Column("delivery_date", DateTime(timezone=True)),
+    sqlalchemy.Column("recipient", JSON),
+    sqlalchemy.Column("note", String),
 )
 
 docs_sales_goods = sqlalchemy.Table(
@@ -1851,9 +1876,6 @@ amo_entity_custom_fields = sqlalchemy.Table(
     extend_existing=True
 )
 
-
-
-
 tg_bot_bills = sqlalchemy.Table(
     "tg_bot_bills",
     metadata,
@@ -1890,7 +1912,23 @@ tg_bot_bill_approvers = sqlalchemy.Table(
     extend_existing=True
 )
 
-
+docs_sales_utm_tags = sqlalchemy.Table(
+    "docs_sales_utm_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
+    sqlalchemy.Column("utm_source", String),
+    sqlalchemy.Column("utm_medium", String),
+    sqlalchemy.Column("utm_campaign", String),
+    sqlalchemy.Column("utm_term", ARRAY(item_type=String)),
+    sqlalchemy.Column("utm_content", String),
+    sqlalchemy.Column("utm_name", String),
+    sqlalchemy.Column("utm_phone", String),
+    sqlalchemy.Column("utm_email", String),
+    sqlalchemy.Column("utm_leadid", String),
+    sqlalchemy.Column("utm_yclientid", String),
+    sqlalchemy.Column("utm_gaclientid", String),
+)
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"

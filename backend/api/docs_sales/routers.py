@@ -28,6 +28,7 @@ from database.db import (
     docs_sales,
     organizations,
     docs_sales_goods,
+    docs_sales_delivery_info,
     contracts,
     loyality_cards,
     loyality_transactions,
@@ -36,7 +37,7 @@ from database.db import (
     price_types, warehouse_balances,
     nomenclature,
     docs_warehouse, docs_sales_tags, amo_leads, amo_install_table_cashboxes, amo_leads_docs_sales_mapping,
-    docs_sales_settings, contragents,
+    docs_sales_settings, contragents, NomenclatureCashbackType,
 
 )
 import datetime
@@ -61,11 +62,13 @@ from functions.helpers import (
     check_period_blocked,
     add_nomenclature_count,
     raschet_oplat,
-    add_docs_sales_settings
+    add_docs_sales_settings,
+    add_delivery_info_to_doc
 )
 from functions.helpers import get_user_by_token
 
 from ws_manager import manager
+
 
 router = APIRouter(tags=["docs_sales"])
 
@@ -141,6 +144,7 @@ async def get_by_id(token: str, idx: int):
     goods_db = [await instance for instance in goods_db]
 
     instance_db["goods"] = goods_db
+    instance_db = await add_delivery_info_to_doc(instance_db)
 
     return instance_db
 
@@ -473,14 +477,28 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
 
             if lcard:
                 nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == item['nomenclature']))
+                calculated_share = paid_rubles / (paid_rubles + paid_lt)
                 if nomenclature_db:
-                    if nomenclature_db.cashback_percent is not None:
-                        if nomenclature_db.cashback_percent != 0:
-                            cashback_sum += item["price"] * item["quantity"] * (nomenclature_db.cashback_percent / 100)
+                    if nomenclature_db.cashback_type == NomenclatureCashbackType.no_cashback:
+                        pass
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.percent:
+                        current_percent = item["price"] * item["quantity"] * (nomenclature_db.cashback_value / 100)
+                        cashback_sum += calculated_share * current_percent
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.const:
+                        cashback_sum += item["quantity"] * nomenclature_db.cashback_value
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.lcard_cashback:
+                        current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        print(current_percent)
+                        print(lcard.cashback_percent)
+                        print(calculated_share)
+                        print(calculated_share * current_percent)
+                        cashback_sum += calculated_share * current_percent
                     else:
-                        cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        cashback_sum += calculated_share * current_percent
                 else:
-                    cashback_sum += item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                    current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                    cashback_sum += calculated_share * current_percent
 
             if instance_values.get("warehouse") is not None:
                 query = (
@@ -615,9 +633,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
             ))
             if lcard:
                 if cashback_sum > 0:
-                    calculated_share = paid_rubles / (paid_rubles + paid_lt)
-                    calculated_cashback_sum = round((calculated_share * cashback_sum), 2)
-
+                    calculated_cashback_sum = round((cashback_sum), 2)
                     if calculated_cashback_sum > 0:
                         rubles_body = {
                             "loyality_card_id": lt,
@@ -886,7 +902,7 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                         "loyality_card_number": lcard.card_number,
                         "type": "accrual",
                         "name": f"Кешбек по документу {instance_values['number']}",
-                        "amount": round((paid_rubles * (lcard.cashback_percent / 100)), 2),
+                        "amount": round((paid_rubles * (lcard.cashback_value / 100)), 2),
                         "created_by_id": user.id,
                         "card_balance": lcard.balance,
                         "tags": instance_values.get("tags", ""),
@@ -1137,3 +1153,48 @@ async def delete(token: str, idx: int):
         )
 
     return items_db
+
+
+@router.post("/docs_sales/{idx}/delivery_info/", response_model=schemas.ResponseDeliveryInfoSchema)
+async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
+    """Добавление информации о доставке в заказу"""
+
+    user = await get_user_by_token(token)
+
+    check_query = (
+        select(docs_sales.c.id)
+        .where(and_(
+            docs_sales.c.id == idx,
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales.c.is_deleted == False
+        ))
+    )
+
+    item_db = await database.fetch_one(check_query)
+    if not item_db:
+        raise HTTPException(404, "Документ не найден!")
+
+    check_delivery_info_query = (
+        select(docs_sales_delivery_info.c.id)
+        .where(docs_sales_delivery_info.c.docs_sales_id == idx)
+    )
+    delivery_info_db = await database.fetch_one(check_delivery_info_query)
+    if delivery_info_db:
+        raise HTTPException(400, "Данные доставки уже добавлены.")
+
+    data_dict = data.dict()
+    data_dict["docs_sales_id"] = idx
+    if data_dict.get("delivery_date") or data_dict.get("delivery_date") == 0:
+        data_dict["delivery_date"] = datetime.datetime.fromtimestamp(data_dict["delivery_date"])
+    insert_query = docs_sales_delivery_info.insert().values(
+        data_dict
+    )
+    inserted_entity_id = await database.execute(insert_query)
+
+    return schemas.ResponseDeliveryInfoSchema(
+        id=inserted_entity_id,
+        docs_sales_id=idx,
+        **data.dict()
+    )
+
+
