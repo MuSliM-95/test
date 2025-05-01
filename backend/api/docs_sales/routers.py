@@ -625,6 +625,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                                     value = good.get("price"),
                                     currency = "RUB"
                                 ),
+                                payment_mode = "full_payment",
                                 payment_subject = payment_subject.get(await database.fetch_val(select(nomenclature.c.type).where(nomenclature.c.id == good.get("nomenclature")))),
                                 quantity = good.get("quantity"),
                                 vat_code = "1"
