@@ -12,4 +12,7 @@ docker-compose.dev.yml
 /nginx/localhost.crt
 .env
 /.idea
+/nginx/rootCA.key
+/nginx/rootCA.crt
+/nginx/rootCA.pem
 
