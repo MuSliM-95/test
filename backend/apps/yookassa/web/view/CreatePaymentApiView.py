@@ -21,7 +21,8 @@ class CreatePaymentApiView:
             }
             user = await get_user_by_token(token)
             for good in payment.receipt.items:
-                good.payment_subject = payment_subject.get((await self.__yookassa_api_service.api_create_payment_get_good(good.id)).get("type"))
+                good.payment_mode = "full_payment"
+                good.payment_subject = payment_subject.get(dict(await self.__yookassa_api_service.api_create_payment_get_good(good.id)).get("type"))
 
             payment_yookassa = await self.__yookassa_api_service.api_create_payment(
                 cashbox = user.cashbox_id,
