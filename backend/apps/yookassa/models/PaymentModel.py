@@ -40,9 +40,18 @@ class ItemModel(BaseModel):
     payment_mode: Optional[str] = None
 
 
+class ItemModelView(ItemModel):
+    id: int = None
+
+
 class ReceiptModel(BaseModel):
     customer: CustomerModel = None
     items: List[ItemModel]
+
+
+class ReceiptModelView(BaseModel):
+    customer: CustomerModel = None
+    items: List[ItemModelView]
 
 
 class RecipientModel(BaseModel):
@@ -93,6 +102,10 @@ class PaymentCreateModel(BaseModel):
     payment_method_data: Union[MethodBankCard, MethodSbp] = None
     test: bool = True
     confirmation: Union[ConfirmationRedirect, ConfirmationEmbedded, ConfirmationRedirectResponce] = None
+
+
+class PaymentCreateModelView(PaymentCreateModel):
+    receipt: Optional[ReceiptModelView] = None
 
 
 class PaymentBaseModel(PaymentCreateModel):

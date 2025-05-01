@@ -27,5 +27,8 @@ class IYookassaApiService:
     async def api_update_crm_payment_from_webhook_success(self, payment_id: str):
         raise NotImplementedError
 
+    async def api_create_payment_get_good(self, good_id: int):
+        raise NotImplementedError
+
 
 
