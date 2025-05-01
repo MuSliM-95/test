@@ -8,5 +8,8 @@ docker-compose.yml
 /nginx/Dockerfile
 docker-compose.dev.yml
 /nginx/nginx.conf
+/nginx/localhost.key
+/nginx/localhost.crt
 .env
 /.idea
+
