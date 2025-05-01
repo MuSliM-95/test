@@ -16,6 +16,7 @@ from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import Yookas
 from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
 from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
+from apps.yookassa.repositories.impl.YookassaTableNomenclature import YookassaTableNomenclature
 from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
@@ -582,15 +583,24 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 oauth_repository = YookassaOauthRepository(),
                 payments_repository = YookassaPaymentsRepository(),
                 crm_payments_repository = YookassaCrmPaymentsRepository(),
-                amo_table_crm_repository = YookasssaAmoTableCrmRepository()
+                amo_table_crm_repository = YookasssaAmoTableCrmRepository(),
+                table_nomenclature_repository=YookassaTableNomenclature()
             )
 
-            subject_type = {
-                "service": "service",
-                "product": "commodity"
+            payment_subject = {
+                "product": "commodity",
+                "service": "service"
             }
 
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id,instance_values['warehouse']):
+                customer = await database.fetch_one(
+                    select(
+                        contragents.c.name,
+                        contragents.c.phone,
+                        contragents.c.inn,
+                        contragents.c.email
+                    ).where(contragents.c.id == instance_values['contragent']))
+
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
                     instance_values['warehouse'],
@@ -604,14 +614,18 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                         description = f"Оплата по документу {instance_values['number']}",
                         capture = True,
                         receipt = ReceiptModel(
-                            customer = CustomerModel(),
+                            customer = CustomerModel(
+                                full_name = customer.get("name"),
+                                phone = customer.get("phone"),
+                                email = customer.get("email")
+                            ),
                             items = [ItemModel(
                                 description = good.get("nomenclature_name") or "",
                                 amount = AmountModel(
                                     value = good.get("price"),
                                     currency = "RUB"
                                 ),
-                                payment_subject = subject_type.get(await database.fetch_val(select(nomenclature.c.type).where(nomenclature.c.id == good.get("nomenclature")))),
+                                payment_subject = payment_subject.get(await database.fetch_val(select(nomenclature.c.type).where(nomenclature.c.id == good.get("nomenclature")))),
                                 quantity = good.get("quantity"),
                                 vat_code = "1"
                             ) for good in goods_tmp],

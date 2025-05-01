@@ -71,11 +71,13 @@ from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import IYook
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
 from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
+from apps.yookassa.repositories.core.IYookassaTableNomenclature import IYookassaTableNomenclature
 from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import IYookasssaAmoTableCrmRepository
 from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
 from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
+from apps.yookassa.repositories.impl.YookassaTableNomenclature import YookassaTableNomenclature
 from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
 from apps.yookassa.web.InstallOauthWeb import InstallYookassaOauthWeb
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
@@ -339,6 +341,7 @@ async def startup():
     InstallCategoriesWeb()(app=app)
     InstallNomenclatureWeb()(app=app)
     ioc.set(IYookasssaAmoTableCrmRepository, YookasssaAmoTableCrmRepository())
+    ioc.set(IYookassaTableNomenclature, YookassaTableNomenclature())
 
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)

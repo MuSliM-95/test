@@ -19,7 +19,7 @@ class AmountModel(BaseModel):
 
 class CustomerModel(BaseModel):
     full_name: str = None
-    inn: str = Field(None, max_length = 12, min_length = 10)
+    inn: str = None
     email: str = None
     phone: str = None
 
