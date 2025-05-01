@@ -620,7 +620,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                                 email = customer.get("email")
                             ),
                             items = [ItemModel(
-                                description = good.get("nomenclature_name") or "",
+                                description = good.get("nomenclature") or "",
                                 amount = AmountModel(
                                     value = good.get("price"),
                                     currency = "RUB"
