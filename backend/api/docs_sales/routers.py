@@ -11,10 +11,12 @@ from apps.yookassa.models.PaymentModel import PaymentCreateModel,AmountModel,Rec
     ConfirmationRedirect
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
+from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import IYookasssaAmoTableCrmRepository
 from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
 from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
+from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from database.db import (
@@ -579,8 +581,14 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 request_repository = YookassaRequestRepository(),
                 oauth_repository = YookassaOauthRepository(),
                 payments_repository = YookassaPaymentsRepository(),
-                crm_payments_repository = YookassaCrmPaymentsRepository()
+                crm_payments_repository = YookassaCrmPaymentsRepository(),
+                amo_table_crm_repository = YookasssaAmoTableCrmRepository()
             )
+
+            subject_type = {
+                "service": "service",
+                "product": "commodity"
+            }
 
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id,instance_values['warehouse']):
                 await yookassa_api_service.api_create_payment(
@@ -603,6 +611,7 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                                     value = good.get("price"),
                                     currency = "RUB"
                                 ),
+                                payment_subject = subject_type.get(await database.fetch_val(select(nomenclature.c.type).where(nomenclature.c.id == good.get("nomenclature")))),
                                 quantity = good.get("quantity"),
                                 vat_code = "1"
                             ) for good in goods_tmp],
