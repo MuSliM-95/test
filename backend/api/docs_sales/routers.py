@@ -585,11 +585,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                 amo_table_crm_repository = YookasssaAmoTableCrmRepository()
             )
 
-            subject_type = {
-                "service": "service",
-                "product": "commodity"
-            }
-
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id,instance_values['warehouse']):
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
@@ -611,7 +606,6 @@ async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: 
                                     value = good.get("price"),
                                     currency = "RUB"
                                 ),
-                                payment_subject = subject_type.get(await database.fetch_val(select(nomenclature.c.type).where(nomenclature.c.id == good.get("nomenclature")))),
                                 quantity = good.get("quantity"),
                                 vat_code = "1"
                             ) for good in goods_tmp],
