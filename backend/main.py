@@ -341,7 +341,7 @@ async def startup():
     InstallCategoriesWeb()(app=app)
     InstallNomenclatureWeb()(app=app)
     ioc.set(IYookasssaAmoTableCrmRepository, YookasssaAmoTableCrmRepository())
-    ioc.set(IYookassaTableNomenclature,YookassaTableNomenclature())
+    ioc.set(IYookassaTableNomenclature, YookassaTableNomenclature())
 
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
