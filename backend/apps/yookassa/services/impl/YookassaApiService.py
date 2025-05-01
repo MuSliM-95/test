@@ -168,3 +168,9 @@ class YookassaApiService(IYookassaApiService):
         except Exception as error:
             raise Exception(f"ошибка обновления платежа crm: {str(error)}")
 
+    async def api_create_payment_get_good(self, good_id: int):
+        try:
+            return await self.__table_nomenclature_repository.fetch_one_by_id(good_id)
+        except Exception as error:
+            raise Exception(f"ошибка получения данных о товарах платежа: {str(error)}")
+
