@@ -11,10 +11,13 @@ from apps.yookassa.models.PaymentModel import PaymentCreateModel,AmountModel,Rec
     ConfirmationRedirect
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
+from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import IYookasssaAmoTableCrmRepository
 from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
 from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
+from apps.yookassa.repositories.impl.YookassaTableNomenclature import YookassaTableNomenclature
+from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from database.db import (
