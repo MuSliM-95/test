@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Set, List, Tuple, Any
 
 from fastapi import HTTPException
-from sqlalchemy import select, and_, or_, desc, tuple_, func
+from sqlalchemy import select, and_, or_, desc, tuple_, func, bindparam
 
 from api.docs_sales import schemas
 from api.docs_warehouses.utils import create_warehouse_docs
@@ -334,24 +334,34 @@ class CreateDocsSalesView:
             await database.execute_many(entity_to_entity.insert(), e2e_to_insert)
 
         if wb_rows_dict:
-            pairs = list(wb_rows_dict.keys())
+            pairs_param = bindparam("pairs", expanding=True)  # 👈 расширяемый параметр
+
             subq = (
                 select(
                     warehouse_balances.c.warehouse_id,
                     warehouse_balances.c.nomenclature_id,
                     warehouse_balances.c.current_amount,
                     func.row_number().over(
-                        partition_by=(warehouse_balances.c.warehouse_id, warehouse_balances.c.nomenclature_id),
+                        partition_by=(
+                            warehouse_balances.c.warehouse_id,
+                            warehouse_balances.c.nomenclature_id,
+                        ),
                         order_by=warehouse_balances.c.created_at.desc(),
                     ).label("rn"),
                 )
                 .where(
-                    tuple_(warehouse_balances.c.warehouse_id, warehouse_balances.c.nomenclature_id)
-                    .in_([(w, n) for w, n, _ in pairs])
+                    warehouse_balances.c.cashbox_id == user.cashbox_id,
+                    tuple_(
+                        warehouse_balances.c.warehouse_id,
+                        warehouse_balances.c.nomenclature_id,
+                    ).in_(pairs_param),  # 👈 здесь bind‑param
                 )
-                .subquery()
+            ).subquery()
+
+            latest = await database.fetch_all(
+                select(subq).where(subq.c.rn == 1),
+                values={"pairs": list(wb_rows_dict.keys())},  # 👈 сами пары передаём здесь
             )
-            latest = await database.fetch_all(select(subq).where(subq.c.rn == 1))
             latest_map = {(r.warehouse_id, r.nomenclature_id): r.current_amount for r in latest}
 
             wb_to_insert = []
