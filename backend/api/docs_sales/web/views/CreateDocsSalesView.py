@@ -113,7 +113,11 @@ class CreateDocsSalesView:
         settings_payload: list[dict | None] = []
 
         for idx, doc in enumerate(docs_sales_data.__root__):
-            settings_payload.append(doc.settings.dict(exclude_unset=True) if doc.settings else None)
+            raw = doc.settings.dict(exclude_unset=True) or {}
+            if raw.get("repeatability_value") is not None and raw.get("repeatability_period") is not None:
+                settings_payload.append(raw)
+            else:
+                settings_payload.append(None)
 
             number = doc.number
             if not number:
@@ -159,7 +163,7 @@ class CreateDocsSalesView:
 
             id_iter = iter(r.id for r in inserted_settings)
             for idx, payload in enumerate(settings_payload):
-                if payload:
+                if payload is not None:
                     settings_ids[idx] = next(id_iter)
 
         for pos, sid in enumerate(settings_ids):
