@@ -334,7 +334,13 @@ class CreateDocsSalesView:
             await database.execute_many(entity_to_entity.insert(), e2e_to_insert)
 
         if wb_rows_dict:
-            pairs_param = bindparam("pairs", expanding=True)  # 👈 расширяемый параметр
+            conditions = [
+                and_(
+                    warehouse_balances.c.warehouse_id == wh,
+                    warehouse_balances.c.nomenclature_id == nom,
+                )
+                for wh, nom, _ in wb_rows_dict.keys()
+            ]
 
             subq = (
                 select(
@@ -351,16 +357,12 @@ class CreateDocsSalesView:
                 )
                 .where(
                     warehouse_balances.c.cashbox_id == user.cashbox_id,
-                    tuple_(
-                        warehouse_balances.c.warehouse_id,
-                        warehouse_balances.c.nomenclature_id,
-                    ).in_(pairs_param),  # 👈 здесь bind‑param
+                    or_(*conditions),
                 )
             ).subquery()
 
             latest = await database.fetch_all(
-                select(subq).where(subq.c.rn == 1),
-                values={"pairs": list(wb_rows_dict.keys())},  # 👈 сами пары передаём здесь
+                select(subq).where(subq.c.rn == 1)
             )
             latest_map = {(r.warehouse_id, r.nomenclature_id): r.current_amount for r in latest}
 
