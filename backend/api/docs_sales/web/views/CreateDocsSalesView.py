@@ -285,6 +285,14 @@ class CreateDocsSalesView:
 
             doc_sum_updates.append({"id": created.id, "sum": round(total, 2)})
 
+        if doc_sum_updates:
+            query_update_sums = """
+                UPDATE docs_sales
+                SET sum = :sum
+                WHERE id = :id
+            """
+            await database.execute_many(query=query_update_sums, values=doc_sum_updates)
+
         if goods_rows:
             await database.execute_many(docs_sales_goods.insert(), goods_rows)
         if tags_rows:
