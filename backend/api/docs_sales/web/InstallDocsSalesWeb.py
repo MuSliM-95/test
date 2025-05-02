@@ -13,7 +13,7 @@ class InstallDocsSalesWeb:
         create_docs_sales_view = CreateDocsSalesView()
 
         app.add_api_route(
-            path="/docs_sales/test",
+            path="/docs_sales/",
             endpoint=create_docs_sales_view.__call__,
             methods=["POST"],
             status_code=status.HTTP_200_OK,
