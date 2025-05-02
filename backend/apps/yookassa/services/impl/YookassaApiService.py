@@ -1,13 +1,20 @@
+import os
+import uuid
 from typing import Optional, List
 
 from apps.yookassa.models.PaymentModel import PaymentCreateModel, PaymentBaseModel, EventWebhookPayment, ReceiptModel,\
     CustomerModel, ItemModel
 from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel,WebhookViewModel
+from apps.yookassa.models.YookassaLinkPushMessage import YookassaLinkPushMessage
 from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import IYookassaCrmPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
 from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
+from apps.yookassa.repositories.core.IYookassaTableNomenclature import IYookassaTableNomenclature
+from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import IYookasssaAmoTableCrmRepository
 from apps.yookassa.services.core.IYookassaApiService import IYookassaApiService
+from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
+from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
 from ws_manager import manager
 
 
@@ -19,11 +26,15 @@ class YookassaApiService(IYookassaApiService):
             oauth_repository: IYookassaOauthRepository,
             payments_repository: IYookassaPaymentsRepository,
             crm_payments_repository: IYookassaCrmPaymentsRepository,
+            amo_table_crm_repository: IYookasssaAmoTableCrmRepository,
+            table_nomenclature_repository: IYookassaTableNomenclature
     ):
         self.__request_repository = request_repository
         self.__oauth_repository = oauth_repository
         self.__payments_repository = payments_repository
         self.__crm_payments_repository = crm_payments_repository
+        self.__amo_table_crm_repository = amo_table_crm_repository
+        self.__table_nomenclature_repository = table_nomenclature_repository
 
     async def api_create_webhook(self, cashbox: int, warehouse: int, webhook: WebhookViewModel):
         try:
@@ -65,6 +76,7 @@ class YookassaApiService(IYookassaApiService):
             payment_crm_id: Optional[int],
             payment: PaymentCreateModel,
     ):
+
         if doc_sales_id and (payment_crm_id is None):
             crm_payment = await self.__crm_payments_repository.get_crm_payments_by_doc_sales_id(doc_sales_id)
             payment_crm_id = crm_payment.id
@@ -86,6 +98,30 @@ class YookassaApiService(IYookassaApiService):
                 access_token = oauth.access_token,
                 payment = payment
             )
+
+            """ отправка в очередь """
+            rabbit_factory = RabbitFactory(settings = RabbitMqSettings(
+                rabbitmq_host = os.getenv('RABBITMQ_HOST'),
+                rabbitmq_user = os.getenv('RABBITMQ_USER'),
+                rabbitmq_pass = os.getenv('RABBITMQ_PASS'),
+                rabbitmq_port = os.getenv('RABBITMQ_PORT'),
+                rabbitmq_vhost = os.getenv('RABBITMQ_VHOST')
+            ))
+            factory = await rabbit_factory()
+            amqp_messaging = await factory()
+
+            install = await self.__amo_table_crm_repository.get_active_install_by_cashbox(cashbox)
+
+            if install is not None:
+                await amqp_messaging.publish(
+                    YookassaLinkPushMessage(
+                        **dict(install),
+                        message_id = uuid.uuid4(),
+                        payment = response.dict(exclude_none = True)),
+                    "amo.push.yookassa.link"
+                )
+
+            """ окончание отправки """
 
             if not payment_db:
                 await self.__payments_repository.insert(
@@ -130,4 +166,10 @@ class YookassaApiService(IYookassaApiService):
             await self.__crm_payments_repository.update_crm_payments_by_webhook_success(payment_db.payment_crm_id)
         except Exception as error:
             raise Exception(f"ошибка обновления платежа crm: {str(error)}")
+
+    async def api_create_payment_get_good(self, good_id: int):
+        try:
+            return await self.__table_nomenclature_repository.fetch_one_by_id(good_id)
+        except Exception as error:
+            raise Exception(f"ошибка получения данных о товарах платежа: {str(error)}")
 
