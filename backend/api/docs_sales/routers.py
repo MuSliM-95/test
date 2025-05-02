@@ -337,439 +337,439 @@ async def check_foreign_keys(instance_values, user, exceptions) -> bool:
 
 
 # @router.post("/docs_sales/", response_model=schemas.ListView)
-# async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: bool = True):
-#     """Создание документов"""
-#     user = await get_user_by_token(token)
-#
-#     inserted_ids = set()
-#     exceptions = []
-#
-#     count_query = (
-#         select(func.count(docs_sales.c.id))
-#         .where(
-#             docs_sales.c.cashbox == user.cashbox_id,
-#             docs_sales.c.is_deleted.is_(False)
-#         )
-#     )
-#     count_docs_sales = await database.fetch_val(count_query, column=0)
-#
-#     paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
-#     paybox = await database.fetch_one(paybox_q)
-#     paybox_id = None if not paybox else paybox.id
-#
-#     article_q = articles.select().where(articles.c.cashbox == user.cashbox_id, articles.c.name == "Продажи")
-#     article_db = await database.fetch_one(article_q)
-#
-#     for index, instance_values in enumerate(docs_sales_data.dict()["__root__"]):
-#
-#         instance_values["created_by"] = user.id
-#         instance_values["sales_manager"] = user.id
-#         instance_values["is_deleted"] = False
-#         instance_values["cashbox"] = user.cashbox_id
-#         instance_values["settings"] = await add_settings_docs_sales(instance_values.pop("settings", None))
-#
-#         goods: Union[list, None] = instance_values.pop("goods", None)
-#
-#         goods_tmp = goods
-#
-#         paid_rubles = instance_values.pop("paid_rubles", 0)
-#         paid_rubles = 0 if not paid_rubles else paid_rubles
-#
-#         paid_lt = instance_values.pop("paid_lt", 0)
-#         paid_lt = 0 if not paid_lt else paid_lt
-#
-#         lt = instance_values.pop("loyality_card_id")
-#
-#         if not await check_period_blocked(
-#                 instance_values["organization"], instance_values.get("dated"), exceptions
-#         ):
-#             continue
-#
-#         if not await check_foreign_keys(
-#                 instance_values,
-#                 user,
-#                 exceptions,
-#         ):
-#             continue
-#
-#         del instance_values["client"]
-#
-#         if not instance_values.get("number"):
-#             query = (
-#                 select(docs_sales.c.number)
-#                 .where(
-#                     docs_sales.c.is_deleted == False,
-#                     docs_sales.c.organization == instance_values["organization"]
-#                 )
-#                 .order_by(desc(docs_sales.c.created_at))
-#             )
-#             prev_number_docs_sales = await database.fetch_one(query)
-#             if prev_number_docs_sales:
-#                 if prev_number_docs_sales.number:
-#                     try:
-#                         number_int = int(prev_number_docs_sales.number)
-#                     except:
-#                         number_int = 0
-#                     instance_values["number"] = str(number_int + 1)
-#                 else:
-#                     instance_values["number"] = "1"
-#             else:
-#                 instance_values["number"] = "1"
-#
-#         paybox = instance_values.pop('paybox', None)
-#         if paybox is None:
-#             if paybox_id is not None:
-#                 paybox = paybox_id
-#
-#         query = docs_sales.insert().values(instance_values)
-#         instance_id = await database.execute(query)
-#
-#         # Процесс разделения тегов(в другую таблицу)
-#         tags = instance_values.pop("tags", "")
-#         if tags:
-#             tags_insert_list = []
-#             tags_split = tags.split(",")
-#             for tag_name in tags_split:
-#                 tags_insert_list.append({
-#                     "docs_sales_id": instance_id,
-#                     "name": tag_name,
-#                 })
-#             if tags_insert_list:
-#                 await database.execute(docs_sales_tags.insert(tags_insert_list))
-#
-#         inserted_ids.add(instance_id)
-#         items_sum = 0
-#
-#         cashback_sum = 0
-#
-#         lcard = None
-#         if lt:
-#             lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
-#             lcard = await database.fetch_one(lcard_q)
-#
-#         for item in goods:
-#             item["docs_sales_id"] = instance_id
-#             del item["nomenclature_name"]
-#             del item["unit_name"]
-#
-#             if item.get("price_type") is not None:
-#                 if item["price_type"] not in price_types_cache:
-#                     try:
-#                         await check_entity_exists(
-#                             price_types, item["price_type"], user.id
-#                         )
-#                         price_types_cache.add(item["price_type"])
-#                     except HTTPException as e:
-#                         exceptions.append(str(item) + " " + e.detail)
-#                         continue
-#             if item.get("unit") is not None:
-#                 if item["unit"] not in units_cache:
-#                     try:
-#                         await check_unit_exists(item["unit"])
-#                         units_cache.add(item["unit"])
-#                     except HTTPException as e:
-#                         exceptions.append(str(item) + " " + e.detail)
-#                         continue
-#             item["nomenclature"] = int(item["nomenclature"])
-#             query = docs_sales_goods.insert().values(item)
-#             await database.execute(query)
-#
-#             items_sum += item["price"] * item["quantity"]
-#
-#             if lcard:
-#                 nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == item['nomenclature']))
-#                 calculated_share = paid_rubles / (paid_rubles + paid_lt)
-#                 if nomenclature_db:
-#                     if nomenclature_db.cashback_type == NomenclatureCashbackType.no_cashback:
-#                         pass
-#                     elif nomenclature_db.cashback_type == NomenclatureCashbackType.percent:
-#                         current_percent = item["price"] * item["quantity"] * (nomenclature_db.cashback_value / 100)
-#                         cashback_sum += calculated_share * current_percent
-#                     elif nomenclature_db.cashback_type == NomenclatureCashbackType.const:
-#                         cashback_sum += item["quantity"] * nomenclature_db.cashback_value
-#                     elif nomenclature_db.cashback_type == NomenclatureCashbackType.lcard_cashback:
-#                         current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
-#                         print(current_percent)
-#                         print(lcard.cashback_percent)
-#                         print(calculated_share)
-#                         print(calculated_share * current_percent)
-#                         cashback_sum += calculated_share * current_percent
-#                     else:
-#                         current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
-#                         cashback_sum += calculated_share * current_percent
-#                 else:
-#                     current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
-#                     cashback_sum += calculated_share * current_percent
-#
-#             if instance_values.get("warehouse") is not None:
-#                 query = (
-#                     warehouse_balances.select()
-#                     .where(
-#                         warehouse_balances.c.warehouse_id == instance_values["warehouse"],
-#                         warehouse_balances.c.nomenclature_id == item["nomenclature"]
-#                     )
-#                     .order_by(desc(warehouse_balances.c.created_at))
-#                 )
-#                 last_warehouse_balance = await database.fetch_one(query)
-#                 warehouse_amount = (
-#                     last_warehouse_balance.current_amount
-#                     if last_warehouse_balance
-#                     else 0
-#                 )
-#
-#                 query = warehouse_balances.insert().values(
-#                     {
-#                         "organization_id": instance_values["organization"],
-#                         "warehouse_id": instance_values["warehouse"],
-#                         "nomenclature_id": item["nomenclature"],
-#                         "document_sale_id": instance_id,
-#                         "outgoing_amount": item["quantity"],
-#                         "current_amount": warehouse_amount - item["quantity"],
-#                         "cashbox_id": user.cashbox_id,
-#                     }
-#                 )
-#                 await database.execute(query)
-#
-#         if paid_rubles > 0:
-#             if article_db:
-#                 article_id = article_db.id
-#             else:
-#                 tstamp = int(datetime.datetime.now().timestamp())
-#                 created_article_q = articles.insert().values({
-#                     "name": "Продажи",
-#                     "emoji": "🛍️",
-#                     "cashbox": user.cashbox_id,
-#                     "created_at": tstamp,
-#                     "updated_at": tstamp
-#                 })
-#                 article_id = await database.execute(created_article_q)
-#
-#             payment_id = await database.execute(payments.insert().values({
-#                 "contragent": instance_values['contragent'],
-#                 "type": "incoming",
-#                 "name": f"Оплата по документу {instance_values['number']}",
-#                 "amount_without_tax": round(paid_rubles, 2),
-#                 "tags": tags,
-#                 "amount": round(paid_rubles, 2),
-#                 "tax": 0,
-#                 "tax_type": "internal",
-#                 "article_id": article_id,
-#                 "article": "Продажи",
-#                 "paybox": paybox,
-#                 "date": int(datetime.datetime.now().timestamp()),
-#                 "account": user.user,
-#                 "cashbox": user.cashbox_id,
-#                 "is_deleted": False,
-#                 "created_at": int(datetime.datetime.now().timestamp()),
-#                 "updated_at": int(datetime.datetime.now().timestamp()),
-#                 "status": instance_values['status'],
-#                 "stopped": True,
-#                 "docs_sales_id": instance_id
-#             }))
-#             await database.execute(
-#                 pboxes.update().where(pboxes.c.id == paybox).values({"balance": pboxes.c.balance - paid_rubles})
-#             )
-#
-#             # Юкасса
-#
-#             yookassa_oauth_service = OauthService(
-#                 oauth_repository = YookassaOauthRepository(),
-#                 request_repository = YookassaRequestRepository(),
-#                 get_oauth_credential_function = GetOauthCredentialFunction()
-#             )
-#
-#             yookassa_api_service = YookassaApiService(
-#                 request_repository = YookassaRequestRepository(),
-#                 oauth_repository = YookassaOauthRepository(),
-#                 payments_repository = YookassaPaymentsRepository(),
-#                 crm_payments_repository = YookassaCrmPaymentsRepository()
-#             )
-#
-#             if await yookassa_oauth_service.validation_oauth(user.cashbox_id,instance_values['warehouse']):
-#                 await yookassa_api_service.api_create_payment(
-#                     user.cashbox_id,
-#                     instance_values['warehouse'],
-#                     instance_id,
-#                     payment_id,
-#                     PaymentCreateModel(
-#                         amount = AmountModel(
-#                             value = str(round(paid_rubles, 2)),
-#                             currency = "RUB"
-#                         ),
-#                         description = f"Оплата по документу {instance_values['number']}",
-#                         capture = True,
-#                         receipt = ReceiptModel(
-#                             customer = CustomerModel(),
-#                             items = [ItemModel(
-#                                 description = good.get("nomenclature_name") or "",
-#                                 amount = AmountModel(
-#                                     value = good.get("price"),
-#                                     currency = "RUB"
-#                                 ),
-#                                 quantity = good.get("quantity"),
-#                                 vat_code = "1"
-#                             ) for good in goods_tmp],
-#                         ),
-#                         confirmation = ConfirmationRedirect(
-#                             type = "redirect",
-#                             return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
-#                         )
-#                     )
-#                 )
-#
-#             # юкасса
-#
-#             await database.execute(entity_to_entity.insert().values(
-#                 {
-#                     "from_entity": 7,
-#                     "to_entity": 5,
-#                     "cashbox_id": user.cashbox_id,
-#                     "type": "docs_sales_payments",
-#                     "from_id": instance_id,
-#                     "to_id": payment_id,
-#                     "status": True,
-#                     "delinked": False,
-#                 }
-#             ))
-#             if lcard:
-#                 if cashback_sum > 0:
-#                     calculated_cashback_sum = round((cashback_sum), 2)
-#                     if calculated_cashback_sum > 0:
-#                         rubles_body = {
-#                             "loyality_card_id": lt,
-#                             "loyality_card_number": lcard.card_number,
-#                             "type": "accrual",
-#                             "name": f"Кешбек по документу {instance_values['number']}",
-#                             "amount": calculated_cashback_sum,
-#                             "created_by_id": user.id,
-#                             "tags": tags,
-#                             "card_balance": lcard.balance,
-#                             "dated": datetime.datetime.now(),
-#                             "cashbox": user.cashbox_id,
-#                             "is_deleted": False,
-#                             "created_at": datetime.datetime.now(),
-#                             "updated_at": datetime.datetime.now(),
-#                             "status": True,
-#                         }
-#
-#                         lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-#
-#                         await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
-#
-#             await asyncio.gather(asyncio.create_task(raschet(user, token)))
-#         if lt:
-#             if paid_lt > 0:
-#                 paybox_q = loyality_cards.select().where(loyality_cards.c.id == lt)
-#                 payboxes = await database.fetch_one(paybox_q)
-#                 print("loyality_transactions insert")
-#                 rubles_body = {
-#                     "loyality_card_id": lt,
-#                     "loyality_card_number": payboxes.card_number,
-#                     "type": "withdraw",
-#                     "name": f"Оплата по документу {instance_values['number']}",
-#                     "amount": paid_lt,
-#                     "created_by_id": user.id,
-#                     "card_balance": lcard.balance,
-#                     "tags": tags,
-#                     "dated": datetime.datetime.now(),
-#                     "cashbox": user.cashbox_id,
-#                     "is_deleted": False,
-#                     "created_at": datetime.datetime.now(),
-#                     "updated_at": datetime.datetime.now(),
-#                     "status": True,
-#                 }
-#                 print("loyality_transactions insert")
-#                 lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
-#                 print("loyality_transactions insert")
-#                 await database.execute(
-#                     loyality_cards.update() \
-#                         .where(loyality_cards.c.card_number == payboxes.card_number) \
-#                         .values({"balance": loyality_cards.c.balance - paid_lt})
-#                 )
-#                 print("loyality_transactions update")
-#                 await database.execute(entity_to_entity.insert().values(
-#                     {
-#                         "from_entity": 7,
-#                         "to_entity": 6,
-#                         "cashbox_id": user.cashbox_id,
-#                         "type": "docs_sales_loyality_transactions",
-#                         "from_id": instance_id,
-#                         "to_id": lt_id,
-#                         "status": True,
-#                         "delinked": False,
-#                     }
-#                 ))
-#
-#                 await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
-#
-#         query = (
-#             docs_sales.update()
-#             .where(docs_sales.c.id == instance_id)
-#             .values({"sum": round(items_sum, 2)})
-#         )
-#         await database.execute(query)
-#
-#         if generate_out:
-#             goods_res = []
-#             for good in goods:
-#                 nomenclature_id = int(good['nomenclature'])
-#                 nomenclature_db = await database.fetch_one(
-#                     nomenclature.select().where(nomenclature.c.id == nomenclature_id))
-#                 if nomenclature_db.type == "product":
-#                     goods_res.append(
-#                         {
-#                             "price_type": 1,
-#                             "price": 0,
-#                             "quantity": good['quantity'],
-#                             "unit": good['unit'],
-#                             "nomenclature": nomenclature_id
-#                         }
-#                     )
-#
-#             body = {
-#                 "number": None,
-#                 "dated": instance_values['dated'],
-#                 "docs_purchases": None,
-#                 "to_warehouse": None,
-#                 "status": True,
-#                 "contragent": instance_values['contragent'],
-#                 "organization": instance_values['organization'],
-#                 "operation": "outgoing",
-#                 "comment": instance_values['comment'],
-#                 "warehouse": instance_values['warehouse'],
-#                 "docs_sales_id": instance_id,
-#                 "goods": goods_res
-#             }
-#             body['docs_purchases'] = None
-#             body['number'] = None
-#             body['to_warehouse'] = None
-#             await create_warehouse_docs(token, body, user.cashbox_id)
-#
-#
-#
-#     query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
-#     docs_sales_db = await database.fetch_all(query)
-#     docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
-#
-#
-#
-#
-#
-#     await manager.send_message(
-#         token,
-#         {
-#             "action": "create",
-#             "target": "docs_sales",
-#             "result": docs_sales_db,
-#         },
-#     )
-#
-#     if exceptions:
-#         raise HTTPException(
-#             400, "Не были добавлены следующие записи: " + ", ".join(exceptions)
-#         )
-#
-#     return docs_sales_db
+async def create(token: str, docs_sales_data: schemas.CreateMass, generate_out: bool = True):
+    """Создание документов"""
+    user = await get_user_by_token(token)
+
+    inserted_ids = set()
+    exceptions = []
+
+    count_query = (
+        select(func.count(docs_sales.c.id))
+        .where(
+            docs_sales.c.cashbox == user.cashbox_id,
+            docs_sales.c.is_deleted.is_(False)
+        )
+    )
+    count_docs_sales = await database.fetch_val(count_query, column=0)
+
+    paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
+    paybox = await database.fetch_one(paybox_q)
+    paybox_id = None if not paybox else paybox.id
+
+    article_q = articles.select().where(articles.c.cashbox == user.cashbox_id, articles.c.name == "Продажи")
+    article_db = await database.fetch_one(article_q)
+
+    for index, instance_values in enumerate(docs_sales_data.dict()["__root__"]):
+
+        instance_values["created_by"] = user.id
+        instance_values["sales_manager"] = user.id
+        instance_values["is_deleted"] = False
+        instance_values["cashbox"] = user.cashbox_id
+        instance_values["settings"] = await add_settings_docs_sales(instance_values.pop("settings", None))
+
+        goods: Union[list, None] = instance_values.pop("goods", None)
+
+        goods_tmp = goods
+
+        paid_rubles = instance_values.pop("paid_rubles", 0)
+        paid_rubles = 0 if not paid_rubles else paid_rubles
+
+        paid_lt = instance_values.pop("paid_lt", 0)
+        paid_lt = 0 if not paid_lt else paid_lt
+
+        lt = instance_values.pop("loyality_card_id")
+
+        if not await check_period_blocked(
+                instance_values["organization"], instance_values.get("dated"), exceptions
+        ):
+            continue
+
+        if not await check_foreign_keys(
+                instance_values,
+                user,
+                exceptions,
+        ):
+            continue
+
+        del instance_values["client"]
+
+        if not instance_values.get("number"):
+            query = (
+                select(docs_sales.c.number)
+                .where(
+                    docs_sales.c.is_deleted == False,
+                    docs_sales.c.organization == instance_values["organization"]
+                )
+                .order_by(desc(docs_sales.c.created_at))
+            )
+            prev_number_docs_sales = await database.fetch_one(query)
+            if prev_number_docs_sales:
+                if prev_number_docs_sales.number:
+                    try:
+                        number_int = int(prev_number_docs_sales.number)
+                    except:
+                        number_int = 0
+                    instance_values["number"] = str(number_int + 1)
+                else:
+                    instance_values["number"] = "1"
+            else:
+                instance_values["number"] = "1"
+
+        paybox = instance_values.pop('paybox', None)
+        if paybox is None:
+            if paybox_id is not None:
+                paybox = paybox_id
+
+        query = docs_sales.insert().values(instance_values)
+        instance_id = await database.execute(query)
+
+        # Процесс разделения тегов(в другую таблицу)
+        tags = instance_values.pop("tags", "")
+        if tags:
+            tags_insert_list = []
+            tags_split = tags.split(",")
+            for tag_name in tags_split:
+                tags_insert_list.append({
+                    "docs_sales_id": instance_id,
+                    "name": tag_name,
+                })
+            if tags_insert_list:
+                await database.execute(docs_sales_tags.insert(tags_insert_list))
+
+        inserted_ids.add(instance_id)
+        items_sum = 0
+
+        cashback_sum = 0
+
+        lcard = None
+        if lt:
+            lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
+            lcard = await database.fetch_one(lcard_q)
+
+        for item in goods:
+            item["docs_sales_id"] = instance_id
+            del item["nomenclature_name"]
+            del item["unit_name"]
+
+            if item.get("price_type") is not None:
+                if item["price_type"] not in price_types_cache:
+                    try:
+                        await check_entity_exists(
+                            price_types, item["price_type"], user.id
+                        )
+                        price_types_cache.add(item["price_type"])
+                    except HTTPException as e:
+                        exceptions.append(str(item) + " " + e.detail)
+                        continue
+            if item.get("unit") is not None:
+                if item["unit"] not in units_cache:
+                    try:
+                        await check_unit_exists(item["unit"])
+                        units_cache.add(item["unit"])
+                    except HTTPException as e:
+                        exceptions.append(str(item) + " " + e.detail)
+                        continue
+            item["nomenclature"] = int(item["nomenclature"])
+            query = docs_sales_goods.insert().values(item)
+            await database.execute(query)
+
+            items_sum += item["price"] * item["quantity"]
+
+            if lcard:
+                nomenclature_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.id == item['nomenclature']))
+                calculated_share = paid_rubles / (paid_rubles + paid_lt)
+                if nomenclature_db:
+                    if nomenclature_db.cashback_type == NomenclatureCashbackType.no_cashback:
+                        pass
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.percent:
+                        current_percent = item["price"] * item["quantity"] * (nomenclature_db.cashback_value / 100)
+                        cashback_sum += calculated_share * current_percent
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.const:
+                        cashback_sum += item["quantity"] * nomenclature_db.cashback_value
+                    elif nomenclature_db.cashback_type == NomenclatureCashbackType.lcard_cashback:
+                        current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        print(current_percent)
+                        print(lcard.cashback_percent)
+                        print(calculated_share)
+                        print(calculated_share * current_percent)
+                        cashback_sum += calculated_share * current_percent
+                    else:
+                        current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                        cashback_sum += calculated_share * current_percent
+                else:
+                    current_percent = item["price"] * item["quantity"] * (lcard.cashback_percent / 100)
+                    cashback_sum += calculated_share * current_percent
+
+            if instance_values.get("warehouse") is not None:
+                query = (
+                    warehouse_balances.select()
+                    .where(
+                        warehouse_balances.c.warehouse_id == instance_values["warehouse"],
+                        warehouse_balances.c.nomenclature_id == item["nomenclature"]
+                    )
+                    .order_by(desc(warehouse_balances.c.created_at))
+                )
+                last_warehouse_balance = await database.fetch_one(query)
+                warehouse_amount = (
+                    last_warehouse_balance.current_amount
+                    if last_warehouse_balance
+                    else 0
+                )
+
+                query = warehouse_balances.insert().values(
+                    {
+                        "organization_id": instance_values["organization"],
+                        "warehouse_id": instance_values["warehouse"],
+                        "nomenclature_id": item["nomenclature"],
+                        "document_sale_id": instance_id,
+                        "outgoing_amount": item["quantity"],
+                        "current_amount": warehouse_amount - item["quantity"],
+                        "cashbox_id": user.cashbox_id,
+                    }
+                )
+                await database.execute(query)
+
+        if paid_rubles > 0:
+            if article_db:
+                article_id = article_db.id
+            else:
+                tstamp = int(datetime.datetime.now().timestamp())
+                created_article_q = articles.insert().values({
+                    "name": "Продажи",
+                    "emoji": "🛍️",
+                    "cashbox": user.cashbox_id,
+                    "created_at": tstamp,
+                    "updated_at": tstamp
+                })
+                article_id = await database.execute(created_article_q)
+
+            payment_id = await database.execute(payments.insert().values({
+                "contragent": instance_values['contragent'],
+                "type": "incoming",
+                "name": f"Оплата по документу {instance_values['number']}",
+                "amount_without_tax": round(paid_rubles, 2),
+                "tags": tags,
+                "amount": round(paid_rubles, 2),
+                "tax": 0,
+                "tax_type": "internal",
+                "article_id": article_id,
+                "article": "Продажи",
+                "paybox": paybox,
+                "date": int(datetime.datetime.now().timestamp()),
+                "account": user.user,
+                "cashbox": user.cashbox_id,
+                "is_deleted": False,
+                "created_at": int(datetime.datetime.now().timestamp()),
+                "updated_at": int(datetime.datetime.now().timestamp()),
+                "status": instance_values['status'],
+                "stopped": True,
+                "docs_sales_id": instance_id
+            }))
+            await database.execute(
+                pboxes.update().where(pboxes.c.id == paybox).values({"balance": pboxes.c.balance - paid_rubles})
+            )
+
+            # Юкасса
+
+            yookassa_oauth_service = OauthService(
+                oauth_repository = YookassaOauthRepository(),
+                request_repository = YookassaRequestRepository(),
+                get_oauth_credential_function = GetOauthCredentialFunction()
+            )
+
+            yookassa_api_service = YookassaApiService(
+                request_repository = YookassaRequestRepository(),
+                oauth_repository = YookassaOauthRepository(),
+                payments_repository = YookassaPaymentsRepository(),
+                crm_payments_repository = YookassaCrmPaymentsRepository()
+            )
+
+            if await yookassa_oauth_service.validation_oauth(user.cashbox_id,instance_values['warehouse']):
+                await yookassa_api_service.api_create_payment(
+                    user.cashbox_id,
+                    instance_values['warehouse'],
+                    instance_id,
+                    payment_id,
+                    PaymentCreateModel(
+                        amount = AmountModel(
+                            value = str(round(paid_rubles, 2)),
+                            currency = "RUB"
+                        ),
+                        description = f"Оплата по документу {instance_values['number']}",
+                        capture = True,
+                        receipt = ReceiptModel(
+                            customer = CustomerModel(),
+                            items = [ItemModel(
+                                description = good.get("nomenclature_name") or "",
+                                amount = AmountModel(
+                                    value = good.get("price"),
+                                    currency = "RUB"
+                                ),
+                                quantity = good.get("quantity"),
+                                vat_code = "1"
+                            ) for good in goods_tmp],
+                        ),
+                        confirmation = ConfirmationRedirect(
+                            type = "redirect",
+                            return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+                        )
+                    )
+                )
+
+            # юкасса
+
+            await database.execute(entity_to_entity.insert().values(
+                {
+                    "from_entity": 7,
+                    "to_entity": 5,
+                    "cashbox_id": user.cashbox_id,
+                    "type": "docs_sales_payments",
+                    "from_id": instance_id,
+                    "to_id": payment_id,
+                    "status": True,
+                    "delinked": False,
+                }
+            ))
+            if lcard:
+                if cashback_sum > 0:
+                    calculated_cashback_sum = round((cashback_sum), 2)
+                    if calculated_cashback_sum > 0:
+                        rubles_body = {
+                            "loyality_card_id": lt,
+                            "loyality_card_number": lcard.card_number,
+                            "type": "accrual",
+                            "name": f"Кешбек по документу {instance_values['number']}",
+                            "amount": calculated_cashback_sum,
+                            "created_by_id": user.id,
+                            "tags": tags,
+                            "card_balance": lcard.balance,
+                            "dated": datetime.datetime.now(),
+                            "cashbox": user.cashbox_id,
+                            "is_deleted": False,
+                            "created_at": datetime.datetime.now(),
+                            "updated_at": datetime.datetime.now(),
+                            "status": True,
+                        }
+
+                        lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
+
+                        await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
+
+            await asyncio.gather(asyncio.create_task(raschet(user, token)))
+        if lt:
+            if paid_lt > 0:
+                paybox_q = loyality_cards.select().where(loyality_cards.c.id == lt)
+                payboxes = await database.fetch_one(paybox_q)
+                print("loyality_transactions insert")
+                rubles_body = {
+                    "loyality_card_id": lt,
+                    "loyality_card_number": payboxes.card_number,
+                    "type": "withdraw",
+                    "name": f"Оплата по документу {instance_values['number']}",
+                    "amount": paid_lt,
+                    "created_by_id": user.id,
+                    "card_balance": lcard.balance,
+                    "tags": tags,
+                    "dated": datetime.datetime.now(),
+                    "cashbox": user.cashbox_id,
+                    "is_deleted": False,
+                    "created_at": datetime.datetime.now(),
+                    "updated_at": datetime.datetime.now(),
+                    "status": True,
+                }
+                print("loyality_transactions insert")
+                lt_id = await database.execute(loyality_transactions.insert().values(rubles_body))
+                print("loyality_transactions insert")
+                await database.execute(
+                    loyality_cards.update() \
+                        .where(loyality_cards.c.card_number == payboxes.card_number) \
+                        .values({"balance": loyality_cards.c.balance - paid_lt})
+                )
+                print("loyality_transactions update")
+                await database.execute(entity_to_entity.insert().values(
+                    {
+                        "from_entity": 7,
+                        "to_entity": 6,
+                        "cashbox_id": user.cashbox_id,
+                        "type": "docs_sales_loyality_transactions",
+                        "from_id": instance_id,
+                        "to_id": lt_id,
+                        "status": True,
+                        "delinked": False,
+                    }
+                ))
+
+                await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
+
+        query = (
+            docs_sales.update()
+            .where(docs_sales.c.id == instance_id)
+            .values({"sum": round(items_sum, 2)})
+        )
+        await database.execute(query)
+
+        if generate_out:
+            goods_res = []
+            for good in goods:
+                nomenclature_id = int(good['nomenclature'])
+                nomenclature_db = await database.fetch_one(
+                    nomenclature.select().where(nomenclature.c.id == nomenclature_id))
+                if nomenclature_db.type == "product":
+                    goods_res.append(
+                        {
+                            "price_type": 1,
+                            "price": 0,
+                            "quantity": good['quantity'],
+                            "unit": good['unit'],
+                            "nomenclature": nomenclature_id
+                        }
+                    )
+
+            body = {
+                "number": None,
+                "dated": instance_values['dated'],
+                "docs_purchases": None,
+                "to_warehouse": None,
+                "status": True,
+                "contragent": instance_values['contragent'],
+                "organization": instance_values['organization'],
+                "operation": "outgoing",
+                "comment": instance_values['comment'],
+                "warehouse": instance_values['warehouse'],
+                "docs_sales_id": instance_id,
+                "goods": goods_res
+            }
+            body['docs_purchases'] = None
+            body['number'] = None
+            body['to_warehouse'] = None
+            await create_warehouse_docs(token, body, user.cashbox_id)
+
+
+
+    query = docs_sales.select().where(docs_sales.c.id.in_(inserted_ids))
+    docs_sales_db = await database.fetch_all(query)
+    docs_sales_db = [*map(datetime_to_timestamp, docs_sales_db)]
+
+
+
+
+
+    await manager.send_message(
+        token,
+        {
+            "action": "create",
+            "target": "docs_sales",
+            "result": docs_sales_db,
+        },
+    )
+
+    if exceptions:
+        raise HTTPException(
+            400, "Не были добавлены следующие записи: " + ", ".join(exceptions)
+        )
+
+    return docs_sales_db
 
 
 @router.patch("/docs_sales/{idx}/", response_model=schemas.ListView)
