@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from api.categories.web.InstallCategoriesWeb import InstallCategoriesWeb
+from api.docs_sales.web.InstallDocsSalesWeb import InstallDocsSalesWeb
 from api.manufacturers.web.InstallManufacturersWeb import InstallManufacturersWeb
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
 from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import NomenclatureReader
@@ -350,6 +351,7 @@ async def startup():
     InstallNomenclatureGroupsWeb()(app=app)
     InstallNomenclatureAttributesWeb()(app=app)
     InstallManufacturersWeb()(app=app)
+    InstallDocsSalesWeb()(app=app)
 
     init_db()
     await database.connect()
