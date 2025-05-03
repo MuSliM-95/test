@@ -113,9 +113,12 @@ class CreateDocsSalesView:
         settings_payload: list[dict | None] = []
 
         for idx, doc in enumerate(docs_sales_data.__root__):
-            raw = doc.settings.dict(exclude_unset=True) or {}
-            if raw.get("repeatability_value") is not None and raw.get("repeatability_period") is not None:
-                settings_payload.append(raw)
+            if doc.settings:
+                raw = doc.settings.dict(exclude_unset=True) or {}
+                if raw.get("repeatability_value") is not None and raw.get("repeatability_period") is not None:
+                    settings_payload.append(raw)
+                else:
+                    settings_payload.append(None)
             else:
                 settings_payload.append(None)
 
