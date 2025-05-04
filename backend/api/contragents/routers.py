@@ -56,6 +56,87 @@ async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQue
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
+async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCreate, List[ca_schemas.ContragentCreate]]):
+    """Создание контрагента"""
+    query = users_cboxes_relation.select(
+        users_cboxes_relation.c.token == token)
+    user = await database.fetch_one(query)
+    if user:
+        if user.status:
+            is_multi_create = type(ca_body) is list
+
+            ca_list = []
+            ca_body = ca_body if is_multi_create else [ca_body]
+            for ca in ca_body:
+                update_dict = ca.dict(exclude_unset=True)
+
+                phone_number = update_dict['phone']
+                phone_code = None
+                is_phone_formatted = False
+
+                if phone_number:
+                    try:
+                        phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+                        number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+                        phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                                  phonenumbers.PhoneNumberFormat.E164)
+                        phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                        is_phone_formatted = True
+                        if not phone_code:
+                            phone_number = update_dict['phone']
+                            is_phone_formatted = False
+                    except:
+                        try:
+                            number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                            phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                                      phonenumbers.PhoneNumberFormat.E164)
+                            phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                            is_phone_formatted = True
+                            if not phone_code:
+                                phone_number = update_dict['phone']
+                                is_phone_formatted = False
+                        except:
+                            phone_number = update_dict['phone']
+                            is_phone_formatted = False
+
+                    q = (
+                        contragents.select()
+                        .where(
+                            contragents.c.cashbox == user.cashbox_id, contragents.c.phone == phone_number
+                        )
+                    )
+                    contr = await database.fetch_one(q)
+                    if contr:
+                        continue
+
+                update_dict['phone'] = phone_number
+                update_dict['phone_code'] = phone_code
+                update_dict['is_phone_formatted'] = is_phone_formatted
+                update_dict['cashbox'] = user.cashbox_id
+                update_dict['is_deleted'] = False
+                update_dict['updated_at'] = int(datetime.utcnow().timestamp())
+                update_dict['created_at'] = int(datetime.utcnow().timestamp())
+
+                ca_list.append(update_dict)
+
+            if not ca_list:
+                return Response(status_code=204)
+
+            q = contragents.insert().values(ca_list).returning(
+                contragents.c.id, contragents.c.name,
+                contragents.c.inn, contragents.c.phone,
+                contragents.c.description, contragents.c.contragent_type,
+                contragents.c.birth_date, contragents.c.data
+            )
+            new_ca = await database.fetch_all(q)
+
+            for ca in new_ca:
+                await manager.send_message(token, {"action": "create", "target": "contragents", "result": dict(ca)})
+
+            return new_ca if is_multi_create else new_ca[0]
+
+    raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
+
 
 @router.get("/contragents/{id}/")
 async def get_contragent_by_id(token: str, id: int):
