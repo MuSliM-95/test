@@ -233,18 +233,21 @@ class CreateDocsSalesView:
                     wb_rows_dict[key] = wb_rows_dict.get(key, 0) + row["quantity"]
 
                 if card_id:
-                    nom = nomenclature_cache[int(g.nomenclature)]
                     share_rubles = paid_r / full_payment if full_payment else 0
-                    cb = 0.0
+                    nom = nomenclature_cache[int(g.nomenclature)]
                     if nom.cashback_type == NomenclatureCashbackType.no_cashback:
-                        cb = 0
+                        pass
                     elif nom.cashback_type == NomenclatureCashbackType.percent:
-                        cb = g.price * g.quantity * (nom.cashback_value or 0) / 100
+                        current_percent = g.price * g.quantity * (nom.cashback_value / 100)
+                        cashback_sum += share_rubles * current_percent
                     elif nom.cashback_type == NomenclatureCashbackType.const:
-                        cb = g.quantity * (nom.cashback_value or 0)
+                        cashback_sum += g.quantity * nom.cashback_value
                     elif nom.cashback_type == NomenclatureCashbackType.lcard_cashback:
-                        cb = g.price * g.quantity * (card_info[card_id]["percent"] or 0) / 100
-                    cashback_sum += share_rubles * cb
+                        current_percent = g.price * g.quantity * ((card_info[card_id]["percent"] or 0) / 100)
+                        cashback_sum += share_rubles * current_percent
+                    else:
+                        current_percent = g.price * g.quantity * ((card_info[card_id]["percent"] or 0) / 100)
+                        cashback_sum += share_rubles * current_percent
 
             if paid_r:
                 payments_rows.append({
@@ -395,7 +398,11 @@ class CreateDocsSalesView:
                     "status": True,
                     "delinked": False,
                 })
-            await database.execute_many(entity_to_entity.insert(), e2e_to_insert)
+            query = (
+                entity_to_entity.insert()
+                .values(e2e_to_insert)
+            )
+            await database.execute(query)
 
         if wb_rows_dict:
             conditions = [
