@@ -60,10 +60,11 @@ class CreateDocsSalesView:
         await self._validate_fk(price_types, fks["price"], "price_types")
         await self._validate_fk(units, fks["unit"], "units")
 
-        org_date_pairs = {(d.organization, d.dated) for d in docs_sales_data.__root__}
-        if org_date_pairs:
-            conds = [and_(fifo_settings.c.organization_id == org, fifo_settings.c.blocked_date >= date)
-                     for org, date in org_date_pairs]
+        conds = []
+        for d in docs_sales_data.__root__:
+            if d.dated is not None:
+                conds.append(and_(fifo_settings.c.organization_id == d.organization, fifo_settings.c.blocked_date >= d.dated))
+        if conds:
             blocked = await database.fetch_all(
                 select(fifo_settings.c.organization_id, fifo_settings.c.blocked_date).where(or_(*conds)))
             if blocked:
