@@ -11,7 +11,8 @@ from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
 from database.db import database, contragents, contracts, organizations, warehouses, users_cboxes_relation, \
     nomenclature, price_types, units, articles, pboxes, fifo_settings, docs_sales, loyality_cards, docs_sales_goods, \
-    docs_sales_tags, payments, loyality_transactions, entity_to_entity, warehouse_balances, docs_sales_settings
+    docs_sales_tags, payments, loyality_transactions, entity_to_entity, warehouse_balances, docs_sales_settings, \
+    NomenclatureCashbackType
 from functions.helpers import get_user_by_token, datetime_to_timestamp
 from functions.users import raschet
 from ws_manager import manager
@@ -28,7 +29,6 @@ class CreateDocsSalesView:
         user = await get_user_by_token(token)
 
         fks = defaultdict(set)
-        org_date_pairs: List[Tuple[int, int]] = []
         nomenclature_ids = set()
         card_info: dict[int, dict[str, Any]] = {}
 
@@ -60,6 +60,7 @@ class CreateDocsSalesView:
         await self._validate_fk(price_types, fks["price"], "price_types")
         await self._validate_fk(units, fks["unit"], "units")
 
+        org_date_pairs = {(d.organization, d.dated) for d in docs_sales_data.__root__}
         if org_date_pairs:
             conds = [and_(fifo_settings.c.organization_id == org, fifo_settings.c.blocked_date >= date)
                      for org, date in org_date_pairs]
@@ -103,7 +104,18 @@ class CreateDocsSalesView:
             )
             card_info = {r.id: {"number": r.card_number, "balance": r.balance} for r in rows}
 
+        nom_rows = await database.fetch_all(
+            select(
+                nomenclature.c.id,
+                nomenclature.c.cashback_type,
+                nomenclature.c.cashback_value,
+                nomenclature.c.type,
+            ).where(nomenclature.c.id.in_(nomenclature_ids))
+        )
+        nomenclature_cache = {r.id: r for r in nom_rows}
+
         card_withdraw_total: dict[int, float] = defaultdict(float)
+        card_accrual_total: dict[int, float] = defaultdict(float)
 
         docs_rows, goods_rows, tags_rows = [], [], []
         payments_rows, lt_rows, e2e_rows = [], [], []
@@ -193,10 +205,12 @@ class CreateDocsSalesView:
             card_id = doc_in.loyality_card_id
             tags = doc_in.tags or ""
 
+            full_payment = paid_r + paid_lt
+
             if tags:
                 tags_rows.extend({"docs_sales_id": doc_id, "name": t.strip()} for t in tags.split(",") if t.strip())
 
-            total = 0.0
+            total, cashback_sum = 0.0, 0.0
 
             for g in goods:
                 row = {
@@ -217,6 +231,20 @@ class CreateDocsSalesView:
                 if wh_id:
                     key = (wh_id, row["nomenclature"], org_id)
                     wb_rows_dict[key] = wb_rows_dict.get(key, 0) + row["quantity"]
+
+                if card_id:
+                    nom = nomenclature_cache[int(g.nomenclature)]
+                    share_rubles = paid_r / full_payment if full_payment else 0
+                    cb = 0.0
+                    if nom.cashback_type == NomenclatureCashbackType.no_cashback:
+                        cb = 0
+                    elif nom.cashback_type == NomenclatureCashbackType.percent:
+                        cb = g.price * g.quantity * (nom.cashback_value or 0) / 100
+                    elif nom.cashback_type == NomenclatureCashbackType.const:
+                        cb = g.quantity * (nom.cashback_value or 0)
+                    elif nom.cashback_type == NomenclatureCashbackType.lcard_cashback:
+                        cb = g.price * g.quantity * (card_info[card_id]["percent"] or 0) / 100
+                    cashback_sum += share_rubles * cb
 
             if paid_r:
                 payments_rows.append({
@@ -261,6 +289,26 @@ class CreateDocsSalesView:
                 })
                 e2e_rows.append(("l", doc_id))
                 card_withdraw_total[card_id] += paid_lt
+
+            if card_id and cashback_sum > 0:
+                lt_rows.append(
+                    {
+                        "loyality_card_id": card_id,
+                        "loyality_card_number": card_info[card_id]["number"],
+                        "type": "accrual",
+                        "name": f"Кэшбэк по документу {created.number}",
+                        "amount": round(cashback_sum, 2),
+                        "created_by_id": user.id,
+                        "card_balance": card_info[card_id]["balance"],
+                        "dated": datetime.utcnow(),
+                        "cashbox": user.cashbox_id,
+                        "tags": tags,
+                        "status": True,
+                        "is_deleted": False,
+                    }
+                )
+                e2e_rows.append(("l", doc_id))
+                card_accrual_total[card_id] += round(cashback_sum, 2)
 
             if generate_out and wh_id:
                 out_docs.append((
@@ -310,6 +358,7 @@ class CreateDocsSalesView:
             payment_ids = [row.id for row in inserted_pmt]
             payment_ids_map = dict(zip([i for i, t in enumerate(e2e_rows) if t[0] == "p"], payment_ids))
 
+        lt_ids_map = {}
         if lt_rows:
             inserted_lt = await database.fetch_all(
                 loyality_transactions.insert()
@@ -400,7 +449,7 @@ class CreateDocsSalesView:
 
         asyncio.create_task(raschet(user, token))
 
-        for card_id in card_withdraw_total:
+        for card_id in set(list(card_withdraw_total) + list(card_accrual_total)):
             asyncio.create_task(raschet_bonuses(card_id))
 
         rows = await database.fetch_all(
