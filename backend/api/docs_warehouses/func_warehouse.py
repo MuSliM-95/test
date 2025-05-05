@@ -311,13 +311,13 @@ async def transfer(entity_values, token):
         raise HTTPException(status_code=433, detail=str(error))
 
 
-def call_type_movement(t, **kwargs):
+async def call_type_movement(t, **kwargs):
     getMethod = {
         'incoming': incoming,
         'outgoing': outgoing,
         'transfer': transfer
     }
     if t in getMethod:
-        return getMethod[t](**kwargs)
+        return await getMethod[t](**kwargs)
     else:
         raise HTTPException(status_code=422, detail=f"error method [{t}] does not exist")
