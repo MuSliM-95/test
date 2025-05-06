@@ -103,7 +103,11 @@ class CreateDocsSalesView:
                     loyality_cards.c.balance,
                 ).where(loyality_cards.c.id.in_(fks["loyality_cards"]))
             )
-            card_info = {r.id: {"number": r.card_number, "balance": r.balance} for r in rows}
+            card_info = {r.id: {
+                "number": r.card_number,
+                "balance": r.balance,
+                "percent": r.cashback_percent or 0,
+            } for r in rows}
 
         nom_rows = await database.fetch_all(
             select(
