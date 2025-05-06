@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from starlette import status
 
 from api.docs_sales.web.views.CreateDocsSalesView import CreateDocsSalesView
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.utils.ioc.ioc import ioc
 
 
 class InstallDocsSalesWeb:
@@ -10,7 +12,9 @@ class InstallDocsSalesWeb:
         self,
         app: FastAPI
     ):
-        create_docs_sales_view = CreateDocsSalesView()
+        create_docs_sales_view = CreateDocsSalesView(
+            rabbitmq_messaging_factory=ioc.get(IRabbitFactory)
+        )
 
         app.add_api_route(
             path="/docs_sales/",
