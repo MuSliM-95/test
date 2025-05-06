@@ -318,6 +318,6 @@ async def call_type_movement(t, **kwargs):
         'transfer': transfer
     }
     if t in getMethod:
-        return await getMethod[t](**kwargs)
+        return getMethod[t](**kwargs)
     else:
         raise HTTPException(status_code=422, detail=f"error method [{t}] does not exist")
