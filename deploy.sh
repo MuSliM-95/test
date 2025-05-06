@@ -151,11 +151,11 @@ deploy_new_bot_version() {
 }
 
 deploy_another_services() {
-  docker stop "repeat_worker"
-  docker rm "repeat_worker"
+  docker stop "worker"
+  docker rm "worker"
 
   docker run -d \
-    --name "repeat_worker" \
+    --name "worker" \
     --restart always \
     --network infrastructure \
     -e RABBITMQ_HOST=$RABBITMQ_HOST \
@@ -178,36 +178,7 @@ deploy_another_services() {
     -e ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL \
     -e ADMIN_ID=$ADMIN_ID \
     $IMAGE_NAME \
-    /bin/bash -c "python3 run_repeat_worker.py"
-
-  docker stop "post_amo_lead_worker"
-  docker rm "post_amo_lead_worker"
-
-  docker run -d \
-    --name "post_amo_lead_worker" \
-    --restart always \
-    --network infrastructure \
-    -e RABBITMQ_HOST=$RABBITMQ_HOST \
-    -e RABBITMQ_PORT=$RABBITMQ_PORT \
-    -e RABBITMQ_USER=$RABBITMQ_USER \
-    -e RABBITMQ_PASS=$RABBITMQ_PASS \
-    -e RABBITMQ_VHOST=$RABBITMQ_VHOST \
-    -e APP_URL=$APP_URL \
-    -e S3_ACCESS=$S3_ACCESS \
-    -e S3_SECRET=$S3_SECRET \
-    -e S3_URL=$S3_URL \
-    -e S3_BACKUPS_ACCESSKEY=$S3_BACKUPS_ACCESSKEY \
-    -e S3_BACKUPS_SECRETKEY=$S3_BACKUPS_SECRETKEY \
-    -e TG_TOKEN=$TG_TOKEN \
-    -e POSTGRES_USER=$POSTGRES_USER \
-    -e POSTGRES_PASS=$POSTGRES_PASS \
-    -e POSTGRES_HOST=$POSTGRES_HOST \
-    -e POSTGRES_PORT=$POSTGRES_PORT \
-    -e CHEQUES_TOKEN=$CHEQUES_TOKEN \
-    -e ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL \
-    -e ADMIN_ID=$ADMIN_ID \
-    $IMAGE_NAME \
-    /bin/bash -c "python3 run_amo_post_worker.py"
+    /bin/bash -c "python3 worker.py"
 
   docker stop "backend_jobs"
   docker rm "backend_jobs"

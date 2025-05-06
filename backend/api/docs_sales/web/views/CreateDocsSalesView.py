@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from collections import defaultdict
 from datetime import datetime
 from typing import Set, List, Tuple, Any
@@ -7,8 +8,12 @@ from fastapi import HTTPException
 from sqlalchemy import select, and_, or_, desc, tuple_, func, bindparam
 
 from api.docs_sales import schemas
+from api.docs_sales.messages.RecalculateFinancialsMessageModel import RecalculateFinancialsMessageModel
+from api.docs_sales.messages.RecalculateLoyaltyPointsMessageModel import RecalculateLoyaltyPointsMessageModel
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import database, contragents, contracts, organizations, warehouses, users_cboxes_relation, \
     nomenclature, price_types, units, articles, pboxes, fifo_settings, docs_sales, loyality_cards, docs_sales_goods, \
     docs_sales_tags, payments, loyality_transactions, entity_to_entity, warehouse_balances, docs_sales_settings, \
@@ -20,12 +25,20 @@ from ws_manager import manager
 
 class CreateDocsSalesView:
 
+    def __init__(
+        self,
+        rabbitmq_messaging_factory: IRabbitFactory
+    ):
+        self.__rabbitmq_messaging_factory = rabbitmq_messaging_factory
+
     async def __call__(
         self,
         token: str,
         docs_sales_data: schemas.CreateMass,
         generate_out: bool = True
     ):
+        rabbitmq_messaging: IRabbitMessaging = await self.__rabbitmq_messaging_factory()
+
         user = await get_user_by_token(token)
 
         fks = defaultdict(set)
@@ -378,16 +391,16 @@ class CreateDocsSalesView:
                 [r.id for r in inserted_lt],
             ))
 
-            if card_withdraw_total:
-                query_update_cards = """
-                    UPDATE loyality_cards
-                    SET balance = balance - :amount
-                    WHERE id = :id
-                """
-                await database.execute_many(
-                    query=query_update_cards,
-                    values=[{"id": cid, "amount": amt} for cid, amt in card_withdraw_total.items()],
-                )
+            # if card_withdraw_total:
+            #     query_update_cards = """
+            #         UPDATE loyality_cards
+            #         SET balance = balance - :amount
+            #         WHERE id = :id
+            #     """
+            #     await database.execute_many(
+            #         query=query_update_cards,
+            #         values=[{"id": cid, "amount": amt} for cid, amt in card_withdraw_total.items()],
+            #     )
 
         if e2e_rows:
             e2e_to_insert = []
@@ -459,10 +472,22 @@ class CreateDocsSalesView:
         for payload, goods in out_docs:
             asyncio.create_task(create_warehouse_docs(token, {**payload, "goods": goods}, user.cashbox_id))
 
-        asyncio.create_task(raschet(user, token))
+        await rabbitmq_messaging.publish(
+            RecalculateFinancialsMessageModel(
+                message_id=uuid.uuid4(),
+                cashbox_id=user.cashbox_id,
+                token=token,
+            ),
+            routing_key="recalculate.financials"
+        )
 
-        for card_id in set(list(card_withdraw_total) + list(card_accrual_total)):
-            asyncio.create_task(raschet_bonuses(card_id))
+        await rabbitmq_messaging.publish(
+            RecalculateLoyaltyPointsMessageModel(
+                message_id=uuid.uuid4(),
+                loyalty_card_ids=list(set(list(card_withdraw_total) + list(card_accrual_total)))
+            ),
+            routing_key="recalculate.loyalty_points"
+        )
 
         rows = await database.fetch_all(
             select(docs_sales).where(docs_sales.c.id.in_([r.id for r in inserted_docs]))

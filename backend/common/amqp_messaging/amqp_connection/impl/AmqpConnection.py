@@ -33,6 +33,6 @@ class AmqpConnection:
         if not self.__connection:
             raise Exception("You are not connected to AMQP. Use install().")
 
-        channel = await self.__connection.channel(channel_number=len(self._channels) + 1)
+        channel = await self.__connection.channel()
         self._channels[len(self._channels) + 1] = channel
         return channel

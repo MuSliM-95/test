@@ -2,8 +2,8 @@ from typing import Dict
 
 from aio_pika.abc import AbstractRobustChannel
 
-from common.amqp_messaging.amqp_connection.impl.AmqpConnection import AmqpConnection
-from common.amqp_messaging.amqp_channels.core.IRabbitChannel import IRabbitChannel
+from ...amqp_connection.impl.AmqpConnection import AmqpConnection
+from ...amqp_channels.core.IRabbitChannel import IRabbitChannel
 
 
 class RabbitChannel(IRabbitChannel):
