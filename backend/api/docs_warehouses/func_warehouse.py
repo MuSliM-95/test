@@ -61,9 +61,9 @@ async def set_data_doc_warehouse(**kwargs):
     users_cboxes = await database.fetch_one(
         users_cboxes_relation.select().where(users_cboxes_relation.c.token == kwargs.get('token'))
     )
-    check = await check_relationship(kwargs.get('entity_values'))
+    # check = await check_relationship(kwargs.get('entity_values'))
 
-    entity = check.get('entity')
+    entity = kwargs.get('entity_values')
 
     if entity['status'] is None:
         entity['status'] = False
@@ -75,7 +75,6 @@ async def set_data_doc_warehouse(**kwargs):
     return entity
 
 
-@database.transaction()
 async def insert_docs_warehouse(entity):
     try:
         del entity["goods"]
@@ -207,7 +206,6 @@ async def check_exist_amount(goods, warehouse):
             raise Exception(f"there is not enough balance to outgoing good = {good}")
 
 
-@database.transaction()
 async def insert_goods(entity, doc_id, type_operation, not_create_goods: bool = False):
     try:
         items_sum = 0
@@ -265,7 +263,6 @@ async def incoming(entity_values, token) -> int:
         raise HTTPException(status_code=433, detail=str(error))
 
 
-@database.transaction()
 async def outgoing(entity_values, token):
     """
     подготавливаем словарь для doc_warehouse
@@ -318,6 +315,6 @@ async def call_type_movement(t, **kwargs):
         'transfer': transfer
     }
     if t in getMethod:
-        return getMethod[t](**kwargs)
+        return await getMethod[t](**kwargs)
     else:
         raise HTTPException(status_code=422, detail=f"error method [{t}] does not exist")
