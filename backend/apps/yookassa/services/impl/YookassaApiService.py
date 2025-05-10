@@ -101,11 +101,11 @@ class YookassaApiService(IYookassaApiService):
 
             """ отправка в очередь """
             rabbit_factory = RabbitFactory(settings = RabbitMqSettings(
-                rabbitmq_host = os.getenv('RABBITMQ_HOST'),
-                rabbitmq_user = os.getenv('RABBITMQ_USER'),
-                rabbitmq_pass = os.getenv('RABBITMQ_PASS'),
-                rabbitmq_port = os.getenv('RABBITMQ_PORT'),
-                rabbitmq_vhost = os.getenv('RABBITMQ_VHOST')
+                rabbitmq_host = os.getenv('RABBITMQ_HOST_AMO_INTEGRATION'),
+                rabbitmq_user = os.getenv('RABBITMQ_USER_AMO_INTEGRATION'),
+                rabbitmq_pass = os.getenv('RABBITMQ_PASS_AMO_INTEGRATION'),
+                rabbitmq_port = os.getenv('RABBITMQ_PORT_AMO_INTEGRATION'),
+                rabbitmq_vhost = os.getenv('RABBITMQ_VHOST_AMO_INTEGRATION')
             ))
             factory = await rabbit_factory()
             amqp_messaging = await factory()
