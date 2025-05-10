@@ -8,10 +8,10 @@ from fastapi import HTTPException
 from sqlalchemy import select, and_, or_, desc, func
 
 from api.docs_sales import schemas
-from api.docs_sales.events.financials.messages.RecalculateFinancialsMessageModel import \
-    RecalculateFinancialsMessageModel
-from api.docs_sales.events.loyalty_points.messages.RecalculateLoyaltyPointsMessageModel import \
-    RecalculateLoyaltyPointsMessageModel
+# from api.docs_sales.events.financials.messages.RecalculateFinancialsMessageModel import \
+#     RecalculateFinancialsMessageModel
+# from api.docs_sales.events.loyalty_points.messages.RecalculateLoyaltyPointsMessageModel import \
+#     RecalculateLoyaltyPointsMessageModel
 
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
