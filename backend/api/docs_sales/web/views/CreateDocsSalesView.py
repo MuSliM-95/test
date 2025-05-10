@@ -2,14 +2,17 @@ import asyncio
 import uuid
 from collections import defaultdict
 from datetime import datetime
-from typing import Set, List, Tuple, Any
+from typing import Set, Any
 
 from fastapi import HTTPException
-from sqlalchemy import select, and_, or_, desc, tuple_, func, bindparam
+from sqlalchemy import select, and_, or_, desc, func
 
 from api.docs_sales import schemas
-from api.docs_sales.messages.RecalculateFinancialsMessageModel import RecalculateFinancialsMessageModel
-from api.docs_sales.messages.RecalculateLoyaltyPointsMessageModel import RecalculateLoyaltyPointsMessageModel
+from api.docs_sales.events.financials.messages.RecalculateFinancialsMessageModel import \
+    RecalculateFinancialsMessageModel
+from api.docs_sales.events.loyalty_points.messages.RecalculateLoyaltyPointsMessageModel import \
+    RecalculateLoyaltyPointsMessageModel
+
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
@@ -472,22 +475,26 @@ class CreateDocsSalesView:
         for payload, goods in out_docs:
             asyncio.create_task(create_warehouse_docs(token, {**payload, "goods": goods}, user.cashbox_id))
 
-        await rabbitmq_messaging.publish(
-            RecalculateFinancialsMessageModel(
-                message_id=uuid.uuid4(),
-                cashbox_id=user.cashbox_id,
-                token=token,
-            ),
-            routing_key="recalculate.financials"
-        )
+        asyncio.create_task(raschet(user, token))
+        for card_id in set(list(card_withdraw_total) + list(card_accrual_total)):
+            asyncio.create_task(raschet_bonuses(card_id))
 
-        await rabbitmq_messaging.publish(
-            RecalculateLoyaltyPointsMessageModel(
-                message_id=uuid.uuid4(),
-                loyalty_card_ids=list(set(list(card_withdraw_total) + list(card_accrual_total)))
-            ),
-            routing_key="recalculate.loyalty_points"
-        )
+        # await rabbitmq_messaging.publish(
+        #     RecalculateFinancialsMessageModel(
+        #         message_id=uuid.uuid4(),
+        #         cashbox_id=user.cashbox_id,
+        #         token=token,
+        #     ),
+        #     routing_key="recalculate.financials"
+        # )
+        #
+        # await rabbitmq_messaging.publish(
+        #     RecalculateLoyaltyPointsMessageModel(
+        #         message_id=uuid.uuid4(),
+        #         loyalty_card_ids=list(set(list(card_withdraw_total) + list(card_accrual_total)))
+        #     ),
+        #     routing_key="recalculate.loyalty_points"
+        # )
 
         rows = await database.fetch_all(
             select(docs_sales).where(docs_sales.c.id.in_([r.id for r in inserted_docs]))
