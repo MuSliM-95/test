@@ -6,7 +6,7 @@ from starlette import status
 import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
-    warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value
+    warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body
 
@@ -255,12 +255,14 @@ async def get_nomenclature(
         select(
             nomenclature,
             nomenclature_groups_value.c.group_id,
+            nomenclature_groups.c.name.label('group_name'),
             nomenclature_groups_value.c.is_main,
             units.c.convent_national_view.label("unit_name"),
             func.array_remove(func.array_agg(func.distinct(nomenclature_barcodes.c.code)), None).label("barcodes")
         )
         .select_from(nomenclature)
         .outerjoin(nomenclature_groups_value, nomenclature_groups_value.c.nomenclature_id == nomenclature.c.id)
+        .outerjoin(nomenclature_groups, nomenclature_groups_value.c.group_id == nomenclature_groups.c.id)
         .join(units, units.c.id == nomenclature.c.unit, full=True)
         .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, full=True)
     )
@@ -314,7 +316,8 @@ async def get_nomenclature(
         nomenclature.c.id,
         units.c.convent_national_view,
         nomenclature_groups_value.c.group_id,
-        nomenclature_groups_value.c.is_main
+        nomenclature_groups_value.c.is_main,
+        nomenclature_groups.c.name
     ).order_by(order_by_condition)
     nomenclature_db = await database.fetch_all(query)
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
