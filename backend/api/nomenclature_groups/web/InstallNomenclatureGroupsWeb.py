@@ -155,7 +155,7 @@ class InstallNomenclatureGroupsWeb:
         )
 
         app.add_api_route(
-            path="/nomenclature/group/attr",
+            path="/nomenclature/group/{group_id}/attr",
             endpoint=get_nom_with_attr_from_groups_view.__call__,
             methods=["GET"],
             status_code=status.HTTP_200_OK,
