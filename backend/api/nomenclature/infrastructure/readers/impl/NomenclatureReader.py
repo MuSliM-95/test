@@ -1,7 +1,8 @@
 from sqlalchemy import select, func
 
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
-from database.db import nomenclature, database, prices, price_types, units
+from database.db import nomenclature, database, prices, price_types, units, nomenclature_groups_value, \
+    nomenclature_groups
 
 
 class NomenclatureReader(INomenclatureReader):
@@ -24,11 +25,16 @@ class NomenclatureReader(INomenclatureReader):
         query = (
             select(
                 nomenclature,
-                units.c.name.label("unit_name")
+                units.c.name.label("unit_name"),
+                nomenclature_groups_value.c.group_id,
+                nomenclature_groups.c.name.label('group_name'),
+                nomenclature_groups_value.c.is_main,
             )
             .select_from(
                 nomenclature
                 .outerjoin(units, units.c.id == nomenclature.c.unit)
+                .outerjoin(nomenclature_groups_value, nomenclature_groups_value.c.nomenclature_id == nomenclature.c.id)
+                .outerjoin(nomenclature_groups, nomenclature_groups_value.c.group_id == nomenclature_groups.c.id)
             )
             .where(
                 nomenclature.c.id == id,
