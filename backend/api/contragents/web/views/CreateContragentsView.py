@@ -59,7 +59,10 @@ class CreateContragentsView:
                         is_phone_formatted = False
 
             if phone_number in phones_seen:
-                raise HTTPException(status_code=400, detail="Phone number already in use")
+                raise HTTPException(status_code=400, detail={
+                    "message": "Phone number already in use",
+                    "phones": [phone_number]
+                })
 
             phones_seen.add(phone_number)
 
@@ -101,7 +104,10 @@ class CreateContragentsView:
         duplicated_contragent_phones = [p for p in insert_values if p["phone"] in existing_phones]
 
         if duplicated_contragent_phones:
-            raise HTTPException(status_code=400, detail="Phone number already in use")
+            raise HTTPException(status_code=400, detail={
+                "message": "Phone number already in use",
+                "phones": [p["phone"] for p in insert_values]
+            })
         query = (
             contragents.insert()
             .values(insert_values)
