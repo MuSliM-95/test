@@ -225,9 +225,9 @@ def get_filters_cards(table, filters):
     if filters_dict.get("start_period_to"):
         and_conditions.append(table.c.start_period <= datetime.fromtimestamp(filters_dict.get("start_period_to")))
     if filters_dict.get("end_period_from"):
-        and_conditions.append(table.c.start_period >= datetime.fromtimestamp(filters_dict.get("end_period_from")))
+        and_conditions.append(table.c.end_period >= datetime.fromtimestamp(filters_dict.get("end_period_from")))
     if filters_dict.get("end_period_to"):
-        and_conditions.append(table.c.start_period <= datetime.fromtimestamp(filters_dict.get("end_period_to")))
+        and_conditions.append(table.c.end_period <= datetime.fromtimestamp(filters_dict.get("end_period_to")))
     if filters_dict.get("created_at_from"):
         and_conditions.append(table.c.created_at >= datetime.fromtimestamp(filters_dict.get("created_at_from")))
     if filters_dict.get("created_at_to"):
