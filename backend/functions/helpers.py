@@ -219,32 +219,24 @@ def get_filters_cards(table, filters):
     filters_list = []
     filters_dict = filters.dict()
 
-    def _periods_filter(period_type):
-        datefrom = filters_dict.get(f"{period_type}_from")
-        dateto = filters_dict.get(f"{period_type}_to")
-
-        if datefrom and not dateto:
-            if period_type == "start_period":
-                filters_list.append(table.c.start_period >= datetime.fromtimestamp(datefrom))
-            else:
-                filters_list.append(table.c.end_period >= datetime.fromtimestamp(datefrom))
-
-        if not datefrom and dateto:
-            if period_type == "start_period":
-                filters_list.append(table.c.start_period <= datetime.fromtimestamp(dateto))
-            else:
-                filters_list.append(table.c.end_period <= datetime.fromtimestamp(dateto))
-
-        if datefrom and dateto:
-            if period_type == "start_period":
-                filters_list.append(and_(table.c.start_period >= datetime.fromtimestamp(datefrom),
-                                         table.c.start_period <= datetime.fromtimestamp(dateto)))
-            else:
-                filters_list.append(and_(table.c.end_period >= datetime.fromtimestamp(datefrom),
-                                         table.c.end_period <= datetime.fromtimestamp(dateto)))
-
-    _periods_filter("start_period")
-    _periods_filter("end_period")
+    and_conditions = []
+    if filters_dict.get("start_period_from"):
+        and_conditions.append(table.c.start_period >= datetime.fromtimestamp(filters_dict.get("start_period_from")))
+    if filters_dict.get("start_period_to"):
+        and_conditions.append(table.c.start_period <= datetime.fromtimestamp(filters_dict.get("start_period_to")))
+    if filters_dict.get("end_period_from"):
+        and_conditions.append(table.c.start_period >= datetime.fromtimestamp(filters_dict.get("end_period_from")))
+    if filters_dict.get("end_period_to"):
+        and_conditions.append(table.c.start_period <= datetime.fromtimestamp(filters_dict.get("end_period_to")))
+    if filters_dict.get("created_at_from"):
+        and_conditions.append(table.c.created_at >= datetime.fromtimestamp(filters_dict.get("created_at_from")))
+    if filters_dict.get("created_at_to"):
+        and_conditions.append(table.c.created_at <= datetime.fromtimestamp(filters_dict.get("created_at_to")))
+    if filters_dict.get("updated_at_from"):
+        and_conditions.append(table.c.updated_at >= datetime.fromtimestamp(filters_dict.get("updated_at_from")))
+    if filters_dict.get("updated_at_to"):
+        and_conditions.append(table.c.updated_at <= datetime.fromtimestamp(filters_dict.get("updated_at_to")))
+    filters_list.append(and_(*and_conditions))
 
     for filter, value in filters_dict.items():
         if filter == "card_number":
