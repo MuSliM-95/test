@@ -40,6 +40,7 @@ async def get_cards(
     int = 100,
     offset: int = 0,
     order_created_at: Optional[SortOrder] = Query(None, alias="order[created_at]"),
+    order_updated_at: Optional[SortOrder] = Query(None, alias="order[updated_at]"),
     filters_q: schemas.LoyalityCardFilters = Depends()
 ):
     """Получение списка карт"""
@@ -107,8 +108,6 @@ async def get_cards(
                 loyality_cards.c.is_deleted.is_not(True)
             )
             .filter(*filters)
-            .limit(limit)
-            .offset(offset)
         )
     else:
         query = (
@@ -117,8 +116,6 @@ async def get_cards(
                 loyality_cards.c.cashbox_id == user.cashbox_id,
                 loyality_cards.c.is_deleted.is_not(True)
             )
-            .limit(limit)
-            .offset(offset)
         )
 
     order_by_condition = desc(loyality_cards.c.id)
@@ -127,8 +124,13 @@ async def get_cards(
             order_by_condition = asc(loyality_cards.c.created_at)
         elif order_created_at == SortOrder.DESC:
             order_by_condition = desc(loyality_cards.c.created_at)
+    elif order_updated_at:
+        if order_updated_at == SortOrder.ASC:
+            order_by_condition = asc(loyality_cards.c.updated_at)
+        elif order_updated_at == SortOrder.DESC:
+            order_by_condition = desc(loyality_cards.c.updated_at)
 
-    query = query.order_by(order_by_condition)
+    query = query.order_by(order_by_condition).limit(limit).offset(offset)
 
     loyality_cards_db = await database.fetch_all(query)
     loyality_cards_db = [*map(datetime_to_timestamp, loyality_cards_db)]
