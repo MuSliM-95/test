@@ -106,7 +106,7 @@ class CreateContragentsView:
         if duplicated_contragent_phones:
             raise HTTPException(status_code=400, detail={
                 "message": "Phone number already in use",
-                "phones": [p["phone"] for p in insert_values]
+                "phones": [p["phone"] for p in duplicated_contragent_phones]
             })
         query = (
             contragents.insert()
