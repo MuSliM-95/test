@@ -145,25 +145,29 @@ class CreateDocsSalesView:
 
         settings_payload: list[dict | None] = []
 
-        max_numbers_rows = await database.fetch_all(
+        subq = (
             select(
                 docs_sales.c.organization,
-                func.max(cast(docs_sales.c.number, Integer)).label("max_num"),
+                docs_sales.c.number,
+                func.row_number()
+                .over(partition_by=docs_sales.c.organization,
+                      order_by=docs_sales.c.id.desc())
+                .label("rn")
             )
             .where(
                 docs_sales.c.organization.in_(fks["org"]),
                 docs_sales.c.is_deleted.is_(False),
             )
-            .group_by(docs_sales.c.organization)
+        ).subquery()
+
+        last_number_rows = await database.fetch_all(
+            select(subq.c.organization, subq.c.number)
+            .where(subq.c.rn == 1)
         )
 
-        max_number_by_org: dict[int, int] = {
-            r.organization: (r.max_num or 0) for r in max_numbers_rows
+        last_number_by_org: dict[int, str] = {
+            r.organization: (r.number or "") for r in last_number_rows
         }
-
-        next_number_by_org: defaultdict[int, int] = defaultdict(
-            int, {org: num + 1 for org, num in max_number_by_org.items()}
-        )
 
         for idx, doc in enumerate(docs_sales_data.__root__):
             if doc.settings:
@@ -175,14 +179,21 @@ class CreateDocsSalesView:
             else:
                 settings_payload.append(None)
 
-            if not doc.number:
-                number = str(next_number_by_org[doc.organization] or 1)
-                next_number_by_org[doc.organization] += 1
+            if doc.number:
+                number_str = doc.number
             else:
-                number = doc.number
+                last_raw = last_number_by_org.get(doc.organization, "")
+                trimmed = (last_raw or "").strip()
+
+                if trimmed.isdigit():
+                    number_str = str(int(trimmed) + 1)
+                else:
+                    number_str = "1"
+
+                last_number_by_org[doc.organization] = number_str
 
             doc_dict = {
-                "number": number,
+                "number": number_str,
                 "dated": doc.dated,
                 "sum": 0.0,
                 "contragent": doc.contragent,
