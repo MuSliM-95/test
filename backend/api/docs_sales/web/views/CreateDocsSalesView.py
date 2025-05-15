@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Set, Any
 
 from fastapi import HTTPException
-from sqlalchemy import select, and_, or_, desc, func
+from sqlalchemy import select, and_, or_, desc, func, cast, Integer
 
 from api.docs_sales import schemas
 # from api.docs_sales.events.financials.messages.RecalculateFinancialsMessageModel import \
@@ -145,6 +145,26 @@ class CreateDocsSalesView:
 
         settings_payload: list[dict | None] = []
 
+        max_numbers_rows = await database.fetch_all(
+            select(
+                docs_sales.c.organization,
+                func.max(cast(docs_sales.c.number, Integer)).label("max_num"),
+            )
+            .where(
+                docs_sales.c.organization.in_(fks["org"]),
+                docs_sales.c.is_deleted.is_(False),
+            )
+            .group_by(docs_sales.c.organization)
+        )
+
+        max_number_by_org: dict[int, int] = {
+            r.organization: (r.max_num or 0) for r in max_numbers_rows
+        }
+
+        next_number_by_org: defaultdict[int, int] = defaultdict(
+            int, {org: num + 1 for org, num in max_number_by_org.items()}
+        )
+
         for idx, doc in enumerate(docs_sales_data.__root__):
             if doc.settings:
                 raw = doc.settings.dict(exclude_unset=True) or {}
@@ -155,23 +175,15 @@ class CreateDocsSalesView:
             else:
                 settings_payload.append(None)
 
-            number = doc.number
-            if not number:
-                last = await database.fetch_val(
-                    select(docs_sales.c.number)
-                    .where(
-                        docs_sales.c.organization == doc.organization,
-                        docs_sales.c.is_deleted.is_(False),
-                    )
-                    .order_by(desc(docs_sales.c.id)).limit(1), column=0,
-                )
-                try:
-                    number = str(int(last) + 1) if last else "1"
-                except Exception:
-                    number = "1"
+            if not doc.number:
+                number = str(next_number_by_org[doc.organization] or 1)
+                next_number_by_org[doc.organization] += 1
+            else:
+                number = doc.number
 
             doc_dict = {
-                "number": number, "dated": doc.dated,
+                "number": number,
+                "dated": doc.dated,
                 "sum": 0.0,
                 "contragent": doc.contragent,
                 "contract": doc.contract,
