@@ -155,7 +155,7 @@ class CreateDocsSalesView:
                 .label("rn")
             )
             .where(
-                docs_sales.c.organization.in_(org_ids),
+                docs_sales.c.organization.in_(fks["org"]),
                 docs_sales.c.is_deleted.is_(False),
             )
         ).subquery()
