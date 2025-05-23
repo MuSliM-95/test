@@ -63,11 +63,20 @@ def get_filters(table, filters):
                 )
         elif filter == "paybox":
             if value:
-                filters_list.append(
-                    (
-                        f"payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox)"
+                is_include_paybox_dest = str(filters_dict.get("include_paybox_dest", "")).lower() == "true"
+                if is_include_paybox_dest:
+                    filters_list.append(
+                        (
+                            f"(payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox) OR "
+                            f"payments.paybox_to IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox))"
+                        )
                     )
-                )
+                else:
+                    filters_list.append(
+                        (
+                            f"payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox)"
+                        )
+                    )
         elif filter == "paybox_to":
             if value:
                 filters_list.append(
@@ -105,7 +114,7 @@ def get_filters(table, filters):
 
     if filters_dict["dateto"]:
         dateto = pytz.utc.localize(
-            datetime.strptime(filters_dict["dateto"], "%d-%m-%Y")
+            datetime.strptime(filters_dict["dateto"], "%d-%m-%Y").replace(hour=23, minute=59, second=59)
         ).timestamp()
 
     if datefrom and not dateto:
