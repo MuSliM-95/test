@@ -106,16 +106,28 @@ def get_filters(table, filters):
 
     datefrom = None
     dateto = None
+    
+    timezone_str = filters_dict.get("timezone", "UTC")
+    try:
+        timezone = pytz.timezone(timezone_str)
+    except pytz.exceptions.UnknownTimeZoneError:
+        timezone = pytz.UTC
 
     if filters_dict["datefrom"]:
-        datefrom = pytz.utc.localize(
-            datetime.strptime(filters_dict["datefrom"], "%d-%m-%Y")
-        ).timestamp()
+        try:
+            date_obj = datetime.strptime(filters_dict["datefrom"], "%d-%m-%Y")
+            date_obj = timezone.localize(date_obj)
+            datefrom = date_obj.astimezone(pytz.UTC).timestamp()
+        except (ValueError, TypeError):
+            datefrom = None
 
     if filters_dict["dateto"]:
-        dateto = pytz.utc.localize(
-            datetime.strptime(filters_dict["dateto"], "%d-%m-%Y").replace(hour=23, minute=59, second=59)
-        ).timestamp()
+        try:
+            date_obj = datetime.strptime(filters_dict["dateto"], "%d-%m-%Y").replace(hour=23, minute=59, second=59)
+            date_obj = timezone.localize(date_obj)
+            dateto = date_obj.astimezone(pytz.UTC).timestamp()
+        except (ValueError, TypeError):
+            dateto = None
 
     if datefrom and not dateto:
         # filters_list.append(table.c.date >= datefrom)
