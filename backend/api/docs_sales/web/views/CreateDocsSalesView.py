@@ -117,6 +117,7 @@ class CreateDocsSalesView:
                     loyality_cards.c.id,
                     loyality_cards.c.card_number,
                     loyality_cards.c.balance,
+                    loyality_cards.c.cashback_percent,
                 ).where(loyality_cards.c.id.in_(fks["loyality_cards"]))
             )
             card_info = {r.id: {
