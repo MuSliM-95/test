@@ -33,7 +33,8 @@ class RabbitMessagingImpl(IRabbitMessaging):
         queue: aio_pika.abc.AbstractQueue = await publication_channel.declare_queue(
             routing_key,
             auto_delete=False,
-            durable=True
+            durable=True,
+            arguments={"x-max-priority": 10}
         )
 
         await publication_channel.default_exchange.publish(
@@ -70,7 +71,8 @@ class RabbitMessagingImpl(IRabbitMessaging):
         queue: AbstractQueue = await consumption_channel.declare_queue(
             queue_name,
             auto_delete=False,
-            durable=True
+            durable=True,
+            arguments={"x-max-priority": 10}
         )
 
         await queue.consume(callback=self.__amqp_event_message_consumer)
