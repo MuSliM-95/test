@@ -10,6 +10,7 @@ class YookasssaAmoTableCrmRepository(IYookasssaAmoTableCrmRepository):
             select(
                 amo_install_table_cashboxes.c.cashbox_id,
                 amo_install_table_cashboxes.c.amo_install_group_id,
+                amo_install.c.referrer
             ).where(
                 amo_install_table_cashboxes.c.cashbox_id == cashbox
             ).select_from(

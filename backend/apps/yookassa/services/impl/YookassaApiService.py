@@ -76,7 +76,35 @@ class YookassaApiService(IYookassaApiService):
             payment_crm_id: Optional[int],
             payment: PaymentCreateModel,
     ):
+        """
+        test send message to broker
+        """
 
+        test_message = {"message_id": "69146e9a-a94f-4ae4-9868-314a694ba1f8", "amo_install_group_id": 1, "cashbox_id": 1, "payment": {"amount": {"value": "1000.00", "currency": "RUB"}, "description": "\u041e\u043f\u043b\u0430\u0442\u0430 \u043f\u043e \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0443 43", "receipt": None, "tax_system_code": None, "capture": None, "merchant_customer_id": None, "payment_method_data": None, "test": None, "confirmation": {"type": "redirect", "confirmation_url": "https://yoomoney.ru/checkout/payments/v2/contract?orderId=2fb06436-000f-5000-a000-113d5a602e08"}, "id": "2fb06436-000f-5000-a000-113d5a602e08", "status": "pending", "income_amount": None, "recipient": {"account_id": "1020107", "gateway_id": "2385072"}, "captured_at": None, "created_at": "2025-05-09T18:59:02.544000+00:00", "expires_at": None, "refundable": False, "receipt_registration": None, "invoice_details": None, "payment_crm_id": None}}
+
+
+        rabbit_factory = RabbitFactory(settings=RabbitMqSettings(
+            rabbitmq_host=os.getenv('RABBITMQ_HOST_AMO_INTEGRATION'),
+            rabbitmq_user=os.getenv('RABBITMQ_USER_AMO_INTEGRATION'),
+            rabbitmq_pass=os.getenv('RABBITMQ_PASS_AMO_INTEGRATION'),
+            rabbitmq_port=os.getenv('RABBITMQ_PORT_AMO_INTEGRATION'),
+            rabbitmq_vhost=os.getenv('RABBITMQ_VHOST_AMO_INTEGRATION')
+        ))
+        factory = await rabbit_factory()
+        amqp_messaging = await factory()
+
+        install = await self.__amo_table_crm_repository.get_active_install_by_cashbox(cashbox)
+
+        if install is not None:
+            await amqp_messaging.publish(
+                YookassaLinkPushMessage(
+                    **test_message),
+                f"amo.{dict(install).get('referrer')}.push.yookassa.link"
+            )
+
+        """
+        end test
+        """
         if doc_sales_id and (payment_crm_id is None):
             crm_payment = await self.__crm_payments_repository.get_crm_payments_by_doc_sales_id(doc_sales_id)
             payment_crm_id = crm_payment.id
@@ -118,7 +146,7 @@ class YookassaApiService(IYookassaApiService):
                         **dict(install),
                         message_id = uuid.uuid4(),
                         payment = response.dict(exclude_none = True)),
-                    "amo.push.yookassa.link"
+                    f"amo.{dict(install).get('referrer')}.push.yookassa.link"
                 )
 
             """ окончание отправки """
