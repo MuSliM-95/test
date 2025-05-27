@@ -63,11 +63,20 @@ def get_filters(table, filters):
                 )
         elif filter == "paybox":
             if value:
-                filters_list.append(
-                    (
-                        f"payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox)"
+                is_include_paybox_dest = str(filters_dict.get("include_paybox_dest", "")).lower() == "true"
+                if is_include_paybox_dest:
+                    filters_list.append(
+                        (
+                            f"(payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox) OR "
+                            f"payments.paybox_to IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox))"
+                        )
                     )
-                )
+                else:
+                    filters_list.append(
+                        (
+                            f"payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox)"
+                        )
+                    )
         elif filter == "paybox_to":
             if value:
                 filters_list.append(
@@ -97,16 +106,28 @@ def get_filters(table, filters):
 
     datefrom = None
     dateto = None
+    
+    timezone_str = filters_dict.get("timezone", "UTC")
+    try:
+        timezone = pytz.timezone(timezone_str)
+    except pytz.exceptions.UnknownTimeZoneError:
+        timezone = pytz.UTC
 
     if filters_dict["datefrom"]:
-        datefrom = pytz.utc.localize(
-            datetime.strptime(filters_dict["datefrom"], "%d-%m-%Y")
-        ).timestamp()
+        try:
+            date_obj = datetime.strptime(filters_dict["datefrom"], "%d-%m-%Y")
+            date_obj = timezone.localize(date_obj)
+            datefrom = date_obj.astimezone(pytz.UTC).timestamp()
+        except (ValueError, TypeError):
+            datefrom = None
 
     if filters_dict["dateto"]:
-        dateto = pytz.utc.localize(
-            datetime.strptime(filters_dict["dateto"], "%d-%m-%Y")
-        ).timestamp()
+        try:
+            date_obj = datetime.strptime(filters_dict["dateto"], "%d-%m-%Y").replace(hour=23, minute=59, second=59)
+            date_obj = timezone.localize(date_obj)
+            dateto = date_obj.astimezone(pytz.UTC).timestamp()
+        except (ValueError, TypeError):
+            dateto = None
 
     if datefrom and not dateto:
         # filters_list.append(table.c.date >= datefrom)
@@ -219,32 +240,24 @@ def get_filters_cards(table, filters):
     filters_list = []
     filters_dict = filters.dict()
 
-    def _periods_filter(period_type):
-        datefrom = filters_dict.get(f"{period_type}_from")
-        dateto = filters_dict.get(f"{period_type}_to")
-
-        if datefrom and not dateto:
-            if period_type == "start_period":
-                filters_list.append(table.c.start_period >= datetime.fromtimestamp(datefrom))
-            else:
-                filters_list.append(table.c.end_period >= datetime.fromtimestamp(datefrom))
-
-        if not datefrom and dateto:
-            if period_type == "start_period":
-                filters_list.append(table.c.start_period <= datetime.fromtimestamp(dateto))
-            else:
-                filters_list.append(table.c.end_period <= datetime.fromtimestamp(dateto))
-
-        if datefrom and dateto:
-            if period_type == "start_period":
-                filters_list.append(and_(table.c.start_period >= datetime.fromtimestamp(datefrom),
-                                         table.c.start_period <= datetime.fromtimestamp(dateto)))
-            else:
-                filters_list.append(and_(table.c.end_period >= datetime.fromtimestamp(datefrom),
-                                         table.c.end_period <= datetime.fromtimestamp(dateto)))
-
-    _periods_filter("start_period")
-    _periods_filter("end_period")
+    and_conditions = []
+    if filters_dict.get("start_period_from"):
+        and_conditions.append(table.c.start_period >= datetime.fromtimestamp(filters_dict.get("start_period_from")))
+    if filters_dict.get("start_period_to"):
+        and_conditions.append(table.c.start_period <= datetime.fromtimestamp(filters_dict.get("start_period_to")))
+    if filters_dict.get("end_period_from"):
+        and_conditions.append(table.c.end_period >= datetime.fromtimestamp(filters_dict.get("end_period_from")))
+    if filters_dict.get("end_period_to"):
+        and_conditions.append(table.c.end_period <= datetime.fromtimestamp(filters_dict.get("end_period_to")))
+    if filters_dict.get("created_at_from"):
+        and_conditions.append(table.c.created_at >= datetime.fromtimestamp(filters_dict.get("created_at_from")))
+    if filters_dict.get("created_at_to"):
+        and_conditions.append(table.c.created_at <= datetime.fromtimestamp(filters_dict.get("created_at_to")))
+    if filters_dict.get("updated_at_from"):
+        and_conditions.append(table.c.updated_at >= datetime.fromtimestamp(filters_dict.get("updated_at_from")))
+    if filters_dict.get("updated_at_to"):
+        and_conditions.append(table.c.updated_at <= datetime.fromtimestamp(filters_dict.get("updated_at_to")))
+    filters_list.append(and_(*and_conditions))
 
     for filter, value in filters_dict.items():
         if filter == "card_number":

@@ -56,8 +56,6 @@ async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQue
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
-
-@router.post("/contragents/")
 async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCreate, List[ca_schemas.ContragentCreate]]):
     """Создание контрагента"""
     query = users_cboxes_relation.select(

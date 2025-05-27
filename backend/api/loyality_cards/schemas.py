@@ -23,6 +23,9 @@ class LoyalityCardFilters(BaseModel):
     created_at_from: Optional[int]
     created_at_to: Optional[int]
 
+    updated_at_from: Optional[int]
+    updated_at_to: Optional[int]
+
     contragent_name: Optional[str]
     phone_number: Optional[str]
     organization_name: Optional[str]

@@ -15,6 +15,8 @@ class PaymentFiltersQuery(BaseModel):
     dateto: Optional[str]
     datefrom: Optional[str]
     payment_type: Optional[str]
+    include_paybox_dest: Optional[bool] = False
+    timezone: Optional[str] = "UTC"
 
 class AnalyticsFiltersQuery(BaseModel):
     datefrom: Optional[int]
