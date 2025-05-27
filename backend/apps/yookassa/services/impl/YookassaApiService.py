@@ -111,14 +111,16 @@ class YookassaApiService(IYookassaApiService):
             amqp_messaging = await factory()
 
             install = await self.__amo_table_crm_repository.get_active_install_by_cashbox(cashbox)
-
+            print(dict(install))
             if install is not None:
+
                 await amqp_messaging.publish(
                     YookassaLinkPushMessage(
                         **dict(install),
+                        docs_sales_id = doc_sales_id,
                         message_id = uuid.uuid4(),
                         payment = response.dict(exclude_none = True)),
-                    "amo.push.yookassa.link"
+                    f"amo.{dict(install).get('referrer')}.push.yookassa.link"
                 )
 
             """ окончание отправки """
