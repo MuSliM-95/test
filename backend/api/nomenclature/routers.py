@@ -6,9 +6,10 @@ from starlette import status
 import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
-    warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups
+    warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups, \
+    nomenclature_attributes, nomenclature_attributes_value
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.params import Body
+from fastapi.params import Body, Query
 
 from functions.helpers import (
     check_entity_exists,
@@ -18,7 +19,7 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_
+from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
 from ws_manager import manager
 import memoization
@@ -240,7 +241,10 @@ async def get_nomenclature(
         offset: int = 0,
         with_prices: bool = False,
         with_balance: bool = False,
+        with_attributes: bool = Query(False, description="Включить атрибуты номенклатуры в ответ"),
         only_main_from_group: bool = False,
+        min_price: Optional[float] = Query(None, description="Минимальная цена для фильтрации"),
+        max_price: Optional[float] = Query(None, description="Максимальная цена для фильтрации"),
         filters_query: NomenclatureFilter = Depends(),
 ):
     start_time = time.time()
@@ -248,84 +252,126 @@ async def get_nomenclature(
     user = await get_user_by_token(token)
 
     if name and barcode:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Укажите только один из параметров: 'name' или 'barcode'")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Фильтр может быть задан или по имени или по штрихкоду")
+
+    price_subquery = None
+    if min_price is not None or max_price is not None:
+        price_subquery = select(
+            prices.c.nomenclature,
+            func.min(prices.c.price).label("min_price")
+        ).where(
+            prices.c.is_deleted.is_not(True)
+        ).group_by(
+            prices.c.nomenclature
+        ).alias("price_subquery")
 
     query = (
         select(
             nomenclature,
-            nomenclature_groups_value.c.group_id,
-            nomenclature_groups.c.name.label('group_name'),
-            nomenclature_groups_value.c.is_main,
             units.c.convent_national_view.label("unit_name"),
             func.array_remove(func.array_agg(func.distinct(nomenclature_barcodes.c.code)), None).label("barcodes")
         )
         .select_from(nomenclature)
-        .outerjoin(nomenclature_groups_value, nomenclature_groups_value.c.nomenclature_id == nomenclature.c.id)
-        .outerjoin(nomenclature_groups, nomenclature_groups_value.c.group_id == nomenclature_groups.c.id)
         .join(units, units.c.id == nomenclature.c.unit, full=True)
         .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, full=True)
     )
 
-    filters = [
-        nomenclature.c.cashbox == user.cashbox_id,
-        nomenclature.c.is_deleted.is_not(True),
-    ]
+    if price_subquery is not None:
+        query = query.join(
+            price_subquery,
+            price_subquery.c.nomenclature == nomenclature.c.id,
+            isouter=True
+        )
 
-    if name:
-        filters.append(nomenclature.c.name.ilike(f"%{name}%"))
-    if barcode:
-        filters.append(nomenclature_barcodes.c.code == barcode)
-    if category:
-        filters.append(nomenclature.c.category == category)
     if only_main_from_group:
-        filters.append(or_(
-            nomenclature_groups_value.c.is_main.is_(True),
-            nomenclature_groups_value.c.is_main.is_(None),
+        subquery = select(nomenclature_groups_value.c.nomenclature_id).distinct().where(
+            nomenclature_groups_value.c.is_main.is_(True)
+        ).alias("active")
+
+        query = query.join(subquery, subquery.c.nomenclature_id == nomenclature.c.id, isouter=True)
+        query = query.where(or_(
+            subquery.c.nomenclature_id == nomenclature.c.id,
+            ~nomenclature.c.id.in_(
+                select(nomenclature_groups_value.c.nomenclature_id)
+            )
         ))
 
-    order_by_condition = asc(nomenclature.c.id)
+    conditions = [
+        nomenclature.c.cashbox == user.cashbox_id,
+        nomenclature.c.is_deleted.is_not(True)
+    ]
+
+    if category:
+        conditions.append(nomenclature.c.category == category)
+
+    if name:
+        conditions.append(nomenclature.c.name.ilike(f'%{name}%'))
+
+    if barcode:
+        join_barcode = select(nomenclature_barcodes.c.nomenclature_id).where(nomenclature_barcodes.c.code.ilike(f'%{barcode}%'))
+        conditions.append(nomenclature.c.id.in_(join_barcode))
+
+    if min_price is not None:
+        conditions.append(price_subquery.c.min_price >= min_price)
+    if max_price is not None:
+        conditions.append(price_subquery.c.min_price <= max_price)
+
+    query = query.where(and_(*conditions))
 
     if filters_query.order_created_at:
         if filters_query.order_created_at == SortOrder.ASC:
-            order_by_condition = asc(nomenclature.c.created_at)
-        elif filters_query.order_created_at == SortOrder.DESC:
-            order_by_condition = desc(nomenclature.c.created_at)
-    elif filters_query.order_price:
-        price_subquery = (
-            select(
-                prices.c.nomenclature.label("nomenclature_id"),
-                func.min(prices.c.price).label("min_price")
-            )
-            .group_by(prices.c.nomenclature)
-            .subquery()
-        )
-        query = query.outerjoin(price_subquery, price_subquery.c.nomenclature_id == nomenclature.c.id).group_by(price_subquery.c.min_price)
-
-        if filters_query.order_price == SortOrder.ASC:
-            order_by_condition = asc(price_subquery.c.min_price)
+            query = query.order_by(asc(nomenclature.c.created_at))
         else:
-            order_by_condition = desc(price_subquery.c.min_price)
+            query = query.order_by(desc(nomenclature.c.created_at))
     elif filters_query.order_name:
         if filters_query.order_name == SortOrder.ASC:
-            order_by_condition = asc(func.upper(func.left(nomenclature.c.name, 1)))
-        elif filters_query.order_name == SortOrder.DESC:
-            order_by_condition = desc(func.upper(func.left(nomenclature.c.name, 1)))
+            query = query.order_by(asc(nomenclature.c.name))
+        else:
+            query = query.order_by(desc(nomenclature.c.name))
+    else:
+        query = query.order_by(desc(nomenclature.c.id))
 
-    query = query.where(*filters).limit(limit).offset(offset).group_by(
-        nomenclature.c.id,
-        units.c.convent_national_view,
-        nomenclature_groups_value.c.group_id,
-        nomenclature_groups_value.c.is_main,
-        nomenclature_groups.c.name
-    ).order_by(order_by_condition)
-    nomenclature_db = await database.fetch_all(query)
+    query = query.group_by(nomenclature.c.id, units.c.convent_national_view)
+
+    count_query = (
+        select(func.count(func.distinct(nomenclature.c.id)))
+        .select_from(nomenclature)
+    )
+
+    if barcode:
+        count_query = count_query.join(
+            nomenclature_barcodes,
+            nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id
+        )
+
+    if price_subquery is not None:
+        count_query = count_query.join(
+            price_subquery,
+            price_subquery.c.nomenclature == nomenclature.c.id,
+            isouter=True
+        )
+    
+    if only_main_from_group:
+        subquery = select(nomenclature_groups_value.c.nomenclature_id).distinct().where(
+            nomenclature_groups_value.c.is_main.is_(True)
+        ).alias("active_count")
+
+        count_query = count_query.join(subquery, subquery.c.nomenclature_id == nomenclature.c.id, isouter=True)
+        count_query = count_query.where(or_(
+            subquery.c.nomenclature_id == nomenclature.c.id,
+            ~nomenclature.c.id.in_(
+                select(nomenclature_groups_value.c.nomenclature_id)
+            )
+        ))
+
+    count_query = count_query.where(and_(*conditions))
+
+    nomenclature_db = await database.fetch_all(query.limit(limit).offset(offset))
     nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
-    print(f"Получение номенклатур: {time.time() - start_time}")
+    nomenclature_db_count = await database.fetch_val(count_query)
 
     for nomenclature_info in nomenclature_db:
-        time_start_2 = time.time()
         if with_prices:
             price = await database.fetch_all(
                 select(prices.c.price, price_types.c.name.label('price_type')).
@@ -334,6 +380,7 @@ async def get_nomenclature(
                 join(price_types, price_types.c.id == prices.c.price_type)
             )
             nomenclature_info["prices"] = price
+
         if with_balance:
             q = case(
                 [
@@ -354,10 +401,7 @@ async def get_nomenclature(
                 .where(
                     nomenclature.c.id == nomenclature_info['id'],
                     warehouse_register_movement.c.cashbox_id == user.cashbox_id
-
                 )
-                .limit(limit)
-                .offset(offset)
             ).group_by(
                 warehouses.c.name,
                 nomenclature.c.id,
@@ -366,16 +410,30 @@ async def get_nomenclature(
                 .select_from(warehouse_register_movement
                              .join(warehouses, warehouse_register_movement.c.warehouse_id == warehouses.c.id))
 
-            warehouse_balances_db = await database.fetch_all(query)
+            balances_list = await database.fetch_all(query)
+            nomenclature_info["balances"] = balances_list
 
-            nomenclature_info["balances"] = warehouse_balances_db
-            print(nomenclature_info["balances"])
-        print(f"Итерация цикла: {time.time() - time_start_2}")
+        if with_attributes:
+            attributes_query = (
+                select(
+                    nomenclature_attributes_value.c.id,
+                    nomenclature_attributes_value.c.attribute_id,
+                    nomenclature_attributes.c.name,
+                    nomenclature_attributes.c.alias,
+                    nomenclature_attributes_value.c.value
+                )
+                .select_from(nomenclature_attributes_value)
+                .join(
+                    nomenclature_attributes,
+                    nomenclature_attributes_value.c.attribute_id == nomenclature_attributes.c.id
+                )
+                .where(
+                    nomenclature_attributes_value.c.nomenclature_id == nomenclature_info['id']
+                )
+            )
+            attributes_list = await database.fetch_all(attributes_query)
+            nomenclature_info["attributes"] = attributes_list
 
-    query = select(func.count(nomenclature.c.id)).where(*filters)
-    nomenclature_db_count = await database.fetch_val(query)
-
-    print(f"Окончание работы эндпоинта: {time.time() - start_time}")
     return {"result": nomenclature_db, "count": nomenclature_db_count}
 
 

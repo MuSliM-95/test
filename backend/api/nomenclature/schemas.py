@@ -51,12 +51,24 @@ class Nomenclature(NomenclatureCreate):
         orm_mode = True
 
 
+class NomenclatureAttributeValue(BaseModel):
+    id: int
+    attribute_id: int
+    name: str
+    alias: Optional[str]
+    value: str
+
+    class Config:
+        orm_mode = True
+
+
 class NomenclatureGet(NomenclatureCreate):
     id: int
     unit_name: Optional[str]
     barcodes: Optional[List[str]]
     prices: Optional[List[PriceGetWithNomenclature]]
     balances: Optional[List[WarehouseWithNomenclature]]
+    attributes: Optional[List[NomenclatureAttributeValue]] = None
     group_id: Optional[int]
     group_name: Optional[str]
     is_main: Optional[bool]
