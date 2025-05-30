@@ -565,17 +565,14 @@ class CreateDocsSalesView:
             )
         )
 
-        print(0)
 
         for created, data, payment_id in zip(inserted_docs, docs_sales_data.__root__, payments_ids):
-            print(created, data, payment_id, data.warehouse)
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
-                print(1)
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
                     data.warehouse,
                     created["id"],
-                    payment_id,
+                    payment_id.get("id"),
                     PaymentCreateModel(
                         amount = AmountModel(
                             value = str(round(data.paid_rubles, 2)),
