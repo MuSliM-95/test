@@ -564,8 +564,13 @@ class CreateDocsSalesView:
                 payments.c.docs_sales_id.in_([doc["id"] for doc in inserted_docs])
             )
         )
+
+        print(0)
+
         for created, data, payment_id in zip(inserted_docs, docs_sales_data.__root__, payments_ids):
+            print(created, data, payment_id, data.warehouse)
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
+                print(1)
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
                     data.warehouse,
@@ -573,7 +578,7 @@ class CreateDocsSalesView:
                     payment_id,
                     PaymentCreateModel(
                         amount = AmountModel(
-                            value = str(round(data['paid_rubles'], 2)),
+                            value = str(round(data.paid_rubles, 2)),
                             currency = "RUB"
                         ),
                         description = f"Оплата по документу {created['number']}",
@@ -581,12 +586,12 @@ class CreateDocsSalesView:
                         receipt = ReceiptModel(
                             customer = CustomerModel(),
                             items = [ItemModel(
-                                description = good.get("nomenclature_name") or "",
+                                description = good.nomenclature_name or "",
                                 amount = AmountModel(
-                                    value = good.get("price"),
+                                    value = good.price,
                                     currency = "RUB"
                                 ),
-                                quantity = good.get("quantity"),
+                                quantity = good.quantity,
                                 vat_code = "1"
                             ) for good in data.goods],
                         ),

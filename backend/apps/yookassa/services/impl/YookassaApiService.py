@@ -76,7 +76,7 @@ class YookassaApiService(IYookassaApiService):
             payment_crm_id: Optional[int],
             payment: PaymentCreateModel,
     ):
-
+        print(payment)
         if doc_sales_id and (payment_crm_id is None):
             crm_payment = await self.__crm_payments_repository.get_crm_payments_by_doc_sales_id(doc_sales_id)
             payment_crm_id = crm_payment.id
