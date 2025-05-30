@@ -104,9 +104,7 @@ class RabbitMessagingImpl(IRabbitMessaging):
             routing_key,
             auto_delete=False,
             durable=True,
-            arguments={
-                "x-max-priority": 10
-            }
+            arguments={"x-max-priority": 10}
         )
 
         return await publication_channel.default_exchange.publish(
@@ -135,6 +133,23 @@ class RabbitMessagingImpl(IRabbitMessaging):
             raise Exception(f"Handler {event_type.__name__} is already registered")
 
         self.__handlers[event_type.__name__] = event_handler
+
+    async def install(
+        self,
+        queue_name: str,
+    ):
+        consumption_channel = await self.__channel.get_consumption_channel()
+
+        queue: AbstractQueue = await consumption_channel.declare_queue(
+            queue_name,
+            auto_delete=False,
+            durable=True,
+            arguments={"x-max-priority": 10}
+        )
+
+        await queue.consume(callback=self.__amqp_event_message_consumer)
+
+        await asyncio.Future()
 
     async def __amqp_event_message_consumer(self, message: IncomingMessage):
         async with message.process(ignore_processed=True):
