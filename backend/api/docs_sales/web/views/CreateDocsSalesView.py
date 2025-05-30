@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from collections import defaultdict
 from datetime import datetime
@@ -15,6 +16,18 @@ from api.docs_sales import schemas
 
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
+from apps.yookassa.functions.impl.GetOauthCredentialFunction import GetOauthCredentialFunction
+from apps.yookassa.models.PaymentModel import PaymentCreateModel,AmountModel,ReceiptModel,CustomerModel,ItemModel,\
+    ConfirmationRedirect
+from apps.yookassa.repositories.core.IYookassaTableNomenclature import IYookassaTableNomenclature
+from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
+from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
+from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
+from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
+from apps.yookassa.repositories.impl.YookassaTableNomenclature import YookassaTableNomenclature
+from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
+from apps.yookassa.services.impl.OauthService import OauthService
+from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import database, contragents, contracts, organizations, warehouses, users_cboxes_relation, \
@@ -527,6 +540,65 @@ class CreateDocsSalesView:
         asyncio.create_task(
             manager.send_message(token, {"action": "create", "target": "docs_sales", "result": result})
         )
+
+        # Юкасса
+
+        yookassa_oauth_service = OauthService(
+            oauth_repository = YookassaOauthRepository(),
+            request_repository = YookassaRequestRepository(),
+            get_oauth_credential_function = GetOauthCredentialFunction()
+        )
+
+        yookassa_api_service = YookassaApiService(
+            request_repository = YookassaRequestRepository(),
+            oauth_repository = YookassaOauthRepository(),
+            payments_repository = YookassaPaymentsRepository(),
+            crm_payments_repository = YookassaCrmPaymentsRepository(),
+            table_nomenclature_repository = YookassaTableNomenclature(),
+            amo_table_crm_repository = YookasssaAmoTableCrmRepository(),
+        )
+        payments_ids = await database.fetch_all(
+            select(
+                payments.c.id
+            ).where(
+                payments.c.docs_sales_id.in_([doc["id"] for doc in inserted_docs])
+            )
+        )
+        for created, data, payment_id in zip(inserted_docs, docs_sales_data.__root__, payments_ids):
+            if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
+                await yookassa_api_service.api_create_payment(
+                    user.cashbox_id,
+                    data.warehouse,
+                    created["id"],
+                    payment_id,
+                    PaymentCreateModel(
+                        amount = AmountModel(
+                            value = str(round(data['paid_rubles'], 2)),
+                            currency = "RUB"
+                        ),
+                        description = f"Оплата по документу {created['number']}",
+                        capture = True,
+                        receipt = ReceiptModel(
+                            customer = CustomerModel(),
+                            items = [ItemModel(
+                                description = good.get("nomenclature_name") or "",
+                                amount = AmountModel(
+                                    value = good.get("price"),
+                                    currency = "RUB"
+                                ),
+                                quantity = good.get("quantity"),
+                                vat_code = "1"
+                            ) for good in data.goods],
+                        ),
+                        confirmation = ConfirmationRedirect(
+                            type = "redirect",
+                            return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+                        )
+                    )
+                )
+
+        # юкасса
+
         return result
 
     async def _validate_fk(self, table, ids: Set[int], name: str):
