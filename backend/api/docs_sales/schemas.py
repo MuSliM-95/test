@@ -135,6 +135,9 @@ class ViewInList(BaseModel):
     delivery_info: Optional[DeliveryInfoSchema]
     updated_at: int
     created_at: int
+    has_contragent: Optional[bool] = False
+    has_loyality_card: Optional[bool] = False
+    color_status: Optional[str] = "default"
 
 
 class ViewInListResult(BaseModel):
