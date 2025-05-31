@@ -1,23 +1,16 @@
 import os
-from typing import Union,Dict,Any,Optional,Literal
+from typing import Union,Dict,Any,Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import desc, func, and_, select
-from sqlalchemy.dialects import postgresql
 
-from apps.yookassa.functions.core.IGetOauthCredentialFunction import IGetOauthCredentialFunction
 from apps.yookassa.functions.impl.GetOauthCredentialFunction import GetOauthCredentialFunction
 from apps.yookassa.models.PaymentModel import PaymentCreateModel,AmountModel,ReceiptModel,CustomerModel,ItemModel,\
     ConfirmationRedirect
-from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
-from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
-from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import IYookasssaAmoTableCrmRepository
 from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
 from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
 from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
-from apps.yookassa.repositories.impl.YookassaTableNomenclature import YookassaTableNomenclature
-from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from database.db import (
@@ -37,8 +30,7 @@ from database.db import (
     users_cboxes_relation,
     price_types, warehouse_balances,
     nomenclature,
-    docs_warehouse, docs_sales_tags, amo_leads, amo_install_table_cashboxes, amo_leads_docs_sales_mapping,
-    docs_sales_settings, contragents, NomenclatureCashbackType,
+    docs_warehouse, docs_sales_tags, docs_sales_settings, contragents, NomenclatureCashbackType,
 
 )
 import datetime
@@ -61,7 +53,6 @@ from functions.helpers import (
     add_nomenclature_name_to_goods,
     check_unit_exists,
     check_period_blocked,
-    add_nomenclature_count,
     raschet_oplat,
     add_docs_sales_settings,
     add_delivery_info_to_doc
@@ -131,7 +122,7 @@ async def get_by_id(token: str, idx: int):
     instance_db = await database.fetch_one(query)
 
     if not instance_db:
-        raise HTTPException(status_code=404, detail=f"Не найдено.")
+        raise HTTPException(status_code=404, detail="Не найдено.")
 
     instance_db = datetime_to_timestamp(instance_db)
     instance_db = await raschet_oplat(instance_db)
@@ -222,6 +213,28 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
 
     doc_ids = [item["id"] for item in items_db]
 
+    doc_has_loyality = {}
+    
+    if doc_ids:
+        loyality_query = entity_to_entity.select().where(
+            and_(
+                entity_to_entity.c.from_entity == 7,  # docs_sales
+                entity_to_entity.c.from_id.in_(doc_ids),  # ID документов продаж
+                entity_to_entity.c.to_entity == 6,    # loyality_transactions
+                entity_to_entity.c.type == "docs_sales_loyality_transactions",  # тип связи
+                entity_to_entity.c.status.is_(True),
+                entity_to_entity.c.delinked.is_not(True)
+            )
+        )
+        
+        loyality_data = await database.fetch_all(loyality_query)
+        
+        loyality_data = [dict(record) for record in loyality_data]
+        print("loyality_data", loyality_data)
+        
+        for record in loyality_data:
+            doc_has_loyality[record["from_id"]] = record["to_id"]
+    
     goods_query = docs_sales_goods.select().where(docs_sales_goods.c.docs_sales_id.in_(doc_ids))
     goods_data = await database.fetch_all(goods_query)
     goods_map = {}
@@ -236,6 +249,19 @@ async def get_list(token: str, limit: int = 100, offset: int = 0, show_goods: bo
         goods = goods_map.get(item["id"], [])
         item["nomenclature_count"] = len(goods)
         item["doc_discount"] = round(sum(good.get("sum_discounted", 0) or 0 for good in goods), 2)
+        
+        contragent_id = item.get("contragent")
+        item["has_contragent"] = bool(contragent_id)
+        
+        has_loyality = item["id"] in doc_has_loyality
+        item["has_loyality_card"] = has_loyality
+        
+        if has_loyality:
+            item["color_status"] = "green"
+        elif item["has_contragent"]:
+            item["color_status"] = "blue"
+        else:
+            item["color_status"] = "default"
 
     settings_ids = [item["settings"] for item in items_db]
     settings_query = docs_sales_settings.select().where(docs_sales_settings.c.id.in_(settings_ids))
