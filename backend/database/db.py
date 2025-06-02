@@ -1930,6 +1930,20 @@ docs_sales_utm_tags = sqlalchemy.Table(
     sqlalchemy.Column("utm_gaclientid", String),
 )
 
+user_permissions = sqlalchemy.Table(
+    "user_permissions",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("user_id", Integer, ForeignKey("users_cboxes_relation.id")),
+    sqlalchemy.Column("section", String, nullable=False),  # Название раздела (payments, payboxes)
+    sqlalchemy.Column("can_view", Boolean, default=True),
+    sqlalchemy.Column("can_edit", Boolean, default=False),
+    sqlalchemy.Column("paybox_id", Integer, ForeignKey("pboxes.id"), nullable=True),  # Доступ к конкретному счету
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_job_store"
