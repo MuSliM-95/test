@@ -44,3 +44,36 @@ class CBUsersList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PermissionItem(BaseModel):
+    section: str
+    can_view: bool = True
+    can_edit: bool = False
+    paybox_id: Optional[int] = None
+
+
+class UserPermissionUpdate(BaseModel):
+    user_id: int
+    permissions: List[PermissionItem]
+
+
+class UserPermissionResponse(BaseModel):
+    status: str = "success"
+    message: str = "Права пользователя обновлены"
+
+
+class UserPermissionsList(BaseModel):
+    section: str
+    can_view: bool
+    can_edit: bool
+    paybox_id: Optional[int] = None
+    paybox_name: Optional[str] = None
+
+
+class UserPermissionsResult(BaseModel):
+    user_id: int
+    first_name: str
+    last_name: Optional[str]
+    username: Optional[str]
+    permissions: List[UserPermissionsList]
