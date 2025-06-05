@@ -76,29 +76,30 @@ class YookassaApiService(IYookassaApiService):
             payment_crm_id: Optional[int],
             payment: PaymentCreateModel,
     ):
-
+        print(payment, payment_crm_id)
         if doc_sales_id and (payment_crm_id is None):
             crm_payment = await self.__crm_payments_repository.get_crm_payments_by_doc_sales_id(doc_sales_id)
             payment_crm_id = crm_payment.id
         try:
+            print(0)
             oauth = await self.__oauth_repository.get_oauth(cashbox, warehouse)
             if not oauth:
                 raise Exception("для склада продажи не установлена интеграция с Юkassa")
             payment_db = await self.__payments_repository.fetch_one_by_crm_payment_id(payment_crm_id)
-
+            print(1)
             settings = await self.__request_repository.oauth_settings(access_token = oauth.access_token)
-
+            print(2)
             if settings:
                 payment.test = settings.test
                 if settings.fiscalization:
                     if not settings.fiscalization.enabled:
                         del payment.receipt
-
+            print(3)
             response = await self.__request_repository.create_payments(
                 access_token = oauth.access_token,
                 payment = payment
             )
-
+            print(4)
             """ отправка в очередь """
             rabbit_factory = RabbitFactory(settings = RabbitMqSettings(
                 rabbitmq_host = os.getenv('RABBITMQ_HOST_AMO_INTEGRATION'),
@@ -111,9 +112,9 @@ class YookassaApiService(IYookassaApiService):
             amqp_messaging = await factory()
 
             install = await self.__amo_table_crm_repository.get_active_install_by_cashbox(cashbox)
-            print(dict(install))
+            print(5)
+            print(6)
             if install is not None:
-
                 await amqp_messaging.publish(
                     YookassaLinkPushMessage(
                         **dict(install),
