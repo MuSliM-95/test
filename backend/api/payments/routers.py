@@ -62,6 +62,15 @@ async def read_payments_list(
                 "repeat_seconds": pay_dict["repeat_seconds"],
                 "repeat_number": pay_dict["repeat_number"],
             }
+            
+            # Добавляем информацию о счете откуда
+            if pay_dict["paybox"]:
+                paybox_query = pboxes.select().where(pboxes.c.id == pay_dict["paybox"])
+                paybox_info = await database.fetch_one(paybox_query)
+                if paybox_info:
+                    pay_dict["source_account_name"] = paybox_info.name
+                    pay_dict["source_account_id"] = paybox_info.id
+            
             if _with:
                 user_created_by_query = users.select(users.c.id == pay.account)
                 user_created_by = await database.fetch_one(user_created_by_query)
@@ -131,6 +140,13 @@ async def read_payments_list(
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
     filters = get_filters(payments, filters)
+    
+    # Дополнительный фильтр для source_account
+    if filters and hasattr(filters, 'source_account') and filters.source_account:
+        source_account_ids = filters.source_account.split(',')
+        source_filter = " AND payments.paybox IN (" + ",".join(source_account_ids) + ")"
+        filters += source_filter
+    
     if not user or not user.status:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
     sort_list = sort.split(":")

@@ -12,6 +12,7 @@ class PaymentFiltersQuery(BaseModel):
     contragent: Optional[str]
     paybox: Optional[str]
     paybox_to: Optional[str]
+    source_account: Optional[str]
     dateto: Optional[str]
     datefrom: Optional[str]
     payment_type: Optional[str]

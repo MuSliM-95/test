@@ -119,6 +119,8 @@ class PaymentInList(BaseModel):
     description: Optional[str]
     paybox: int
     paybox_to: Optional[int]
+    source_account_name: Optional[str]
+    source_account_id: Optional[int]
     date: Optional[int]
     repeat_freq: Optional[int]
     repeat: Optional[PaymentRepeat]
