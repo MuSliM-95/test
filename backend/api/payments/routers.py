@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from sqlalchemy import desc, func, select, distinct, and_
+from sqlalchemy import desc, func, select, distinct
 
 from const import PaymentType
 from api.articles.schemas import Article
@@ -22,9 +22,8 @@ from database.db import (
     articles,
     cheques,
     contragents,
-    user_permissions,
 )
-from functions.helpers import get_filters, check_user_permission, hide_balance_for_non_admin
+from functions.helpers import get_filters
 from functions.users import raschet
 
 import api.payments.schemas as pay_schemas
@@ -69,19 +68,8 @@ async def read_payments_list(
                 paybox_query = pboxes.select().where(pboxes.c.id == pay_dict["paybox"])
                 paybox_info = await database.fetch_one(paybox_query)
                 if paybox_info:
-                    has_permission = await check_user_permission(
-                        user.id, 
-                        user.cashbox_id, 
-                        "pboxes", 
-                        paybox_info.id
-                    )
-                    
-                    if has_permission:
-                        paybox_info_dict = dict(paybox_info)
-                        paybox_info_dict = await hide_balance_for_non_admin(user, paybox_info_dict)
-                        
-                        pay_dict["source_account_name"] = paybox_info_dict["name"]
-                        pay_dict["source_account_id"] = paybox_info_dict["id"]
+                    pay_dict["source_account_name"] = paybox_info.name
+                    pay_dict["source_account_id"] = paybox_info.id
             
             if _with:
                 user_created_by_query = users.select(users.c.id == pay.account)
@@ -149,15 +137,8 @@ async def read_payments_list(
             payments_list.append(pay_dict)
         return payments_list
 
-    query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
+    query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
-    if not user or not user.status:
-        raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
-    
-    has_permission = await check_user_permission(user.id, user.cashbox_id, "payments")
-    if not has_permission:
-        raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра платежей")
-    
     filters = get_filters(payments, filters)
     
     # Дополнительный фильтр для source_account
@@ -166,27 +147,8 @@ async def read_payments_list(
         source_filter = " AND payments.paybox IN (" + ",".join(source_account_ids) + ")"
         filters += source_filter
     
-    if not user.is_owner:
-        allowed_payboxes_query = user_permissions.select().where(
-            and_(
-                user_permissions.c.user_id == user.id,
-                user_permissions.c.cashbox_id == user.cashbox_id,
-                user_permissions.c.section == "payments",
-                user_permissions.c.can_view.is_(True)
-            )
-        )
-        allowed_payboxes = await database.fetch_all(allowed_payboxes_query)
-        
-        if allowed_payboxes:
-            paybox_ids = []
-            for perm in allowed_payboxes:
-                if perm.paybox_id:  
-                    paybox_ids.append(str(perm.paybox_id))
-            
-            if paybox_ids:
-                paybox_filter = " AND payments.paybox IN (" + ",".join(paybox_ids) + ")"
-                filters += paybox_filter
-    
+    if not user or not user.status:
+        raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
     sort_list = sort.split(":")
     if not (
         sort_list[1] in ["desc", "asc"]
@@ -255,249 +217,247 @@ async def read_payments_list(
 @router.post("/payments/")
 async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
     """Создание платежа"""
-    query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
+    query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
 
-    if not user or not user.status:
-        raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
-    
-    has_permission = await check_user_permission(user.id, user.cashbox_id, "payments", payment.paybox, True)
-    if not has_permission:
-        raise HTTPException(status_code=403, detail="Недостаточно прав для создания платежей")
+    if user:
+        if user.status:
 
-    payment_dict = payment.dict()
+            payment_dict = payment.dict()
 
-    if not payment_dict.get("date"):
-        payment_dict['date'] = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+            if not payment_dict.get("date"):
+                payment_dict['date'] = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
 
-    if payment_dict.get("preamount") and payment_dict.get("percentamount"):
-        amount = payment.preamount * payment.percentamount
-        amount_without_tax = amount
+            if payment_dict.get("preamount") and payment_dict.get("percentamount"):
+                amount = payment.preamount * payment.percentamount
+                amount_without_tax = amount
 
-        payment_dict['amount'] = amount
-        payment_dict['amount_without_tax'] = amount_without_tax
+                payment_dict['amount'] = amount
+                payment_dict['amount_without_tax'] = amount_without_tax
 
-        del payment_dict['preamount']
-        del payment_dict['percentamount']
-    else:
-        del payment_dict['preamount']
-        del payment_dict['percentamount']
+                del payment_dict['preamount']
+                del payment_dict['percentamount']
+            else:
+                del payment_dict['preamount']
+                del payment_dict['percentamount']
 
 
-    if payment_dict.get("repeat"):
-        payment_dict.update(payment_dict["repeat"])
-    del payment_dict["repeat"]
+            if payment_dict.get("repeat"):
+                payment_dict.update(payment_dict["repeat"])
+            del payment_dict["repeat"]
 
-    paybox_q = pboxes.select().where(
-        pboxes.c.id == payment.paybox, pboxes.c.cashbox == user.cashbox_id
-    )
-    paybox = await database.fetch_one(paybox_q)
-
-    if not paybox:
-        raise HTTPException(
-            status_code=403,
-            detail="Введенный счет не принадлежит вам или не существует!",
-        )
-    paybox_dict = dict(paybox)
-    project_dict = None
-
-    if payment.project_id:
-        project_q = projects.select().where(
-            projects.c.id == payment.project_id,
-            projects.c.cashbox == user.cashbox_id,
-        )
-        project = await database.fetch_one(project_q)
-        project_dict = dict(project)
-        payment_dict["project_id"] = project.id
-    else:
-        payment_dict["project_id"] = None
-
-    if payment.contragent == 0:
-        payment_dict["contragent"] = None
-    else:
-        payment_dict["contragent"] = payment.contragent
-
-    if payment.article_id:
-        article_query = articles.select().where(
-            articles.c.cashbox == user.cashbox_id,
-            articles.c.id == payment.article_id,
-        )
-        article_name = await database.fetch_one(article_query)
-
-        if not article_name:
-            raise HTTPException(
-                status_code=403,
-                detail="Выбранная статья не принадлежит вам или не существует!",
+            paybox_q = pboxes.select().where(
+                pboxes.c.id == payment.paybox, pboxes.c.cashbox == user.cashbox_id
             )
+            paybox = await database.fetch_one(paybox_q)
 
-        payment_dict["article"] = article_name[1]
-
-    if payment.cheque:
-        cheque_query = cheques.select().where(
-            cheques.c.cashbox == user.cashbox_id, cheques.c.id == payment.cheque
-        )
-        cheque = await database.fetch_one(cheque_query)
-
-        if not cheque:
-            raise HTTPException(
-                status_code=403,
-                detail="Выбранный чек не принадлежит вам или не существует!",
-            )
-
-    payment_dict["cashbox"] = user.cashbox_id
-    payment_dict["account"] = user.user
-    payment_dict["paybox"] = paybox.id
-    payment_dict["is_deleted"] = False
-    payment_dict["raspilen"] = False
-    payment_dict["created_at"] = int(datetime.utcnow().timestamp())
-    payment_dict["updated_at"] = int(datetime.utcnow().timestamp())
-
-    paybox_to_id = None
-
-    if payment.type == PaymentType.transfer:
-        if payment.status:
-            paybox_to_id = payment.paybox_to
-            paybox_dict["balance"] = round(
-                float(paybox_dict["balance"]) - float(payment_dict['amount']), 2
-            )
-            query = pboxes.select().where(
-                pboxes.c.id == paybox_to_id, pboxes.c.cashbox == user.cashbox_id
-            )
-            pbox_to = await database.fetch_one(query)
-
-            if not pbox_to:
+            if not paybox:
                 raise HTTPException(
                     status_code=403,
                     detail="Введенный счет не принадлежит вам или не существует!",
                 )
+            paybox_dict = dict(paybox)
+            project_dict = None
 
-            pbox_to_dict = dict(pbox_to)
-            pbox_to_dict["balance"] = round(
-                float(pbox_to_dict["balance"]) + float(payment_dict['amount']), 2
+            if payment.project_id:
+                project_q = projects.select().where(
+                    projects.c.id == payment.project_id,
+                    projects.c.cashbox == user.cashbox_id,
+                )
+                project = await database.fetch_one(project_q)
+                project_dict = dict(project)
+                payment_dict["project_id"] = project.id
+            else:
+                payment_dict["project_id"] = None
+
+            if payment.contragent == 0:
+                payment_dict["contragent"] = None
+            else:
+                payment_dict["contragent"] = payment.contragent
+
+            if payment.article_id:
+                article_query = articles.select().where(
+                    articles.c.cashbox == user.cashbox_id,
+                    articles.c.id == payment.article_id,
+                )
+                article_name = await database.fetch_one(article_query)
+
+                if not article_name:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Выбранная статья не принадлежит вам или не существует!",
+                    )
+
+                payment_dict["article"] = article_name[1]
+
+            if payment.cheque:
+                cheque_query = cheques.select().where(
+                    cheques.c.cashbox == user.cashbox_id, cheques.c.id == payment.cheque
+                )
+                cheque = await database.fetch_one(cheque_query)
+
+                if not cheque:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Выбранный чек не принадлежит вам или не существует!",
+                    )
+
+            payment_dict["cashbox"] = user.cashbox_id
+            payment_dict["account"] = user.user
+            payment_dict["paybox"] = paybox.id
+            payment_dict["is_deleted"] = False
+            payment_dict["raspilen"] = False
+            payment_dict["created_at"] = int(datetime.utcnow().timestamp())
+            payment_dict["updated_at"] = int(datetime.utcnow().timestamp())
+
+            paybox_to_id = None
+
+            if payment.type == PaymentType.transfer:
+                if payment.status:
+                    paybox_to_id = payment.paybox_to
+                    paybox_dict["balance"] = round(
+                        float(paybox_dict["balance"]) - float(payment_dict['amount']), 2
+                    )
+                    query = pboxes.select().where(
+                        pboxes.c.id == paybox_to_id, pboxes.c.cashbox == user.cashbox_id
+                    )
+                    pbox_to = await database.fetch_one(query)
+
+                    if not pbox_to:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Введенный счет не принадлежит вам или не существует!",
+                        )
+
+                    pbox_to_dict = dict(pbox_to)
+                    pbox_to_dict["balance"] = round(
+                        float(pbox_to_dict["balance"]) + float(payment_dict['amount']), 2
+                    )
+                    paybox_q = (
+                        pboxes.update()
+                        .where(
+                            pboxes.c.id == paybox_to_id,
+                            pboxes.c.cashbox == user.cashbox_id,
+                        )
+                        .values(pbox_to_dict)
+                    )
+                    await database.execute(paybox_q)
+
+            query = payments.insert(values=payment_dict)
+            pay_id = await database.execute(query)
+
+            if payment.project_id:
+                if payment.type == PaymentType.incoming:
+                    if payment.status:
+                        project_dict["incoming"] += payment_dict['amount_without_tax']
+                if payment.type == PaymentType.outgoing:
+                    if payment.status:
+                        project_dict["outgoing"] += payment_dict['amount_without_tax']
+                project_q = (
+                    projects.update()
+                    .where(
+                        projects.c.id == payment.project_id,
+                        projects.c.cashbox == user.cashbox_id,
+                    )
+                    .values(project_dict)
+                )
+                await database.execute(project_q)
+
+                query = projects.select().where(
+                    projects.c.id == payment.project_id,
+                    projects.c.cashbox == user.cashbox_id,
+                )
+                project = await database.fetch_one(query)
+
+                if not project:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Введенный проект не принадлежит вам или не существует!",
+                    )
+
+                in_sum = float(project.incoming)
+                out_sum = float(project.outgoing)
+
+                if out_sum == 0 and in_sum != 0:
+                    project_dict["profitability"] = 100
+                elif out_sum == 0 and in_sum == 0:
+                    project_dict["profitability"] = 0
+                else:
+                    project_dict["profitability"] = round(
+                        ((in_sum - out_sum) / out_sum) * 100, 2
+                    )
+
+                project_dict["updated_at"] = int(datetime.utcnow().timestamp())
+
+                query = (
+                    projects.update()
+                    .where(
+                        projects.c.id == payment.project_id,
+                        projects.c.cashbox == user.cashbox_id,
+                    )
+                    .values(project_dict)
+                )
+                await database.execute(query)
+
+                await manager.send_message(
+                    token,
+                    {"action": "edit", "target": "projects", "result": project_dict},
+                )
+
+            payment_dict["id"] = pay_id
+
+            # date_ts = int(datetime.timestamp(datetime.combine(payment.date, datetime.min.time())))
+
+            if paybox_dict["balance_date"] <= payment_dict['date']:
+                if payment.status:
+                    if payment.type == PaymentType.incoming:
+                        paybox_dict["balance"] = round(
+                            float(paybox_dict["balance"]) + float(payment_dict['amount']), 2
+                        )
+                    elif payment.type == PaymentType.outgoing:
+                        paybox_dict["balance"] = round(
+                            float(paybox_dict["balance"]) - float(payment_dict['amount']), 2
+                        )
+
+            await manager.send_message(
+                token, {"action": "edit", "target": "payboxes", "result": paybox_dict}
             )
+
+            del paybox_dict["id"]
+
             paybox_q = (
                 pboxes.update()
                 .where(
-                    pboxes.c.id == paybox_to_id,
-                    pboxes.c.cashbox == user.cashbox_id,
+                    pboxes.c.id == payment.paybox, pboxes.c.cashbox == user.cashbox_id
                 )
-                .values(pbox_to_dict)
+                .values(paybox_dict)
             )
             await database.execute(paybox_q)
 
-    query = payments.insert(values=payment_dict)
-    pay_id = await database.execute(query)
+            query = f"""
+            SELECT payments.id, payments.type, payments.name, payments.external_id, payments.article,
+            payments.article_id, payments.project_id, payments.tags, payments.amount,
+            payments.amount_without_tax, payments.description, payments.date, payments.repeat_freq,
+            payments.repeat_parent_id, payments.repeat_period, payments.repeat_first, payments.repeat_last,
+            payments.repeat_number, payments.repeat_day, payments.repeat_month, payments.repeat_weekday,
+            payments.repeat_seconds, payments.parent_id, payments.stopped, payments.status, payments.tax,
+            payments.tax_type, payments.deb_cred, payments.raspilen, payments.contragent, payments.cashbox,
+            payments.paybox, payments.paybox_to, payments.account, payments.is_deleted, payments.cheque,
+            payments.docs_sales_id, payments.created_at, payments.updated_at, 
+            (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents
+             WHERE contragents.id = payments.contragent) END) AS contragent_name
+            FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.id = {pay_id}
+            """
+            pay_dict = await database.fetch_one(query)
 
-    if payment.project_id:
-        if payment.type == PaymentType.incoming:
-            if payment.status:
-                project_dict["incoming"] += payment_dict['amount_without_tax']
-        if payment.type == PaymentType.outgoing:
-            if payment.status:
-                project_dict["outgoing"] += payment_dict['amount_without_tax']
-        project_q = (
-            projects.update()
-            .where(
-                projects.c.id == payment.project_id,
-                projects.c.cashbox == user.cashbox_id,
-            )
-            .values(project_dict)
-        )
-        await database.execute(project_q)
-
-        query = projects.select().where(
-            projects.c.id == payment.project_id,
-            projects.c.cashbox == user.cashbox_id,
-        )
-        project = await database.fetch_one(query)
-
-        if not project:
-            raise HTTPException(
-                status_code=403,
-                detail="Введенный проект не принадлежит вам или не существует!",
+            await manager.send_message(
+                token,
+                {"action": "create", "target": "payments", "result": dict(pay_dict)},
             )
 
-        in_sum = float(project.incoming)
-        out_sum = float(project.outgoing)
+            return {**payment_dict, **{ "data": { "status": "success" } }}
 
-        if out_sum == 0 and in_sum != 0:
-            project_dict["profitability"] = 100
-        elif out_sum == 0 and in_sum == 0:
-            project_dict["profitability"] = 0
-        else:
-            project_dict["profitability"] = round(
-                ((in_sum - out_sum) / out_sum) * 100, 2
-            )
-
-        project_dict["updated_at"] = int(datetime.utcnow().timestamp())
-
-        query = (
-            projects.update()
-            .where(
-                projects.c.id == payment.project_id,
-                projects.c.cashbox == user.cashbox_id,
-            )
-            .values(project_dict)
-        )
-        await database.execute(query)
-
-        await manager.send_message(
-            token,
-            {"action": "edit", "target": "projects", "result": project_dict},
-        )
-
-    payment_dict["id"] = pay_id
-
-    # date_ts = int(datetime.timestamp(datetime.combine(payment.date, datetime.min.time())))
-
-    if paybox_dict["balance_date"] <= payment_dict['date']:
-        if payment.status:
-            if payment.type == PaymentType.incoming:
-                paybox_dict["balance"] = round(
-                    float(paybox_dict["balance"]) + float(payment_dict['amount']), 2
-                )
-            elif payment.type == PaymentType.outgoing:
-                paybox_dict["balance"] = round(
-                    float(paybox_dict["balance"]) - float(payment_dict['amount']), 2
-                )
-
-    await manager.send_message(
-        token, {"action": "edit", "target": "payboxes", "result": paybox_dict}
-    )
-
-    del paybox_dict["id"]
-
-    paybox_q = (
-        pboxes.update()
-        .where(
-            pboxes.c.id == payment.paybox, pboxes.c.cashbox == user.cashbox_id
-        )
-        .values(paybox_dict)
-    )
-    await database.execute(paybox_q)
-
-    query = f"""
-    SELECT payments.id, payments.type, payments.name, payments.external_id, payments.article,
-    payments.article_id, payments.project_id, payments.tags, payments.amount,
-    payments.amount_without_tax, payments.description, payments.date, payments.repeat_freq,
-    payments.repeat_parent_id, payments.repeat_period, payments.repeat_first, payments.repeat_last,
-    payments.repeat_number, payments.repeat_day, payments.repeat_month, payments.repeat_weekday,
-    payments.repeat_seconds, payments.parent_id, payments.stopped, payments.status, payments.tax,
-    payments.tax_type, payments.deb_cred, payments.raspilen, payments.contragent, payments.cashbox,
-    payments.paybox, payments.paybox_to, payments.account, payments.is_deleted, payments.cheque,
-    payments.docs_sales_id, payments.created_at, payments.updated_at, 
-    (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents
-     WHERE contragents.id = payments.contragent) END) AS contragent_name
-    FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.id = {pay_id}
-    """
-    pay_dict = await database.fetch_one(query)
-
-    await manager.send_message(
-        token,
-        {"action": "create", "target": "payments", "result": dict(pay_dict)},
-    )
-
-    return {**payment_dict, **{ "data": { "status": "success" } }}
+    raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
 @router.get("/payment/{id}/", response_model=pay_schemas.PaymentInList)
