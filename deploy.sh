@@ -242,35 +242,6 @@ deploy_another_services() {
     -e ADMIN_ID=$ADMIN_ID \
     $IMAGE_NAME \
     /bin/bash -c "python3 message_consumer.py"
-
-  docker stop "notification_consumer_task"
-  docker rm "notification_consumer_task"
-
-  docker run -d \
-    --name "notification_consumer_task" \
-    --restart always \
-    --network infrastructure \
-    -e RABBITMQ_HOST=$RABBITMQ_HOST \
-    -e RABBITMQ_PORT=$RABBITMQ_PORT \
-    -e RABBITMQ_USER=$RABBITMQ_USER \
-    -e RABBITMQ_PASS=$RABBITMQ_PASS \
-    -e RABBITMQ_VHOST=$RABBITMQ_VHOST \
-    -e APP_URL=$APP_URL \
-    -e S3_ACCESS=$S3_ACCESS \
-    -e S3_SECRET=$S3_SECRET \
-    -e S3_URL=$S3_URL \
-    -e S3_BACKUPS_ACCESSKEY=$S3_BACKUPS_ACCESSKEY \
-    -e S3_BACKUPS_SECRETKEY=$S3_BACKUPS_SECRETKEY \
-    -e TG_TOKEN=$TG_TOKEN \
-    -e POSTGRES_USER=$POSTGRES_USER \
-    -e POSTGRES_PASS=$POSTGRES_PASS \
-    -e POSTGRES_HOST=$POSTGRES_HOST \
-    -e POSTGRES_PORT=$POSTGRES_PORT \
-    -e CHEQUES_TOKEN=$CHEQUES_TOKEN \
-    -e ACCOUNT_INTERVAL=$ACCOUNT_INTERVAL \
-    -e ADMIN_ID=$ADMIN_ID \
-    $IMAGE_NAME \
-    /bin/bash -c "python3 notification_consumer.py"
 }
 
 deploy_new_version
