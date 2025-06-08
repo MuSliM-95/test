@@ -255,7 +255,7 @@ class Segments:
         contragents = await self.get_contragents_data()
         added_contragents = await self.added_contragents_data()
         deleted_contragents = await self.deleted_contragents_data()
-        return{
+        return {
             "contragents": contragents,
             "added_contragents": added_contragents,
             "deleted_contragents": deleted_contragents
