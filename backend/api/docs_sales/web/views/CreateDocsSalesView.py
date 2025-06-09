@@ -579,6 +579,34 @@ class CreateDocsSalesView:
 
         for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
+                print(PaymentCreateModel(
+                        amount = AmountModel(
+                            value = str(round(data.paid_rubles, 2)),
+                            currency = "RUB"
+                        ),
+                        description = f"Оплата по документу {created['number']}",
+                        capture = True,
+                        receipt = ReceiptModel(
+                            customer = CustomerModel(
+                                full_name = contragent_data.name,
+                                email = contragent_data.email,
+                                phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
+                            ),
+                            items = [ItemModel(
+                                description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).get("name") or "Товар",
+                                amount = AmountModel(
+                                    value = good.price,
+                                    currency = "RUB"
+                                ),
+                                quantity = good.quantity,
+                                vat_code = "1"
+                            ) for good in data.goods],
+                        ),
+                        confirmation = ConfirmationRedirect(
+                            type = "redirect",
+                            return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+                        )
+                    ))
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
                     data.warehouse,
@@ -598,7 +626,7 @@ class CreateDocsSalesView:
                                 phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
                             ),
                             items = [ItemModel(
-                                description = good.nomenclature or "",
+                                description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).name or "Товар",
                                 amount = AmountModel(
                                     value = good.price,
                                     currency = "RUB"
