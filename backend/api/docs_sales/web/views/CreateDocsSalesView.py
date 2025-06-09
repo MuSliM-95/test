@@ -37,6 +37,7 @@ from database.db import database, contragents, contracts, organizations, warehou
 from functions.helpers import get_user_by_token, datetime_to_timestamp
 from functions.users import raschet
 from ws_manager import manager
+import phonenumbers
 
 
 class CreateDocsSalesView:
@@ -565,8 +566,18 @@ class CreateDocsSalesView:
             )
         )
 
+        contragents_data = await database.fetch_all(
+            select(
+                contragents.c.id,
+                contragents.c.name,
+                contragents.c.phone,
+                contragents.c.email
+            ).where(
+                contragents.c.id.in_([doc["contragent"] for doc in inserted_docs])
+            )
+        )
 
-        for created, data, payment_id in zip(inserted_docs, docs_sales_data.__root__, payments_ids):
+        for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
@@ -581,7 +592,11 @@ class CreateDocsSalesView:
                         description = f"Оплата по документу {created['number']}",
                         capture = True,
                         receipt = ReceiptModel(
-                            customer = CustomerModel(),
+                            customer = CustomerModel(
+                                full_name = contragent_data.name,
+                                email = contragent_data.email,
+                                phone = phonenumbers.parse(contragent_data.phone, "RU").national_number,
+                            ),
                             items = [ItemModel(
                                 description = good.nomenclature_name or "",
                                 amount = AmountModel(
