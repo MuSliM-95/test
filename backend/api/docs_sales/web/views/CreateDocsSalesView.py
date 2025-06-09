@@ -565,8 +565,6 @@ class CreateDocsSalesView:
                 payments.c.docs_sales_id.in_([doc["id"] for doc in inserted_docs])
             )
         )
-        print(inserted_docs)
-        print([doc["contragent"] for doc in inserted_docs])
 
         contragents_data = await database.fetch_all(
             select(
@@ -575,7 +573,7 @@ class CreateDocsSalesView:
                 contragents.c.phone,
                 contragents.c.email
             ).where(
-                contragents.c.id.in_([doc["contragent"] for doc in inserted_docs])
+                contragents.c.id.in_([doc.contragent for doc in docs_sales_data.__root__])
             )
         )
 
@@ -597,7 +595,7 @@ class CreateDocsSalesView:
                             customer = CustomerModel(
                                 full_name = contragent_data.name,
                                 email = contragent_data.email,
-                                phone = phonenumbers.parse(contragent_data.phone, "RU").national_number,
+                                phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
                             ),
                             items = [ItemModel(
                                 description = good.nomenclature_name or "",
