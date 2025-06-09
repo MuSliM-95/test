@@ -598,7 +598,7 @@ class CreateDocsSalesView:
                                 phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
                             ),
                             items = [ItemModel(
-                                description = good.nomenclature_name or "",
+                                description = good.nomenclature or "",
                                 amount = AmountModel(
                                     value = good.price,
                                     currency = "RUB"
