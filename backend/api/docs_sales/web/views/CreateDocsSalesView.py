@@ -577,6 +577,11 @@ class CreateDocsSalesView:
             )
         )
 
+        payment_subject = {
+            "product":"commodity",
+            "service":"service"
+        }
+
         for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
                 await yookassa_api_service.api_create_payment(
@@ -603,6 +608,8 @@ class CreateDocsSalesView:
                                     value = good.price,
                                     currency = "RUB"
                                 ),
+                                payment_mode = "full_payment",
+                                payment_subject = payment_subject.get((await database.fetch_one(select(nomenclature.c.type).where(nomenclature.c.id == int(good.nomenclature)))).type),
                                 quantity = good.quantity,
                                 vat_code = "1"
                             ) for good in data.goods],
