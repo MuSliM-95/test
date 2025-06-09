@@ -565,6 +565,8 @@ class CreateDocsSalesView:
                 payments.c.docs_sales_id.in_([doc["id"] for doc in inserted_docs])
             )
         )
+        print(inserted_docs)
+        print([doc["contragent"] for doc in inserted_docs])
 
         contragents_data = await database.fetch_all(
             select(
