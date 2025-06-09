@@ -1,10 +1,11 @@
+from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Union
-import datetime
 
-from database.db import OrderStatus
-from database.enums import Repeatability
 from pydantic import BaseModel
+from typing import Optional, List, Union
+
+from database.enums import Repeatability
+from sqlalchemy import JSON
 
 
 class Item(BaseModel):
@@ -88,7 +89,6 @@ class CreateMass(BaseModel):
     class Config:
         orm_mode = True
 
-
 class RecipientInfoSchema(BaseModel):
     name: Optional[str]
     surname: Optional[str]
@@ -101,11 +101,9 @@ class DeliveryInfoSchema(BaseModel):
     recipient: Optional[RecipientInfoSchema]
     note: Optional[str]
 
-
 class ResponseDeliveryInfoSchema(DeliveryInfoSchema):
     id: int
     docs_sales_id: int
-
 
 class ViewInList(BaseModel):
     id: int
@@ -186,57 +184,3 @@ class FilterSchema(BaseModel):
     created_at_to: Optional[int]
     updated_at_from: Optional[int]
     updated_at_to: Optional[int]
-
-
-class NotifyType(str, Enum):
-    general = "Общее"
-    assembly = "Сборка"
-    delivery = "Доставка"
-
-
-class OrderStatusUpdate(BaseModel):
-    status: OrderStatus
-    comment: Optional[str] = None
-
-
-class AssignUserRole(str, Enum):
-    picker = "picker"
-    courier = "courier"
-
-
-class AssignUser(BaseModel):
-    user_id: Optional[int] = None
-    phone: Optional[str] = None
-    name: Optional[str] = None
-
-
-class NotifyConfig(BaseModel):
-    type: NotifyType
-    send_notification: bool = True
-    recipients: Optional[List[str]] = (
-        None
-    )
-
-
-class NotifyResponse(BaseModel):
-    success: bool
-    message: str
-    general_url: Optional[str] = None
-    picker_url: Optional[str] = None
-    courier_url: Optional[str] = None
-
-
-class OrderLinkResponse(BaseModel):
-    id: int
-    docs_sales_id: int
-    role: str
-    hash: str
-    url: str
-    created_at: Optional[datetime.datetime] = None
-    updated_at: Optional[datetime.datetime] = None
-
-
-class OrderLinksResponse(BaseModel):
-    general_link: Optional[OrderLinkResponse] = None
-    picker_link: Optional[OrderLinkResponse] = None
-    courier_link: Optional[OrderLinkResponse] = None
