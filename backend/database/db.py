@@ -1948,15 +1948,14 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("criteria", JSON, nullable=False),
-    sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True)),
-    sqlalchemy.Column("uuid", UUID, nullable=False, unique=True, index=True),
     sqlalchemy.Column("type_of_update", String, nullable=False),
     sqlalchemy.Column("update_settings", JSON, nullable=True),
     sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
     sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
-
+    sqlalchemy.Column("is_archived", Boolean, server_default='false'),
 
 
 )

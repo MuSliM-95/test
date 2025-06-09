@@ -22,6 +22,7 @@ async def get_segment_ids():
     query = select(segments.c.id).where(
         and_(
             segments.c.type_of_update == 'cron',
+            segments.c.is_archived.isnot(True),
             segments.c.update_settings['interval_minutes'].isnot(None),
             segments.c.updated_at <= func.now() - func.make_interval(
                 0, 0, 0, 0, 0, interval_minutes)

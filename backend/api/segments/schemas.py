@@ -67,6 +67,7 @@ class SegmentCreate(BaseModel):
     criteria: SegmentCriteria
     type_of_update: Literal["cron", "request"]
     update_settings: Optional[UpdateSettings]
+    is_archived: bool
 
     @root_validator
     def check_update_settings(cls, values):
@@ -87,8 +88,7 @@ class Segment(BaseModel):
     type_of_update: str
     update_settings: dict
     status: str
-    update_url: str
-    result_url: str
+    is_archived: bool
 
 
 class Contragent(BaseModel):

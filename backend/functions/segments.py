@@ -1,5 +1,4 @@
 import json
-from asyncio import sleep
 from datetime import datetime, timedelta
 
 from database.db import (
@@ -18,12 +17,6 @@ class Segments:
     async def async_init(self):
         self.segment_obj = await database.fetch_one(
             segments.select().where(segments.c.id == self.segment_id))
-
-    async def obj_by_uuid(self, uuid):
-        self.segment_obj = await database.fetch_one(
-            segments.select().where(segments.c.uuid == uuid))
-        if self.segment_obj:
-            self.segment_id = self.segment_obj.id
 
     async def update_segment_datetime(self):
         await database.execute(
@@ -188,7 +181,7 @@ class Segments:
             select(contragents.c.id)
             .distinct(contragents.c.id)
             .join(docs_sales, docs_sales.c.contragent == contragents.c.id)
-            .where(docs_sales.c.created_by == self.segment_obj.created_by)
+            .where(docs_sales.c.cashbox == self.segment_obj.cashbox_id)
         )
 
         if criteria_data.get("purchases"):
