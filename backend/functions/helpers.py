@@ -581,8 +581,9 @@ async def check_user_permission(user_id: int, cashbox_id: int, section: str, pay
             users_cboxes_relation.c.cashbox_id == cashbox_id
         )
     )
+    print(user_id, cashbox_id)
     user = await database.fetch_one(user_query)
-
+    print(dict(user))
     if user and user.is_owner:
         return True
 
