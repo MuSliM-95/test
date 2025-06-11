@@ -72,6 +72,7 @@ class UserPermissionsList(BaseModel):
 
 
 class UserPermissionsResult(BaseModel):
+    is_admin: Optional[bool] = None
     user_id: int
     first_name: str
     last_name: Optional[str]

@@ -286,6 +286,7 @@ async def get_my_permissions(token: str):
             })
         
         return {
+            "is_admin": user_relation.is_owner,
             "user_id": user_relation.user,
             "first_name": target_user.first_name,
             "last_name": target_user.last_name,
@@ -380,6 +381,7 @@ async def get_my_permissions(token: str):
                 permissions_list.append(payment_perm)
     
     return {
+        "is_admin":user_relation.is_owner,
         "user_id": user_relation.user,
         "first_name": target_user.first_name,
         "last_name": target_user.last_name,
