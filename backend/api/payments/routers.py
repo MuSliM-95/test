@@ -151,6 +151,7 @@ async def read_payments_list(
 
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
+
     if not user or not user.status:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 

@@ -577,7 +577,7 @@ async def check_user_permission(user_id: int, cashbox_id: int, section: str, pay
     """
     user_query = users_cboxes_relation.select().where(
         and_(
-            users_cboxes_relation.c.user == user_id,
+            users_cboxes_relation.c.id == user_id,
             users_cboxes_relation.c.cashbox_id == cashbox_id
         )
     )
