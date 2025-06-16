@@ -22,10 +22,11 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
+import enum
+import datetime
 
 from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
 
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -114,6 +115,14 @@ class NomenclatureCashbackType(str, ENUM):
     const = "const"
     no_cashback = "no_cashback"
     lcard_cashback = "lcard_cashback"
+    
+class OrderStatus(str, ENUM):
+    received = "received"
+    processed = "processed"
+    collecting = "collecting"
+    collected = "collected"
+    picked = "picked"
+    delivered = "delivered"
 
 metadata = sqlalchemy.MetaData()
 
@@ -1173,6 +1182,15 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("sum", Float),
     sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean, index=True),
+    
+    sqlalchemy.Column("order_status", Enum(OrderStatus), nullable=True, server_default="received"),
+    sqlalchemy.Column("assigned_picker", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=True),
+    sqlalchemy.Column("picker_started_at", DateTime(timezone=True), nullable=True),
+    sqlalchemy.Column("picker_finished_at", DateTime(timezone=True), nullable=True),
+    sqlalchemy.Column("assigned_courier", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=True),
+    sqlalchemy.Column("courier_picked_at", DateTime(timezone=True), nullable=True),
+    sqlalchemy.Column("courier_delivered_at", DateTime(timezone=True), nullable=True),
+    
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -1970,3 +1988,21 @@ engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)
 
 async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL_ASYNC, pool_pre_ping=True, poolclass=NullPool)
 async_session_maker = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+
+class Role(enum.Enum):
+    general = "general"
+    picker = "picker"
+    courier = "courier"
+
+docs_sales_links = sqlalchemy.Table(
+    "docs_sales_links",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("docs_sales_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column("role", sqlalchemy.Enum(Role), nullable=False),
+    sqlalchemy.Column("hash", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("url", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now),
+    sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
+)
