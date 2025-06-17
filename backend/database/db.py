@@ -25,6 +25,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 import enum
 import datetime
+from dotenv import load_dotenv
 
 from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
 
