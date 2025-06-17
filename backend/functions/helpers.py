@@ -8,7 +8,7 @@ import aiohttp
 import pytz
 from databases.backends.postgres import Record
 from fastapi import HTTPException
-from sqlalchemy import Table, cast, String, and_
+from sqlalchemy import Table, cast, String, and_, or_
 
 from database.db import articles
 
@@ -27,6 +27,7 @@ from database.db import (
     units,
     entity_or_function,
     fifo_settings, docs_sales_settings,
+    user_permissions,
 )
 
 
@@ -106,7 +107,7 @@ def get_filters(table, filters):
 
     datefrom = None
     dateto = None
-    
+
     timezone_str = filters_dict.get("timezone", "UTC")
     try:
         timezone = pytz.timezone(timezone_str)
@@ -552,11 +553,87 @@ def add_status(instance: Optional[Record]) -> Optional[dict]:
 
 
 async def get_user_by_token(token: str) -> Record:
-    query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
+    query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
     if not user or not user.status:
         raise_wrong_token()
     return user
+
+
+async def check_user_permission(user_id: int, cashbox_id: int, section: str, paybox_id: int = None,
+                                need_edit: bool = False) -> bool:
+    """
+    Проверка прав пользователя на доступ к разделу/счету
+
+    Args:
+        user_id: ID пользователя
+        cashbox_id: ID кассы
+        section: Название раздела (payments, pboxes и т.д.)
+        paybox_id: ID счета (опционально)
+        need_edit: Требуется ли право на редактирование
+
+    Returns:
+        bool: Есть ли у пользователя требуемые права
+    """
+    user_query = users_cboxes_relation.select().where(
+        and_(
+            users_cboxes_relation.c.id == user_id,
+            users_cboxes_relation.c.cashbox_id == cashbox_id
+        )
+    )
+    user = await database.fetch_one(user_query)
+    if user and user.is_owner:
+        return True
+
+    query = user_permissions.select().where(
+        and_(
+            user_permissions.c.user_id == user_id,
+            user_permissions.c.cashbox_id == cashbox_id,
+            user_permissions.c.section == section,
+            user_permissions.c.can_view == True
+        )
+    )
+
+    if need_edit:
+        query = query.where(user_permissions.c.can_edit == True)
+
+    if paybox_id:
+        query = query.where(
+            or_(
+                user_permissions.c.paybox_id.is_(None),
+                user_permissions.c.paybox_id == paybox_id
+            )
+        )
+
+    permission = await database.fetch_one(query)
+    return bool(permission)
+
+
+async def hide_balance_for_non_admin(user, data):
+    """
+    Скрывает баланс счета для обычных пользователей (не админов)
+
+    Args:
+        user: Объект пользователя из таблицы users_cboxes_relation
+        data: Данные счетов (список или один счет)
+
+    Returns:
+        Модифицированные данные счетов
+    """
+    if not user.is_owner:
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and "balance" in item:
+                    item["balance"] = None
+                    if "name" in item and " (" in item["name"]:
+                        item["name"] = item["name"].split(" (")[0]
+        else:
+            if isinstance(data, dict) and "balance" in data:
+                data["balance"] = None
+                if "name" in data and " (" in data["name"]:
+                    data["name"] = data["name"].split(" (")[0]
+
+    return data
 
 
 async def get_entity_by_id(entity: Table, idx: int, cashbox: int) -> Record:
@@ -727,7 +804,8 @@ async def init_statement(statement_data: dict, access_token: str):
 
 
 async def add_delivery_info_to_doc(doc: dict) -> dict:
-    delivery_info_query = docs_sales_delivery_info.select().where(docs_sales_delivery_info.c.docs_sales_id == doc.get('id'))
+    delivery_info_query = docs_sales_delivery_info.select().where(
+        docs_sales_delivery_info.c.docs_sales_id == doc.get('id'))
     delivery_info = await database.fetch_one(delivery_info_query)
     if delivery_info:
         doc["delivery_info"] = {

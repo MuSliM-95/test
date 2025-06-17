@@ -37,6 +37,7 @@ from database.db import database, contragents, contracts, organizations, warehou
 from functions.helpers import get_user_by_token, datetime_to_timestamp
 from functions.users import raschet
 from ws_manager import manager
+import phonenumbers
 
 
 class CreateDocsSalesView:
@@ -565,8 +566,23 @@ class CreateDocsSalesView:
             )
         )
 
+        contragents_data = await database.fetch_all(
+            select(
+                contragents.c.id,
+                contragents.c.name,
+                contragents.c.phone,
+                contragents.c.email
+            ).where(
+                contragents.c.id.in_([doc.contragent for doc in docs_sales_data.__root__])
+            )
+        )
 
-        for created, data, payment_id in zip(inserted_docs, docs_sales_data.__root__, payments_ids):
+        payment_subject = {
+            "product":"commodity",
+            "service":"service"
+        }
+
+        for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
@@ -581,13 +597,19 @@ class CreateDocsSalesView:
                         description = f"Оплата по документу {created['number']}",
                         capture = True,
                         receipt = ReceiptModel(
-                            customer = CustomerModel(),
+                            customer = CustomerModel(
+                                full_name = contragent_data.name,
+                                email = contragent_data.email,
+                                phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
+                            ),
                             items = [ItemModel(
-                                description = good.nomenclature_name or "",
+                                description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).name or "Товар",
                                 amount = AmountModel(
-                                    value = good.price,
+                                    value = str(round(good.price - data.paid_lt/len(data.goods),2)),
                                     currency = "RUB"
                                 ),
+                                payment_mode = "full_payment",
+                                payment_subject = payment_subject.get((await database.fetch_one(select(nomenclature.c.type).where(nomenclature.c.id == int(good.nomenclature)))).type),
                                 quantity = good.quantity,
                                 vat_code = "1"
                             ) for good in data.goods],
