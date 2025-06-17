@@ -1,8 +1,9 @@
 import os
+import uuid
 from enum import Enum as ENUM
 import databases
-from dotenv import load_dotenv
 import sqlalchemy
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.pool import NullPool
 from sqlalchemy import (
     ARRAY,
@@ -30,7 +31,6 @@ from database.enums import Repeatability, DebitCreditType, Gender, ContragentTyp
 
 load_dotenv()
 
-load_dotenv()
 
 class OperationType(str, ENUM):
     plus = "+"
@@ -123,6 +123,18 @@ class OrderStatus(str, ENUM):
     collected = "collected"
     picked = "picked"
     delivered = "delivered"
+
+
+class SegmentStatus(str, ENUM):
+    created = "created"
+    in_process = "in_process"
+    calculated = "calculated"
+
+
+class SegmentStatusHistory(str, ENUM):
+    added = "added"
+    deleted = "deleted"
+
 
 metadata = sqlalchemy.MetaData()
 
@@ -1948,6 +1960,42 @@ docs_sales_utm_tags = sqlalchemy.Table(
     sqlalchemy.Column("utm_gaclientid", String),
 )
 
+segments = sqlalchemy.Table(
+    "segments",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("name", String, nullable=False),
+    sqlalchemy.Column("criteria", JSON, nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True)),
+    sqlalchemy.Column("type_of_update", String, nullable=False),
+    sqlalchemy.Column("update_settings", JSON, nullable=True),
+    sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
+    sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
+    sqlalchemy.Column("is_archived", Boolean, server_default='false'),
+
+
+)
+client_segments = sqlalchemy.Table(
+    "client_segments",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("segment_id", ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("contragent_id", ForeignKey("contragents.id")),
+)
+
+client_segment_history = sqlalchemy.Table(
+    "client_segment_history",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("segment_id", ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("contragent_id", ForeignKey("contragents.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
+    sqlalchemy.Column("status", Enum(SegmentStatusHistory), nullable=False),
+)
+
+
 user_permissions = sqlalchemy.Table(
     "user_permissions",
     metadata,
@@ -1973,7 +2021,6 @@ amo_docs_sales_delivery_contragents = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
-
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_job_store"
