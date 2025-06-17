@@ -33,8 +33,6 @@ async def get_segment_ids():
 
 
 async def segment_update():
-    await database.connect()
-
     segment_ids = await get_segment_ids()
     for segment_id in segment_ids:
         await update_segment_task(segment_id)
