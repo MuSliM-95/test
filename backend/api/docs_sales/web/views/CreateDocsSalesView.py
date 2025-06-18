@@ -605,7 +605,7 @@ class CreateDocsSalesView:
                             items = [ItemModel(
                                 description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).name or "Товар",
                                 amount = AmountModel(
-                                    value = str(round(good.price - data.paid_lt/len(data.goods),2)),
+                                    value = str(round(good.price - data.paid_lt/len(data.goods), 2)) if data.paid_lt else str(round(good.price,2)),
                                     currency = "RUB"
                                 ),
                                 payment_mode = "full_payment",
