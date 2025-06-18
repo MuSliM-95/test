@@ -602,11 +602,11 @@ class CreateDocsSalesView:
                                     quantity = good.quantity,
                                     vat_code = "1"
                                 ))
-                sum_goods_diff = [float(item.amount.value) for item in payment_items_data]
+                sum_goods_diff = [float(item.amount.value)*item.quantity for item in payment_items_data]
                 print(sum_goods_diff)
                 diff_for_last_item = data.paid_rubles - sum(sum_goods_diff)
                 print(diff_for_last_item)
-                payment_items_data[-1].amount.value = float(payment_items_data[-1].amount.value) + diff_for_last_item
+                payment_items_data[-1].amount.value = str(float(payment_items_data[-1].amount.value) + diff_for_last_item)
                 print(PaymentCreateModel(
                         amount = AmountModel(
                             value = str(round(data.paid_rubles, 2)),
