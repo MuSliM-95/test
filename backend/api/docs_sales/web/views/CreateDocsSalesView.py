@@ -589,7 +589,7 @@ class CreateDocsSalesView:
                 print(goods_sum)
                 discount_sum_item = round(abs(data.paid_rubles - goods_sum), 2)
                 print(discount_sum_item)
-                discount_sum_diff = abs(discount_sum_item - data.paid_rubles)
+                discount_sum_diff = abs(goods_sum+discount_sum_item - data.paid_rubles)
                 print(discount_sum_diff)
                 for index, good in enumerate(data.goods):
                     payment_items_data.append(
