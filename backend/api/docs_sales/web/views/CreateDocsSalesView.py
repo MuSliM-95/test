@@ -4,6 +4,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime
 from typing import Set, Any
+import decimal
 
 from fastapi import HTTPException
 from sqlalchemy import select, and_, or_, desc, func, cast, Integer
@@ -602,11 +603,11 @@ class CreateDocsSalesView:
                                     quantity = good.quantity,
                                     vat_code = "1"
                                 ))
-                sum_goods_diff = [float(item.amount.value)*item.quantity for item in payment_items_data]
+                sum_goods_diff = [decimal.Decimal(item.amount.value)*int(item.quantity) for item in payment_items_data]
                 print(sum_goods_diff)
-                diff_for_last_item = abs(data.paid_rubles - sum(sum_goods_diff))
+                diff_for_last_item = decimal.Decimal(abs(data.paid_rubles - sum(sum_goods_diff)))
                 print(diff_for_last_item)
-                payment_items_data[-1].amount.value = str(float(payment_items_data[-1].amount.value) + round(diff_for_last_item, 2))
+                payment_items_data[-1].amount.value = str(decimal.Decimal(payment_items_data[-1].amount.value) + diff_for_last_item)
                 print(PaymentCreateModel(
                         amount = AmountModel(
                             value = str(round(data.paid_rubles, 2)),
