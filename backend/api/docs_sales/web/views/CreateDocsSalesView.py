@@ -585,7 +585,7 @@ class CreateDocsSalesView:
         for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
                 payment_items_data = []
-                discount_sum_item = round(abs(data.paid_rubles - sum([good.price for good in data.goods]))/len(data.goods), 2)
+                discount_sum_item = round(abs(data.paid_rubles - sum([good.price*good.quantity for good in data.goods]))/len(data.goods), 2)
                 discount_sum_diff = abs(discount_sum_item - data.paid_rubles)
                 for index, good in enumerate(data.goods):
                     payment_items_data.append(
