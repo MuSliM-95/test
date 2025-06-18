@@ -605,7 +605,7 @@ class CreateDocsSalesView:
                                 ))
                 sum_goods_diff = [decimal.Decimal(item.amount.value)*int(item.quantity) for item in payment_items_data]
                 print(sum_goods_diff)
-                diff_for_last_item = decimal.Decimal(abs(data.paid_rubles - sum(sum_goods_diff)))
+                diff_for_last_item = abs(decimal.Decimal(data.paid_rubles) - sum(sum_goods_diff))
                 print(diff_for_last_item)
                 payment_items_data[-1].amount.value = str(decimal.Decimal(payment_items_data[-1].amount.value) + diff_for_last_item)
                 print(PaymentCreateModel(
