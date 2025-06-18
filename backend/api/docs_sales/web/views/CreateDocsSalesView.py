@@ -584,6 +584,42 @@ class CreateDocsSalesView:
 
         for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
+                payment_items_data = []
+                discount_sum_item = round(abs(data.paid_rubles - sum([good.price for good in data.goods]))/len(data.goods), 2)
+                discount_sum_diff = abs(discount_sum_item - data.paid_rubles)
+                for index, good in enumerate(data.goods):
+                    payment_items_data.append(
+                        ItemModel(
+                                    description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).name or "Товар",
+                                    amount = AmountModel(
+                                        value = str(good.price - discount_sum_item) if index != len(data.goods) else str(good.price - discount_sum_item + discount_sum_diff),
+                                        currency = "RUB"
+                                    ),
+                                    payment_mode = "full_payment",
+                                    payment_subject = payment_subject.get((await database.fetch_one(select(nomenclature.c.type).where(nomenclature.c.id == int(good.nomenclature)))).type),
+                                    quantity = good.quantity,
+                                    vat_code = "1"
+                                ))
+                print(PaymentCreateModel(
+                        amount = AmountModel(
+                            value = str(round(data.paid_rubles, 2)),
+                            currency = "RUB"
+                        ),
+                        description = f"Оплата по документу {created['number']}",
+                        capture = True,
+                        receipt = ReceiptModel(
+                            customer = CustomerModel(
+                                full_name = contragent_data.name,
+                                email = contragent_data.email,
+                                phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
+                            ),
+                            items = payment_items_data,
+                        ),
+                        confirmation = ConfirmationRedirect(
+                            type = "redirect",
+                            return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+                        )
+                    ))
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
                     data.warehouse,
@@ -602,17 +638,7 @@ class CreateDocsSalesView:
                                 email = contragent_data.email,
                                 phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
                             ),
-                            items = [ItemModel(
-                                description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).name or "Товар",
-                                amount = AmountModel(
-                                    value = str(round(good.price - data.paid_lt/len(data.goods), 2)) if data.paid_lt else str(round(good.price,2)),
-                                    currency = "RUB"
-                                ),
-                                payment_mode = "full_payment",
-                                payment_subject = payment_subject.get((await database.fetch_one(select(nomenclature.c.type).where(nomenclature.c.id == int(good.nomenclature)))).type),
-                                quantity = good.quantity,
-                                vat_code = "1"
-                            ) for good in data.goods],
+                            items = payment_items_data,
                         ),
                         confirmation = ConfirmationRedirect(
                             type = "redirect",
