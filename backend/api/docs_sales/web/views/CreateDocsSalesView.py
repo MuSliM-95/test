@@ -586,10 +586,11 @@ class CreateDocsSalesView:
         for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
             if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
                 payment_items_data = []
+
                 goods_sum_item = sum([good.price*good.quantity for good in data.goods])
-                print(goods_sum_item)
+
                 discount_sum_item = round(abs(data.paid_rubles - goods_sum_item), 2)
-                print(discount_sum_item)
+
                 for index, good in enumerate(data.goods):
                     payment_items_data.append(
                         ItemModel(
@@ -604,30 +605,7 @@ class CreateDocsSalesView:
                                     vat_code = "1"
                                 ))
                 sum_goods_diff = [decimal.Decimal(item.amount.value)*int(item.quantity) for item in payment_items_data]
-                print(sum_goods_diff)
-                diff_for_last_item = abs(decimal.Decimal(data.paid_rubles) - sum(sum_goods_diff))
-                print(diff_for_last_item)
-                payment_items_data[-1].amount.value = str(decimal.Decimal(payment_items_data[-1].amount.value) + diff_for_last_item)
-                print(PaymentCreateModel(
-                        amount = AmountModel(
-                            value = str(round(data.paid_rubles, 2)),
-                            currency = "RUB"
-                        ),
-                        description = f"Оплата по документу {created['number']}",
-                        capture = True,
-                        receipt = ReceiptModel(
-                            customer = CustomerModel(
-                                full_name = contragent_data.name,
-                                email = contragent_data.email,
-                                phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
-                            ),
-                            items = payment_items_data,
-                        ),
-                        confirmation = ConfirmationRedirect(
-                            type = "redirect",
-                            return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
-                        )
-                    ))
+
                 await yookassa_api_service.api_create_payment(
                     user.cashbox_id,
                     data.warehouse,
@@ -635,7 +613,7 @@ class CreateDocsSalesView:
                     payment_id.get("id"),
                     PaymentCreateModel(
                         amount = AmountModel(
-                            value = str(round(data.paid_rubles, 2)),
+                            value = str(round(sum(sum_goods_diff), 2)),
                             currency = "RUB"
                         ),
                         description = f"Оплата по документу {created['number']}",
