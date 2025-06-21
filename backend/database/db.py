@@ -558,6 +558,7 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
     sqlalchemy.Column("category", Integer, ForeignKey("categories.id")),
+    sqlalchemy.Column("tags", String, nullable=True),
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
@@ -856,6 +857,7 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("user", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("token", String),
     sqlalchemy.Column("status", Boolean, default=True),
+    sqlalchemy.Column("tags", String, nullable=True),
     sqlalchemy.Column("is_owner", Boolean, default=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
@@ -2001,11 +2003,11 @@ user_permissions = sqlalchemy.Table(
     "user_permissions",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("user_id", Integer, ForeignKey("users_cboxes_relation.id")),
+    sqlalchemy.Column("user_id", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("section", String, nullable=False),  # Название раздела (payments, payboxes)
     sqlalchemy.Column("can_view", Boolean, default=True),
     sqlalchemy.Column("can_edit", Boolean, default=False),
-    sqlalchemy.Column("paybox_id", Integer, ForeignKey("pboxes.id"), nullable=True),  # Доступ к конкретному счету
+    sqlalchemy.Column("paybox_id", Integer, ForeignKey("payboxes.id"), nullable=True),  # Доступ к конкретному счету
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),

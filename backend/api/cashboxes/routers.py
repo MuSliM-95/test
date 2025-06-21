@@ -77,6 +77,7 @@ async def read_cashbox_users(
                     "is_admin": u.is_owner,
                     "created_at": tg_acc.created_at,
                     "updated_at": tg_acc.updated_at,
+                    "tags": u.tags,
                 }
 
                 users_list.append(user_dict)
@@ -122,6 +123,7 @@ async def edit_cashbox_user_status(token: str, user_id: int, status: bool):
                 "is_admin": owner.is_owner,
                 "created_at": tg_acc.created_at,
                 "updated_at": tg_acc.updated_at,
+                "tags": owner.tags,
             }
 
             await manager.send_message(

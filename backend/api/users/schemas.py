@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import re
+
+from pydantic import BaseModel, validator
 from typing import List, Optional
 
 
@@ -14,6 +16,7 @@ class CBUsers(BaseModel):
     is_admin: bool
     created_at: int
     updated_at: int
+    tags: Optional[str]
 
     class Config:
         orm_mode = True
@@ -78,3 +81,26 @@ class UserPermissionsResult(BaseModel):
     last_name: Optional[str]
     username: Optional[str]
     permissions: List[UserPermissionsList]
+
+
+class UserTagsUpdate(BaseModel):
+    tags: Optional[str]
+
+    @validator("tags")
+    def validate_tags(cls, v):
+        tag_list = [tag.strip() for tag in v.split(",") if tag.strip()]
+
+        if len(tag_list) > 10:
+            raise ValueError("Максимум 10 тегов")
+
+        if len(set(tag_list)) < len(tag_list):
+            raise ValueError("Теги не должны повторяться")
+
+        pattern = re.compile(r"^[a-zA-Zа-яА-Я0-9_-]{2,20}$")
+        for tag in tag_list:
+            if not pattern.match(tag):
+                raise ValueError(
+                    f"Тег '{tag}' содержит недопустимые символы или некорректную длину (2–20 символов)"
+                )
+
+        return v
