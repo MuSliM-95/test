@@ -18,7 +18,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger, BIGINT, text,
+    UniqueConstraint, SmallInteger, BIGINT, text, Index
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -2001,11 +2001,11 @@ user_permissions = sqlalchemy.Table(
     "user_permissions",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("user_id", Integer, ForeignKey("users_cboxes_relation.id")),
+    sqlalchemy.Column("user_id", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("section", String, nullable=False),  # Название раздела (payments, payboxes)
     sqlalchemy.Column("can_view", Boolean, default=True),
     sqlalchemy.Column("can_edit", Boolean, default=False),
-    sqlalchemy.Column("paybox_id", Integer, ForeignKey("pboxes.id"), nullable=True),  # Доступ к конкретному счету
+    sqlalchemy.Column("paybox_id", Integer, ForeignKey("payboxes.id"), nullable=True),  # Доступ к конкретному счету
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -2022,6 +2022,30 @@ amo_docs_sales_delivery_contragents = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
+
+amo_lead_contacts = sqlalchemy.Table(
+    "amo_lead_contacts",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("lead_id", BigInteger),
+    sqlalchemy.Column("contact_id", BigInteger),
+    sqlalchemy.Column("is_main", Boolean, server_default="true"),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+
+    Index(
+        "uq_amo_lead_contacts_group_lead_contact",
+        "amo_install_group_id", "lead_id", "contact_id",
+        unique=True,
+        postgresql_where=sqlalchemy.and_(
+            sqlalchemy.Column("amo_install_group_id").isnot(None),
+            sqlalchemy.Column("lead_id").isnot(None),
+            sqlalchemy.Column("contact_id").isnot(None),
+        )
+    ),
+)
+
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_job_store"
