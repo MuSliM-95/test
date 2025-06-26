@@ -165,7 +165,7 @@ from api.segments.routers import router as segments_router
 # )
 
 app = FastAPI(
-    root_path="/api/v1",
+    # root_path="/api/v1",
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0"

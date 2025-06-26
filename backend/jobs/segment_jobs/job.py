@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from database.db import database, segments
-from functions.segments import update_segment_task
+from segments.main import update_segment_task
 
 from sqlalchemy import select, cast, func, Integer, and_
 from sqlalchemy.dialects.postgresql import JSONB

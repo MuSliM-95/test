@@ -8,47 +8,15 @@ from database.db import (
 )
 from sqlalchemy import func, and_, text, or_, select
 
+from segments.ranges import apply_range, apply_date_range
+from sqlalchemy.sql import Select
 
-class Segments:
-    def __init__(self, segment_id: int = None):
-        self.segment_id = segment_id
-        self.segment_obj = None
 
-    async def async_init(self):
-        self.segment_obj = await database.fetch_one(
-            segments.select().where(segments.c.id == self.segment_id))
+class ContragentsLogic:
+    def __init__(self, segment_obj):
+        self.segment_obj = segment_obj
 
-    async def update_segment_datetime(self):
-        await database.execute(
-            segments.update().where(segments.c.id == self.segment_id)
-            .values(
-                updated_at=datetime.now(),
-                previous_update_at=self.segment_obj.updated_at,
-            )
-        )
-        await self.async_init()
-
-    @staticmethod
-    def _apply_range(col, rng: dict, container: list):
-        """
-        Вспомогательная функция: добавляет выражения >=, <=, = в container.
-        """
-        if not rng:
-            return
-        if "gte" in rng:
-            container.append(col >= rng["gte"])
-        if "lte" in rng:
-            container.append(col <= rng["lte"])
-        if "eq" in rng:
-            container.append(col == rng["eq"])
-
-    def _apply_date_range(self, col, rng:dict, container: list):
-        new_rng = {}
-        for k, v in rng.items():
-            new_rng[k] = datetime.strptime(v, "%Y-%m-%d").date()
-        self._apply_range(col, new_rng, container)
-
-    def add_purchase_filters(self, query:str, purchase_criteria: dict) -> str:
+    def add_purchase_filters(self, query: Select, purchase_criteria: dict) -> Select:
         """
             Добавляет в запрос фильтры и агрегаты, описанные в purchase_criteria.
 
@@ -61,11 +29,11 @@ class Segments:
 
         # ---- 1. Диапазон дат конкретных чеков ----------------------------------
         if dr := purchase_criteria.get("date_range"):
-            self._apply_date_range(docs_sales.c.created_at, dr, where_clauses)
+            apply_date_range(docs_sales.c.created_at, dr, where_clauses)
 
         # ---- 2. Сумма одного чека ----------------------------------------------
         if per_check := purchase_criteria.get("amount_per_check"):
-            self._apply_range(docs_sales.c.sum, per_check, where_clauses)
+            apply_range(docs_sales.c.sum, per_check, where_clauses)
 
         if purchase_criteria.get("categories") or purchase_criteria.get("nomenclatures"):
             query = (
@@ -99,10 +67,10 @@ class Segments:
         query = query.group_by(contragents.c.id)
 
         if rng := purchase_criteria.get("count"):
-            self._apply_range(func.count(docs_sales.c.id), rng, having_clauses)
+            apply_range(func.count(docs_sales.c.id), rng, having_clauses)
 
         if rng := purchase_criteria.get("total_amount"):
-            self._apply_range(func.sum(docs_sales.c.sum), rng, having_clauses)
+            apply_range(func.sum(docs_sales.c.sum), rng, having_clauses)
 
         # ---- 5. Последняя покупка N дней назад ---------------------------------
         if rng := purchase_criteria.get("last_purchase_days_ago"):
@@ -126,7 +94,7 @@ class Segments:
 
         return query
 
-    def add_loyality_filters(self, query:str, loyality_criteria: dict) -> str:
+    def add_loyality_filters(self, query: Select, loyality_criteria: dict) -> Select:
         """
             Добавляет в запрос фильтры и агрегаты, описанные в loyality_criteria.
 
@@ -144,7 +112,7 @@ class Segments:
         )
 
         if balance := loyality_criteria.get("balance"):
-            self._apply_range(loyality_cards.c.balance, balance, where_clauses)
+            apply_range(loyality_cards.c.balance, balance, where_clauses)
 
         if expire := loyality_criteria.get("expires_in_days"):
             # INTERVAL '1 second' * lifetime
@@ -154,26 +122,14 @@ class Segments:
             # Остаток в днях
             days_left = func.DATE_PART('day', expiry_datetime - func.now())
 
-            self._apply_range(days_left, expire, where_clauses)
+            apply_range(days_left, expire, where_clauses)
 
         if where_clauses:
             query = query.where(and_(*where_clauses))
 
         return query
 
-    async def set_status_in_progress(self):
-        await database.execute(
-            segments.update().where(segments.c.id == self.segment_id)
-            .values(status=SegmentStatus.in_process.value)
-        )
-
-    async def set_status_calculated(self):
-        await database.execute(
-            segments.update().where(segments.c.id == self.segment_id)
-            .values(status=SegmentStatus.calculated.value)
-        )
-
-    async def update_segment(self):
+    async def update_contragent_segment(self):
 
         criteria_data = json.loads(self.segment_obj.criteria)
 
@@ -199,26 +155,24 @@ class Segments:
             await self.add_contragents_to_segment(ids_to_segment)
         if ids_out_of_segment:
             await self.remove_contragents_from_segment(ids_out_of_segment)
-        await self.update_segment_datetime()
-        await self.set_status_calculated()
 
         return contragent_to_segment
 
     async def get_contragent_in_segment(self):
-        query = select(client_segments.c.contragent_id).where(client_segments.c.segment_id == self.segment_id)
+        query = select(client_segments.c.contragent_id).where(client_segments.c.segment_id == self.segment_obj.id)
         contragent_ids = await database.fetch_all(query)
         return [row.contragent_id for row in contragent_ids]
 
-    async def add_contragents_to_segment(self, contragent_ids: list) -> list:
+    async def add_contragents_to_segment(self, contragent_ids: list) -> None:
         query = client_segments.insert()
         history_query = client_segment_history.insert()
 
         values = []
         history_values = []
         for contragent_id in contragent_ids:
-            values.append({"segment_id": self.segment_id, "contragent_id": contragent_id})
+            values.append({"segment_id": self.segment_obj.id, "contragent_id": contragent_id})
             history_values.append({
-                "segment_id": self.segment_id,
+                "segment_id": self.segment_obj.id,
                 "contragent_id": contragent_id,
                 "status": SegmentStatusHistory.added.value
             })
@@ -228,7 +182,7 @@ class Segments:
 
     async def remove_contragents_from_segment(self, contragent_ids: list) -> None:
         query = client_segments.delete().where(
-            client_segments.c.segment_id == self.segment_id,
+            client_segments.c.segment_id == self.segment_obj.id,
             client_segments.c.contragent_id.in_(contragent_ids),
         )
         await database.execute(query)
@@ -237,7 +191,7 @@ class Segments:
         history_values = []
         for contragent_id in contragent_ids:
             history_values.append({
-                "segment_id": self.segment_id,
+                "segment_id": self.segment_obj.id,
                 "contragent_id": contragent_id,
                 "status": SegmentStatusHistory.deleted.value
             })
@@ -259,7 +213,7 @@ class Segments:
             contragents.select()
             .join(client_segments,
                   client_segments.c.contragent_id == contragents.c.id)
-            .where(client_segments.c.segment_id == self.segment_id)
+            .where(client_segments.c.segment_id == self.segment_obj.id)
         )
         objs = await database.fetch_all(query)
         return [{
@@ -273,7 +227,7 @@ class Segments:
             contragents.select()
             .join(client_segment_history,
                   client_segment_history.c.contragent_id == contragents.c.id)
-            .where(client_segment_history.c.segment_id == self.segment_id,
+            .where(client_segment_history.c.segment_id == self.segment_obj.id,
                    client_segment_history.c.status == SegmentStatusHistory.added.value)
         )
         objs = await database.fetch_all(query)
@@ -288,7 +242,7 @@ class Segments:
             contragents.select()
             .join(client_segment_history,
                   client_segment_history.c.contragent_id == contragents.c.id)
-            .where(client_segment_history.c.segment_id == self.segment_id,
+            .where(client_segment_history.c.segment_id == self.segment_obj.id,
                    client_segment_history.c.status == SegmentStatusHistory.deleted.value)
         )
         objs = await database.fetch_all(query)
@@ -297,9 +251,3 @@ class Segments:
             "name": obj.name,
             "phone": obj.phone
         } for obj in objs]
-
-async def update_segment_task(segment_id: int):
-    segment = Segments(segment_id)
-    await segment.async_init()
-    if segment.segment_obj:
-        await segment.update_segment()
