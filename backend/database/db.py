@@ -2034,15 +2034,11 @@ amo_lead_contacts = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 
-    Index(
-        "uq_amo_lead_contacts_group_lead_contact",
-        "amo_install_group_id", "lead_id", "contact_id",
-        unique=True,
-        postgresql_where=sqlalchemy.and_(
-            sqlalchemy.Column("amo_install_group_id").isnot(None),
-            sqlalchemy.Column("lead_id").isnot(None),
-            sqlalchemy.Column("contact_id").isnot(None),
-        )
+    UniqueConstraint(
+        "amo_install_group_id",
+        "lead_id",
+        "contact_id",
+        name="uq_amo_lead_contacts_group_lead_contact",
     ),
 )
 
