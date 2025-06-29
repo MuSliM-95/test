@@ -4,6 +4,8 @@ from database.db import segments, database, SegmentStatus
 
 from segments.contragents_logic import ContragentsLogic
 
+from segments.docs_sales_logic import DocsSalesLogic
+
 
 class Segments:
     def __init__(self, segment_id: int = None):
@@ -37,23 +39,28 @@ class Segments:
         )
 
     async def update_segment(self):
-        await self.set_status_in_progress()
-        if self.segment_obj.selection_field is None:
-            pass
-        elif self.segment_obj.selection_field == 'contragents':
+        if self.segment_obj.selection_field == 'contragents':
             logic = ContragentsLogic(self.segment_obj)
-            await logic.update_contragent_segment()
+        elif self.segment_obj.selection_field == 'docs_sales':
+            logic = DocsSalesLogic(self.segment_obj)
+        else:
+            return
+        await self.set_status_in_progress()
+        await logic.update_segment()
+        await logic.start_actions()
         await self.update_segment_datetime()
         await self.set_status_calculated()
 
 
 
     async def collect_data(self):
-        if self.segment_obj.selection_field is None:
-            return None
-        elif self.segment_obj.selection_field == 'contragents':
+        if self.segment_obj.selection_field == 'contragents':
             logic = ContragentsLogic(self.segment_obj)
-            return await logic.collect_data()
+        elif self.segment_obj.selection_field == 'docs_sales':
+            logic = DocsSalesLogic(self.segment_obj)
+        else:
+            return
+        return await logic.collect_data()
 
 
 

@@ -1969,6 +1969,7 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("criteria", JSON, nullable=False),
+    sqlalchemy.Column("actions", JSON, nullable=True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True)),
@@ -1976,8 +1977,11 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("update_settings", JSON, nullable=True),
     sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
     sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
-    sqlalchemy.Column("is_archived", Boolean, server_default='false'),
+    sqlalchemy.Column("is_archived", Boolean, server_default='false', nullable=False),
     sqlalchemy.Column("selection_field", String, nullable=True),
+    sqlalchemy.Column("current_ids", ARRAY(item_type=Integer), nullable=True),
+    sqlalchemy.Column("last_added_ids", ARRAY(item_type=Integer), nullable=True),
+    sqlalchemy.Column("last_removed_ids", ARRAY(item_type=Integer), nullable=True),
 
 
 )

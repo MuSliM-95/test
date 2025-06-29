@@ -11,10 +11,10 @@ from sqlalchemy import func, and_, text, or_, select
 from segments.ranges import apply_range, apply_date_range
 from sqlalchemy.sql import Select
 
+from segments.base_logic import BaseSegmentLogic
 
-class ContragentsLogic:
-    def __init__(self, segment_obj):
-        self.segment_obj = segment_obj
+
+class ContragentsLogic(BaseSegmentLogic):
 
     def add_purchase_filters(self, query: Select, purchase_criteria: dict) -> Select:
         """
@@ -38,11 +38,11 @@ class ContragentsLogic:
         if purchase_criteria.get("categories") or purchase_criteria.get("nomenclatures"):
             query = (
                 query
-                .join(docs_sales_goods,
+                .outerjoin(docs_sales_goods,
                       docs_sales_goods.c.docs_sales_id == docs_sales.c.id)
-                .join(nomenclature,
+                .outerjoin(nomenclature,
                       docs_sales_goods.c.nomenclature == nomenclature.c.id)
-                .join(categories, nomenclature.c.category == categories.c.id)
+                .outerjoin(categories, nomenclature.c.category == categories.c.id)
             )
 
         # ---- 3. Категории товаров ----------------------------------------------
@@ -107,7 +107,7 @@ class ContragentsLogic:
 
         query = (
             query
-            .join(loyality_cards, loyality_cards.c.contragent_id == contragents.c.id)
+            .outerjoin(loyality_cards, loyality_cards.c.contragent_id == contragents.c.id)
             .outerjoin(loyality_transactions, loyality_transactions.c.loyality_card_id == loyality_cards.c.id)
         )
 
@@ -129,7 +129,7 @@ class ContragentsLogic:
 
         return query
 
-    async def update_contragent_segment(self):
+    async def update_segment(self):
 
         criteria_data = json.loads(self.segment_obj.criteria)
 
@@ -145,7 +145,6 @@ class ContragentsLogic:
 
         if criteria_data.get("loyality"):
             query = self.add_loyality_filters(query, criteria_data.get("loyality"))
-
         rows = await database.fetch_all(query)
         contragent_to_segment = [row.id for row in rows]
         contragent_in_segment = await self.get_contragent_in_segment()
@@ -251,3 +250,6 @@ class ContragentsLogic:
             "name": obj.name,
             "phone": obj.phone
         } for obj in objs]
+
+    async def start_actions(self):
+        return

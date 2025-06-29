@@ -1,20 +1,25 @@
 from datetime import datetime
-from typing import Union, Optional
+from pydantic import BaseModel, Field
+from typing import Union, Optional, Annotated
 
 from api.segments.schema_contragents import SegmentContragentCreate, SegmentContragentData
-from pydantic import BaseModel
+from api.segments.schema_docs_sales import DocsSalesSegmentCreate
 
-SegmentCreate = Union[SegmentContragentCreate, ]
+SegmentCreate = Annotated[
+    Union[SegmentContragentCreate, DocsSalesSegmentCreate],
+    Field(discriminator="selection_field")
+]
+
+SegmentData = Union[SegmentContragentData, ]
 
 class Segment(BaseModel):
     id: int
     name: str
     selection_field: Optional[str] = None
     criteria: dict
+    actions: Optional[dict] = None
     updated_at: Optional[datetime] = None
     type_of_update: str
     update_settings: dict
     status: str
     is_archived: bool
-
-SegmentData = Union[SegmentContragentData, ]

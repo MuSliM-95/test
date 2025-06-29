@@ -22,6 +22,7 @@ async def create_segments(token: str, segment_data: schemas.SegmentCreate):
     query = segments.insert().values(
         name=segment_data.name,
         criteria=data.get("criteria"),
+        actions=data.get("actions"),
         cashbox_id=user.cashbox_id,
         type_of_update=data.get("type_of_update"),
         update_settings=data.get("update_settings"),
@@ -41,6 +42,7 @@ async def create_segments(token: str, segment_data: schemas.SegmentCreate):
         id=segment.id,
         name=segment.name,
         criteria=json.loads(segment.criteria),
+        actions=json.loads(segment.actions) if segment.actions else {},
         updated_at=segment.updated_at,
         type_of_update=segment.type_of_update,
         update_settings=json.loads(segment.update_settings),
@@ -60,11 +62,12 @@ async def refresh_segments(idx: int, token: str):
         raise HTTPException(status_code=403, detail="Сегмент заархивирован!")
     if segment.updated_at and datetime.now(timezone.utc) - segment.updated_at < timedelta(minutes=5):
         raise HTTPException(status_code=403, detail="Сегмент обновлен менее 5 минут назад!")
-    asyncio.create_task(update_segment_task(segment.id))
+
     await database.execute(
         segments.update().where(segments.c.id == segment.id)
         .values(status=SegmentStatus.in_process.value)
     )
+    asyncio.create_task(update_segment_task(segment.id))
     segment = await database.fetch_one(
         segments.select()
         .where(segments.c.id == idx)
@@ -73,6 +76,31 @@ async def refresh_segments(idx: int, token: str):
         id=segment.id,
         name=segment.name,
         criteria=json.loads(segment.criteria),
+        actions=json.loads(segment.actions) if segment.actions else {},
+        updated_at=segment.updated_at,
+        type_of_update=segment.type_of_update,
+        update_settings=json.loads(segment.update_settings),
+        status=segment.status,
+        is_archived=segment.is_archived,
+        selection_field=segment.selection_field,
+    )
+
+
+@router.get("/segments/{idx}", response_model=schemas.Segment)
+async def get_segment(idx: int, token: str):
+    user = await get_user_by_token(token)
+    query = segments.select().where(segments.c.id == idx,
+                                    segments.c.cashbox_id == user.cashbox_id)
+    segment = await database.fetch_one(query)
+    if not segment:
+        raise HTTPException(status_code=404, detail="Сегмент не найден")
+    if segment.is_archived:
+        raise HTTPException(status_code=403, detail="Сегмент заархивирован!")
+    return schemas.Segment(
+        id=segment.id,
+        name=segment.name,
+        criteria=json.loads(segment.criteria),
+        actions=json.loads(segment.actions) if segment.actions else {},
         updated_at=segment.updated_at,
         type_of_update=segment.type_of_update,
         update_settings=json.loads(segment.update_settings),
@@ -96,6 +124,7 @@ async def update_segments(idx: int, token: str, segment_data: schemas.SegmentCre
     query = segments.update().where(segments.c.id == idx).values(
         name=segment_data.name,
         criteria=data.get("criteria"),
+        actions=data.get("actions"),
         cashbox_id=user.cashbox_id,
         type_of_update=data.get("type_of_update"),
         update_settings=data.get("update_settings"),
@@ -115,6 +144,7 @@ async def update_segments(idx: int, token: str, segment_data: schemas.SegmentCre
         id=segment.id,
         name=segment.name,
         criteria=json.loads(segment.criteria),
+        actions=json.loads(segment.actions),
         updated_at=segment.updated_at,
         type_of_update=segment.type_of_update,
         update_settings=json.loads(segment.update_settings),
@@ -153,6 +183,7 @@ async def get_user_segments(token: str):
         id=row.id,
         name=row.name,
         criteria=json.loads(row.criteria),
+        actions=json.loads(row.actions) if row.actions else {},
         updated_at=row.updated_at,
         type_of_update=row.type_of_update,
         update_settings=json.loads(row.update_settings),

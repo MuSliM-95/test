@@ -1,26 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, validator, root_validator
-from typing import Optional, List, Dict, Literal, Union
+from pydantic import BaseModel, validator
+from typing import Optional, List, Literal
 
-
-class Range(BaseModel):
-    gte: Optional[float]
-    lte: Optional[float]
-    eq: Optional[float]
-
-
-class DateRange(BaseModel):
-    gte: Optional[str]
-    lte: Optional[str]
-
-    @validator('gte', 'lte')
-    def validate_date_format(cls, v):
-        try:
-            datetime.strptime(v, "%Y-%m-%d").date()
-            return v
-        except ValueError:
-            raise ValueError("Дата должна быть в формате YYYY-MM-DD")
+from api.segments.schema_base import SegmentBaseCreate, Range, DateRange
 
 
 class PurchaseCriteria(BaseModel):
@@ -52,33 +35,10 @@ class SegmentCriteria(BaseModel):
         extra = "ignore"
 
 
-class UpdateSettings(BaseModel):
-    interval_minutes: int
-
-    @validator('interval_minutes')
-    def validate_interval_minutes(cls, v):
-        if v < 5:
-            raise ValueError("Интервал не может быть менее 5 минут")
-        return v
-
-
-class SegmentContragentCreate(BaseModel):
-    name: str
-    type_of_update: Literal["cron", "request"]
-    update_settings: Optional[UpdateSettings]
-    criteria: SegmentCriteria
+class SegmentContragentCreate(SegmentBaseCreate):
     selection_field: Literal["contragents"]
-    is_archived: bool
+    criteria: SegmentCriteria
 
-    @root_validator
-    def check_update_settings(cls, values):
-        update_type = values.get("type_of_update")
-        settings = values.get("update_settings")
-
-        if update_type == "cron" and settings is None:
-            raise ValueError(
-                "Поле 'update_settings' обязательно при type_of_update='cron'")
-        return values
 
 
 class Contragent(BaseModel):
