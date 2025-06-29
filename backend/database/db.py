@@ -553,7 +553,7 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description_short", String),
     sqlalchemy.Column("description_long", String),
-    sqlalchemy.Column("cashback_type", Enum(NomenclatureCashbackType), nullable=False, server_default="no_cashback"),
+    sqlalchemy.Column("cashback_type", Enum(NomenclatureCashbackType), nullable=False, server_default="lcard_cashback"),
     sqlalchemy.Column("cashback_value", Integer),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
