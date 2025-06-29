@@ -8,6 +8,7 @@ class TgNotificationsAction(BaseModel):
     trigger_on_new: bool = True
     message: str
     user_tag: str
+    send_to: Optional[Literal["picker", "courier"]]
 
 
 class PickerCourierSchema(BaseModel):
@@ -17,6 +18,7 @@ class PickerCourierSchema(BaseModel):
 
 
 class DocsSalesCriteria(BaseModel):
+    tag: str
     created_at: Optional[DateRange]
     picker: Optional[PickerCourierSchema]
     courier: Optional[PickerCourierSchema]

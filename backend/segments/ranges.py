@@ -41,6 +41,9 @@ def apply_date_range(col, rng:dict, container: list):
         # Используем только абсолютные значения
         for k, v in rng.items():
             new_rng[k] = datetime.strptime(v, "%Y-%m-%d").date()
+
+    if "is_none" in rng:
+        new_rng["is_none"] = rng["is_none"]
     apply_range(col, new_rng, container)
 
 def assign_range(col, rng: dict, container: list):

@@ -37,6 +37,7 @@ class Range(BaseModel):
     gte: Optional[float]
     lte: Optional[float]
     eq: Optional[float]
+    is_none: Optional[bool]
 
 
 class DateRange(BaseModel):
@@ -44,6 +45,7 @@ class DateRange(BaseModel):
     lte: Optional[str]
     gte_seconds_ago: Optional[int]
     lte_seconds_ago: Optional[int]
+    is_none: Optional[bool]
 
     @validator('gte', 'lte')
     def validate_date_format(cls, v):

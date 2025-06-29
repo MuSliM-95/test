@@ -29,9 +29,6 @@ class DocsSalesLogic(BaseSegmentLogic):
             apply_range(docs_sales.c.assigned_picker,
                         {"is_none": not assigned}, where_clauses)
 
-            if assigned is False:
-                apply_range(docs_sales.c.order_status,
-                            {"eq": OrderStatus.processed.value}, where_clauses)
 
         if sdr := picker_filters.get("start"):
             apply_date_range(docs_sales.c.picker_started_at, sdr, where_clauses)
@@ -77,6 +74,8 @@ class DocsSalesLogic(BaseSegmentLogic):
             .distinct(docs_sales.c.id)
             .where(docs_sales.c.cashbox == self.segment_obj.cashbox_id)
         )
+        if tag := criteria_data.get("tag"):
+            query = query.where(docs_sales.c.tags.op('~')(fr'(?<=^|,){tag}(?=,|$)'))
 
         where_clauses = []  # фильтры
 
@@ -131,20 +130,11 @@ class DocsSalesLogic(BaseSegmentLogic):
             await self.actions(k)(**v)
         return
 
-    async def send_tg_notification(self, trigger_on_new: bool, message: str, user_tag: str = None, link: str = None):
+    async def send_tg_notification(self, trigger_on_new: bool, message: str, user_tag: str = None, send_to: str = None):
         if not trigger_on_new or not user_tag:
             return  # Заглушка, пока нет решения как должны отрабатывать actions при каждом обновлении сегмента
-
-        query = (
-            select(users.c.chat_id)
-            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-            .where(and_(
-                users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
-                users_cboxes_relation.c.tags.op('~')(fr'(?<=^|,){user_tag}(?=,|$)')
-            ))
-        )
-        rows = await database.fetch_all(query)
-        chat_ids = [row.chat_id for row in rows]
+        if send_to is None or send_to not in ["picker", "courier"]:
+            chat_ids = await self.get_user_chat_ids_by_tag(user_tag)
         if trigger_on_new:
             if not self.segment_obj.last_added_ids:
                 return
@@ -154,6 +144,10 @@ class DocsSalesLogic(BaseSegmentLogic):
                 replacements = await self.link_replacements(order_id)
 
                 message_text = replace_masks(message_text, replacements)
+                if send_to == "picker":
+                    chat_ids = await self.get_picker_chat_id(order_id)
+                elif send_to == "courier":
+                    chat_ids = await self.get_courier_chat_id(order_id)
                 await send_segment_notification(
                     recipient_ids=chat_ids,
                     notification_text=message_text,
@@ -166,3 +160,37 @@ class DocsSalesLogic(BaseSegmentLogic):
         for k,v in links.items():
             replacements[k] = f"\n\n<a href='{v['url']}'>Открыть заказ</a>"
         return replacements
+
+    async def get_user_chat_ids_by_tag(self, user_tag: str):
+        query = (
+            select(users.c.chat_id)
+            .join(users_cboxes_relation,
+                  users_cboxes_relation.c.user == users.c.id)
+            .where(and_(
+                users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
+                users_cboxes_relation.c.tags.op('~')(
+                    fr'(?<=^|,){user_tag}(?=,|$)')
+            ))
+        )
+        rows = await database.fetch_all(query)
+        return [row.chat_id for row in rows]
+
+    async def get_picker_chat_id(self, order_id: int):
+        query = (
+            select(users.c.chat_id)
+            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
+            .outerjoin(docs_sales, docs_sales.c.assigned_picker == users_cboxes_relation.c.id)
+            .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
+        )
+        rows = await database.fetch_all(query)
+        return [row.chat_id for row in rows]
+
+    async def get_courier_chat_id(self, order_id: int):
+        query = (
+            select(users.c.chat_id)
+            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
+            .outerjoin(docs_sales, docs_sales.c.assigned_courier == users_cboxes_relation.c.id)
+            .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
+        )
+        rows = await database.fetch_all(query)
+        return [row.chat_id for row in rows]
