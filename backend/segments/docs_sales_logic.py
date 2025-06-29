@@ -164,5 +164,5 @@ class DocsSalesLogic(BaseSegmentLogic):
         links = await generate_and_save_order_links(order_id)
         replacements = {}
         for k,v in links.items():
-            replacements[k] = f"\n\n<a href='http://example.com/'>Открыть заказ</a>"
+            replacements[k] = f"\n\n<a href='{v['url']}'>Открыть заказ</a>"
         return replacements
