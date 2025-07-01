@@ -164,7 +164,7 @@ async def read_payments_list(
     # Дополнительный фильтр для source_account
     if filters and hasattr(filters, 'source_account') and filters.source_account:
         source_account_ids = filters.source_account.split(',')
-        source_filter = " AND payments.paybox IN (" + ",".join(source_account_ids) + ")"
+        source_filter = " AND (payments.paybox IN (" + ",".join(source_account_ids) + ") OR payments.paybox_to IN (" + ",".join(source_account_ids) + "))"
         filters += source_filter
 
     if not user.is_owner:
@@ -185,7 +185,7 @@ async def read_payments_list(
                     paybox_ids.append(str(perm.paybox_id))
 
             if paybox_ids:
-                paybox_filter = " AND payments.paybox IN (" + ",".join(paybox_ids) + ")"
+                paybox_filter = " AND (payments.paybox IN (" + ",".join(paybox_ids) + ") OR payments.paybox_to IN (" + ",".join(paybox_ids) + "))"
                 filters += paybox_filter
 
     sort_list = sort.split(":")
