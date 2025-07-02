@@ -2,7 +2,7 @@ import json
 
 from sqlalchemy import select, and_
 
-from database.db import docs_sales, OrderStatus, database, segments, users, users_cboxes_relation
+from database.db import docs_sales, OrderStatus, database, segments, users, users_cboxes_relation, docs_sales_tags
 
 from segments.ranges import apply_date_range, apply_range
 from sqlalchemy.sql import Select
@@ -75,7 +75,11 @@ class DocsSalesLogic(BaseSegmentLogic):
             .where(docs_sales.c.cashbox == self.segment_obj.cashbox_id)
         )
         if tag := criteria_data.get("tag"):
-            query = query.where(docs_sales.c.tags.op('~')(fr'(?<=^|,){tag}(?=,|$)'))
+            query = (
+                query
+                .join(docs_sales_tags, docs_sales_tags.c.docs_sales_id == docs_sales.c.id)
+                .where(docs_sales_tags.c.name == tag)
+            )
 
         where_clauses = []  # фильтры
 

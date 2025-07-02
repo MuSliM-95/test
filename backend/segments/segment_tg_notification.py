@@ -15,7 +15,6 @@ async def send_segment_notification(
     Отправляет уведомление из сегментов RabbitMQ
 
     Args:
-        notification_type: Тип уведомления (general, assembly, delivery)
         recipient_ids: Список ID получателей (telegram chat_id)
         notification_text: Предварительно форматированный текст уведомления (опционально)
         segment_id: ID сегмента (опционально)

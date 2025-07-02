@@ -225,7 +225,6 @@ async def process_notification(message):
             await sleep(0.05)
             text = data.get("text", "")
             recipients = data.get("recipients", [])
-            print(text)
             for recipient_id in recipients:
                 success = await send_notification(recipient_id, text)
                 if success:
