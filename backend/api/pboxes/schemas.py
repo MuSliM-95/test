@@ -48,3 +48,14 @@ class GetPayments(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PayboxesShort(BaseModel):
+    id: int
+    external_id: Optional[str]
+    name: str
+    created_at: int
+    updated_at: int
+
+class GetPaymentsShort(GetPayments):
+    result: Optional[List[PayboxesShort]]
