@@ -72,7 +72,7 @@ async def read_payboxes_meta(token: str, limit: int = 100, offset: int = 0, sort
     pbox_list = [dict(record) for record in pbox_records]
     # pbox_list = await hide_balance_for_non_admin(user, pbox_list)
 
-    count_query = select(func.count(pboxes.c.id)).select_from(base_query.subquery())
+    count_query = select(func.count()).select_from(base_query.subquery())
     count = await database.fetch_val(count_query)
 
     return {"result": pbox_list, "count": count}
@@ -251,3 +251,47 @@ async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit)
 
     else:
         raise HTTPException(status_code=400, detail="Неверный запрос!")
+
+
+@router.get("/payboxes_alt/", response_model=pboxes_schemas.GetPaymentsShort)
+async def read_payboxes_short(token: str, limit: int = 100, offset: int = 0, sort: str = "created_at:desc",
+                             filters: filter_schemas.PayboxesFiltersQuery = Depends()):
+    """Получение счетов"""
+    query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
+    user = await database.fetch_one(query)
+
+    if not user or not user.status:
+        raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
+
+    filters = get_filters_pboxes(pboxes, filters)
+
+    sort_list = sort.split(":")
+    if sort_list[0] not in ["created_at", "updated_at"]:
+        raise HTTPException(
+            status_code=400, detail="Вы ввели некорректный параметр сортировки!")
+
+    base_query = select(
+        pboxes.c.id,
+        pboxes.c.external_id,
+        pboxes.c.name,
+        pboxes.c.created_at,
+        pboxes.c.updated_at,
+    ).where(pboxes.c.cashbox == user.cashbox_id).filter(*filters)
+
+    if sort_list[1] == "desc":
+        q = base_query.order_by(desc(getattr(pboxes.c, sort_list[0]))).offset(offset).limit(limit)
+    elif sort_list[1] == "asc":
+        q = base_query.order_by(asc(getattr(pboxes.c, sort_list[0]))).offset(offset).limit(limit)
+    else:
+        raise HTTPException(
+            status_code=400, detail="Вы ввели некорректный параметр сортировки!")
+
+    pbox_records = await database.fetch_all(q)
+
+
+    pbox_list = [dict(record) for record in pbox_records]
+
+    count_query = select(func.count()).select_from(base_query.subquery())
+    count = await database.fetch_val(count_query)
+
+    return {"result": pbox_list, "count": count}
