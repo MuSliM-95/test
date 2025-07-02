@@ -256,7 +256,7 @@ async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit)
 @router.get("/payboxes_alt/", response_model=pboxes_schemas.GetPaymentsShort)
 async def read_payboxes_short(token: str, limit: int = 100, offset: int = 0, sort: str = "created_at:desc",
                              filters: filter_schemas.PayboxesFiltersQuery = Depends()):
-    """Получение счетов"""
+    """Получение краткой информации по всем счетам"""
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
 
