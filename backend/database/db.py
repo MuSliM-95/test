@@ -1,9 +1,8 @@
 import os
-import uuid
 from enum import Enum as ENUM
 import databases
 import sqlalchemy
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 from sqlalchemy import (
     ARRAY,
@@ -18,7 +17,10 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger, BIGINT, text, Index
+    UniqueConstraint,
+    SmallInteger,
+    BIGINT,
+    text,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -27,7 +29,16 @@ import enum
 import datetime
 from dotenv import load_dotenv
 
-from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
+from database.enums import (
+    Repeatability,
+    DebitCreditType,
+    Gender,
+    ContragentType,
+    TriggerType,
+    TriggerTime,
+)
+from sqlalchemy import Column
+from sqlalchemy.orm import relationship
 
 
 load_dotenv()
@@ -68,6 +79,7 @@ class TypeCustomField(str, ENUM):
     Contact = "Контакт"
     Lead = "Сделка"
 
+
 class BookingStatus(str, ENUM):
     new = "Новый"
     confirmed = "Подтвержден"
@@ -106,17 +118,20 @@ class TgBillStatus(str, ENUM):
     PAID = "PAID"
     ERROR = "ERROR"
 
+
 class TgBillApproveStatus(str, ENUM):
     NEW = "NEW"
     APPROVED = "APPROVED"
     CANCELED = "CANCELED"
+
 
 class NomenclatureCashbackType(str, ENUM):
     percent = "percent"
     const = "const"
     no_cashback = "no_cashback"
     lcard_cashback = "lcard_cashback"
-    
+
+
 class OrderStatus(str, ENUM):
     received = "received"
     processed = "processed"
@@ -138,7 +153,7 @@ class SegmentStatusHistory(str, ENUM):
 
 
 metadata = sqlalchemy.MetaData()
-
+Base = declarative_base(metadata=metadata)
 
 yookassa_install = sqlalchemy.Table(
     "yookassa_install",
