@@ -9,10 +9,12 @@ from sqlalchemy import select, and_
 
 from database.db import users, users_cboxes_relation, database, docs_sales
 
+from segments.base.base_action import BaseAction
 
-class DocsSalesAction:
+
+class DocsSalesAction(BaseAction):
     def __init__(self, segment_obj):
-        self.segment_obj = segment_obj
+        super().__init__(segment_obj)
         self.ACTIONS = {
             "send_tg_notification": self.send_tg_notification,
         }

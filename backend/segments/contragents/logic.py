@@ -7,7 +7,7 @@ from database.db import (
     SegmentStatusHistory
 )
 
-from segments.base_logic import BaseSegmentLogic
+from segments.base.base_logic import BaseSegmentLogic
 from segments.contragents.criteria_query import ContragentsCriteriaQuery
 from sqlalchemy import select
 

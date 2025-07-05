@@ -3,12 +3,16 @@ from typing import List
 
 from database.db import docs_sales, OrderStatus, database, segments, users, users_cboxes_relation, docs_sales_tags
 
-from segments.base_logic import BaseSegmentLogic
+from segments.base.base_logic import BaseSegmentLogic
 from segments.docs_sales.criteria_query import DocsSalesCriteriaQuery
 from segments.docs_sales.actions import DocsSalesAction
 
 
 class DocsSalesLogic(BaseSegmentLogic):
+
+    def __init__(self, segment_obj):
+        super().__init__(segment_obj)
+        self.action_logic = DocsSalesAction(self.segment_obj)
 
     async def update_segment(self):
 
@@ -25,10 +29,6 @@ class DocsSalesLogic(BaseSegmentLogic):
     async def collect_data(self):
         return {}
 
-    async def run_action(self, action: str, ids: List[int], data: dict = None):
-        """Метод для выполения action"""
-        obj = DocsSalesAction(self.segment_obj)
-        await obj.run(action, ids, data)
 
 
 

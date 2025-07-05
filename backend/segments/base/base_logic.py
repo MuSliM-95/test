@@ -14,7 +14,8 @@ class BaseSegmentLogic(ABC):
 
     def __init__(self, segment_obj):
         self.segment_obj = segment_obj
-        self.ACTIONS = {}
+        self.action_logic = None
+
 
     async def refresh_segment_obj(self):
         self.segment_obj = await database.fetch_one(
@@ -49,10 +50,10 @@ class BaseSegmentLogic(ABC):
         """Метод для сбора данных сегмента"""
         pass
 
-    @abstractmethod
     async def run_action(self, action: str, ids: List[int], data: dict = None):
         """Метод для выполения action"""
-        pass
+        if self.action_logic:
+            await self.action_logic.run(action, ids, data)
 
     async def start_actions(self):
         """Метод для запуска actions"""
