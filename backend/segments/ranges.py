@@ -45,10 +45,3 @@ def apply_date_range(col, rng:dict, container: list):
     if "is_none" in rng:
         new_rng["is_none"] = rng["is_none"]
     apply_range(col, new_rng, container)
-
-def assign_range(col, rng: dict, container: list):
-    new_rng = {}
-
-    for k, v in rng.items():
-        if k == "assigned":
-            new_rng["is_"] = v
