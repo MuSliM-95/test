@@ -22,8 +22,9 @@ class SegmentBaseCreate(BaseModel):
 
     is_archived: bool
 
-    @root_validator
+    @root_validator(pre=True)
     def check_update_settings(cls, values):
+        values = cls._remove_empty_fields(values)
         update_type = values.get("type_of_update")
         settings = values.get("update_settings")
 
@@ -31,6 +32,27 @@ class SegmentBaseCreate(BaseModel):
             raise ValueError(
                 "Поле 'update_settings' обязательно при type_of_update='cron'")
         return values
+
+    @classmethod
+    def _remove_empty_fields(cls, data):
+        """Чистим переданные пустые поля  {}, []"""
+        if isinstance(data, dict):
+            cleaned = {}
+            for k, v in data.items():
+                v_cleaned = cls._remove_empty_fields(v)
+                # Удаляем только по-настоящему пустые: None, {}, []
+                if v_cleaned is not None and v_cleaned != {} and v_cleaned != []:
+                    cleaned[k] = v_cleaned
+            return cleaned
+
+        elif isinstance(data, list):
+            cleaned_list = [cls._remove_empty_fields(item) for item in data]
+            # Удаляем только полностью пустые элементы
+            return [item for item in cleaned_list if
+                    item != {} and item != [] and item is not None]
+
+        # Базовые значения сохраняем всегда: 0, False, "", и т.д.
+        return data
 
 
 class Range(BaseModel):
