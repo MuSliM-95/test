@@ -21,7 +21,15 @@ class TechCardDB(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     description = Column(String(1000))
-    card_type = Column(Enum("reference", "automatic", name="card_type"), nullable=False)
+    card_type = Column(
+        Enum(
+            "reference",
+            "automatic",
+            name="card_type",
+            create_type=False,
+        ),
+        nullable=False,
+    )
     auto_produce = Column(Boolean, default=False)  # автосоздания операций
     # Технолог (user_id)
     user_id = Column(Integer, ForeignKey("relation_tg_cashboxes.id"))
@@ -46,6 +54,7 @@ class TechCardItemDB(Base):
     tech_card_id = Column(UUID(as_uuid=True), ForeignKey("tech_cards.id"))
     # component_id = Column(UUID(as_uuid=True), nullable=False)
     name = Column(String(255), nullable=False)
+    nomenclature_id = Column(Integer, ForeignKey("nomenclature.id"))
     quantity = Column(Float, nullable=False)
     gross_weight = Column(Float, nullable=True)  # Вес брутто (г, кг)
     net_weight = Column(Float, nullable=True)  # Вес нетто (г, кг)

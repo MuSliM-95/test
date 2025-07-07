@@ -1,8 +1,8 @@
 """add tech cards
 
-Revision ID: 24f9130a566f
+Revision ID: 4e29c4778eae
 Revises: dfa79fb8b227
-Create Date: 2025-07-05 12:36:13.524105
+Create Date: 2025-07-07 22:16:03.382096
 
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "24f9130a566f"
+revision = "4e29c4778eae"
 down_revision = "dfa79fb8b227"
 branch_labels = None
 depends_on = None
@@ -59,9 +59,14 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("tech_card_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("nomenclature_id", sa.Integer(), nullable=True),
         sa.Column("quantity", sa.Float(), nullable=False),
         sa.Column("gross_weight", sa.Float(), nullable=True),
         sa.Column("net_weight", sa.Float(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["nomenclature_id"],
+            ["nomenclature.id"],
+        ),
         sa.ForeignKeyConstraint(
             ["tech_card_id"],
             ["tech_cards.id"],

@@ -39,6 +39,7 @@ class TechCardItemCreate(BaseModel):
     quantity: float = Field(None, gt=0)
     gross_weight: Optional[float] = Field(None, gt=0)
     net_weight: Optional[float] = Field(None, gt=0)
+    nomenclature_id: int
 
 
 class TechCardCreate(TechCardBase):
