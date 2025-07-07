@@ -154,6 +154,7 @@ from api.settings.amo_triggers.routers import router as triggers_router
 from api.trigger_notification.routers import router as triggers_notification
 from api.docs_sales_utm_tags.routers import router as utm_router
 from api.segments.routers import router as segments_router
+from api.tags.routers import router as tags_router
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
@@ -180,6 +181,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(tags_router)
 app.include_router(triggers_notification)
 app.include_router(triggers_router)
 app.include_router(booking_router)
