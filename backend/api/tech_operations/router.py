@@ -14,7 +14,7 @@ from api.tech_operations.models import (
     TechOperationComponentDB,
     TechOperationPaymentDB,
 )
-from api.deps import get_db
+from api.deps import get_db, get_user_by_token
 import uuid
 
 router = APIRouter(prefix="/tech_operations", tags=["tech_operations"])
@@ -26,42 +26,46 @@ router = APIRouter(prefix="/tech_operations", tags=["tech_operations"])
     status_code=status.HTTP_201_CREATED,
 )
 async def create_tech_operation(
-    operation: TechOperationCreate, db: Session = Depends(get_db)
+    token: str, tech_operation: TechOperationCreate, db: Session = Depends(get_db)
 ):
-    db_tech_card = db.query(TechCardDB).get(operation.tech_card_id)
+    user = await get_user_by_token(token, db)
+    db_tech_card = db.query(TechCardDB).get(tech_operation.tech_card_id)
     if not db_tech_card:
         raise HTTPException(status_code=404, detail="Tech card not found")
 
-    db_operation = TechOperationDB(
+    db_tech_operation = TechOperationDB(
         id=uuid.uuid4(),
-        **operation.dict(exclude={"component_quantities", "payment_ids"}),
+        user_id=user.id,
+        **tech_operation.dict(exclude={"component_quantities", "payment_ids"}),
         production_order_id=uuid.uuid4(),
         consumption_order_id=uuid.uuid4(),
         status="active",
     )
 
     # Добавляем компоненты
-    for component_id, quantity in operation.component_quantities.items():
+    for i in tech_operation.component_quantities:
         comp = TechOperationComponentDB(
             id=uuid.uuid4(),
-            operation_id=db_operation.id,
-            component_id=component_id,
-            quantity=quantity,
+            name=i.name,
+            quantity=i.quantity,
+            operation_id=db_tech_operation.id,
         )
         db.add(comp)
 
     # Добавляем платежи
-    if operation.payment_ids:
-        for payment_id in operation.payment_ids:
+    if tech_operation.payment_ids:
+        for payment_id in tech_operation.payment_ids:
             payment = TechOperationPaymentDB(
-                id=uuid.uuid4(), operation_id=db_operation.id, payment_id=payment_id
+                id=uuid.uuid4(),
+                operation_id=db_tech_operation.id,
+                payment_id=payment_id,
             )
             db.add(payment)
 
-    db.add(db_operation)
+    db.add(db_tech_operation)
     db.commit()
-    db.refresh(db_operation)
-    return db_operation
+    db.refresh(db_tech_operation)
+    return db_tech_operation
 
 
 @router.post(
@@ -70,27 +74,31 @@ async def create_tech_operation(
     status_code=status.HTTP_201_CREATED,
 )
 async def bulk_create_tech_operations(
-    operations: List[TechOperationCreate], db: Session = Depends(get_db)
+    token: str, tech_operation: List[TechOperationCreate], db: Session = Depends(get_db)
 ):
+    await get_user_by_token(token, db)
     created_ops = []
-    for op in operations:
-        created_ops.append(create_tech_operation(op, db))
+    for op in tech_operation:
+        created_ops.append(create_tech_operation(token, op, db))
     return created_ops
 
 
 @router.get("/", response_model=List[TechOperation])
 async def get_tech_operations(
-    user_id: Optional[int] = None,
+    token: str,
     tech_card_id: Optional[uuid.UUID] = None,
     status: Optional[TechCardStatus] = None,
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    query = db.query(TechOperationDB)
+    user = await get_user_by_token(token, db)
 
-    if user_id:
-        query = query.filter(TechOperationDB.user_id == user_id)
+    query = db.query(TechOperationDB).filter(
+        TechOperationDB.status != "deleted",
+        TechOperationDB.user_id == user.id,
+    )
+
     if tech_card_id:
         query = query.filter(TechOperationDB.tech_card_id == tech_card_id)
     if status:
@@ -100,7 +108,10 @@ async def get_tech_operations(
 
 
 @router.post("/{idx}/cancel", response_model=TechOperation)
-async def cancel_tech_operation(idx: uuid.UUID, db: Session = Depends(get_db)):
+async def cancel_tech_operation(
+    token: str, idx: uuid.UUID, db: Session = Depends(get_db)
+):
+    await get_user_by_token(token, db)
     operation = db.query(TechOperationDB).get(idx)
     if not operation:
         raise HTTPException(status_code=404, detail="Operation not found")
@@ -108,7 +119,6 @@ async def cancel_tech_operation(idx: uuid.UUID, db: Session = Depends(get_db)):
     if operation.status != "active":
         raise HTTPException(status_code=400, detail="Operation not active")
 
-    # В реальной системе здесь была бы логика отмены ордеров
     operation.status = "canceled"
     db.commit()
     db.refresh(operation)
@@ -116,22 +126,26 @@ async def cancel_tech_operation(idx: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.delete("/{idx}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_tech_operation(idx: uuid.UUID, db: Session = Depends(get_db)):
+async def delete_tech_operation(
+    token: str, idx: uuid.UUID, db: Session = Depends(get_db)
+):
+    await get_user_by_token(token, db)
     operation = db.query(TechOperationDB).get(idx)
     if not operation:
         raise HTTPException(status_code=404, detail="Operation not found")
 
-    # В реальной системе - удаление связанных документов
     operation.status = "deleted"
     db.commit()
 
 
 @router.post("/{idx}/items", status_code=status.HTTP_201_CREATED)
 async def add_items_to_operation(
+    token: str,
     idx: uuid.UUID,
     items: List[TechOperationComponentCreate],
     db: Session = Depends(get_db),
 ):
+    await get_user_by_token(token, db)
     operation = db.query(TechOperationDB).get(idx)
     if not operation:
         raise HTTPException(status_code=404, detail="Operation not found")

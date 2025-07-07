@@ -21,24 +21,22 @@ class TechCardBase(BaseModel):
     description: Optional[str] = None
     card_type: TechCardType
     auto_produce: bool = False
-    user_id: Optional[int] = None
 
 
 class TechCard(TechCardBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    user_id: int
     status: TechCardStatus
 
     class Config:
         orm_mode = True
 
 
-
 class TechCardItemCreate(BaseModel):
-    # component_id: UUID
     name: str = Field(..., min_length=1)
-    quantity: float
+    quantity: float = Field(None, gt=0)
     gross_weight: Optional[float] = Field(None, gt=0)
     net_weight: Optional[float] = Field(None, gt=0)
 

@@ -21,10 +21,9 @@ class TechOperationBase(BaseModel):
     output_quantity: float
     from_warehouse_id: UUID
     to_warehouse_id: UUID
-    user_id: int
     nomenclature_id: int
     # количество выпускаемого изделия
-    component_quantities: TechOperationComponentQuantities
+    component_quantities: List[TechOperationComponentQuantities]
     payment_ids: Optional[List[UUID]] = None
 
 
@@ -34,6 +33,7 @@ class TechOperationCreate(TechOperationBase):
 
 class TechOperation(TechOperationBase):
     id: UUID
+    user_id: int
     created_at: datetime
     status: TechCardStatus
     production_order_id: UUID
