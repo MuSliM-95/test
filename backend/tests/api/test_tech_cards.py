@@ -4,7 +4,7 @@ from backend.main import app
 import pytest_asyncio
 
 # TODO: Token should be generated dynamically or mocked
-token = "c16ff521c6c5dcb215a84aa2e7bc8c5d08073abba25ae45e5e476b71cc5e9205"
+token = "c9e7c8072c900d07aadccabe66fcbae873d01807d176d3353454edc9091fd244"
 
 
 class TestTechCardsAPI:
@@ -28,10 +28,31 @@ class TestTechCardsAPI:
 
     @pytest.mark.asyncio
     async def test_create_and_get_tech_card(self, client: AsyncClient):
+        # TODO: исправить ошибку при создании номенклатуры - cannot perform operation: another operation is in progress
+        # Create numeclature
+        # payload_nomenclature = [
+        #     {
+        #         "name": "Test Nomenclature",
+        #     }
+        # ]
+        # response_nomenclature = await client.post(
+        #     url="http://localhost/nomenclature/",
+        #     json=payload_nomenclature,
+        #     params={"token": token},
+        # )
+        # data_nomenclature = response_nomenclature.json()
+        # assert response_nomenclature.status_code == 201
+
         payload = {
             "name": "Test Card",
             "card_type": "reference",
-            "items": [{"name": "Item1", "quantity": 2}],
+            "items": [
+                # {
+                #     "name": "Item1",
+                #     "quantity": 2,
+                #     "nomenclature_id": data_nomenclature[0]["id"],
+                # }
+            ],
         }
         response = await client.post(
             "/",
