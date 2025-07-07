@@ -87,7 +87,7 @@ async def get_price_by_id(token: str, idx: int):
     
 
 @router.get("/alt_prices/{idx}/", response_model=schemas.Price)
-async def get_price_by_id(token: str, idx: int):
+async def get_price_by_id(token: str, idx: int, filters: schemas.FilterSchema = Depends()):
     """Получение цены по ID номенклатуры"""
     user = await get_user_by_token(token)
 
@@ -101,6 +101,10 @@ async def get_price_by_id(token: str, idx: int):
     if nom_db:
 
         q = prices.select().where(prices.c.nomenclature == nom_db.id, prices.c.cashbox == user.cashbox_id, prices.c.is_deleted == False)
+
+        if filters.price_type_id:
+            q = q.where(prices.c.price_type == filters.price_type_id)
+
         price_db = await database.fetch_one(q)
 
         if price_db:
