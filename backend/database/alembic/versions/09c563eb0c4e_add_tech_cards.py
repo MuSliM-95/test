@@ -1,8 +1,8 @@
 """add tech cards
 
-Revision ID: 4e29c4778eae
+Revision ID: 09c563eb0c4e
 Revises: dfa79fb8b227
-Create Date: 2025-07-07 22:16:03.382096
+Create Date: 2025-07-07 23:13:21.302585
 
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "4e29c4778eae"
+revision = "09c563eb0c4e"
 down_revision = "dfa79fb8b227"
 branch_labels = None
 depends_on = None
@@ -58,11 +58,14 @@ def upgrade() -> None:
         "tech_card_items",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("tech_card_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("nomenclature_id", sa.Integer(), nullable=True),
+        sa.Column("type_of_processing", sa.String(length=255), nullable=False),
+        sa.Column("waste_from_cold_processing", sa.Float(), nullable=False),
+        sa.Column("waste_from_heat_processing", sa.Float(), nullable=False),
+        sa.Column("net_weight", sa.Float(), nullable=False),
         sa.Column("quantity", sa.Float(), nullable=False),
-        sa.Column("gross_weight", sa.Float(), nullable=True),
-        sa.Column("net_weight", sa.Float(), nullable=True),
+        sa.Column("gross_weight", sa.Float(), nullable=False),
+        sa.Column("output", sa.Float(), nullable=False),
         sa.ForeignKeyConstraint(
             ["nomenclature_id"],
             ["nomenclature.id"],

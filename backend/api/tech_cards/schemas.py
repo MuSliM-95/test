@@ -35,11 +35,14 @@ class TechCard(TechCardBase):
 
 
 class TechCardItemCreate(BaseModel):
-    name: str = Field(..., min_length=1)
-    quantity: float = Field(None, gt=0)
-    gross_weight: Optional[float] = Field(None, gt=0)
-    net_weight: Optional[float] = Field(None, gt=0)
+    # name: str = Field(..., min_length=1)
     nomenclature_id: int
+    type_of_processing: str = Field(..., min_length=1)
+    net_weight: float = Field(0, gt=0)
+    waste_from_cold_processing: float = Field(0, gt=0)
+    waste_from_heat_processing: float = Field(0, gt=0)
+    quantity: float = Field(0, gt=0)
+    gross_weight: float = Field(0, gt=0)
 
 
 class TechCardCreate(TechCardBase):

@@ -53,10 +53,18 @@ class TechCardItemDB(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tech_card_id = Column(UUID(as_uuid=True), ForeignKey("tech_cards.id"))
     # component_id = Column(UUID(as_uuid=True), nullable=False)
-    name = Column(String(255), nullable=False)
+    # name = Column(String(255), nullable=False)
     nomenclature_id = Column(Integer, ForeignKey("nomenclature.id"))
+    type_of_processing = Column(String(255), nullable=False)
+    waste_from_cold_processing = Column(
+        Float, nullable=False
+    )  # Отходы от холодной обработки
+    waste_from_heat_processing = Column(
+        Float, nullable=False
+    )  # Отходы при тепловой обработке
+    net_weight = Column(Float, nullable=False)  # Вес нетто (г, кг)
     quantity = Column(Float, nullable=False)
-    gross_weight = Column(Float, nullable=True)  # Вес брутто (г, кг)
-    net_weight = Column(Float, nullable=True)  # Вес нетто (г, кг)
+    gross_weight = Column(Float, nullable=False)  # Вес брутто (г, кг)
+    output = Column(Float, nullable=False)  # Выход
 
     tech_card = relationship("TechCardDB", back_populates="items")

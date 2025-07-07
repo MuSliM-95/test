@@ -36,7 +36,7 @@ async def create_tech_card(
 async def get_tech_cards(
     token: str,
     card_type: Optional[schemas.TechCardType] = None,
-    name_item: Optional[str] = None,
+    # name_item: Optional[str] = None,
     # parent_item_id: Optional[uuid.UUID] = None,
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
@@ -51,8 +51,8 @@ async def get_tech_cards(
     if card_type:
         query = query.filter(TechCardDB.card_type == card_type)
 
-    if name_item:
-        query = query.join(TechCardDB.items).filter(TechCardItemDB.name == name_item)
+    # if name_item:
+    #     query = query.join(TechCardDB.items).filter(TechCardItemDB.name == name_item)
 
     return query.offset(offset).limit(limit).all()
 
