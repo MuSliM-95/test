@@ -534,7 +534,7 @@ async def edit_price(
 
         q = nomenclature.select().where(
             nomenclature.c.id == price_db.nomenclature,
-            nomenclature.c.cashbox_id == user.cashbox_id,
+            nomenclature.c.cashbox == user.cashbox_id,
             nomenclature.c.is_deleted == False,
         )
         nom_db = await database.fetch_one(q)
