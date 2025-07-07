@@ -95,3 +95,6 @@ class PriceListPure(BaseModel):
 class PriceGetWithNomenclature(BaseModel):
     price: Optional[float]
     price_type: Optional[str]
+
+class FilterSchema(BaseModel):
+    price_type_id: Optional[int]
