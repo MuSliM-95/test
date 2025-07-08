@@ -5,11 +5,12 @@ from asyncpg import ForeignKeyViolationError
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from phonenumbers import geocoder
-from sqlalchemy import desc, asc, func, select
+from sqlalchemy import desc, asc, func, select, cast, literal_column
+from sqlalchemy.dialects.postgresql import JSONB
 
 from ws_manager import manager
 
-from database.db import database, users_cboxes_relation, contragents
+from database.db import database, users_cboxes_relation, contragents, tags, contragents_tags
 import api.contragents.schemas as ca_schemas
 import functions.filter_schemas as filter_schemas
 
@@ -38,14 +39,38 @@ async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQue
                                                            contragents.c.is_deleted == False).filter(*filters)
             count = await database.fetch_one(q)
 
+            query = (
+                select(
+                    contragents,
+                    func.coalesce(cast(
+                        func.jsonb_agg(
+                            func.jsonb_build_object(
+                                literal_column("'id'"), tags.c.id,
+                                literal_column("'name'"), tags.c.name,
+                                literal_column("'emoji'"), tags.c.emoji,
+                                literal_column("'color'"), tags.c.color,
+                                literal_column("'description'"), tags.c.description,
+                            )
+                        ).filter(tags.c.id.isnot(None)), JSONB),
+                        literal_column("'[]'::jsonb")
+                    ).label("tags")
+                )
+                .select_from(
+                    contragents
+                    .outerjoin(contragents_tags,
+                               contragents.c.id == contragents_tags.c.contragent_id)
+                    .outerjoin(tags, contragents_tags.c.tag_id == tags.c.id)
+                )
+                .group_by(contragents.c.id)
+            )
             if sort_list[1] == "desc":
-                q = contragents.select().where(contragents.c.cashbox == user.cashbox_id,
+                q = query.where(contragents.c.cashbox == user.cashbox_id,
                                                contragents.c.is_deleted == False).filter(*filters).order_by(
                     desc(getattr(contragents.c, sort_list[0]))).offset(offset).limit(limit)
                 payment = await database.fetch_all(q)
                 return {"count": count.count_1, "result": payment}
             if sort_list[1] == "asc":
-                q = contragents.select().where(contragents.c.cashbox == user.cashbox_id,
+                q = query.where(contragents.c.cashbox == user.cashbox_id,
                                                contragents.c.is_deleted == False).filter(*filters).order_by(
                     asc(getattr(contragents.c, sort_list[0]))).offset(offset).limit(limit)
                 payment = await database.fetch_all(q)
