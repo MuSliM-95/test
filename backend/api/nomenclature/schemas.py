@@ -24,14 +24,13 @@ class NomenclatureCreate(BaseModel):
     cashback_type: Optional[NomenclatureCashbackType] = NomenclatureCashbackType.no_cashback
     cashback_value: Optional[int] = 0
     external_id: Optional[str]
-    tags: Optional[str] = ""
+    tags: Optional[List[str]] = []
 
     class Config:
         orm_mode = True
 
     @validator("tags")
-    def validate_tags(cls, v):
-        tag_list = [tag.strip() for tag in v.split(",") if tag.strip()]
+    def validate_tags(cls, tag_list):
 
         if len(tag_list) > 10:
             raise ValueError("Максимум 10 тегов")
@@ -46,7 +45,7 @@ class NomenclatureCreate(BaseModel):
                     f"Тег '{tag}' содержит недопустимые символы или некорректную длину (2–20 символов)"
                 )
 
-        return v
+        return tag_list
 
 
 class NomenclatureCreateMass(BaseModel):
