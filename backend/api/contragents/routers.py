@@ -22,7 +22,7 @@ router = APIRouter(tags=["contragents"])
 
 @router.get("/contragents/")
 async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQuery = Depends(), limit: int = 100,
-                                offset: int = 0, sort: str = "created_at:desc"):
+                                offset: int = 0, sort: str = "created_at:desc", add_tags: bool = False):
     """Получение меты контрагентов"""
     query = users_cboxes_relation.select(
         users_cboxes_relation.c.token == token)
@@ -39,30 +39,32 @@ async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQue
                                                            contragents.c.is_deleted == False).filter(*filters)
             count = await database.fetch_one(q)
 
-            query = (
-                select(
-                    contragents,
-                    func.coalesce(cast(
-                        func.jsonb_agg(
-                            func.jsonb_build_object(
-                                literal_column("'id'"), tags.c.id,
-                                literal_column("'name'"), tags.c.name,
-                                literal_column("'emoji'"), tags.c.emoji,
-                                literal_column("'color'"), tags.c.color,
-                                literal_column("'description'"), tags.c.description,
-                            )
-                        ).filter(tags.c.id.isnot(None)), JSONB),
-                        literal_column("'[]'::jsonb")
-                    ).label("tags")
+            query = contragents.select()
+            if add_tags is True:
+                query = (
+                    select(
+                        contragents,
+                        func.coalesce(cast(
+                            func.jsonb_agg(
+                                func.jsonb_build_object(
+                                    literal_column("'id'"), tags.c.id,
+                                    literal_column("'name'"), tags.c.name,
+                                    literal_column("'emoji'"), tags.c.emoji,
+                                    literal_column("'color'"), tags.c.color,
+                                    literal_column("'description'"), tags.c.description,
+                                )
+                            ).filter(tags.c.id.isnot(None)), JSONB),
+                            literal_column("'[]'::jsonb")
+                        ).label("tags")
+                    )
+                    .select_from(
+                        contragents
+                        .outerjoin(contragents_tags,
+                                   contragents.c.id == contragents_tags.c.contragent_id)
+                        .outerjoin(tags, contragents_tags.c.tag_id == tags.c.id)
+                    )
+                    .group_by(contragents.c.id)
                 )
-                .select_from(
-                    contragents
-                    .outerjoin(contragents_tags,
-                               contragents.c.id == contragents_tags.c.contragent_id)
-                    .outerjoin(tags, contragents_tags.c.tag_id == tags.c.id)
-                )
-                .group_by(contragents.c.id)
-            )
             if sort_list[1] == "desc":
                 q = query.where(contragents.c.cashbox == user.cashbox_id,
                                                contragents.c.is_deleted == False).filter(*filters).order_by(
