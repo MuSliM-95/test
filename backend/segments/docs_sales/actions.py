@@ -5,7 +5,7 @@ from segments.masks import replace_masks
 from api.docs_sales.routers import generate_and_save_order_links
 
 from segments.actions.segment_tg_notification import send_segment_notification
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, literal, func
 
 from database.db import users, users_cboxes_relation, database, docs_sales
 
@@ -63,8 +63,7 @@ class DocsSalesAction(BaseAction):
                   users_cboxes_relation.c.user == users.c.id)
             .where(and_(
                 users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
-                users_cboxes_relation.c.tags.op('~')(
-                    fr'(?<=^|,){user_tag}(?=,|$)')
+                literal(user_tag) == func.any(users_cboxes_relation.c.tags)
             ))
         )
         rows = await database.fetch_all(query)
