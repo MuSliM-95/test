@@ -47,21 +47,20 @@ async def get_tags(idx: int, token: str):
 @router.post("/", response_model=schemas.Tag)
 async def create_tag(token: str, data: schemas.TagCreate):
     user = await get_user_by_token(token)
+    data = data.dict()
     try:
-        query = tags.insert().values(**data.dict(), cashbox_id=user.cashbox_id)
+        query = tags.insert().values(**data, cashbox_id=user.cashbox_id)
         new_tag_id = await database.execute(query)
     except UniqueViolationError:
         raise HTTPException(status_code=400, detail="Тег с таким именем уже существует!")
     except Exception as e:
         raise HTTPException(status_code=400, detail="Ошибка при создании сегмента!")
-    query = tags.select().where(tags.c.id == new_tag_id)
-    tag = await database.fetch_one(query)
+    if not new_tag_id:
+        raise HTTPException(status_code=400,
+                            detail="Ошибка при создании сегмента!")
     return schemas.Tag(
-        id=tag.id,
-        name=tag.name,
-        color=tag.color,
-        emoji=tag.emoji,
-        description=tag.description
+        id=new_tag_id,
+        **data
     )
 
 
