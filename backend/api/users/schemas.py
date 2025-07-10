@@ -16,7 +16,7 @@ class CBUsers(BaseModel):
     is_admin: bool
     created_at: int
     updated_at: int
-    tags: Optional[str]
+    tags: Optional[List[str]]
 
     class Config:
         orm_mode = True
@@ -84,11 +84,10 @@ class UserPermissionsResult(BaseModel):
 
 
 class UserTagsUpdate(BaseModel):
-    tags: Optional[str]
+    tags: Optional[List[str]]
 
     @validator("tags")
-    def validate_tags(cls, v):
-        tag_list = [tag.strip() for tag in v.split(",") if tag.strip()]
+    def validate_tags(cls, tag_list):
 
         if len(tag_list) > 10:
             raise ValueError("Максимум 10 тегов")
@@ -103,4 +102,4 @@ class UserTagsUpdate(BaseModel):
                     f"Тег '{tag}' содержит недопустимые символы или некорректную длину (2–20 символов)"
                 )
 
-        return v
+        return tag_list
