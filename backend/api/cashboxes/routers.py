@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, asc
 
@@ -9,6 +11,8 @@ import functions.filter_schemas as filter_schemas
 import api.users.schemas as user_schemas
 
 from functions.helpers import get_filters_users, raise_wrong_token
+
+from backend.api.cashboxes.schemas import CashboxUpdate
 
 router = APIRouter(tags=["cboxes"])
 
@@ -88,21 +92,34 @@ async def read_cashbox_users(
 
 
 @router.put("/cashbox_users/", response_model=user_schemas.CBUsers)
-async def edit_cashbox_user_status(token: str, user_id: int, status: bool):
+async def edit_cashbox_user(token: str, user_id: int, data: Optional[CashboxUpdate] = None, status: Optional[bool] = None):
     """Обновление статуса юзера кассы"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
+    if not data:
+        data = {}
+    else:
+        data = data.dict()
+    if status is True or status is False:
+        data["status"] = status
+
+    if "status" in data and data.get("status") is None:
+        del data["status"]
+    if "tags" in data and data.get("tags") is None:
+        del data["tags"]
+
     if user:
         if user.is_owner:
-            q = (
-                users_cboxes_relation.update()
-                .where(
-                    users_cboxes_relation.c.cashbox_id == user.cashbox_id,
-                    users_cboxes_relation.c.user == user_id,
+            if data:
+                q = (
+                    users_cboxes_relation.update()
+                    .where(
+                        users_cboxes_relation.c.cashbox_id == user.cashbox_id,
+                        users_cboxes_relation.c.user == user_id,
+                    )
+                    .values(**data)
                 )
-                .values(status=status)
-            )
-            await database.execute(q)
+                await database.execute(q)
 
             q = users_cboxes_relation.select().where(
                 users_cboxes_relation.c.cashbox_id == user.cashbox_id,
@@ -119,18 +136,20 @@ async def edit_cashbox_user_status(token: str, user_id: int, status: bool):
                 "first_name": tg_acc.first_name,
                 "last_name": tg_acc.last_name,
                 "username": tg_acc.username,
-                "status": status,
+                "status": owner.status,
                 "is_admin": owner.is_owner,
                 "created_at": tg_acc.created_at,
                 "updated_at": tg_acc.updated_at,
                 "tags": owner.tags,
             }
 
-            await manager.send_message(
-                token, {"action": "edit", "target": "users", "result": user_dict}
-            )
+            if data.get("status") is not None:
+                await manager.send_message(
+                    token, {"action": "edit", "target": "users", "result": user_dict}
+                )
 
             return user_dict
+
 
     raise_wrong_token()
 
