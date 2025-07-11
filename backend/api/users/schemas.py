@@ -21,6 +21,10 @@ class CBUsers(BaseModel):
     class Config:
         orm_mode = True
 
+    @validator("tags")
+    def validate_tags(cls, tag_list):
+        return tag_list or []
+
 
 class CBUsersShort(BaseModel):
     id: int
@@ -88,7 +92,8 @@ class UserTagsUpdate(BaseModel):
 
     @validator("tags")
     def validate_tags(cls, tag_list):
-
+        if tag_list is None:
+            return []
         if len(tag_list) > 10:
             raise ValueError("Максимум 10 тегов")
 

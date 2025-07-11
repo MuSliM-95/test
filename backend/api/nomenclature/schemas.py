@@ -31,7 +31,8 @@ class NomenclatureCreate(BaseModel):
 
     @validator("tags")
     def validate_tags(cls, tag_list):
-
+        if tag_list is None:
+            return []
         if len(tag_list) > 10:
             raise ValueError("Максимум 10 тегов")
 
@@ -98,11 +99,6 @@ class NomenclatureGet(NomenclatureCreate):
 
     class Config:
         orm_mode = True
-
-    @validator("tags")
-    def validate_tags(cls, tag_list):
-        return tag_list or []
-
 
 class NomenclatureList(BaseModel):
     __root__: Optional[List[Nomenclature]]
