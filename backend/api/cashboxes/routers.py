@@ -12,7 +12,7 @@ import api.users.schemas as user_schemas
 
 from functions.helpers import get_filters_users, raise_wrong_token
 
-from backend.api.cashboxes.schemas import CashboxUpdate
+from api.cashboxes.schemas import CashboxUpdate
 
 router = APIRouter(tags=["cboxes"])
 
