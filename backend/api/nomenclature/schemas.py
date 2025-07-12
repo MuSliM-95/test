@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import re
+
+from pydantic import BaseModel, validator
 from typing import Optional, List
 
 from api.prices.schemas import PriceInList, PriceGetWithNomenclature
@@ -22,9 +24,29 @@ class NomenclatureCreate(BaseModel):
     cashback_type: Optional[NomenclatureCashbackType] = NomenclatureCashbackType.no_cashback
     cashback_value: Optional[int] = 0
     external_id: Optional[str]
+    tags: Optional[List[str]] = []
 
     class Config:
         orm_mode = True
+
+    @validator("tags")
+    def validate_tags(cls, tag_list):
+        if tag_list is None:
+            return []
+        if len(tag_list) > 10:
+            raise ValueError("Максимум 10 тегов")
+
+        if len(set(tag_list)) < len(tag_list):
+            raise ValueError("Теги не должны повторяться")
+
+        pattern = re.compile(r"^[a-zA-Zа-яА-Я0-9_-]{2,20}$")
+        for tag in tag_list:
+            if not pattern.match(tag):
+                raise ValueError(
+                    f"Тег '{tag}' содержит недопустимые символы или некорректную длину (2–20 символов)"
+                )
+
+        return tag_list
 
 
 class NomenclatureCreateMass(BaseModel):
@@ -77,7 +99,6 @@ class NomenclatureGet(NomenclatureCreate):
 
     class Config:
         orm_mode = True
-
 
 class NomenclatureList(BaseModel):
     __root__: Optional[List[Nomenclature]]

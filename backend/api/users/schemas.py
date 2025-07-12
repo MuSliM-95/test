@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 
 
@@ -14,9 +14,14 @@ class CBUsers(BaseModel):
     is_admin: bool
     created_at: int
     updated_at: int
+    tags: Optional[List[str]]
 
     class Config:
         orm_mode = True
+
+    @validator("tags")
+    def validate_tags(cls, tag_list):
+        return tag_list or []
 
 
 class CBUsersShort(BaseModel):
