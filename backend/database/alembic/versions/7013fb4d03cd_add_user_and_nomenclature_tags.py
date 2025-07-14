@@ -1,7 +1,7 @@
 """add/user_and_nomenclature_tags
 
 Revision ID: 7013fb4d03cd
-Revises: f82fc5198d96
+Revises: dfa79fb8b227
 Create Date: 2025-06-21 14:22:27.713796
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '7013fb4d03cd'
-down_revision = 'f82fc5198d96'
+down_revision = 'dfa79fb8b227'
 branch_labels = None
 depends_on = None
 

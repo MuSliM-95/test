@@ -388,25 +388,3 @@ async def get_my_permissions(token: str):
         "username": target_user.username,
         "permissions": permissions_list
     }
-
-
-@router.patch("/{user_id}/tags", response_model=schemas.CBUsers)
-async def update_tags(user_id: int, token: str, data: schemas.UserTagsUpdate):
-    cashbox_id = await database.execute(
-        select(users_cboxes_relation.c.cashbox_id).where(
-            users_cboxes_relation.c.token == token)
-    )
-
-    if not cashbox_id:
-        raise HTTPException(status_code=403, detail="Некорректный токен")
-
-    data = data.dict()
-
-    q = users_cboxes_relation.update().where(
-        users_cboxes_relation.c.user == user_id,
-        users_cboxes_relation.c.cashbox_id == cashbox_id
-    ).values(data).returning(users_cboxes_relation.c.token)
-    user_token = await database.execute(q)
-    if not user_token:
-        raise HTTPException(status_code=403, detail="У вас нет прав на добавление тегов этому пользователю.")
-    return await func.get_user_by_token(token=user_token)

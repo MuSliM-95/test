@@ -44,7 +44,7 @@ class Settings(BaseModel):
 class Create(BaseModel):
     number: Optional[str]
     dated: Optional[int]
-    operation: Optional[SaleOperations]
+    operation: Optional[SaleOperations] = SaleOperations.order
     tags: Optional[str] = ""
     parent_docs_sales: Optional[int]
     comment: Optional[str]

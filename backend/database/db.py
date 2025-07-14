@@ -18,7 +18,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger, BIGINT, text,
+    UniqueConstraint, SmallInteger, BIGINT, text, Index
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -553,7 +553,7 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description_short", String),
     sqlalchemy.Column("description_long", String),
-    sqlalchemy.Column("cashback_type", Enum(NomenclatureCashbackType), nullable=False, server_default="no_cashback"),
+    sqlalchemy.Column("cashback_type", Enum(NomenclatureCashbackType), nullable=False, server_default="lcard_cashback"),
     sqlalchemy.Column("cashback_value", Integer),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
@@ -2058,6 +2058,25 @@ contragents_tags = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint("tag_id", "contragent_id", name="unique_tag_id_contragent_id"),
 )
 
+
+amo_lead_contacts = sqlalchemy.Table(
+    "amo_lead_contacts",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("lead_id", BigInteger),
+    sqlalchemy.Column("contact_id", BigInteger),
+    sqlalchemy.Column("is_main", Boolean, server_default="true"),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+
+    UniqueConstraint(
+        "amo_install_group_id",
+        "lead_id",
+        "contact_id",
+        name="uq_amo_lead_contacts_group_lead_contact",
+    ),
+)
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
