@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+from asyncio import sleep
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
@@ -48,6 +49,7 @@ async def send_notification(recipient_id: str, text: str, retry_count: int = 3) 
     for attempt in range(retry_count):
         try:
             print(f"Attempt {attempt + 1} to send message to {recipient_id}")
+            print(text)
             sent_message = await bot.send_message(
                 chat_id=recipient_id, text=text, parse_mode="HTML"
             )
@@ -219,7 +221,17 @@ async def process_notification(message):
                     print(f"Legacy notification sent to {recipient_id}")
                 else:
                     print(f"Failed to send legacy notification to {recipient_id}")
-
+        elif data.get("type") == "segment_notification":
+            await sleep(0.05)
+            text = data.get("text", "")
+            recipients = data.get("recipients", [])
+            for recipient_id in recipients:
+                success = await send_notification(recipient_id, text)
+                if success:
+                    print(f"Legacy notification sent to {recipient_id}")
+                else:
+                    print(
+                        f"Failed to send legacy notification to {recipient_id}")
         else:
             print(f"Unknown notification type: {data.get('type')}")
     except Exception as e:
