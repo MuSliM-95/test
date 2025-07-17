@@ -13,8 +13,14 @@ from sqlalchemy import select
 
 from segments.contragents.collect_data import ContragentsData
 
+from segments.contragents.actions import ContragentsAction
+
 
 class ContragentsLogic(BaseSegmentLogic):
+
+    def __init__(self, segment_obj):
+        super().__init__(segment_obj)
+        self.action_logic = ContragentsAction(self.segment_obj)
 
     async def update_segment(self):
 
@@ -82,11 +88,3 @@ class ContragentsLogic(BaseSegmentLogic):
     async def collect_data(self):
         data = ContragentsData(self.segment_obj)
         return await data.collect()
-
-    async def run_action(self, action: str, ids: List[int], data: dict = None):
-        """Метод для выполения action"""
-        return
-
-
-
-

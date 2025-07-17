@@ -30,14 +30,31 @@ class LoyalityCriteria(BaseModel):
 class SegmentCriteria(BaseModel):
     purchases: Optional[PurchaseCriteria]
     loyality: Optional[LoyalityCriteria]
+    tags: Optional[List[str]]
 
     class Config:
         extra = "ignore"
 
 
+class AddRemoveTags(BaseModel):
+    name: List[str]
+
+    @validator("name", each_item=True)
+    def validate_tag_item(cls, v):
+        if len(v) < 3:
+            raise ValueError("Элемент списка должен быть не короче 3 символов")
+        return v
+
+
+class ContragentActions(BaseModel):
+    add_tags: Optional[AddRemoveTags]
+    remove_tags: Optional[AddRemoveTags]
+
+
 class SegmentContragentCreate(SegmentBaseCreate):
     selection_field: Literal["contragents"]
     criteria: SegmentCriteria
+    actions: Optional[ContragentActions]
 
 
 

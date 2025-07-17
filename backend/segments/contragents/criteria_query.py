@@ -2,7 +2,10 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import select, or_, func, and_, text
 
-from database.db import contragents, docs_sales, docs_sales_goods, nomenclature, categories, loyality_cards, loyality_transactions
+from database.db import (
+    contragents, docs_sales, docs_sales_goods, nomenclature, categories,
+    loyality_cards, loyality_transactions, contragents_tags, tags
+)
 from sqlalchemy.sql import Select
 
 from segments.ranges import apply_date_range, apply_range
@@ -25,6 +28,14 @@ class ContragentsCriteriaQuery:
 
         if self.criteria_data.get("loyality"):
             self.base_query = self.add_loyality_filters(self.base_query, self.criteria_data.get("loyality"))
+
+        if self.criteria_data.get("tags"):
+            self.base_query = (
+                self.base_query
+                .outerjoin(contragents_tags, contragents_tags.c.contragent_id == contragents.c.id)
+                .outerjoin(tags, tags.c.id == contragents_tags.c.tag_id)
+                .where(tags.c.name.in_(self.criteria_data.get("tags")))
+            )
 
         return self.base_query
 
