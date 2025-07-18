@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from database.db import database, segments
 from segments.main import update_segment_task
 
-from sqlalchemy import select, cast, func, Integer, and_
+from sqlalchemy import select, cast, func, Integer, and_, or_
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql.psycopg2 import dialect
 
@@ -24,8 +24,10 @@ async def get_segment_ids():
             segments.c.type_of_update == 'cron',
             segments.c.is_archived.isnot(True),
             segments.c.update_settings['interval_minutes'].isnot(None),
-            segments.c.updated_at <= func.now() - func.make_interval(
-                0, 0, 0, 0, 0, interval_minutes)
+            or_(segments.c.updated_at.is_(None),
+                segments.c.updated_at <= func.now() - func.make_interval(
+                    0, 0, 0, 0, 0, interval_minutes)
+                )
         )
     )
     rows = await database.fetch_all(query)

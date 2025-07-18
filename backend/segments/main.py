@@ -60,5 +60,5 @@ class Segments:
 async def update_segment_task(segment_id: int):
     segment = Segments(segment_id)
     await segment.async_init()
-    if segment.segment_obj:
+    if segment.segment_obj and segment.logic:
         await segment.update_segment()
