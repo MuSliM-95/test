@@ -58,6 +58,8 @@ class BaseSegmentLogic(ABC):
     async def start_actions(self):
         """Метод для запуска actions"""
         await self.refresh_segment_obj()
+        if self.segment_obj.actions is None:
+            return
         actions = json.loads(self.segment_obj.actions)
         if not actions or not isinstance(actions, dict):
             return

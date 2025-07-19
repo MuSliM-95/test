@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timezone, timedelta
 from typing import List
 
 from fastapi import APIRouter, HTTPException
@@ -161,8 +162,6 @@ async def get_segment_data(idx: int, token: str):
     if not segment.segment_obj or segment.segment_obj.cashbox_id != user.cashbox_id:
         raise HTTPException(status_code=404, detail="Сегмент не найден")
     contragents_data = await segment.collect_data()
-    if not contragents_data:
-        return {}
 
     return schemas.SegmentData(
         id=segment.segment_id,
