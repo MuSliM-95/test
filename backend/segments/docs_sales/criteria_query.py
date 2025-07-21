@@ -1,6 +1,6 @@
 from sqlalchemy import select, and_
 
-from database.db import docs_sales, docs_sales_tags, OrderStatus
+from database.db import docs_sales, docs_sales_tags, OrderStatus, docs_sales_delivery_info
 
 from segments.ranges import apply_date_range, apply_range
 from sqlalchemy.sql import Select
@@ -35,10 +35,25 @@ class DocsSalesCriteriaQuery:
         if self.criteria_data.get("courier"):
             self.base_query = self.add_courier_filters(self.base_query, self.criteria_data.get("courier"))
 
+        if "delivery_required" in self.criteria_data:
+            self.base_query = self.add_delivery_required_filters(self.base_query, self.criteria_data.get("delivery_required"))
+
         if where_clauses:
             self.base_query = self.base_query.where(and_(*where_clauses))
 
         return self.base_query
+
+
+    @staticmethod
+    def add_delivery_required_filters(query: Select, delivery_required: bool):
+        query = query.outerjoin(docs_sales_delivery_info, docs_sales_delivery_info.c.docs_sales_id == docs_sales.c.id)
+
+        if delivery_required is True:
+            query = query.where(docs_sales_delivery_info.c.docs_sales_id.isnot(None))
+        elif delivery_required is False:
+            query = query.where(docs_sales_delivery_info.c.docs_sales_id.is_(None))
+
+        return query
 
     @staticmethod
     def add_picker_filters(query: Select, picker_filters):
