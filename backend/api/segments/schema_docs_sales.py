@@ -18,7 +18,8 @@ class PickerCourierSchema(BaseModel):
 
 
 class DocsSalesCriteria(BaseModel):
-    tag: str
+    tag: Optional[str]
+    delivery_required: Optional[bool]
     created_at: Optional[DateRange]
     picker: Optional[PickerCourierSchema]
     courier: Optional[PickerCourierSchema]
