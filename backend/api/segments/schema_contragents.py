@@ -1,10 +1,12 @@
 from datetime import datetime
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, constr
+
 from typing import Optional, List, Literal
 
 from api.segments.schema_base import SegmentBaseCreate, Range, DateRange
 
+HEXColor = constr(regex=r"^#(?:[0-9a-fA-F]{6})$")
 
 class PurchaseCriteria(BaseModel):
     total_amount: Optional[Range]
@@ -46,9 +48,21 @@ class AddRemoveTags(BaseModel):
         return v
 
 
+class Tag(BaseModel):
+    name: str
+    emoji: Optional[str]
+    color: Optional[HEXColor]
+    description: Optional[str]
+
+
+class CreateTags(BaseModel):
+    tags: List[Tag]
+
+
 class ContragentActions(BaseModel):
-    add_tags: Optional[AddRemoveTags]
+    add_existed_tags: Optional[AddRemoveTags]
     remove_tags: Optional[AddRemoveTags]
+    client_tags: Optional[CreateTags]
 
 
 class SegmentContragentCreate(SegmentBaseCreate):
