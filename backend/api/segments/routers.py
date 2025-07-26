@@ -6,7 +6,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 
 from api.segments import schemas
-from database.db import segments, database, client_segments, SegmentStatus
+from database.db import segments, database, SegmentStatus
 from functions.helpers import get_user_by_token
 from segments.main import Segments, update_segment_task
 
@@ -28,7 +28,6 @@ async def create_segments(token: str, segment_data: schemas.SegmentCreate):
         update_settings=data.get("update_settings"),
         status=SegmentStatus.in_process.value,
         is_archived=data.get("is_archived"),
-        selection_field=data.get("selection_field"),
     )
 
     new_segment_id = await database.execute(query)
@@ -48,7 +47,6 @@ async def create_segments(token: str, segment_data: schemas.SegmentCreate):
         update_settings=json.loads(segment.update_settings),
         status=segment.status,
         is_archived=segment.is_archived,
-        selection_field=segment.selection_field,
     )
 
 @router.post("/segments/{idx}", response_model=schemas.Segment)
@@ -82,7 +80,6 @@ async def refresh_segments(idx: int, token: str):
         update_settings=json.loads(segment.update_settings),
         status=segment.status,
         is_archived=segment.is_archived,
-        selection_field=segment.selection_field,
     )
 
 
@@ -129,8 +126,7 @@ async def update_segments(idx: int, token: str, segment_data: schemas.SegmentCre
         type_of_update=data.get("type_of_update"),
         update_settings=data.get("update_settings"),
         status=SegmentStatus.in_process.value,
-        is_archived=data.get("is_archived"),
-        selection_field=data.get("selection_field"),
+        is_archived=data.get("is_archived")
     )
 
     await database.execute(query)

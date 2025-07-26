@@ -132,11 +132,6 @@ class SegmentStatus(str, ENUM):
     calculated = "calculated"
 
 
-class SegmentStatusHistory(str, ENUM):
-    added = "added"
-    deleted = "deleted"
-
-
 metadata = sqlalchemy.MetaData()
 
 
@@ -1970,7 +1965,7 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("criteria", JSON, nullable=False),
     sqlalchemy.Column("actions", JSON, nullable=True),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), index=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True)),
     sqlalchemy.Column("type_of_update", String, nullable=False),
@@ -1978,31 +1973,44 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
     sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
     sqlalchemy.Column("is_archived", Boolean, server_default='false', nullable=False),
-    sqlalchemy.Column("selection_field", String, nullable=True),
-    sqlalchemy.Column("current_ids", ARRAY(item_type=Integer), nullable=True),
-    sqlalchemy.Column("last_added_ids", ARRAY(item_type=Integer), nullable=True),
-    sqlalchemy.Column("last_removed_ids", ARRAY(item_type=Integer), nullable=True),
-
-
-)
-client_segments = sqlalchemy.Table(
-    "client_segments",
-    metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("segment_id", ForeignKey("segments.id"), nullable=False),
-    sqlalchemy.Column("contragent_id", ForeignKey("contragents.id")),
+    sqlalchemy.Column("current_version", Integer, nullable=True, index=True),
 )
 
-client_segment_history = sqlalchemy.Table(
-    "client_segment_history",
+segment_versions = sqlalchemy.Table(
+    "segment_versions",
     metadata,
     sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("segment_id", ForeignKey("segments.id"), nullable=False),
-    sqlalchemy.Column("contragent_id", ForeignKey("contragents.id")),
+    sqlalchemy.Column("segment_id", Integer, ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("version", BigInteger, nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
-    sqlalchemy.Column("status", Enum(SegmentStatusHistory), nullable=False),
+    sqlalchemy.UniqueConstraint("segment_id", "version", name="uq_segment_version"),
 )
 
+class SegmentObjectType(enum.Enum):
+    docs_sales = "docs_sales"
+    contragents = "contragents"
+
+
+class SegmentChangeType(enum.Enum):
+    added = "added"
+    removed = "removed"
+    existing = "existing"
+
+
+segment_version_objects = sqlalchemy.Table(
+    "segment_version_objects",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("segment_id", BigInteger, ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("version", BigInteger, ForeignKey("segment_versions.id"), nullable=False),
+    sqlalchemy.Column("object_id", BigInteger, nullable=False, index=True),
+    sqlalchemy.Column("object_type", Enum(SegmentObjectType, name="segment_object_type"), nullable=False, index=True),
+    sqlalchemy.Column("change_type", Enum(SegmentChangeType, name="segment_change_type"), nullable=False, index=True),
+    sqlalchemy.UniqueConstraint("segment_id", "version", "object_id", "object_type", "change_type", name="uq_svo_unique_object_per_version"),
+)
+
+Index("ix_svo_segment_version", segment_version_objects.c.segment_id, segment_version_objects.c.version)
+Index("ix_svo_object_type", segment_version_objects.c.object_id, segment_version_objects.c.object_type)
 
 user_permissions = sqlalchemy.Table(
     "user_permissions",

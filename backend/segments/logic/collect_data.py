@@ -1,4 +1,8 @@
-from database.db import contragents, client_segments, database, client_segment_history, SegmentStatusHistory
+from database.db import (
+    contragents, database, SegmentObjectType, SegmentChangeType
+)
+
+from segments.helpers.collect_obj_ids import collect_objects
 
 
 class ContragentsData:
@@ -16,11 +20,10 @@ class ContragentsData:
         }
 
     async def get_contragents_data(self):
+        contragents_ids = await collect_objects(self.segment_obj.id, self.segment_obj.current_version, SegmentObjectType.contragents.value, SegmentChangeType.existing.value)
         query = (
             contragents.select()
-            .join(client_segments,
-                  client_segments.c.contragent_id == contragents.c.id)
-            .where(client_segments.c.segment_id == self.segment_obj.id)
+            .where(contragents.c.id.in_(contragents_ids))
         )
         objs = await database.fetch_all(query)
         return [{
@@ -30,12 +33,13 @@ class ContragentsData:
         } for obj in objs]
 
     async def added_contragents_data(self):
+        contragents_ids = await collect_objects(self.segment_obj.id,
+                                                self.segment_obj.current_version,
+                                                SegmentObjectType.contragents.value,
+                                                SegmentChangeType.added.value)
         query = (
             contragents.select()
-            .join(client_segment_history,
-                  client_segment_history.c.contragent_id == contragents.c.id)
-            .where(client_segment_history.c.segment_id == self.segment_obj.id,
-                   client_segment_history.c.status == SegmentStatusHistory.added.value)
+            .where(contragents.c.id.in_(contragents_ids))
         )
         objs = await database.fetch_all(query)
         return [{
@@ -45,12 +49,13 @@ class ContragentsData:
         } for obj in objs]
 
     async def deleted_contragents_data(self):
+        contragents_ids = await collect_objects(self.segment_obj.id,
+                                                self.segment_obj.current_version,
+                                                SegmentObjectType.contragents.value,
+                                                SegmentChangeType.removed.value)
         query = (
             contragents.select()
-            .join(client_segment_history,
-                  client_segment_history.c.contragent_id == contragents.c.id)
-            .where(client_segment_history.c.segment_id == self.segment_obj.id,
-                   client_segment_history.c.status == SegmentStatusHistory.deleted.value)
+            .where(contragents.c.id.in_(contragents_ids))
         )
         objs = await database.fetch_all(query)
         return [{
