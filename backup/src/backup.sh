@@ -60,17 +60,24 @@ send_message "<b>🛡️ Backup database #${POSTGRES_DATABASE} in project #${PRO
 
 if [ -n "$BACKUP_KEEP_DAYS" ]; then
   echo "Cleaning up old backups..."
-  # Получаем список всех бэкапов
   backups_json=$(aws $aws_args s3api list-objects \
     --bucket "${S3_BUCKET}" \
     --prefix "${S3_PREFIX}" \
     --query "Contents[?ends_with(Key, '.sql') || ends_with(Key, '.sql.gpg')].{Key: Key, LastModified: LastModified}" \
     --output json)
 
-  mapfile -t keep_keys < <(echo "$backups_json" | jq -r '.[] | "\(.Key) \(.LastModified)"' | \
-    awk '{split($2, a, "T"); print a[1], $1, $2}' | \
-    sort -k1,1 -k3,3 | \
-    awk '{day=$1; key=$2; time=$3; if (time > times[day] || !(day in times)) { times[day]=time; keys[day]=key } } END { for (d in keys) print keys[d] }')
+  mapfile -t keep_keys < <(echo "$backups_json" | \
+    jq -r '.[] | "\(.LastModified) \(.Key)"' | \
+    sort -r | \
+    awk '{
+      split($1, dt, "T");
+      day=dt[1];
+      if (!(day in kept)) {
+        kept[day] = $2
+      }
+    } END {
+      for (d in kept) print kept[d]
+    }')
 
   echo "$backups_json" | jq -r '.[] | "\(.Key) \(.LastModified)"' | while read -r key last_modified; do
     backup_date=$(date -d "$last_modified" +"%Y-%m-%d")
