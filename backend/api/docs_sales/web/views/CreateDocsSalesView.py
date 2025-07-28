@@ -511,13 +511,12 @@ class CreateDocsSalesView:
                     "current_amount": prev - qty,
                     "cashbox_id": user.cashbox_id,
                 })
+
             # Выбираем номенклатуры, которые являются ("product", "property"):
             filtered_wb_to_insert = []
             for record in wb_to_insert:
                 nomenclature_id = record["nomenclature_id"]
-                nomenclature_db = await database.fetch_one(
-                    nomenclature.select().where(nomenclature.c.id == nomenclature_id)
-                )
+                nomenclature_db = nomenclature_cache.get(nomenclature_id)
                 if nomenclature_db and nomenclature_db.type in ("product", "property"):
                     filtered_wb_to_insert.append(record)
             # Вставляем только те записи, которые соответствуют условиям
