@@ -511,10 +511,21 @@ class CreateDocsSalesView:
                     "current_amount": prev - qty,
                     "cashbox_id": user.cashbox_id,
                 })
-            await database.execute_many(warehouse_balances.insert(), wb_to_insert)
+
+            # Выбираем номенклатуры, которые являются ("product", "property"):
+            filtered_wb_to_insert = []
+            for record in wb_to_insert:
+                nomenclature_id = record["nomenclature_id"]
+                nomenclature_db = nomenclature_cache.get(nomenclature_id)
+                if nomenclature_db and nomenclature_db.type in ("product", "property"):
+                    filtered_wb_to_insert.append(record)
+            # Вставляем только те записи, которые соответствуют условиям
+            if filtered_wb_to_insert:
+                await database.execute_many(warehouse_balances.insert(), filtered_wb_to_insert)
 
         for payload, goods in out_docs:
             asyncio.create_task(create_warehouse_docs(token, {**payload, "goods": goods}, user.cashbox_id))
+
 
         asyncio.create_task(raschet(user, token))
         for card_id in set(list(card_withdraw_total) + list(card_accrual_total)):

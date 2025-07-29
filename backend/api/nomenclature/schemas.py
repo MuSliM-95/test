@@ -1,4 +1,5 @@
 import re
+from enum import Enum
 
 from pydantic import BaseModel, validator
 from typing import Optional, List
@@ -8,13 +9,22 @@ from api.warehouse_balances.schemas import WarehouseWithNomenclature
 from database.db import NomenclatureCashbackType
 
 
+class NomenclatureType(str, Enum):
+    product = "product"
+    service = "service"
+    offer = "offer"
+    resourse = "resourse"
+    rental = "rental"
+    property = "property"
+    
+
 class NomenclatureBarcodeCreate(BaseModel):
     barcode: str
 
 
 class NomenclatureCreate(BaseModel):
     name: str
-    type: Optional[str]
+    type: Optional[NomenclatureType]
     description_short: Optional[str]
     description_long: Optional[str]
     code: Optional[str]
