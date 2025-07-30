@@ -19,6 +19,13 @@ from apps.yookassa.models.PaymentModel import (
     ItemModel,
     PaymentCreateModel,
     ReceiptModel,
+    
+)
+from backend.apps.yookassa.repositories.impl.YookassaTableNomenclature import (
+    YookassaTableNomenclature,
+)
+from backend.apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
+    YookasssaAmoTableCrmRepository,
 )
 from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import (
     YookassaCrmPaymentsRepository,
@@ -34,6 +41,7 @@ from apps.yookassa.repositories.impl.YookassaRequestRepository import (
 )
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
+
 from database.db import (
     NomenclatureCashbackType,
     OrderStatus,
@@ -781,6 +789,8 @@ async def create(
                 oauth_repository=YookassaOauthRepository(),
                 payments_repository=YookassaPaymentsRepository(),
                 crm_payments_repository=YookassaCrmPaymentsRepository(),
+                table_nomenclature_repository=YookassaTableNomenclature(),
+                amo_table_crm_repository=YookasssaAmoTableCrmRepository(),
             )
 
             if await yookassa_oauth_service.validation_oauth(

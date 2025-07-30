@@ -221,12 +221,12 @@ async def create_doc_sales(
 
         return await createDocSales(
             token=token,
-            docs_sales_data = CreateMassDocSales(
-                __root__ = docs_data),
-            generate_out = generate_out)
+            docs_sales_data=CreateMassDocSales(__root__=docs_data),
+            generate_out=generate_out
+        )
     except Exception as e:
         print(e)
-        raise HTTPException(status_code = 432, detail = f"ошибка создания документы продажи")
+        raise HTTPException(status_code=432, detail=f"ошибка создания документы продажи")
 
 
 @router.get("/evotor/integration/on")
