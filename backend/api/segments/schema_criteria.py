@@ -2,7 +2,7 @@ from typing import Optional, List
 
 from pydantic import BaseModel, validator, constr
 
-from backend.api.segments.schema_base import Range, DateRange
+from api.segments.schema_base import Range, DateRange
 
 class PurchaseCriteria(BaseModel):
     total_amount: Optional[Range]
