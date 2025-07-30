@@ -21,10 +21,10 @@ from apps.yookassa.models.PaymentModel import (
     ReceiptModel,
     
 )
-from backend.apps.yookassa.repositories.impl.YookassaTableNomenclature import (
+from apps.yookassa.repositories.impl.YookassaTableNomenclature import (
     YookassaTableNomenclature,
 )
-from backend.apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
+from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
     YookasssaAmoTableCrmRepository,
 )
 from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import (
