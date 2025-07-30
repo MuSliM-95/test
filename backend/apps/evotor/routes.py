@@ -8,7 +8,7 @@ from api.prices.routers import new_price
 from api.prices.schemas import PriceCreateMass, PriceCreate
 from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, warehouses, users_cboxes_relation, nomenclature
+from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, warehouses, users_cboxes_relation, nomenclature, prices
 from functions.helpers import get_user_by_token
 from ws_manager import manager
 from sqlalchemy import or_, and_, select
@@ -160,15 +160,14 @@ async def create_doc_sales(
         ):
     try:
         docs_data = []
-        doc_goods_data = []
         for item in docs_sales_data.__getattribute__("__root__"):
             item = dict(item)
+            doc_goods_data = []
+            
             for good in item.get("goods"):
-                print(good)
                 if good.nomenclature:
                     good_db = await database.fetch_one(nomenclature.select().where(nomenclature.c.external_id == good.nomenclature))
                     if good_db:
-                        print(good_db)
                         good.nomenclature = good_db.get("id")
                         doc_goods_data.append(good)
                     else:
@@ -187,7 +186,7 @@ async def create_doc_sales(
                                     }) as resp:
                                 product = await resp.json()
                             await session.close()
-                        print(product)
+
                         good_id = await new_nomenclature(token, nomenclature_data = NomenclatureCreateMass(
                             __root__ = [
                                 {
@@ -197,23 +196,38 @@ async def create_doc_sales(
                                     "cashback_type": "lcard_cashback"
                                 }
                             ]))
-                        good.nomenclature = good_id[0].get("id")
+                        nomenclature_id = good_id[0].get("id")
+                        good.nomenclature = nomenclature_id
                         
                         if price := product.get("price"):
                             await new_price(token, PriceCreateMass(
                                 __root__ = [
                                     PriceCreate(
                                         price=float(price),
-                                        nomenclature=good_id[0].get("id"),
+                                        nomenclature=nomenclature_id,
                                         price_type=1 
                                     )
                                 ]
                             ))
                         
                         doc_goods_data.append(good)
-
+                
+                if good.price is None:
+                    if isinstance(good.nomenclature, int):
+                        price_query = prices.select().where(
+                            prices.c.nomenclature == good.nomenclature,
+                            prices.c.price_type == 1,
+                            prices.c.is_deleted == False
+                        )
+                        price_db = await database.fetch_one(price_query)
+                        good.price = price_db.price if price_db else 0.0
+                
+                good.sum_discounted = good.price * good.quantity
+                total_sum += good.sum_discounted
+            
             item.update({"goods": doc_goods_data})
             item.update({"warehouse": warehouse_id})
+            item.update({"sum": total_sum})
             docs_data.append(Create(**item))
 
         return await createDocSales(
