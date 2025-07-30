@@ -197,19 +197,7 @@ async def create_doc_sales(
                                     "cashback_type": "lcard_cashback"
                                 }
                             ]))
-                        nomenclature_id = good_id[0].get("id")
-                        good.nomenclature = nomenclature_id
-                        
-                        if price := product.get("price"):
-                            await new_price(token, PriceCreateMass(
-                                __root__ = [
-                                    PriceCreate(
-                                        price=float(price),
-                                        nomenclature=nomenclature_id,
-                                        price_type=1 
-                                    )
-                                ]
-                            ))
+                        good.nomenclature = good_id[0].get("id")
                         
                         doc_goods_data.append(good)
                 
