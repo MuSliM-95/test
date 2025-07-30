@@ -31,7 +31,7 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
-    cashback_type: Optional[NomenclatureCashbackType] = NomenclatureCashbackType.no_cashback
+    cashback_type: Optional[NomenclatureCashbackType] = NomenclatureCashbackType.lcard_cashback
     cashback_value: Optional[int] = 0
     external_id: Optional[str]
     tags: Optional[List[str]] = []

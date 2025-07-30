@@ -4,6 +4,8 @@ from api.loyality_cards.routers import get_cards
 from api.docs_sales.routers import create as createDocSales
 from api.nomenclature.routers import new_nomenclature
 from api.nomenclature.schemas import NomenclatureCreateMass
+from api.prices.routers import new_price
+from api.prices.schemas import PriceCreateMass, PriceCreate
 from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, warehouses, users_cboxes_relation, nomenclature
@@ -188,9 +190,26 @@ async def create_doc_sales(
                         print(product)
                         good_id = await new_nomenclature(token, nomenclature_data = NomenclatureCreateMass(
                             __root__ = [
-                                {"name": product.get("name"), "unit": 116, "external_id": good.nomenclature}
+                                {
+                                    "name": product.get("name"), 
+                                    "unit": 116, 
+                                    "external_id": good.nomenclature,
+                                    "cashback_type": "lcard_cashback"
+                                }
                             ]))
                         good.nomenclature = good_id[0].get("id")
+                        
+                        if price := product.get("price"):
+                            await new_price(token, PriceCreateMass(
+                                __root__ = [
+                                    PriceCreate(
+                                        price=float(price),
+                                        nomenclature=good_id[0].get("id"),
+                                        price_type=1 
+                                    )
+                                ]
+                            ))
+                        
                         doc_goods_data.append(good)
 
             item.update({"goods": doc_goods_data})
