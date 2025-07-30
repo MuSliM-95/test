@@ -162,6 +162,7 @@ async def create_doc_sales(
         docs_data = []
         for item in docs_sales_data.__getattribute__("__root__"):
             item = dict(item)
+            total_sum = 0.0
             doc_goods_data = []
             
             for good in item.get("goods"):
