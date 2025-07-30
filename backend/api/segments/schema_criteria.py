@@ -1,0 +1,42 @@
+from typing import Optional, List
+
+from pydantic import BaseModel, validator, constr
+
+from api.segments.schema_base import Range, DateRange
+
+class PurchaseCriteria(BaseModel):
+    total_amount: Optional[Range]
+    count: Optional[Range]
+    last_purchase_days_ago: Optional[Range]
+    amount_per_check: Optional[Range]
+    date_range: Optional[DateRange]
+    categories: Optional[List[str]]
+    nomenclatures: Optional[List[str]]
+
+    @validator("categories", "nomenclatures", each_item=True)
+    def validate_category_item(cls, v):
+        if len(v) < 3:
+            raise ValueError("Элемент списка должен быть не короче 3 символов")
+        return v
+
+
+class LoyalityCriteria(BaseModel):
+    balance: Optional[Range]
+    expires_in_days: Optional[Range]
+
+
+class PickerCourierSchema(BaseModel):
+    assigned: Optional[bool]
+    start: Optional[DateRange]
+    finish: Optional[DateRange]
+
+
+class SegmentCriteria(BaseModel):
+    purchases: Optional[PurchaseCriteria]
+    loyality: Optional[LoyalityCriteria]
+    tags: Optional[List[str]]
+    tag: Optional[str]
+    delivery_required: Optional[bool]
+    created_at: Optional[DateRange]
+    picker: Optional[PickerCourierSchema]
+    courier: Optional[PickerCourierSchema]

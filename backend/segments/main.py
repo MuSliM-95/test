@@ -1,10 +1,13 @@
+import json
 from datetime import datetime
 
 from database.db import segments, database, SegmentStatus
 
-from segments.contragents.logic import ContragentsLogic
+from segments.logic.logic import SegmentLogic
+from segments.query.queries import SegmentCriteriaQuery
+from segments.actions.actions import SegmentActions
 
-from segments.docs_sales.logic import DocsSalesLogic
+from segments.logic.collect_data import ContragentsData
 
 
 class Segments:
@@ -12,14 +15,22 @@ class Segments:
         self.segment_id = segment_id
         self.segment_obj = None
         self.logic = None
+        self.query = None
+        self.actions = None
 
     async def async_init(self):
         self.segment_obj = await database.fetch_one(
             segments.select().where(segments.c.id == self.segment_id))
-        if self.segment_obj.selection_field == 'contragents':
-            self.logic = ContragentsLogic(self.segment_obj)
-        elif self.segment_obj.selection_field == 'docs_sales':
-            self.logic = DocsSalesLogic(self.segment_obj)
+        self.logic = SegmentLogic(self.segment_obj)
+        self.query = SegmentCriteriaQuery(
+            self.segment_obj.cashbox_id,
+            json.loads(self.segment_obj.criteria)
+        )
+        self.actions = SegmentActions(self.segment_obj)
+
+    async def refresh_segment_obj(self):
+        self.segment_obj = await database.fetch_one(
+            segments.select().where(segments.c.id == self.segment_obj.id))
 
     async def update_segment_datetime(self):
         await database.execute(
@@ -46,19 +57,20 @@ class Segments:
     async def update_segment(self):
 
         await self.set_status_in_progress()
-        await self.logic.update_segment()
-        await self.logic.start_actions()
+        new_ids = await self.query.collect_ids()
+        await self.logic.update_segment_data_in_db(new_ids)
+        await self.actions.start_actions()
         await self.update_segment_datetime()
         await self.set_status_calculated()
 
     async def collect_data(self):
-        if self.logic:
-            return await self.logic.collect_data()
-        return {}
+        data_obj = ContragentsData(self.segment_obj)
+
+        return await data_obj.collect()
 
 
 async def update_segment_task(segment_id: int):
     segment = Segments(segment_id)
     await segment.async_init()
-    if segment.segment_obj and segment.logic:
+    if segment.segment_obj:
         await segment.update_segment()
