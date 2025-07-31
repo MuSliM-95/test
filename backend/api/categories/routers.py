@@ -17,8 +17,35 @@ router = APIRouter(tags=["categories"])
 @router.get("/categories/{idx}/", response_model=schemas.Category)
 async def get_category_by_id(token: str, idx: int):
     """Получение категории по ID"""
+    
     user = await get_user_by_token(token)
     category_db = await get_entity_by_id(categories, idx, user.id)
+    category_db = datetime_to_timestamp(category_db)
+    return category_db
+
+
+@router.delete("/categories/{idx}/photo", response_model=schemas.Category)
+async def delete_category_photo(token: str, idx: int):
+    """Установка в pictures is_deleted=True и установка category.photo_id = None"""
+    user = await get_user_by_token(token)
+    query = categories.select().where(categories.c.id==idx, categories.c.owner==user.user, categories.c.photo_id.is_not(None))
+    category_db = await database.fetch_one(query)
+    if not category_db:
+        raise HTTPException(status_code=404, detail="Категория не найдена или вам не принадлежит")
+    
+    query = pictures.select().where(pictures.c.id == category_db.get("photo_id"),
+                                         pictures.c.owner == user.user,
+                                         pictures.c.is_deleted.is_not(True))
+    picture_db = await database.fetch_one(query)
+    if not picture_db :
+        raise HTTPException(status_code=404, detail="Фотография не найдена или вам не принадлежит")
+
+    query = categories.update().where(categories.c.id == idx).values({"photo_id": None}).returning(categories)
+    category_db = await database.fetch_one(query)
+
+    query = pictures.update().where(pictures.c.id == category_db.get("photo_id")).values({"is_deleted": True})
+    await database.execute(query)
+
     category_db = datetime_to_timestamp(category_db)
     return category_db
 
@@ -104,6 +131,8 @@ async def new_categories(token: str, categories_data: schemas.CategoryCreateMass
         raise HTTPException(400, "Не были добавлены следующие записи: " + ", ".join(exceptions))
 
     return categories_db
+
+
 
 
 @router.patch("/categories/{idx}/", response_model=schemas.Category)
