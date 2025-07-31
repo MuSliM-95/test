@@ -135,7 +135,7 @@ def add_purchase_filters(query: Select, purchase_criteria: dict) -> Select:
         apply_range(func.sum(docs_sales.c.sum), rng, subq_having)
 
     if subq_having:
-        subq = subq.having(*subq_having)
+        subq = subq.having(and_(*subq_having))
 
     subq = subq.subquery()
 

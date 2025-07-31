@@ -61,7 +61,7 @@ class SegmentActions:
             if v.get('trigger_on_new'):
                 del v['trigger_on_new']
                 ids = await collect_objects(self.segment_obj.id, self.segment_obj.current_version, self.ACTIONS[k]["obj_type"], SegmentChangeType.added.value)
-            if v.get('trigger_on_removed'):
+            elif v.get('trigger_on_removed'):
                 ids = await collect_objects(self.segment_obj.id, self.segment_obj.current_version, self.ACTIONS[k]["obj_type"], SegmentChangeType.removed.value)
                 del v['trigger_on_removed']
             else:
