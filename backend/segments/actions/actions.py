@@ -3,7 +3,7 @@ from typing import List
 
 from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
-    users_cboxes_relation, docs_sales, SegmentChangeType
+    users_cboxes_relation, docs_sales
 )
 from sqlalchemy import select, and_, func, literal
 from sqlalchemy.dialects.postgresql import insert
@@ -14,6 +14,8 @@ from segments.masks import replace_masks
 from api.docs_sales.routers import generate_and_save_order_links
 
 from segments.helpers.collect_obj_ids import collect_objects
+
+from segments.constants import SegmentChangeType
 
 
 class SegmentActions:
@@ -60,14 +62,15 @@ class SegmentActions:
                 continue
             if v.get('trigger_on_new'):
                 del v['trigger_on_new']
-                ids = await collect_objects(self.segment_obj.id, self.segment_obj.current_version, self.ACTIONS[k]["obj_type"], SegmentChangeType.added.value)
+                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"], SegmentChangeType.new.value)
             elif v.get('trigger_on_removed'):
-                ids = await collect_objects(self.segment_obj.id, self.segment_obj.current_version, self.ACTIONS[k]["obj_type"], SegmentChangeType.removed.value)
+                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"], SegmentChangeType.removed.value)
                 del v['trigger_on_removed']
             else:
-                ids = await collect_objects(self.segment_obj.id, self.segment_obj.current_version,
-                                      self.ACTIONS[k]["obj_type"],
-                                      SegmentChangeType.existing.value)
+                ids = await collect_objects(
+                    self.segment_obj.id,
+                    self.ACTIONS[k]["obj_type"],
+                    SegmentChangeType.active.value)
             if ids:
                 await self.run(k, ids, v)
         return

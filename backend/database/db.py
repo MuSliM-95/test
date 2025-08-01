@@ -1973,44 +1973,29 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
     sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
     sqlalchemy.Column("is_archived", Boolean, server_default='false', nullable=False),
-    sqlalchemy.Column("current_version", Integer, nullable=True, index=True),
 )
 
-segment_versions = sqlalchemy.Table(
-    "segment_versions",
-    metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("segment_id", Integer, ForeignKey("segments.id"), nullable=False),
-    sqlalchemy.Column("version", BigInteger, nullable=False),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
-    sqlalchemy.UniqueConstraint("segment_id", "version", name="uq_segment_version"),
-)
 
 class SegmentObjectType(enum.Enum):
     docs_sales = "docs_sales"
     contragents = "contragents"
 
 
-class SegmentChangeType(enum.Enum):
-    added = "added"
-    removed = "removed"
-    existing = "existing"
-
-
-segment_version_objects = sqlalchemy.Table(
-    "segment_version_objects",
+segment_objects = sqlalchemy.Table(
+    "segment_objects",
     metadata,
     sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
     sqlalchemy.Column("segment_id", BigInteger, ForeignKey("segments.id"), nullable=False),
-    sqlalchemy.Column("version", BigInteger, ForeignKey("segment_versions.id"), nullable=False),
     sqlalchemy.Column("object_id", BigInteger, nullable=False, index=True),
     sqlalchemy.Column("object_type", Enum(SegmentObjectType, name="segment_object_type"), nullable=False, index=True),
-    sqlalchemy.Column("change_type", Enum(SegmentChangeType, name="segment_change_type"), nullable=False, index=True),
-    sqlalchemy.UniqueConstraint("segment_id", "version", "object_id", "object_type", "change_type", name="uq_svo_unique_object_per_version"),
+    sqlalchemy.Column("valid_from", DateTime(timezone=True), nullable=False),
+    sqlalchemy.Column("valid_to", DateTime(timezone=True), nullable=True),
+    sqlalchemy.UniqueConstraint("segment_id", "object_id", "object_type", "valid_from", "valid_to", name="uq_svo_unique_object_per_move"),
 )
 
-Index("ix_svo_segment_version", segment_version_objects.c.segment_id, segment_version_objects.c.version)
-Index("ix_svo_object_type", segment_version_objects.c.object_id, segment_version_objects.c.object_type)
+Index("ix_svo_segment_valid_from", segment_objects.c.segment_id, segment_objects.c.valid_from)
+Index("ix_svo_segment_valid_to", segment_objects.c.segment_id, segment_objects.c.valid_to)
+
 
 user_permissions = sqlalchemy.Table(
     "user_permissions",

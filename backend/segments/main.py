@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 
 from database.db import segments, database, SegmentStatus
@@ -55,13 +56,15 @@ class Segments:
         )
 
     async def update_segment(self):
-
-        await self.set_status_in_progress()
-        new_ids = await self.query.collect_ids()
-        await self.logic.update_segment_data_in_db(new_ids)
-        await self.actions.start_actions()
-        await self.update_segment_datetime()
-        await self.set_status_calculated()
+        try:
+            await self.set_status_in_progress()
+            new_ids = await self.query.collect_ids()
+            await self.logic.update_segment_data_in_db(new_ids)
+            await self.actions.start_actions()
+            await self.update_segment_datetime()
+            await self.set_status_calculated()
+        except Exception as e:
+            logging.exception(f"Ошибка при обновлении сегмента {self.segment_obj.id}: {e}")
 
     async def collect_data(self):
         data_obj = ContragentsData(self.segment_obj)
