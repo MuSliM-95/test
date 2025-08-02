@@ -1,21 +1,42 @@
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_
 
-from database.db import SegmentObjectType, SegmentChangeType, \
-    segment_version_objects, database, segment_versions
+from database.db import (
+    SegmentObjectType, database, segment_objects, segments
+)
+
+from segments.constants import SegmentChangeType
 
 
-async def collect_objects(segment_id, version, obj_type: SegmentObjectType, change_type: SegmentChangeType):
-    """Получение списка id объектов в версии среза."""
+async def collect_objects(segment_id, obj_type: SegmentObjectType, mode: str):
+    """
+    Получение списка id объектов в сегменте.
+    """
+
+    base_condition = [
+        segment_objects.c.segment_id == segment_id,
+        segment_objects.c.object_type == obj_type
+    ]
+
+    if mode == SegmentChangeType.new.value:
+        base_condition.append(
+            or_(
+                segments.c.updated_at.is_(None),
+                segment_objects.c.valid_from >= segments.c.updated_at
+            )
+        )
+
+    elif mode == SegmentChangeType.active.value:
+        base_condition.append(segment_objects.c.valid_to.is_(None))
+
+    elif mode == SegmentChangeType.removed.value:
+        base_condition.append(segment_objects.c.valid_to.isnot(None))
+        base_condition.append(
+            segment_objects.c.valid_to >= segments.c.updated_at)
 
     query = (
-        select(segment_version_objects.c.object_id)
-        .outerjoin(segment_versions, segment_version_objects.c.version == segment_versions.c.id)
-        .where(
-            segment_version_objects.c.segment_id == segment_id,
-            segment_versions.c.version == version,
-            segment_version_objects.c.object_type == obj_type,
-            segment_version_objects.c.change_type == change_type
-        )
+        select(segment_objects.c.object_id)
+        .join(segments, segment_objects.c.segment_id == segments.c.id)
+        .where(and_(*base_condition))
     )
     rows = await database.fetch_all(query)
     obj_ids = [row["object_id"] for row in rows]

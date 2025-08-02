@@ -1,8 +1,10 @@
 from database.db import (
-    contragents, database, SegmentObjectType, SegmentChangeType
+    contragents, database, SegmentObjectType
 )
 
 from segments.helpers.collect_obj_ids import collect_objects
+
+from segments.constants import SegmentChangeType
 
 
 class ContragentsData:
@@ -20,7 +22,7 @@ class ContragentsData:
         }
 
     async def get_contragents_data(self):
-        contragents_ids = await collect_objects(self.segment_obj.id, self.segment_obj.current_version, SegmentObjectType.contragents.value, SegmentChangeType.existing.value)
+        contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         query = (
             contragents.select()
             .where(contragents.c.id.in_(contragents_ids))
@@ -34,9 +36,8 @@ class ContragentsData:
 
     async def added_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id,
-                                                self.segment_obj.current_version,
                                                 SegmentObjectType.contragents.value,
-                                                SegmentChangeType.added.value)
+                                                SegmentChangeType.new.value)
         query = (
             contragents.select()
             .where(contragents.c.id.in_(contragents_ids))
@@ -50,7 +51,6 @@ class ContragentsData:
 
     async def deleted_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id,
-                                                self.segment_obj.current_version,
                                                 SegmentObjectType.contragents.value,
                                                 SegmentChangeType.removed.value)
         query = (
