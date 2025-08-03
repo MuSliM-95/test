@@ -72,6 +72,8 @@ class SegmentCriteriaQuery:
         }
         for row in rows:
             data[SegmentObjectType.docs_sales.value].append(row.id)
+            if not row.contragent:
+                continue
             data[SegmentObjectType.contragents.value].append(row.contragent)
 
         data[SegmentObjectType.docs_sales.value] = set(data[SegmentObjectType.docs_sales.value])
