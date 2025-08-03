@@ -35,7 +35,6 @@ class SegmentCriteria(BaseModel):
     purchases: Optional[PurchaseCriteria]
     loyality: Optional[LoyalityCriteria]
     tags: Optional[List[str]]
-    tag: Optional[str]
     delivery_required: Optional[bool]
     created_at: Optional[DateRange]
     picker: Optional[PickerCourierSchema]
