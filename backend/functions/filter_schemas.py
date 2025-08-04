@@ -48,7 +48,7 @@ class UsersFiltersQuery(BaseModel):
 class CAFiltersQuery(BaseModel):
     name: Optional[str]
     inn: Optional[int]
-    phone: Optional[int]
+    phone: Optional[str]
     external_id: Optional[str]
 
 class PicturesFiltersQuery(BaseModel):
