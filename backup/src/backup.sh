@@ -7,6 +7,8 @@ source ./env.sh
 
 export TZ="Europe/Moscow"
 
+: "${aws_args:=--region ${S3_REGION} --endpoint-url ${S3_ENDPOINT}}"
+
 send_message() {
     local message="$1"
 
@@ -21,10 +23,10 @@ send_message() {
 
 echo "Creating backup of $POSTGRES_DATABASE database..."
 pg_dump --format=plain \
-        -h $POSTGRES_HOST \
-        -p $POSTGRES_PORT \
-        -U $POSTGRES_USER \
-        -d $POSTGRES_DATABASE \
+        -h "$POSTGRES_HOST" \
+        -p "$POSTGRES_PORT" \
+        -U "$POSTGRES_USER" \
+        -d "$POSTGRES_DATABASE" \
         $PGDUMP_EXTRA_OPTS \
         > db.sql
 
@@ -36,7 +38,7 @@ cutoff=$(date -d "$today - $BACKUP_KEEP_DAYS days" +"%Y-%m-%d")
 backupName="${POSTGRES_DATABASE}_${timestamp}.sql"
 s3_uri_base="s3://${S3_BUCKET}/${S3_PREFIX}/${backupName}"
 
-if [ -n "$PASSPHRASE" ]; then
+if [ -n "${PASSPHRASE:-}" ]; then
   echo "Encrypting backup..."
   rm -f db.sql.gpg
   gpg --symmetric --batch --passphrase "$PASSPHRASE" db.sql
@@ -68,19 +70,13 @@ if [ -n "$BACKUP_KEEP_DAYS" ]; then
 
   mapfile -t keep_keys < <(echo "$backups_json" | \
     jq -r '.[] | "\(.LastModified) \(.Key)"' | \
-    sort -r | \
-    awk '{
-      split($1, dt, "T");
-      day=dt[1];
-      if (!(day in kept)) {
-        kept[day] = $2
-      }
-    } END {
-      for (d in kept) print kept[d]
-    }')
+    while read -r last_modified key; do
+      local_date=$(TZ="Europe/Moscow" date -d "$last_modified" +"%Y-%m-%d")
+      echo "$local_date $last_modified $key"
+    done | sort -k1,1 -k2,2r | awk '!seen[$1]++ { print $3 }')
 
   echo "$backups_json" | jq -r '.[] | "\(.Key) \(.LastModified)"' | while read -r key last_modified; do
-    backup_date=$(date -d "$last_modified" +"%Y-%m-%d")
+    backup_date=$(TZ="Europe/Moscow" date -d "$last_modified" +"%Y-%m-%d")
     keep=false
     for keep_key in "${keep_keys[@]}"; do
       if [[ "$key" == "$keep_key" ]]; then
