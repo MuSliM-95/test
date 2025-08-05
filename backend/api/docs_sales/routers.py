@@ -1811,66 +1811,93 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
     if hash != expected_hash:
         raise HTTPException(status_code=403, detail="Недействительная ссылка")
 
-    query = docs_sales.select().where(
-        docs_sales.c.id == order_id, docs_sales.c.is_deleted.is_not(True)
-    )
-    order = await database.fetch_one(query)
-
-    if not order:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
-
-    if role == "general":
-        order_data = datetime_to_timestamp(order)
-        return order_data
-
-    elif role == "picker":
-        picker_data = {
-            "id": order.id,
-            "number": order.number,
-            "status": order.order_status,
-            "warehouse": order.warehouse,
-            "assigned_picker": order.assigned_picker,
-        }
-
-        query = docs_sales_goods.select().where(
-            docs_sales_goods.c.docs_sales_id == order_id
+    if role == "general" or role == "courier":
+        query = docs_sales.select().where(
+            docs_sales.c.id == order_id, docs_sales.c.is_deleted.is_not(True)
         )
-        goods = await database.fetch_all(query)
+        order = await database.fetch_one(query)
 
-        if goods:
-            picker_data["goods"] = [
-                {
-                    "nomenclature_id": good.nomenclature,
-                    "quantity": good.quantity,
-                    "unit": good.unit,
-                }
-                for good in goods
-            ]
+        if not order:
+            raise HTTPException(status_code=404, detail="Заказ не найден")
 
-        return picker_data
-
-    elif role == "courier":
-        courier_data = {
-            "id": order.id,
-            "number": order.number,
-            "status": order.order_status,
-            "assigned_courier": order.assigned_courier,
-        }
-
-        query = docs_sales_delivery_info.select().where(
-            docs_sales_delivery_info.c.docs_sales_id == order_id
-        )
-        delivery = await database.fetch_one(query)
-
-        if delivery:
-            courier_data["delivery"] = {
-                "address": delivery.address,
-                "delivery_date": delivery.delivery_date,
-                "recipient": delivery.recipient,
-                "note": delivery.note,
+        if role == "general":
+            order_data = datetime_to_timestamp(order)
+            return order_data
+        
+        elif role == "courier":
+            courier_data = {
+                "id": order.id,
+                "number": order.number,
+                "status": order.order_status,
+                "assigned_courier": order.assigned_courier,
             }
 
-        return courier_data
+            query = docs_sales_delivery_info.select().where(
+                docs_sales_delivery_info.c.docs_sales_id == order_id
+            )
+            delivery = await database.fetch_one(query)
 
+            if delivery:
+                courier_data["delivery"] = {
+                    "address": delivery.address,
+                    "delivery_date": delivery.delivery_date,
+                    "recipient": delivery.recipient,
+                    "note": delivery.note,
+                }
+
+            return courier_data
+
+    elif role == "picker":
+        query = f"""
+            SELECT 
+                sales.*,
+                {', '.join(f'warehouse.{c.name} AS warehouse_{c.name}' for c in warehouses.c)},
+                {', '.join(f'contragent.{c.name} AS contragent_{c.name}' for c in contragents.c)}
+            FROM docs_sales sales
+            LEFT JOIN warehouses warehouse ON warehouse.id = sales.warehouse
+            LEFT JOIN contragents contragent ON contragent.id = sales.contragent
+            WHERE sales.id = :order_id AND sales.is_deleted IS NOT TRUE
+        """
+        order = await database.fetch_one(query, { "order_id": order_id })
+        order_dict = dict(order)
+
+        if not order:
+            raise HTTPException(status_code=404, detail="Заказ не найден")
+        
+        order_dict["status"] = order_dict["order_status"]
+
+        query = f"""
+            select
+                "goods".*,
+                {', '.join(f'nomenclature.{c.name} AS nomenclature_{c.name}' for c in nomenclature.c)},
+                "pictures"."id" AS "picture_id",
+                "pictures"."url" AS "picture_url",
+                "pictures"."is_main" AS "picture_is_main",
+                "unit"."id" as "nomenclature_unit_id",
+                "unit"."convent_national_view" as "nomenclature_unit_convent_national_view"
+            from "docs_sales_goods" "goods"
+            left join "nomenclature" "nomenclature"
+            on "goods"."nomenclature" = "nomenclature"."id"
+            left join "units" "unit"
+            on "nomenclature"."unit" = "unit"."id"
+            left join lateral (
+                select "id", "url", "is_main"
+                from "pictures"
+                where 
+                    "entity" = 'nomenclature' AND 
+                    "entity_id" = "nomenclature"."id"
+                order by 
+                    "is_main" desc,
+                    "id" asc
+                limit 1
+            ) "pictures" on true
+            where "goods"."docs_sales_id" = :order_id
+        """
+        goods = await database.fetch_all(query, { "order_id": order_id })
+
+        if goods:
+            order_dict["goods"] = goods
+
+        return order_dict
     else:
         raise HTTPException(status_code=400, detail="Неизвестная роль")
