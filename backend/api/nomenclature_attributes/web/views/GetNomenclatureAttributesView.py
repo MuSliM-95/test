@@ -39,8 +39,16 @@ class GetNomenclatureAttributesView:
         results = await database.fetch_all(query)
 
         if not results:
-            raise HTTPException(status_code=404,
-                                detail=f"Номенклатура с ID {nomenclature_id} не найдена или не имеет атрибутов.")
+            check_nomenclature_query = select(nomenclature).where(nomenclature.c.id == nomenclature_id)
+            res = await database.fetch_one(check_nomenclature_query)
+            if not res:
+                raise HTTPException(status_code=404,
+                                    detail=f"Номенклатура с ID {nomenclature_id} не имеет атрибутов.")
+
+            return schemas.NomenclatureWithAttributesResponse(
+                nomenclature_id=nomenclature_id,
+                attributes=[],
+            )
 
         return schemas.NomenclatureWithAttributesResponse(
             nomenclature_id=nomenclature_id,
