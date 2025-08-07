@@ -11,7 +11,8 @@ from database.db import (
     warehouses,
     units,
     OperationType,
-    docs_warehouse_goods
+    docs_warehouse_goods,
+    Operation
 )
 from . import schemas
 from fastapi import APIRouter, HTTPException, Query
@@ -30,7 +31,8 @@ from ws_manager import manager
 
 from typing import List
 
-from api.docs_warehouses.func_warehouse import call_type_movement, set_data_doc_warehouse, update_docs_warehouse, update_goods_warehouse
+from api.docs_warehouses.func_warehouse import call_type_movement, set_data_doc_warehouse, update_docs_warehouse, update_goods_warehouse, validate_photo_for_writeoff
+from api.docs_warehouses.schemas import WarehouseOperations
 
 router = APIRouter(tags=["docs_warehouse"])
 

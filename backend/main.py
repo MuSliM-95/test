@@ -166,7 +166,6 @@ from api.tags.routers import router as tags_router
 # )
 
 app = FastAPI(
-    root_path="/api/v1",
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0"
