@@ -322,7 +322,7 @@ async def call_type_movement(t, **kwargs):
         raise HTTPException(status_code=422, detail=f"error method [{t}] does not exist")
 
 
-async def validate_photo_for_writeoff(entity_id: int, token: str):
+async def validate_photo_for_writeoff(entity_id: int, user_id: int):
     """
     Проверка наличия фото для списания товара
     """
@@ -330,14 +330,6 @@ async def validate_photo_for_writeoff(entity_id: int, token: str):
         docs_warehouse.c.id == entity_id,
         docs_warehouse.c.operation == WarehouseOperations.write_off,
         docs_warehouse.c.is_deleted.is_not(True),
-
-    )
-
-    query = pictures.select().where(
-        pictures.c.entity_id == entity_id,
-        pictures.c.entity == 'docs_warehouse',
-        pictures.c.owner == user.id,
-        pictures.c.is_deleted.is_not(True),
     )
 
     doc = await database.fetch_one(doc_query)
@@ -349,6 +341,7 @@ async def validate_photo_for_writeoff(entity_id: int, token: str):
         pictures.c.entity_id == entity_id,
         pictures.c.entity == 'docs_warehouse',
         pictures.c.is_deleted.is_not(True),
+        pictures.c.owner == user_id,
     )
 
     pictures = await database.fetch_one(picture_query)
