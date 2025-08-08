@@ -101,7 +101,7 @@ async def edit_cashbox_user(token: str, user_id: int, data: Optional[CashboxUpda
     if not data:
         data = {}
     else:
-        data = data.dict(exclude_none=True, exclude_unset=True)
+        data = data.dict(exclude_unset=True)
     if status is not None:
         data["status"] = status
 
