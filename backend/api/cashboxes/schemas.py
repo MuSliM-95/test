@@ -1,12 +1,15 @@
 import re
 from typing import Optional, List
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, Field
 
 
 class CashboxUpdate(BaseModel):
     tags: Optional[List[str]]
     status: Optional[bool]
+
+    timezone: Optional[str]
+    payment_past_edit_days: Optional[int] = Field(default=None, ge=0)
 
     @validator("tags")
     def validate_tags(cls, tag_list):
