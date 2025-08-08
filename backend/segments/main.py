@@ -57,12 +57,14 @@ class Segments:
 
     async def update_segment(self):
         try:
+            start = datetime.now()
             await self.set_status_in_progress()
             new_ids = await self.query.collect_ids()
             await self.logic.update_segment_data_in_db(new_ids)
             await self.actions.start_actions()
             await self.update_segment_datetime()
             await self.set_status_calculated()
+            logging.info(f'Segment {self.segment_id} updated successfully. Took {datetime.now() - start}')
         except Exception as e:
             logging.exception(f"Ошибка при обновлении сегмента {self.segment_obj.id}: {e}")
 

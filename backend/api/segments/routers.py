@@ -58,8 +58,8 @@ async def refresh_segments(idx: int, token: str):
         raise HTTPException(status_code=404, detail="Сегмент не найден")
     if segment.is_archived:
         raise HTTPException(status_code=403, detail="Сегмент заархивирован!")
-    if segment.updated_at and datetime.now(timezone.utc) - segment.updated_at < timedelta(minutes=5):
-        raise HTTPException(status_code=403, detail="Сегмент обновлен менее 5 минут назад!")
+    # if segment.updated_at and datetime.now(timezone.utc) - segment.updated_at < timedelta(minutes=5):
+    #     raise HTTPException(status_code=403, detail="Сегмент обновлен менее 5 минут назад!")
 
     await database.execute(
         segments.update().where(segments.c.id == segment.id)
