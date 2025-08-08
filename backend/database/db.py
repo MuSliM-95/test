@@ -856,6 +856,8 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("is_owner", Boolean, default=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("timezone", String),
+    sqlalchemy.Column("payment_past_edit_days", Integer)
 )
 
 contragents = sqlalchemy.Table(
