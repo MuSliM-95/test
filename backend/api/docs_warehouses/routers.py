@@ -161,7 +161,7 @@ async def create(token: str, docs_warehouse_data: schemas.CreateMass):
         instance_values["created_by"] = user.id
         instance_values["cashbox"] = user.cashbox_id
 
-        if instance_values["operation"] == WarehouseOperations.write_off:
+        if instance_values["operation"] == "write_off":
             instance_values["status"] = False
 
         if not await check_period_blocked(instance_values["organization"], instance_values.get("dated"), exceptions):
@@ -288,7 +288,10 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
         if not await check_foreign_keys(instance_values, user, exceptions):
             continue
 
-        if instance_values.get("status") is True:
+        query = docs_warehouse.select().where(docs_warehouse.c.id == instance_values["id"])
+        instance_db = await database.fetch_one(query)
+
+        if instance_values.get("status") is True and instance_db.operation == "write_off":
             try:
                 await validate_photo_for_writeoff(instance_values["id"], user.id)
             except HTTPException as e:
@@ -466,6 +469,9 @@ async def create(
     docs_warehouse_data = docs_warehouse_data.dict()
     user = await get_user_by_token(token)
     for doc in docs_warehouse_data["__root__"]:
+
+        if doc["operation"] == "write_off":
+            doc["status"] = False
 
         for doc_good in doc['goods']:
             if not doc_good['unit']:
