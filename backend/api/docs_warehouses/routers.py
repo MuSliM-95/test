@@ -610,6 +610,14 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
             await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
             entity.update({'warehouse': entity['to_warehouse']})
             await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
+        if entity['operation'] == "write_off":
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+            if doc.get("status") is True:
+                try:
+                    await validate_photo_for_writeoff(instance_values["id"], user.id)
+                except HTTPException as e:
+                    exceptions.append(f"Документ {instance_values['id']}: {e.detail}")
+                    continue
         response.append(doc_id)
 
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
