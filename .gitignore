@@ -18,3 +18,4 @@ docker-compose.dev.yml
 /.nezuko
 /certs
 docker-compose-dev-https.yml
+.vscode
