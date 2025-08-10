@@ -618,9 +618,8 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
                 # Если в настройках включено требование фото — проверяем
                 if require_photo:
                     try:
-                        await validate_photo_for_writeoff(doc["id"], user.id)
+                        await validate_photo_for_writeoff(doc["id"])
                     except HTTPException as e:
-                        exceptions.append(f"Документ {doc['id']}: {e.detail}")
                         continue
             await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
 
