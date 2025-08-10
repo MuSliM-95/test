@@ -593,20 +593,8 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
         updated_item = stored_item_model.copy(update=doc)
         doc = jsonable_encoder(updated_item)
         del doc['goods']
-
+        
         entity = await set_data_doc_warehouse(entity_values=doc, token=token)
-        doc_id = await update_docs_warehouse(entity=entity)
-        entity.update({'goods': goods})
-        if entity['operation'] == "incoming":
-            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
-            response.append(doc_id)
-        if entity['operation'] == "outgoing":
-            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
-            response.append(doc_id)
-        if entity['operation'] == "transfer":
-            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
-            entity.update({'warehouse': entity['to_warehouse']})
-            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
         if entity['operation'] == "write_off":
             if doc.get("status") is True:
                 # Получаем настройки кассы
@@ -621,7 +609,23 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
                         await validate_photo_for_writeoff(doc["id"])
                     except HTTPException as e:
                         continue
+
+        doc_id = await update_docs_warehouse(entity=entity)
+        entity.update({'goods': goods})
+        if entity['operation'] == "incoming":
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
+            response.append(doc_id)
+        if entity['operation'] == "outgoing":
             await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+            response.append(doc_id)
+        if entity['operation'] == "transfer":
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+            entity.update({'warehouse': entity['to_warehouse']})
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
+        if entity['operation'] == "write_off":
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+            response.append(doc_id)
+
 
 
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
