@@ -359,7 +359,7 @@ async def validate_photo_for_writeoff(entity_id: int):
         pictures.c.is_deleted.is_not(True),
     )
 
-    picture = await database.fetch_all(picture_query)
+    picture = await database.fetch_one(picture_query)
 
     if not picture:
             raise HTTPException(
