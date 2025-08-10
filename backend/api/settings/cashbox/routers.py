@@ -40,7 +40,7 @@ async def create_cashbox_settings(token: str, settings: schemas.CreateCashboxSet
             "updated_at": now,
             "is_deleted": False
         }
-        query = cashbox_settings.insert().values(settings_create)
+        query = cashbox_settings.insert().values(settings_create).returning(cashbox_settings.c.cashbox_id)
         settings_id = await database.execute(query)
         created = await database.fetch_one(
             select(cashbox_settings).where(cashbox_settings.c.cashbox_id == settings_id)
