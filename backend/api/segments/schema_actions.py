@@ -32,8 +32,21 @@ class TgNotificationsAction(BaseModel):
     send_to: Optional[Literal["picker", "courier"]]
 
 
+class DocsSalesTags(BaseModel):
+    tags: List[str]
+
+    @validator("tags", each_item=True)
+    def validate_tag_item(cls, v):
+        if len(v) < 3:
+            raise ValueError("Элемент списка должен быть не короче 3 символов")
+        return v
+
+
 class SegmentActions(BaseModel):
     add_existed_tags: Optional[AddRemoveTags]
     remove_tags: Optional[AddRemoveTags]
     client_tags: Optional[CreateTags]
     send_tg_notification: Optional[TgNotificationsAction]
+    add_docs_sales_tags: Optional[DocsSalesTags]
+    remove_docs_sales_tags: Optional[DocsSalesTags]
+

@@ -3,7 +3,7 @@ from typing import List
 
 from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
-    users_cboxes_relation, docs_sales
+    users_cboxes_relation, docs_sales, docs_sales_tags
 )
 from sqlalchemy import select, and_, func, literal
 from sqlalchemy.dialects.postgresql import insert
@@ -38,6 +38,14 @@ class SegmentActions:
                 "obj_type": SegmentObjectType.docs_sales.value,
                 "method": self.send_tg_notification
             },
+            "add_docs_sales_tags": {
+                "obj_type": SegmentObjectType.docs_sales.value,
+                "method": self.add_docs_sales_tags
+            },
+            "remove_docs_sales_tags": {
+                "obj_type": SegmentObjectType.docs_sales.value,
+                "method": self.remove_docs_sales_tags
+            }
         }
 
     async def refresh_segment_obj(self):
@@ -196,3 +204,28 @@ class SegmentActions:
         )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
+
+    async def add_docs_sales_tags(self, docs_ids:List[int], data: dict):
+
+        tags = data.get("tags")
+        prepared_data = []
+
+        for doc_id in docs_ids:
+            for tag in set(tags):
+                prepared_data.append({
+                    "docs_sales_id": doc_id,
+                    "name": tag
+                })
+
+        if prepared_data:
+            query = insert(docs_sales_tags).values(prepared_data)
+            await database.execute(query)
+
+    async def remove_docs_sales_tags(self, docs_ids:List[int], data: dict):
+        tags = data.get("tags")
+        query = docs_sales_tags.delete().where(and_(
+            docs_sales_tags.c.docs_sales_id.in_(docs_ids),
+            docs_sales_tags.c.name.in_(tags)
+        ))
+
+        await database.execute(query)

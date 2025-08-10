@@ -83,7 +83,7 @@ scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5,
 scheduler.add_job(func=module_bank_update_transaction, trigger='interval', minutes=5, id="module_bank_update_transaction", max_instances=1, replace_existing=True)
 scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", max_instances=1, replace_existing=True)
 scheduler.add_job(func=check_account, trigger="interval", seconds=accountant_interval, id="check_account", max_instances=1, replace_existing=True)
-scheduler.add_job(func=segment_update, trigger="interval", seconds=3*60, id="segment_update", max_instances=1, replace_existing=True)
+scheduler.add_job(func=segment_update, trigger="interval", seconds=60, id="segment_update", max_instances=1, replace_existing=True)
 
 
 scheduler.add_jobstore(jobstore)
