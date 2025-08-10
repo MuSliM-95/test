@@ -27,5 +27,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['cashbox_id'], ['cashboxes.id']),
     )
 
+    op.execute("""
+        INSERT INTO cashbox_settings (cashbox_id, require_photo_for_writeoff, created_at, updated_at, is_deleted)
+        SELECT id, false, now(), now(), false
+        FROM cashboxes
+    """)
+
 def downgrade() -> None:
     op.drop_table('cashbox_settings')
