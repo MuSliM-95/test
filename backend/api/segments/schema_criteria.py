@@ -31,11 +31,26 @@ class PickerCourierSchema(BaseModel):
     finish: Optional[DateRange]
 
 
+class RecipientInfoSchema(BaseModel):
+    name: Optional[str]
+    surname: Optional[str]
+    phone: Optional[str]
+
+
+class DeliverySchema(BaseModel):
+    address: Optional[str]
+    delivery_date: Optional[DateRange]
+    note: Optional[str]
+    recipient: Optional[RecipientInfoSchema]
+
+
 class SegmentCriteria(BaseModel):
     purchases: Optional[PurchaseCriteria]
     loyality: Optional[LoyalityCriteria]
     tags: Optional[List[str]]
+    docs_sales_tags: Optional[List[str]]
     delivery_required: Optional[bool]
     created_at: Optional[DateRange]
     picker: Optional[PickerCourierSchema]
     courier: Optional[PickerCourierSchema]
+    delivery_info: Optional[DeliverySchema]

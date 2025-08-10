@@ -6,7 +6,7 @@ from sqlalchemy.sql import Select
 from database.db import (
     docs_sales, OrderStatus, docs_sales_delivery_info, docs_sales_goods,
     nomenclature, categories, contragents, loyality_cards,
-    loyality_transactions
+    loyality_transactions, contragents_tags, tags, docs_sales_tags
 )
 from segments.ranges import apply_range, apply_date_range
 
@@ -61,7 +61,6 @@ def add_courier_filters(query: Select, courier_filters):
 
 
 def add_delivery_required_filters(query: Select, delivery_required: bool):
-    query = query.outerjoin(docs_sales_delivery_info, docs_sales_delivery_info.c.docs_sales_id == docs_sales.c.id)
 
     if delivery_required is True:
         query = query.where(docs_sales_delivery_info.c.docs_sales_id.isnot(None))
@@ -180,12 +179,6 @@ def add_loyality_filters(query: Select, loyality_criteria: dict) -> Select:
 
     where_clauses = []
 
-    query = (
-        query
-        .outerjoin(loyality_cards, loyality_cards.c.contragent_id == contragents.c.id)
-        .outerjoin(loyality_transactions, loyality_transactions.c.loyality_card_id == loyality_cards.c.id)
-    )
-
     if balance := loyality_criteria.get("balance"):
         apply_range(loyality_cards.c.balance, balance, where_clauses)
 
@@ -198,6 +191,61 @@ def add_loyality_filters(query: Select, loyality_criteria: dict) -> Select:
         days_left = func.DATE_PART('day', expiry_datetime - func.now())
 
         apply_range(days_left, expire, where_clauses)
+
+    if where_clauses:
+        query = query.where(and_(*where_clauses))
+
+    return query
+
+
+def created_at_filters(query: Select, data: dict) -> Select:
+    where_clauses = []
+    apply_date_range(docs_sales.c.created_at, data, where_clauses)
+    if where_clauses:
+        query = query.where(and_(*where_clauses))
+    return query
+
+
+def tags_filters(query: Select, data: list) -> Select:
+    like_conditions = [
+        tags.c.name.ilike(f"%{tag}%") for tag in data
+    ]
+    return (
+        query
+        .where(or_(*like_conditions))
+    )
+
+
+def docs_sales_tags_filters(query: Select, data: list) -> Select:
+    like_conditions = [
+        docs_sales_tags.c.name.ilike(f"%{tag}%") for tag in data
+    ]
+    return (
+        query
+        .where(or_(*like_conditions))
+    )
+
+
+def delivery_info_filters(query: Select, data: dict) -> Select:
+    where_clauses = []
+
+    if dd := data.get("delivery_date"):
+        apply_date_range(docs_sales_delivery_info.c.delivery_date, dd, where_clauses)
+
+    if address := data.get("address"):
+        where_clauses.append(docs_sales_delivery_info.c.address.ilike(f"%{address}%"))
+
+    if note := data.get("note"):
+        where_clauses.append(
+            docs_sales_delivery_info.c.note.ilike(f"%{note}%"))
+
+    if recipient := data.get("recipient"):
+        if not isinstance(recipient, dict):
+            recipient = {}
+        for k, v in recipient.items():
+            where_clauses.append(
+                docs_sales_delivery_info.c.recipient.op('->>')(text(f"'{k}'")).ilike(f'%{v}%')
+            )
 
     if where_clauses:
         query = query.where(and_(*where_clauses))

@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta
+
 
 from database.db import database, segments
 from segments.main import update_segment_task
 
 from sqlalchemy import select, cast, func, Integer, and_, or_
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql.psycopg2 import dialect
+
 
 
 async def get_segment_ids():

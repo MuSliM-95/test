@@ -65,7 +65,7 @@ class Segments:
             await self.actions.start_actions()
             await self.update_segment_datetime()
             await self.set_status_calculated()
-            logger.info(f'Segment {self.segment_id} updated successfully. Took {datetime.now() - start}')
+            logger.info(f'Segment {self.segment_id} updated successfully. Start - {start}. Took {datetime.now() - start}')
         except Exception as e:
             logger.exception(f"Ошибка при обновлении сегмента {self.segment_obj.id}: {e}")
 
