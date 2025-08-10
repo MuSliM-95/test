@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from functions.helpers import gen_token
-from database.db import database, cboxes, pboxes, users, users_cboxes_relation
+from database.db import database, cboxes, pboxes, users, users_cboxes_relation, cashbox_settings
 
 import websockets
 import json
@@ -24,6 +24,15 @@ async def create_cbox(user):
     )
 
     cashbox_id = await database.execute(cashbox_query)
+
+    settings_query = cashbox_settings.insert().values(
+        cashbox_id=cashbox_id,
+        require_photo_for_writeoff=False,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        is_deleted=False
+    )
+    await database.execute(settings_query)
 
     cashbox_query = cboxes.select().where(cboxes.c.id == cashbox_id)
     cashbox = await database.fetch_one(cashbox_query)

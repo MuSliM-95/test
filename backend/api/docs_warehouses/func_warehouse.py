@@ -285,6 +285,21 @@ async def outgoing(entity_values, token):
     except Exception as error:
         raise HTTPException(status_code=433, detail=str(error))
 
+@database.transaction()
+async def write_off(entity_values, token):
+    """
+    Списание товара — частный случай расхода, когда нужно обязательное фото (зависит от настроек)
+    и уменьшение остатка (OperationType.minus).
+    """
+    try:
+        goods: list = entity_values['goods']
+        entity = await set_data_doc_warehouse(entity_values=entity_values, token=token)
+        doc_id = await insert_docs_warehouse(entity=entity)
+        entity.update({'goods': goods})
+        await insert_goods(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+        return doc_id
+    except Exception as error:
+        raise HTTPException(status_code=433, detail=str(error))
 
 @database.transaction()
 async def transfer(entity_values, token):
@@ -314,7 +329,8 @@ async def call_type_movement(t, **kwargs):
     getMethod = {
         'incoming': incoming,
         'outgoing': outgoing,
-        'transfer': transfer
+        'transfer': transfer,
+        'write_off': write_off
     }
     if t in getMethod:
         return await getMethod[t](**kwargs)

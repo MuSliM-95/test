@@ -12,7 +12,7 @@ from database.db import (
     units,
     OperationType,
     docs_warehouse_goods,
-    Operation
+    cashbox_settings
 )
 from . import schemas
 from fastapi import APIRouter, HTTPException, Query
@@ -470,9 +470,6 @@ async def create(
     user = await get_user_by_token(token)
     for doc in docs_warehouse_data["__root__"]:
 
-        if doc["operation"] == "write_off":
-            doc["status"] = False
-
         for doc_good in doc['goods']:
             if not doc_good['unit']:
                 q = nomenclature.select().where(nomenclature.c.id == doc_good['nomenclature'])
@@ -611,14 +608,22 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
             entity.update({'warehouse': entity['to_warehouse']})
             await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
         if entity['operation'] == "write_off":
-            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
             if doc.get("status") is True:
-                try:
-                    await validate_photo_for_writeoff(instance_values["id"], user.id)
-                except HTTPException as e:
-                    exceptions.append(f"Документ {instance_values['id']}: {e.detail}")
-                    continue
-        response.append(doc_id)
+                # Получаем настройки кассы
+                cashbox_settings_data = await database.fetch_one(
+                    cashbox_settings.select().where(cashbox_settings.c.cashbox_id == entity["cashbox"])
+                )
+                require_photo = cashbox_settings_data and cashbox_settings_data["require_photo_for_writeoff"]
+
+                # Если в настройках включено требование фото — проверяем
+                if require_photo:
+                    try:
+                        await validate_photo_for_writeoff(instance_values["id"], user.id)
+                    except HTTPException as e:
+                        exceptions.append(f"Документ {instance_values['id']}: {e.detail}")
+                        continue
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+
 
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
     docs_warehouse_db = await database.fetch_all(query)
