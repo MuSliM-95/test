@@ -344,7 +344,7 @@ async def validate_photo_for_writeoff(entity_id: int, user_id: int):
     """
     doc_query = docs_warehouse.select().where(
         docs_warehouse.c.id == entity_id,
-        docs_warehouse.c.operation == WarehouseOperations.write_off,
+        docs_warehouse.c.operation == "write_off",
         docs_warehouse.c.is_deleted.is_not(True),
     )
 
