@@ -11,7 +11,8 @@ from database.db import (
     warehouses,
     units,
     OperationType,
-    docs_warehouse_goods
+    docs_warehouse_goods,
+    cashbox_settings
 )
 from . import schemas
 from fastapi import APIRouter, HTTPException, Query
@@ -30,7 +31,8 @@ from ws_manager import manager
 
 from typing import List
 
-from api.docs_warehouses.func_warehouse import call_type_movement, set_data_doc_warehouse, update_docs_warehouse, update_goods_warehouse
+from api.docs_warehouses.func_warehouse import call_type_movement, set_data_doc_warehouse, update_docs_warehouse, update_goods_warehouse, validate_photo_for_writeoff
+from api.docs_warehouses.schemas import WarehouseOperations
 
 router = APIRouter(tags=["docs_warehouse"])
 
@@ -159,6 +161,9 @@ async def create(token: str, docs_warehouse_data: schemas.CreateMass):
         instance_values["created_by"] = user.id
         instance_values["cashbox"] = user.cashbox_id
 
+        if instance_values["operation"] == "write_off":
+            instance_values["status"] = False
+
         if not await check_period_blocked(instance_values["organization"], instance_values.get("dated"), exceptions):
             continue
 
@@ -282,6 +287,16 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
 
         if not await check_foreign_keys(instance_values, user, exceptions):
             continue
+
+        query = docs_warehouse.select().where(docs_warehouse.c.id == instance_values["id"])
+        instance_db = await database.fetch_one(query)
+
+        if instance_values.get("status") is True and instance_db.operation == "write_off":
+            try:
+                await validate_photo_for_writeoff(instance_values["id"], user.id)
+            except HTTPException as e:
+                exceptions.append(f"Документ {instance_values['id']}: {e.detail}")
+                continue
 
         goods: list = instance_values.get("goods")
         try:
@@ -592,7 +607,23 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
             await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
             entity.update({'warehouse': entity['to_warehouse']})
             await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.plus)
-        response.append(doc_id)
+        if entity['operation'] == "write_off":
+            if doc.get("status") is True:
+                # Получаем настройки кассы
+                cashbox_settings_data = await database.fetch_one(
+                    cashbox_settings.select().where(cashbox_settings.c.cashbox_id == entity["cashbox"])
+                )
+                require_photo = cashbox_settings_data and cashbox_settings_data["require_photo_for_writeoff"]
+
+                # Если в настройках включено требование фото — проверяем
+                if require_photo:
+                    try:
+                        await validate_photo_for_writeoff(instance_values["id"], user.id)
+                    except HTTPException as e:
+                        exceptions.append(f"Документ {instance_values['id']}: {e.detail}")
+                        continue
+            await update_goods_warehouse(entity=entity, doc_id=doc_id, type_operation=OperationType.minus)
+
 
     query = docs_warehouse.select().where(docs_warehouse.c.id.in_(response))
     docs_warehouse_db = await database.fetch_all(query)

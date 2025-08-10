@@ -134,6 +134,15 @@ class SegmentStatus(str, ENUM):
 
 metadata = sqlalchemy.MetaData()
 
+cashbox_settings = sqlalchemy.Table(
+    "cashbox_settings",
+    metadata,
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("require_photo_for_writeoff", Boolean, nullable=False, server_default=sqlalchemy.false()),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("is_deleted", Boolean, nullable=False, server_default=sqlalchemy.false()),
+)
 
 yookassa_install = sqlalchemy.Table(
     "yookassa_install",

@@ -26,14 +26,22 @@ def upgrade() -> None:
     op.drop_index('ix_svo_segment_version', table_name='segment_version_objects')
     op.drop_table('segment_version_objects')
     op.execute('DROP TYPE IF EXISTS segment_object_type')
-    op.create_table('segment_objects',
+    segment_object_type_enum = sa.Enum(
+    'docs_sales',
+    'contragents',
+    name='segment_object_type'
+    )
+    segment_object_type_enum.create(op.get_bind())   
+
+    op.create_table(
+    'segment_objects',
     sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('segment_id', sa.BigInteger(), nullable=False),
     sa.Column('object_id', sa.BigInteger(), nullable=False),
-    sa.Column('object_type', sa.Enum('docs_sales', 'contragents', name='segment_object_type'), nullable=False),
+    sa.Column('object_type', segment_object_type_enum, nullable=False),
     sa.Column('valid_from', sa.DateTime(timezone=True), nullable=False),
     sa.Column('valid_to', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['segment_id'], ['segments.id'], ),
+    sa.ForeignKeyConstraint(['segment_id'], ['segments.id']),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('segment_id', 'object_id', 'object_type', 'valid_from', 'valid_to', name='uq_svo_unique_object_per_move')
     )
