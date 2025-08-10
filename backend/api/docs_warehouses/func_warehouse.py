@@ -359,12 +359,12 @@ async def validate_photo_for_writeoff(entity_id: int):
         pictures.c.is_deleted.is_not(True),
     )
 
-    pictures = await database.fetch_one(picture_query)
+    picture = await database.fetch_all(picture_query)
 
-    if not pictures:
+    if not picture:
             raise HTTPException(
             status_code=422,
             detail="Для проведения документа со списанием необходимо прикрепить хотя бы одну фотографию."
         )
 
-    return pictures
+    return picture
