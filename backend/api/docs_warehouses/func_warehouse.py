@@ -361,7 +361,7 @@ async def validate_photo_for_writeoff(entity_id: int):
 
     picture = await database.fetch_one(picture_query)
 
-    if not picture:
+    if picture["count"] == 0:
             raise HTTPException(
             status_code=422,
             detail="Для проведения документа со списанием необходимо прикрепить хотя бы одну фотографию."
