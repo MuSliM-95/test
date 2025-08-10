@@ -3,6 +3,7 @@ from sqlalchemy import select, update
 from database.db import database, cashbox_settings
 from . import schemas
 from functions.helpers import get_user_by_token
+from datetime import datetime
 
 router = APIRouter(tags=["cashbox_settings"], prefix="/cashbox")
 
@@ -31,12 +32,15 @@ async def get_cashbox_settings(token: str, user=Depends(verify_user)):
 @router.post("/settings", status_code=201)
 async def create_cashbox_settings(token: str, settings: schemas.CreateCashboxSettings, user=Depends(verify_user)):
     try:
+        now = datetime.utcnow()
         settings_create = {
             "cashbox_id": user.get("cashbox_id"),
             **settings.dict(),
+            "created_at": now,
+            "updated_at": now,
             "is_deleted": False
         }
-        query = cashbox_settings.insert().values(settings_create)
+        query = cashbox_settings.insert().values(settings_create).returning(cashbox_settings.c.cashbox_id)
         settings_id = await database.execute(query)
         created = await database.fetch_one(
             select(cashbox_settings).where(cashbox_settings.c.cashbox_id == settings_id)
@@ -58,6 +62,7 @@ async def patch_cashbox_settings(token: str, idx: int, settings: schemas.PatchCa
         if not stored_item_data:
             raise HTTPException(status_code=404, detail="Settings not found")
         update_data = settings.dict(exclude_unset=True)
+        update_data["updated_at"] = datetime.utcnow()
         await database.execute(
             update(cashbox_settings).values(update_data).where(cashbox_settings.c.cashbox_id == idx)
         )

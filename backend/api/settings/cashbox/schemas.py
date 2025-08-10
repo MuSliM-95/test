@@ -14,7 +14,6 @@ class CashboxSettingsView(BaseModel):
 
 
 class CreateCashboxSettings(BaseModel):
-    cashbox_id: int
     require_photo_for_writeoff: bool = False
 
 
