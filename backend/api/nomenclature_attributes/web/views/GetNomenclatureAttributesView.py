@@ -11,6 +11,12 @@ class GetNomenclatureAttributesView:
     async def __call__(self, token: str, nomenclature_id: int):
         user = await get_user_by_token(token)
 
+        check_nomenclature_query = select(nomenclature).where(nomenclature.c.id == nomenclature_id)
+        res = await database.fetch_one(check_nomenclature_query)
+        if not res:
+            raise HTTPException(status_code=404,
+                                detail=f"Номенклатура с ID {nomenclature_id} не найдена.")
+
         query = (
             select(
                 nomenclature_attributes.c.id,
@@ -39,12 +45,6 @@ class GetNomenclatureAttributesView:
         results = await database.fetch_all(query)
 
         if not results:
-            check_nomenclature_query = select(nomenclature).where(nomenclature.c.id == nomenclature_id)
-            res = await database.fetch_one(check_nomenclature_query)
-            if not res:
-                raise HTTPException(status_code=404,
-                                    detail=f"Номенклатура с ID {nomenclature_id} не имеет атрибутов.")
-
             return schemas.NomenclatureWithAttributesResponse(
                 nomenclature_id=nomenclature_id,
                 attributes=[],
