@@ -30,7 +30,7 @@ async def delete_category_photo(token: str, idx: int):
     user = await get_user_by_token(token)
     # Делаем запрос к categories, чтобы получить photo_id до удаления
     query = categories.select().where(categories.c.id==idx,
-                                      categories.c.owner==user.user,
+                                      categories.c.cashbox==user.cashbox_id,
                                       categories.c.photo_id.is_not(None))
     record_photo_id = await database.fetch_one(query)
     if not record_photo_id:
@@ -38,12 +38,12 @@ async def delete_category_photo(token: str, idx: int):
     photo_id = record_photo_id.get("photo_id")
     
     query = categories.update().where(categories.c.id == idx,
-                                      categories.c.owner==user.user,
+                                      categories.c.cashbox==user.cashbox_id,
                                       categories.c.photo_id.is_not(None)).values({"photo_id": None}).returning(categories)
     category_db = await database.fetch_one(query)
 
     query = pictures.update().where(pictures.c.id == photo_id,
-                                    pictures.c.owner == user.user,
+                                    pictures.c.cashbox==user.cashbox_id,
                                     pictures.c.is_deleted.is_not(True)
                                     ).values({"is_deleted": True}).returning(pictures)
     

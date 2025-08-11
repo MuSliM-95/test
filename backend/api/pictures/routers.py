@@ -35,19 +35,11 @@ s3_data = {
 bucket_name = "5075293c-docs_generated"
 
 
-
 @router.get("/pictures/{idx}/", response_model=schemas.Picture)
 async def get_picture_by_id(token: str, idx: int):
     """Получение картинки по ID"""
     user = await get_user_by_token(token)
-    query = pictures.select().where(pictures.c.id == idx,
-                                    pictures.c.owner == user.user,
-                                    pictures.c.is_deleted.is_not(True))
-    picture_db = await database.fetch_one(query)
-    if not picture_db:
-        raise HTTPException(
-            status_code=404, detail=f"У вас нет {pictures.name.rstrip('s')} с таким id."
-        )
+    picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
     picture_db = datetime_to_timestamp(picture_db)
     return picture_db
 
@@ -174,7 +166,7 @@ async def new_picture(
         "entity": entity,
         "entity_id": entity_id,
         "is_main": is_main,
-        "owner": user.user,
+        "owner": user.id,
         "url": file_link,
         "size": file_size,
         "cashbox": user.cashbox_id,
@@ -186,7 +178,7 @@ async def new_picture(
     
     query = pictures.select().where(
         pictures.c.id == picture_id,
-        pictures.c.owner == user.user,
+        pictures.c.owner == user.id,
         pictures.c.is_deleted.is_not(True),
     )
     picture_db = await database.fetch_one(query)
@@ -218,15 +210,18 @@ async def edit_picture(
 ):
     """Редактирование картинки"""
     user = await get_user_by_token(token)
+    picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
     picture_values = picture.dict(exclude_unset=True)
-    query = pictures.update().where(pictures.c.id == idx, pictures.c.owner == user.user).values(picture_values).returning(pictures)
-    picture_db = await database.fetch_one(query)
 
-    if not picture_db:
-        raise HTTPException(
-            status_code=404, detail=f"У вас нет {pictures.name.rstrip('s')} с таким id."
+    if picture_values:
+        query = (
+            pictures.update()
+            .where(pictures.c.id == idx, pictures.c.owner == user.id)
+            .values(picture_values)
         )
-    
+        await database.execute(query)
+        picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
+
     picture_db = datetime_to_timestamp(picture_db)
 
     await manager.send_message(
@@ -242,14 +237,17 @@ async def delete_picture(token: str, idx: int):
     """Удаление картинки"""
     user = await get_user_by_token(token)
 
-    query = pictures.update().where(pictures.c.id == idx, pictures.c.owner == user.user).values({"is_deleted": True}).returning(pictures)
+    await get_entity_by_id(pictures, idx, user.cashbox_id)
+
+    query = (
+        pictures.update()
+        .where(pictures.c.id == idx, pictures.c.owner == user.id)
+        .values({"is_deleted": True})
+    )
+    await database.execute(query)
+
+    query = pictures.select().where(pictures.c.id == idx, pictures.c.owner == user.id)
     picture_db = await database.fetch_one(query)
-
-    if not picture_db:
-        raise HTTPException(
-            status_code=404, detail=f"У вас нет {pictures.name.rstrip('s')} с таким id."
-        )
-
     picture_db = datetime_to_timestamp(picture_db)
 
     await manager.send_message(
