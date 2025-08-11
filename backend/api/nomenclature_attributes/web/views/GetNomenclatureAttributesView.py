@@ -11,7 +11,7 @@ class GetNomenclatureAttributesView:
     async def __call__(self, token: str, nomenclature_id: int):
         user = await get_user_by_token(token)
 
-        check_nomenclature_query = select(nomenclature).where(nomenclature.c.id == nomenclature_id)
+        check_nomenclature_query = select(nomenclature).where(nomenclature.c.id == nomenclature_id, nomenclature.c.owner == user.id)
         res = await database.fetch_one(check_nomenclature_query)
         if not res:
             raise HTTPException(status_code=404,
@@ -43,12 +43,6 @@ class GetNomenclatureAttributesView:
         )
 
         results = await database.fetch_all(query)
-
-        if not results:
-            return schemas.NomenclatureWithAttributesResponse(
-                nomenclature_id=nomenclature_id,
-                attributes=[],
-            )
 
         return schemas.NomenclatureWithAttributesResponse(
             nomenclature_id=nomenclature_id,
