@@ -572,6 +572,7 @@ async def edit_nomenclature_mass(
             )
             await database.execute(query)
             nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+            await update_entity_hash(table=nomenclature, entity=nomenclature_db)
 
         nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
