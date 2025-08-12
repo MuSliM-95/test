@@ -194,22 +194,39 @@ async def get_segment_data(idx: int, token: str):
     )
 
 
-@router.get("/segments", response_model=List[schemas.Segment])
+@router.get("/segments", response_model=List[schemas.SegmentWithContragents])
 async def get_user_segments(token: str):
     user = await get_user_by_token(token)
 
     query = segments.select().where(segments.c.cashbox_id == user.cashbox_id, segments.c.is_deleted.isnot(True))
 
     rows = await database.fetch_all(query)
-    return [schemas.Segment(
-        id=row.id,
-        name=row.name,
-        criteria=json.loads(row.criteria),
-        actions=json.loads(row.actions) if row.actions else {},
-        updated_at=row.updated_at,
-        type_of_update=row.type_of_update,
-        update_settings=json.loads(row.update_settings),
-        status=row.status,
-        is_archived=row.is_archived,
-        selection_field=row.selection_field,
-    ) for row in rows]
+
+    result = []
+
+    for row in rows:
+        segment = Segments(row.id)
+        await segment.async_init()
+        if not segment.segment_obj or segment.segment_obj.cashbox_id != user.cashbox_id:
+            raise HTTPException(status_code=404, detail="Сегмент не найден")
+        contragents_data = await segment.collect_data()
+        result.append(schemas.SegmentWithContragents(
+            id=row.id,
+            name=row.name,
+            criteria=json.loads(row.criteria),
+            actions=json.loads(row.actions) if row.actions else {},
+            updated_at=row.updated_at,
+            type_of_update=row.type_of_update,
+            update_settings=json.loads(row.update_settings),
+            status=row.status,
+            is_archived=row.is_archived,
+            selection_field=row.selection_field,
+            contragents_count=len(contragents_data["contragents"]),
+            added_contragents_count=len(contragents_data["added_contragents"]),
+            deleted_contragents_count=len(contragents_data["deleted_contragents"]),
+            entered_contragents_count=len(contragents_data["entered_contragents"]),
+            exited_contragents_count=len(contragents_data["exited_contragents"]),
+        ))  
+
+
+    return result
