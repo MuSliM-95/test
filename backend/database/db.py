@@ -131,6 +131,10 @@ class SegmentStatus(str, ENUM):
     in_process = "in_process"
     calculated = "calculated"
 
+class HashableObject(str, ENUM):
+    nomenclature = "nomenclature"
+    warehouses = "warehouses"
+
 
 metadata = sqlalchemy.MetaData()
 
@@ -2114,4 +2118,15 @@ docs_sales_links = sqlalchemy.Table(
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now),
     sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
+)
+
+entity_hash = sqlalchemy.Table(
+    "hash",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True),
+    sqlalchemy.Column("type", Enum(HashableObject), nullable=False),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("hash", String, nullable=False),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 )

@@ -3,7 +3,7 @@ from typing import Optional
 import api.warehouses.schemas as schemas
 from database.db import database, warehouses
 from fastapi import APIRouter, HTTPException
-from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token
+from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token, create_entity_hash, update_entity_hash
 from sqlalchemy import func, select
 from ws_manager import manager
 
@@ -68,6 +68,7 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
 
         query = warehouses.insert().values(warehouse_values)
         warehouse_id = await database.execute(query)
+        await create_entity_hash(table=warehouses, idx=warehouse_id)
         inserted_ids.add(warehouse_id)
 
     query = warehouses.select().where(warehouses.c.cashbox == user.cashbox_id, warehouses.c.id.in_(inserted_ids))
@@ -109,6 +110,7 @@ async def edit_warehouse(
         )
         await database.execute(query)
         warehouse_db = await get_entity_by_id(warehouses, idx,user.cashbox_id)
+        await update_entity_hash(table=warehouses, entity=warehouse_db)
 
     warehouse_db = datetime_to_timestamp(warehouse_db)
 

@@ -27,7 +27,7 @@ from database.db import (
     units,
     entity_or_function,
     fifo_settings, docs_sales_settings,
-    user_permissions,
+    user_permissions, entity_hash
 )
 
 
@@ -832,3 +832,40 @@ async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
     ))
     article_exists = await database.fetch_all(check_query)
     return True if article_exists else False
+
+
+async def create_entity_hash(table: Table, idx: int):
+    query = table.select().with_only_columns(
+        table.c.id,
+        table.c.created_at,
+        table.c.updated_at
+    ).where(table.c.id == idx)
+    entity = await database.fetch_one(query)
+    data = str({"type": table.name,
+           "id": entity.id,
+           "created_at": entity.created_at,
+           "updated_at": entity.updated_at})
+    
+    hash_string = hashlib.sha256(data.encode("utf-8")).hexdigest()
+    hash_data = {"type": table.name,
+                 "hash": hash_string,
+                 "entity_id": entity.id,
+                 "created_at": datetime.now(),
+                 "updated_at": datetime.now()}
+    insert_query = entity_hash.insert().values(hash_data)
+    await database.execute(insert_query)
+
+async def update_entity_hash(table: Table, entity):
+    data = str({"type": table.name,
+           "id": entity.id,
+           "created_at": entity.created_at,
+           "updated_at": entity.updated_at})
+    
+    hash_string = hashlib.sha256(data.encode("utf-8")).hexdigest()
+    hash_data = {"type": table.name, "hash": hash_string, "entity_id": entity.id, "updated_at": datetime.now()}
+    update_query = entity_hash.update().where(entity_hash.c.entity_id==entity.id).values(hash_data)
+    await database.execute(update_query)
+    
+
+
+    

@@ -18,6 +18,7 @@ from functions.helpers import (
     get_entity_by_id,
     get_user_by_token,
     nomenclature_unit_id_to_name,
+    create_entity_hash, update_entity_hash
 )
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
@@ -481,6 +482,7 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
 
         query = nomenclature.insert().values(nomenclature_values)
         nomenclature_id = await database.execute(query)
+        await create_entity_hash(nomenclature, nomenclature_id)
         inserted_ids.add(nomenclature_id)
 
     query = nomenclature.select().where(nomenclature.c.cashbox == user.cashbox_id, nomenclature.c.id.in_(inserted_ids))
@@ -528,6 +530,7 @@ async def edit_nomenclature(
         )
         await database.execute(query)
         nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+        await update_entity_hash(table=nomenclature, entity=nomenclature_db)
 
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
