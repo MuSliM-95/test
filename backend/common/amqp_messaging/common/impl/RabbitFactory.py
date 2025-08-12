@@ -3,12 +3,12 @@ from typing import Dict
 import aio_pika
 from aio_pika.abc import AbstractRobustChannel
 
-from common.amqp_messaging.amqp_connection.impl.AmqpConnection import AmqpConnection
-from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
-from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
-from common.amqp_messaging.amqp_channels.impl.RabbitChannel import RabbitChannel
-from common.amqp_messaging.common.impl.RabbitMessagingImpl import RabbitMessagingImpl
-from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
+from ...amqp_connection.impl.AmqpConnection import AmqpConnection
+from ...common.core.IRabbitFactory import IRabbitFactory
+from ...common.core.IRabbitMessaging import IRabbitMessaging
+from ...amqp_channels.impl.RabbitChannel import RabbitChannel
+from ...common.impl.RabbitMessagingImpl import RabbitMessagingImpl
+from ...models.RabbitMqSettings import RabbitMqSettings
 
 
 class RabbitFactory(IRabbitFactory):

@@ -8,7 +8,8 @@ from apps.amocrm.leads.repositories.models.CreateLeadModel import CreateLeadMode
     CustomFieldValueElement, EmveddedModel, EmveddedContactModel
 from apps.amocrm.tools.get_install import get_install_by_cashbox
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
-from database.db import amo_leads, database, amo_leads_docs_sales_mapping, docs_sales_tags, docs_sales
+from database.db import amo_leads, database, amo_leads_docs_sales_mapping, docs_sales_tags, docs_sales, booking_tags, \
+    payments
 
 
 class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
@@ -69,7 +70,7 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
                 ]
             ),
         ]
-        if post_amo_lead_message.contact_ext_id:
+        if post_amo_lead_message.contact_id:
             create_lead_model = CreateLeadModel(
                 name=post_amo_lead_message.lead_name,
                 price=0 if not post_amo_lead_message.price else post_amo_lead_message.price,
@@ -78,7 +79,7 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
                 _embedded=EmveddedModel(
                     contacts=[
                         EmveddedContactModel(
-                            id=post_amo_lead_message.contact_ext_id
+                            id=post_amo_lead_message.contact_id
                         )
                     ]
                 )
@@ -133,6 +134,15 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
             await database.execute(query)
 
             query = (
+                insert(booking_tags)
+                .values(
+                    booking_id=post_amo_lead_message.booking_id,
+                    name=f"ID_{lead_info['id']}"
+                )
+            )
+            await database.execute(query)
+
+            query = (
                 select(docs_sales.c.tags)
                 .where(docs_sales.c.id == post_amo_lead_message.docs_sales_id)
             )
@@ -150,6 +160,27 @@ class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):
                 .where(docs_sales.c.id == post_amo_lead_message.docs_sales_id)
                 .values(
                     tags=tags
+                )
+            )
+            await database.execute(query)
+
+            query = (
+                select(payments.c.tags)
+                .where(payments.c.docs_sales_id == post_amo_lead_message.docs_sales_id)
+            )
+            payment_tags_info = await database.fetch_one(query)
+            if payment_tags_info:
+                if payment_tags_info.tags:
+                    payment_tags = payment_tags_info.tags + f",ID_{lead_info['id']}"
+                else:
+                    payment_tags = f"ID_{lead_info['id']}"
+            else:
+                payment_tags = f"ID_{lead_info['id']}"
+            query = (
+                update(payments)
+                .where(payments.c.docs_sales_id == post_amo_lead_message.docs_sales_id)
+                .values(
+                    tags=payment_tags
                 )
             )
             await database.execute(query)

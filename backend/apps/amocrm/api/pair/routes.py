@@ -5,7 +5,6 @@ from apps.amocrm.pair.functions.fields import create_custom_fields_contacts, cre
 from ws_manager import manager
 
 from datetime import datetime
-from jobs.jobs import scheduler
 from functions.helpers import gen_token
 
 

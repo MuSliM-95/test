@@ -2,6 +2,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
 # this is the Alembic Config object, which provides
@@ -14,6 +15,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 section = config.config_ini_section
+
+load_dotenv()
 
 config.set_section_option(section, "POSTGRES_USER", os.environ.get("POSTGRES_USER"))
 config.set_section_option(section, "POSTGRES_PASS", os.environ.get("POSTGRES_PASS"))
@@ -48,12 +51,11 @@ def run_migrations_offline() -> None:
 
     """
     url = config.get_main_option("sqlalchemy.url")
-    print(url)
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
+        dialect_opts={"paramstyle": "named"}
     )
 
     with context.begin_transaction():
@@ -70,7 +72,7 @@ def run_migrations_online() -> None:
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+        poolclass=pool.NullPool
     )
 
     with connectable.connect() as connection:

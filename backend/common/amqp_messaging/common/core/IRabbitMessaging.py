@@ -1,7 +1,11 @@
-from typing import Type
+from typing import Type, Optional, List
 
-from common.amqp_messaging.common.core.EventHandler import IEventHandler
-from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
+import aiormq
+from aio_pika.abc import AbstractRobustChannel
+
+from ..impl.models.QueueSettingsModel import QueueSettingsModel
+from ...common.core.EventHandler import IEventHandler
+from ...models.BaseModelMessage import BaseModelMessage
 
 
 class IRabbitMessaging:
@@ -9,8 +13,10 @@ class IRabbitMessaging:
     async def publish(
         self,
         message: BaseModelMessage,
-        routing_key: str
-    ):
+        routing_key: str,
+        priority: int = None,
+        ttl_expiration: int = None
+    ) -> aiormq.abc.ConfirmationFrameType:
         raise NotImplementedError()
 
     async def subscribe(
@@ -22,7 +28,7 @@ class IRabbitMessaging:
 
     async def install(
         self,
-        queue_name: str,
-    ):
+        queues_settings: List[QueueSettingsModel]
+    ) -> List[AbstractRobustChannel]:
         raise NotImplementedError()
 

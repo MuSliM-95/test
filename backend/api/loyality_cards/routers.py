@@ -1,7 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+
+import phonenumbers
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from phonenumbers import geocoder
+
+from api.nomenclature.web.pagination.NomenclatureFilter import SortOrder
 from database.db import database, loyality_cards, contragents, organizations, loyality_settings, users, users_cboxes_relation
 import api.loyality_cards.schemas as schemas
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, asc
 
 from functions.helpers import datetime_to_timestamp, get_entity_by_id, add_status, get_entity_by_id_cashbox, contr_org_ids_to_name, get_entity_by_id_and_created_by, get_filters_cards, clear_phone_number
 
@@ -29,7 +35,14 @@ async def get_loyality_card_by_id(token: str, idx: int):
 
 
 @router.get("/loyality_cards/", response_model=schemas.CountRes)
-async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: schemas.LoyalityCardFilters = Depends()):
+async def get_cards(
+    token: str, limit:
+    int = 100,
+    offset: int = 0,
+    order_created_at: Optional[SortOrder] = Query(None, alias="order[created_at]"),
+    order_updated_at: Optional[SortOrder] = Query(None, alias="order[updated_at]"),
+    filters_q: schemas.LoyalityCardFilters = Depends()
+):
     """Получение списка карт"""
 
     user = await get_user_by_token(token)
@@ -46,9 +59,21 @@ async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: sc
         )
 
     if filters_dict.get("phone_number"):
-        q = contragents.select().where(contragents.c.phone.ilike(f'%{filters_dict.get("phone_number")}%'), contragents.c.cashbox == user.cashbox_id)
+        phone_number = filters_dict.get("phone_number")
+        phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+        try:
+            number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+            phone_number = number_phone_parsed.national_number
+        except:
+            try:
+                number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                phone_number = number_phone_parsed.national_number
+            except:
+                pass
+        q = contragents.select().where(contragents.c.phone.ilike(f'%{phone_number}%'),
+                                       contragents.c.cashbox == user.cashbox_id)
         finded_contrs = await database.fetch_all(q)
-        
+
         filters.append(
             loyality_cards.c.contragent_id.in_([contr.id for contr in finded_contrs])
         )
@@ -82,12 +107,8 @@ async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: sc
                 loyality_cards.c.cashbox_id == user.cashbox_id,
                 loyality_cards.c.is_deleted.is_not(True)
             )
-            .order_by(desc(loyality_cards.c.id))
             .filter(*filters)
-            .limit(limit)
-            .offset(offset)
         )
-
     else:
         query = (
             loyality_cards.select()
@@ -95,11 +116,21 @@ async def get_cards(token: str, limit: int = 100, offset: int = 0, filters_q: sc
                 loyality_cards.c.cashbox_id == user.cashbox_id,
                 loyality_cards.c.is_deleted.is_not(True)
             )
-            .order_by(desc(loyality_cards.c.id))
-            .limit(limit)
-            .offset(offset)
         )
 
+    order_by_condition = desc(loyality_cards.c.id)
+    if order_created_at:
+        if order_created_at == SortOrder.ASC:
+            order_by_condition = asc(loyality_cards.c.created_at)
+        elif order_created_at == SortOrder.DESC:
+            order_by_condition = desc(loyality_cards.c.created_at)
+    elif order_updated_at:
+        if order_updated_at == SortOrder.ASC:
+            order_by_condition = asc(loyality_cards.c.updated_at)
+        elif order_updated_at == SortOrder.DESC:
+            order_by_condition = desc(loyality_cards.c.updated_at)
+
+    query = query.order_by(order_by_condition).limit(limit).offset(offset)
 
     loyality_cards_db = await database.fetch_all(query)
     loyality_cards_db = [*map(datetime_to_timestamp, loyality_cards_db)]
@@ -171,15 +202,45 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                 else:
                     loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
         else:
+            phone_code = None
+            is_phone_formatted = False
+            try:
+                phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+                number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+                phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                          phonenumbers.PhoneNumberFormat.E164)
+                phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                is_phone_formatted = True
+                if not phone_code:
+                    phone_number = loyality_cards_values.get("phone_number")
+                    is_phone_formatted = False
+            except:
+                try:
+                    number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                    phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                              phonenumbers.PhoneNumberFormat.E164)
+                    phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                    is_phone_formatted = True
+                    if not phone_code:
+                        phone_number = loyality_cards_values.get("phone_number")
+                        is_phone_formatted = False
+                except:
+                    phone_number = loyality_cards_values.get("phone_number")
+                    is_phone_formatted = False
+
             q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
             loyality_card_contr = await database.fetch_one(q)
+
             if not loyality_card_contr:
+
                 time = int(datetime.now().timestamp())
                 q = contragents.insert().values(
                     {
                         "name": contr_name if contr_name else "",
                         "external_id": "",
-                        "phone": str(clear_phone_number(phone_number=phone_number)),
+                        "phone": phone_number,
+                        "phone_code": phone_code,
+                        "is_phone_formatted": is_phone_formatted,
                         "inn": "",
                         "description": "",
                         "cashbox": user.cashbox_id,

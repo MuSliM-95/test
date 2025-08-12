@@ -2,10 +2,59 @@ import json
 import os
 import time
 
+import aiohttp
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from api.categories.web.InstallCategoriesWeb import InstallCategoriesWeb
+from api.contragents.web.InstallContragentsWeb import InstallContragentsWeb
+from api.docs_sales.web.InstallDocsSalesWeb import InstallDocsSalesWeb
+from api.loyality_transactions.web.InstallLoyalityTransactionsWeb import InstallLoyalityTransactionsWeb
+from api.manufacturers.web.InstallManufacturersWeb import InstallManufacturersWeb
+from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
+from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import NomenclatureReader
+from api.nomenclature.web.InstallNomenclatureWeb import InstallNomenclatureWeb
+from api.nomenclature_attributes.infrastructure.functions.core.IDeleteNomenclatureAttributesFunction import \
+    IDeleteNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.core.IInsertNomenclatureAttributesFunction import \
+    IInsertNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.impl.DeleteNomenclatureAttributesFunction import \
+    DeleteNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.functions.impl.InsertNomenclatureAttributesFunction import \
+    InsertNomenclatureAttributesFunction
+from api.nomenclature_attributes.infrastructure.readers.core.INomenclatureAttributesReader import \
+    INomenclatureAttributesReader
+from api.nomenclature_attributes.infrastructure.readers.impl.NomenclatureAttributesReader import \
+    NomenclatureAttributesReader
+from api.nomenclature_attributes.web.InstallNomenclatureAttributesWeb import InstallNomenclatureAttributesWeb
+from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import \
+    IAddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import \
+    IChangeMainNomenclGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import \
+    ICreateNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IDelNomenclatureFromGroupFunction import \
+    IDelNomenclatureFromGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IDeleteNomenclatureGroupFunction import \
+    IDeleteNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IPatchNomenclatureGroupFunction import \
+    IPatchNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.AddNomenclatureToGroupFunction import \
+    AddNomenclatureToGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.ChangeMainNomenclGroupFunction import \
+    ChangeMainNomenclGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.CreateNomenclatureGroupFunction import \
+    CreateNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.DelNomenclatureFromGroupFunction import \
+    DelNomenclatureFromGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.DeleteNomenclatureGroupFunction import \
+    DeleteNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.functions.impl.PatchNomenclatureGroupFunction import \
+    PatchNomenclatureGroupFunction
+from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
+from api.nomenclature_groups.infrastructure.readers.impl.NomenclatureGroupsReader import NomenclatureGroupsReader
+from api.nomenclature_groups.web.InstallNomenclatureGroupsWeb import InstallNomenclatureGroupsWeb
 from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
 from apps.amocrm.installer.infrastructure.repositories.impl.WidgetInstallerRepository import \
@@ -21,6 +70,19 @@ from apps.booking.nomenclature.infrastructure.repositories.core.IBookingNomencla
 from apps.booking.nomenclature.infrastructure.repositories.impl.BookingNomenclatureRepository import \
     BookingNomenclatureRepository
 from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
+from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import IYookassaCrmPaymentsRepository
+from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
+from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
+from apps.yookassa.repositories.core.IYookassaRequestRepository import IYookassaRequestRepository
+from apps.yookassa.repositories.core.IYookassaTableNomenclature import IYookassaTableNomenclature
+from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import IYookasssaAmoTableCrmRepository
+from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
+from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
+from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
+from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
+from apps.yookassa.repositories.impl.YookassaTableNomenclature import YookassaTableNomenclature
+from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
+from apps.yookassa.web.InstallOauthWeb import InstallYookassaOauthWeb
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
@@ -55,7 +117,6 @@ from api.organizations.routers import router as organizations_router
 from api.contracts.routers import router as contracts_router
 from api.categories.routers import router as categories_router
 from api.warehouses.routers import router as warehouses_router
-from api.manufacturers.routers import router as manufacturers_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.nomenclature.routers import router as nomenclature_router
@@ -91,6 +152,10 @@ from apps.module_bank.routes import router as module_bank_router
 from apps.booking.routers import router as booking_router
 from api.settings.amo_triggers.routers import router as triggers_router
 from api.trigger_notification.routers import router as triggers_notification
+from api.docs_sales_utm_tags.routers import router as utm_router
+from api.segments.routers import router as segments_router
+from api.tags.routers import router as tags_router
+from api.settings.cashbox.routers import router as cashbox_settings_router
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
@@ -100,6 +165,8 @@ from api.trigger_notification.routers import router as triggers_notification
 #     # We recommend adjusting this value in production,
 #     traces_sample_rate=1.0,
 # )
+
+
 
 app = FastAPI(
     root_path="/api/v1",
@@ -112,11 +179,11 @@ app.add_middleware(GZipMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(tags_router)
 app.include_router(triggers_notification)
 app.include_router(triggers_router)
 app.include_router(booking_router)
@@ -141,7 +208,6 @@ app.include_router(organizations_router)
 app.include_router(contracts_router)
 app.include_router(categories_router)
 app.include_router(warehouses_router)
-app.include_router(manufacturers_router)
 app.include_router(price_types_router)
 app.include_router(prices_router)
 app.include_router(nomenclature_router)
@@ -159,6 +225,7 @@ app.include_router(gross_profit_docs_router)
 app.include_router(loyality_cards)
 app.include_router(loyality_transactions)
 app.include_router(loyality_settings)
+app.include_router(cashbox_settings_router)
 
 app.include_router(int_router)
 app.include_router(oauth_router)
@@ -171,6 +238,8 @@ app.include_router(tochka_router)
 app.include_router(reports_router)
 
 app.include_router(module_bank_router)
+app.include_router(utm_router)
+app.include_router(segments_router)
 
 
 @app.get("/health")
@@ -261,10 +330,39 @@ async def startup():
     ioc.set(IBookingNomenclatureRepository, BookingNomenclatureRepository())
 
     ioc.set(IWidgetInstallerRepository, WidgetInstallerRepository())
+    ioc.set(IYookassaOauthRepository, YookassaOauthRepository())
+    ioc.set(IYookassaRequestRepository, YookassaRequestRepository())
+    ioc.set(IYookassaPaymentsRepository, YookassaPaymentsRepository())
+    ioc.set(IYookassaCrmPaymentsRepository, YookassaCrmPaymentsRepository())
+
+    ioc.set(INomenclatureReader, NomenclatureReader())
+    ioc.set(INomenclatureGroupsReader, NomenclatureGroupsReader())
+    ioc.set(IAddNomenclatureToGroupFunction, AddNomenclatureToGroupFunction())
+    ioc.set(ICreateNomenclatureGroupFunction, CreateNomenclatureGroupFunction())
+    ioc.set(IDeleteNomenclatureGroupFunction, DeleteNomenclatureGroupFunction())
+    ioc.set(IPatchNomenclatureGroupFunction, PatchNomenclatureGroupFunction())
+    ioc.set(IDelNomenclatureFromGroupFunction, DelNomenclatureFromGroupFunction())
+
+    ioc.set(IInsertNomenclatureAttributesFunction, InsertNomenclatureAttributesFunction())
+    ioc.set(INomenclatureAttributesReader, NomenclatureAttributesReader())
+    ioc.set(IDeleteNomenclatureAttributesFunction, DeleteNomenclatureAttributesFunction())
+    ioc.set(IChangeMainNomenclGroupFunction, ChangeMainNomenclGroupFunction())
+
+    InstallCategoriesWeb()(app=app)
+    InstallNomenclatureWeb()(app=app)
+    ioc.set(IYookasssaAmoTableCrmRepository, YookasssaAmoTableCrmRepository())
+    ioc.set(IYookassaTableNomenclature, YookassaTableNomenclature())
 
     InstallBookingRepeatWeb()(app=app)
     InstallBookingEventsWeb()(app=app)
     InstallWidgetInstallerInfoWeb()(app=app)
+    InstallYookassaOauthWeb()(app=app)
+    InstallNomenclatureGroupsWeb()(app=app)
+    InstallNomenclatureAttributesWeb()(app=app)
+    InstallManufacturersWeb()(app=app)
+    InstallDocsSalesWeb()(app=app)
+    InstallContragentsWeb()(app=app)
+    InstallLoyalityTransactionsWeb()(app=app)
 
     init_db()
     await database.connect()

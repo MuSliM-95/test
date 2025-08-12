@@ -109,15 +109,14 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
 
-  repeat_worker:
+  worker:
     image: tablecrm_backend:latest
     restart: always
-    command: bash -c "python3 run_repeat_worker.py"
+    command: bash -c "python3 worker.py"
     volumes:
       - ./backend:/backend
     environment:
@@ -138,37 +137,6 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-      ADMIN_ID: ${ADMIN_ID}
-    networks:
-      - nginx-proxy
-      - infrastructure
-
-  post_amo_lead_worker:
-    build: ./backend
-    image: tablecrm_backend:latest
-    restart: always
-    command: bash -c "python3 run_amo_post_worker.py"
-    volumes:
-      - ./backend:/backend
-    environment:
-      APP_URL: ${APP_URL}
-      S3_ACCESS: ${S3_ACCESS}
-      S3_SECRET: ${S3_SECRET}
-      S3_URL: ${S3_URL}
-      TG_TOKEN: ${TG_TOKEN}
-      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
-      ACCOUNT_INTERVAL: ${ACCOUNT_INTERVAL}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASS: ${POSTGRES_PASS}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      XDG_RUNTIME_DIR: ./tmp
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASS: ${RABBITMQ_PASS}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
@@ -193,7 +161,6 @@ services:
       POSTGRES_PASS: ${POSTGRES_PASS}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
-      ADMIN_ID: ${ADMIN_ID}
       XDG_RUNTIME_DIR: ./tmp
     networks:
       - nginx-proxy
@@ -220,7 +187,6 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure
@@ -242,7 +208,6 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-      ADMIN_ID: ${ADMIN_ID}
     networks:
       - nginx-proxy
       - infrastructure

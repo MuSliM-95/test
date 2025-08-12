@@ -13,7 +13,7 @@ class LeadsRepository(ILeadsRepository):
         async with aiohttp.ClientSession(trust_env=True) as http_session:
             async with http_session.post(
                 self.__base_url.format(referrer),
-                json=[amo_lead_model.dict()],
+                json=[amo_lead_model.dict(exclude_defaults=True, exclude_none=True, by_alias=True)],
                 headers={
                     'Authorization': f'Bearer {access_token}',
                     'Content-type': 'application/json'

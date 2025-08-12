@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional, List
 
+from database.enums import DebitCreditType
+
 class PaymentFiltersQuery(BaseModel):
     name: Optional[str]
     tags: Optional[str]
@@ -10,9 +12,12 @@ class PaymentFiltersQuery(BaseModel):
     contragent: Optional[str]
     paybox: Optional[str]
     paybox_to: Optional[str]
+    source_account: Optional[str]
     dateto: Optional[str]
     datefrom: Optional[str]
     payment_type: Optional[str]
+    include_paybox_dest: Optional[bool] = False
+    timezone: Optional[str] = "UTC"
 
 class AnalyticsFiltersQuery(BaseModel):
     datefrom: Optional[int]
@@ -35,6 +40,7 @@ class ProjectsFiltersQuery(BaseModel):
 
 class ArticlesFiltersQuery(BaseModel):
     name: Optional[str]
+    dc: Optional[DebitCreditType]
 
 class UsersFiltersQuery(BaseModel):
     external_id: Optional[str]
@@ -42,7 +48,7 @@ class UsersFiltersQuery(BaseModel):
 class CAFiltersQuery(BaseModel):
     name: Optional[str]
     inn: Optional[int]
-    phone: Optional[int]
+    phone: Optional[str]
     external_id: Optional[str]
 
 class PicturesFiltersQuery(BaseModel):

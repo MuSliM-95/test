@@ -8,7 +8,9 @@ import aiohttp
 import pytz
 from databases.backends.postgres import Record
 from fastapi import HTTPException
-from sqlalchemy import Table, cast, String, and_
+from sqlalchemy import Table, cast, String, and_, or_, func
+
+from database.db import articles
 
 from const import PaymentType
 from database.db import (
@@ -19,11 +21,13 @@ from database.db import (
     contragents,
     payments,
     docs_sales_goods,
+    docs_sales_delivery_info,
     loyality_transactions,
     organizations,
     units,
     entity_or_function,
     fifo_settings, docs_sales_settings,
+    user_permissions,
 )
 
 
@@ -60,11 +64,20 @@ def get_filters(table, filters):
                 )
         elif filter == "paybox":
             if value:
-                filters_list.append(
-                    (
-                        f"payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox)"
+                is_include_paybox_dest = str(filters_dict.get("include_paybox_dest", "")).lower() == "true"
+                if is_include_paybox_dest:
+                    filters_list.append(
+                        (
+                            f"(payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox) OR "
+                            f"payments.paybox_to IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox))"
+                        )
                     )
-                )
+                else:
+                    filters_list.append(
+                        (
+                            f"payments.paybox IN (SELECT payboxes.id FROM payboxes WHERE payboxes.name ILIKE '%{value}%' AND payboxes.cashbox = payments.cashbox)"
+                        )
+                    )
         elif filter == "paybox_to":
             if value:
                 filters_list.append(
@@ -95,15 +108,27 @@ def get_filters(table, filters):
     datefrom = None
     dateto = None
 
+    timezone_str = filters_dict.get("timezone", "UTC")
+    try:
+        timezone = pytz.timezone(timezone_str)
+    except pytz.exceptions.UnknownTimeZoneError:
+        timezone = pytz.UTC
+
     if filters_dict["datefrom"]:
-        datefrom = pytz.utc.localize(
-            datetime.strptime(filters_dict["datefrom"], "%d-%m-%Y")
-        ).timestamp()
+        try:
+            date_obj = datetime.strptime(filters_dict["datefrom"], "%d-%m-%Y")
+            date_obj = timezone.localize(date_obj)
+            datefrom = date_obj.astimezone(pytz.UTC).timestamp()
+        except (ValueError, TypeError):
+            datefrom = None
 
     if filters_dict["dateto"]:
-        dateto = pytz.utc.localize(
-            datetime.strptime(filters_dict["dateto"], "%d-%m-%Y")
-        ).timestamp()
+        try:
+            date_obj = datetime.strptime(filters_dict["dateto"], "%d-%m-%Y").replace(hour=23, minute=59, second=59)
+            date_obj = timezone.localize(date_obj)
+            dateto = date_obj.astimezone(pytz.UTC).timestamp()
+        except (ValueError, TypeError):
+            dateto = None
 
     if datefrom and not dateto:
         # filters_list.append(table.c.date >= datefrom)
@@ -216,32 +241,24 @@ def get_filters_cards(table, filters):
     filters_list = []
     filters_dict = filters.dict()
 
-    def _periods_filter(period_type):
-        datefrom = filters_dict.get(f"{period_type}_from")
-        dateto = filters_dict.get(f"{period_type}_to")
-
-        if datefrom and not dateto:
-            if period_type == "start_period":
-                filters_list.append(table.c.start_period >= datetime.fromtimestamp(datefrom))
-            else:
-                filters_list.append(table.c.end_period >= datetime.fromtimestamp(datefrom))
-
-        if not datefrom and dateto:
-            if period_type == "start_period":
-                filters_list.append(table.c.start_period <= datetime.fromtimestamp(dateto))
-            else:
-                filters_list.append(table.c.end_period <= datetime.fromtimestamp(dateto))
-
-        if datefrom and dateto:
-            if period_type == "start_period":
-                filters_list.append(and_(table.c.start_period >= datetime.fromtimestamp(datefrom),
-                                         table.c.start_period <= datetime.fromtimestamp(dateto)))
-            else:
-                filters_list.append(and_(table.c.end_period >= datetime.fromtimestamp(datefrom),
-                                         table.c.end_period <= datetime.fromtimestamp(dateto)))
-
-    _periods_filter("start_period")
-    _periods_filter("end_period")
+    and_conditions = []
+    if filters_dict.get("start_period_from"):
+        and_conditions.append(table.c.start_period >= datetime.fromtimestamp(filters_dict.get("start_period_from")))
+    if filters_dict.get("start_period_to"):
+        and_conditions.append(table.c.start_period <= datetime.fromtimestamp(filters_dict.get("start_period_to")))
+    if filters_dict.get("end_period_from"):
+        and_conditions.append(table.c.end_period >= datetime.fromtimestamp(filters_dict.get("end_period_from")))
+    if filters_dict.get("end_period_to"):
+        and_conditions.append(table.c.end_period <= datetime.fromtimestamp(filters_dict.get("end_period_to")))
+    if filters_dict.get("created_at_from"):
+        and_conditions.append(table.c.created_at >= datetime.fromtimestamp(filters_dict.get("created_at_from")))
+    if filters_dict.get("created_at_to"):
+        and_conditions.append(table.c.created_at <= datetime.fromtimestamp(filters_dict.get("created_at_to")))
+    if filters_dict.get("updated_at_from"):
+        and_conditions.append(table.c.updated_at >= datetime.fromtimestamp(filters_dict.get("updated_at_from")))
+    if filters_dict.get("updated_at_to"):
+        and_conditions.append(table.c.updated_at <= datetime.fromtimestamp(filters_dict.get("updated_at_to")))
+    filters_list.append(and_(*and_conditions))
 
     for filter, value in filters_dict.items():
         if filter == "card_number":
@@ -310,6 +327,9 @@ def get_filters_articles(table, filters):
         if filter == "name":
             if value:
                 filters_list.append(table.c.name.ilike(f"%{value}%"))
+        if filter == "dc":
+            if value:
+                filters_list.append(table.c.dc == value)
     return filters_list
 
 
@@ -336,7 +356,14 @@ def get_filters_ca(table, filters):
                 filters_list.append(table.c.inn.ilike(r"%{}%".format(value)))
         elif filter == "phone":
             if value:
-                filters_list.append(table.c.phone.ilike(r"%{}%".format(value)))
+                normalized_search_phone = clear_phone_number(value)
+                if normalized_search_phone:
+                    normalized_phone_in_db = func.regexp_replace(table.c.phone, r'[^\d]', '', 'g')
+                    filters_list.append(
+                        normalized_phone_in_db.ilike(f"%{normalized_search_phone}%")
+                    )
+                else:
+                    filters_list.append(table.c.phone.ilike(r"%{}%".format(value)))
         elif filter == "external_id":
             if value:
                 filters_list.append(table.c.external_id.ilike(r"%{}%".format(value)))
@@ -533,11 +560,87 @@ def add_status(instance: Optional[Record]) -> Optional[dict]:
 
 
 async def get_user_by_token(token: str) -> Record:
-    query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
+    query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
     if not user or not user.status:
         raise_wrong_token()
     return user
+
+
+async def check_user_permission(user_id: int, cashbox_id: int, section: str, paybox_id: int = None,
+                                need_edit: bool = False) -> bool:
+    """
+    Проверка прав пользователя на доступ к разделу/счету
+
+    Args:
+        user_id: ID пользователя
+        cashbox_id: ID кассы
+        section: Название раздела (payments, pboxes и т.д.)
+        paybox_id: ID счета (опционально)
+        need_edit: Требуется ли право на редактирование
+
+    Returns:
+        bool: Есть ли у пользователя требуемые права
+    """
+    user_query = users_cboxes_relation.select().where(
+        and_(
+            users_cboxes_relation.c.id == user_id,
+            users_cboxes_relation.c.cashbox_id == cashbox_id
+        )
+    )
+    user = await database.fetch_one(user_query)
+    if user and user.is_owner:
+        return True
+
+    query = user_permissions.select().where(
+        and_(
+            user_permissions.c.user_id == user_id,
+            user_permissions.c.cashbox_id == cashbox_id,
+            user_permissions.c.section == section,
+            user_permissions.c.can_view == True
+        )
+    )
+
+    if need_edit:
+        query = query.where(user_permissions.c.can_edit == True)
+
+    if paybox_id:
+        query = query.where(
+            or_(
+                user_permissions.c.paybox_id.is_(None),
+                user_permissions.c.paybox_id == paybox_id
+            )
+        )
+
+    permission = await database.fetch_one(query)
+    return bool(permission)
+
+
+async def hide_balance_for_non_admin(user, data):
+    """
+    Скрывает баланс счета для обычных пользователей (не админов)
+
+    Args:
+        user: Объект пользователя из таблицы users_cboxes_relation
+        data: Данные счетов (список или один счет)
+
+    Returns:
+        Модифицированные данные счетов
+    """
+    if not user.is_owner:
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and "balance" in item:
+                    item["balance"] = None
+                    if "name" in item and " (" in item["name"]:
+                        item["name"] = item["name"].split(" (")[0]
+        else:
+            if isinstance(data, dict) and "balance" in data:
+                data["balance"] = None
+                if "name" in data and " (" in data["name"]:
+                    data["name"] = data["name"].split(" (")[0]
+
+    return data
 
 
 async def get_entity_by_id(entity: Table, idx: int, cashbox: int) -> Record:
@@ -705,3 +808,27 @@ async def init_statement(statement_data: dict, access_token: str):
                 init_statement_json = {"Data": {"Statement": {"status": "error"}}}
         await session.close()
     return init_statement_json
+
+
+async def add_delivery_info_to_doc(doc: dict) -> dict:
+    delivery_info_query = docs_sales_delivery_info.select().where(
+        docs_sales_delivery_info.c.docs_sales_id == doc.get('id'))
+    delivery_info = await database.fetch_one(delivery_info_query)
+    if delivery_info:
+        doc["delivery_info"] = {
+            "address": delivery_info.get('address'),
+            "delivery_date": delivery_info['delivery_date'].timestamp() if delivery_info.get('delivery_date') else None,
+            "recipient": delivery_info.get('recipient'),
+            "note": delivery_info.get('note'),
+        }
+    return doc
+
+
+async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
+    check_query = articles.select().where(and_(
+        articles.c.name == name,
+        articles.c.cashbox == user_cashbox_id,
+        articles.c.dc == dc_type
+    ))
+    article_exists = await database.fetch_all(check_query)
+    return True if article_exists else False

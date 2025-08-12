@@ -1,17 +1,20 @@
 from typing import Union, List
 
+import phonenumbers
 from asyncpg import ForeignKeyViolationError
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
-from sqlalchemy import desc, asc, func, select
+from phonenumbers import geocoder
+from sqlalchemy import desc, asc, func, select, cast, literal_column
+from sqlalchemy.dialects.postgresql import JSONB
 
 from ws_manager import manager
 
-from database.db import database, users_cboxes_relation, contragents
+from database.db import database, users_cboxes_relation, contragents, tags, contragents_tags
 import api.contragents.schemas as ca_schemas
 import functions.filter_schemas as filter_schemas
 
-from functions.helpers import get_filters_ca
+from functions.helpers import get_filters_ca, clear_phone_number
 from datetime import datetime
 
 router = APIRouter(tags=["contragents"])
@@ -19,7 +22,7 @@ router = APIRouter(tags=["contragents"])
 
 @router.get("/contragents/")
 async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQuery = Depends(), limit: int = 100,
-                                offset: int = 0, sort: str = "created_at:desc"):
+                                offset: int = 0, sort: str = "created_at:desc", add_tags: bool = False):
     """Получение меты контрагентов"""
     query = users_cboxes_relation.select(
         users_cboxes_relation.c.token == token)
@@ -36,14 +39,40 @@ async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQue
                                                            contragents.c.is_deleted == False).filter(*filters)
             count = await database.fetch_one(q)
 
+            query = contragents.select()
+            if add_tags is True:
+                query = (
+                    select(
+                        contragents,
+                        func.coalesce(cast(
+                            func.jsonb_agg(
+                                func.jsonb_build_object(
+                                    literal_column("'id'"), tags.c.id,
+                                    literal_column("'name'"), tags.c.name,
+                                    literal_column("'emoji'"), tags.c.emoji,
+                                    literal_column("'color'"), tags.c.color,
+                                    literal_column("'description'"), tags.c.description,
+                                )
+                            ).filter(tags.c.id.isnot(None)), JSONB),
+                            literal_column("'[]'::jsonb")
+                        ).label("tags")
+                    )
+                    .select_from(
+                        contragents
+                        .outerjoin(contragents_tags,
+                                   contragents.c.id == contragents_tags.c.contragent_id)
+                        .outerjoin(tags, contragents_tags.c.tag_id == tags.c.id)
+                    )
+                    .group_by(contragents.c.id)
+                )
             if sort_list[1] == "desc":
-                q = contragents.select().where(contragents.c.cashbox == user.cashbox_id,
+                q = query.where(contragents.c.cashbox == user.cashbox_id,
                                                contragents.c.is_deleted == False).filter(*filters).order_by(
                     desc(getattr(contragents.c, sort_list[0]))).offset(offset).limit(limit)
                 payment = await database.fetch_all(q)
                 return {"count": count.count_1, "result": payment}
             if sort_list[1] == "asc":
-                q = contragents.select().where(contragents.c.cashbox == user.cashbox_id,
+                q = query.where(contragents.c.cashbox == user.cashbox_id,
                                                contragents.c.is_deleted == False).filter(*filters).order_by(
                     asc(getattr(contragents.c, sort_list[0]))).offset(offset).limit(limit)
                 payment = await database.fetch_all(q)
@@ -54,8 +83,6 @@ async def read_contragents_meta(token: str, filters: filter_schemas.CAFiltersQue
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
-
-@router.post("/contragents/")
 async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCreate, List[ca_schemas.ContragentCreate]]):
     """Создание контрагента"""
     query = users_cboxes_relation.select(
@@ -70,12 +97,59 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
             for ca in ca_body:
                 update_dict = ca.dict(exclude_unset=True)
 
-                if update_dict['phone']:
-                    q = contragents.select().where(contragents.c.phone == update_dict['phone'])
+                phone_number = update_dict['phone']
+                phone_code = None
+                is_phone_formatted = False
+
+                if phone_number:
+                    try:
+                        phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+                        number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
+                        phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                                  phonenumbers.PhoneNumberFormat.E164)
+                        phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                        is_phone_formatted = True
+                        if not phone_code:
+                            phone_number = update_dict['phone']
+                            is_phone_formatted = False
+                    except:
+                        try:
+                            number_phone_parsed = phonenumbers.parse(phone_number, "RU")
+                            phone_number = phonenumbers.format_number(number_phone_parsed,
+                                                                      phonenumbers.PhoneNumberFormat.E164)
+                            phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                            is_phone_formatted = True
+                            if not phone_code:
+                                phone_number = update_dict['phone']
+                                is_phone_formatted = False
+                        except:
+                            phone_number = update_dict['phone']
+                            is_phone_formatted = False
+
+                    normalized_phone = clear_phone_number(phone_number)
+                    if normalized_phone:
+                        q = (
+                            contragents.select()
+                            .where(
+                                contragents.c.cashbox == user.cashbox_id,
+                                func.regexp_replace(contragents.c.phone, r'[^\d]', '', 'g') == normalized_phone
+                            )
+                        )
+                    else:
+                        q = (
+                            contragents.select()
+                            .where(
+                                contragents.c.cashbox == user.cashbox_id, contragents.c.phone == phone_number
+                            )
+                        )
+                        
                     contr = await database.fetch_one(q)
                     if contr:
                         continue
 
+                update_dict['phone'] = phone_number
+                update_dict['phone_code'] = phone_code
+                update_dict['is_phone_formatted'] = is_phone_formatted
                 update_dict['cashbox'] = user.cashbox_id
                 update_dict['is_deleted'] = False
                 update_dict['updated_at'] = int(datetime.utcnow().timestamp())

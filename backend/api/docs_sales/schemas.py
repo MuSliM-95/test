@@ -1,9 +1,10 @@
 from enum import Enum
+from typing import List, Optional, Union
+import datetime
 
-from pydantic import BaseModel
-from typing import Optional, List, Union
-
+from database.db import OrderStatus
 from database.enums import Repeatability
+from pydantic import BaseModel
 
 
 class Item(BaseModel):
@@ -43,7 +44,7 @@ class Settings(BaseModel):
 class Create(BaseModel):
     number: Optional[str]
     dated: Optional[int]
-    operation: Optional[SaleOperations]
+    operation: Optional[SaleOperations] = SaleOperations.order
     tags: Optional[str] = ""
     parent_docs_sales: Optional[int]
     comment: Optional[str]
@@ -88,6 +89,24 @@ class CreateMass(BaseModel):
         orm_mode = True
 
 
+class RecipientInfoSchema(BaseModel):
+    name: Optional[str]
+    surname: Optional[str]
+    phone: Optional[str]
+
+
+class DeliveryInfoSchema(BaseModel):
+    address: Optional[str]
+    delivery_date: Optional[int]
+    recipient: Optional[RecipientInfoSchema]
+    note: Optional[str]
+
+
+class ResponseDeliveryInfoSchema(DeliveryInfoSchema):
+    id: int
+    docs_sales_id: int
+
+
 class ViewInList(BaseModel):
     id: int
     number: Optional[str]
@@ -115,8 +134,12 @@ class ViewInList(BaseModel):
     tax_active: Optional[bool]
     sales_manager: Optional[int]
     goods: Optional[List[Item]]
+    delivery_info: Optional[DeliveryInfoSchema]
     updated_at: int
     created_at: int
+    has_contragent: Optional[bool] = False
+    has_loyality_card: Optional[bool] = False
+    color_status: Optional[str] = "default"
 
 
 class ViewInListResult(BaseModel):
@@ -163,3 +186,57 @@ class FilterSchema(BaseModel):
     created_at_to: Optional[int]
     updated_at_from: Optional[int]
     updated_at_to: Optional[int]
+
+
+class NotifyType(str, Enum):
+    general = "Общее"
+    assembly = "Сборка"
+    delivery = "Доставка"
+
+
+class OrderStatusUpdate(BaseModel):
+    status: OrderStatus
+    comment: Optional[str] = None
+
+
+class AssignUserRole(str, Enum):
+    picker = "picker"
+    courier = "courier"
+
+
+class AssignUser(BaseModel):
+    user_id: Optional[int] = None
+    phone: Optional[str] = None
+    name: Optional[str] = None
+
+
+class NotifyConfig(BaseModel):
+    type: NotifyType
+    send_notification: bool = True
+    recipients: Optional[List[str]] = (
+        None
+    )
+
+
+class NotifyResponse(BaseModel):
+    success: bool
+    message: str
+    general_url: Optional[str] = None
+    picker_url: Optional[str] = None
+    courier_url: Optional[str] = None
+
+
+class OrderLinkResponse(BaseModel):
+    id: int
+    docs_sales_id: int
+    role: str
+    hash: str
+    url: str
+    created_at: Optional[datetime.datetime] = None
+    updated_at: Optional[datetime.datetime] = None
+
+
+class OrderLinksResponse(BaseModel):
+    general_link: Optional[OrderLinkResponse] = None
+    picker_link: Optional[OrderLinkResponse] = None
+    courier_link: Optional[OrderLinkResponse] = None

@@ -1,8 +1,8 @@
 from typing import TypeVar, Generic
 
-from pydantic.main import BaseModel
+from pydantic import BaseModel
 
-from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
+from .BaseModelMessage import BaseModelMessage
 
 E = TypeVar('E', bound=BaseModelMessage)
 

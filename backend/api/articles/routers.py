@@ -8,7 +8,7 @@ from database.db import database, users_cboxes_relation, articles
 import functions.filter_schemas as filter_schemas
 import api.articles.schemas as article_schemas
 
-from functions.helpers import get_filters_articles
+from functions.helpers import get_filters_articles, check_article_exists
 from datetime import datetime
 
 import aiofiles
@@ -108,6 +108,8 @@ async def new_article(token: str, article: article_schemas.ArticleCreate):
                     "cashbox": user.cashbox_id,
                 }
             )
+            if await check_article_exists(article_values.get('name'), user.cashbox_id, article_values.get('dc')):
+                raise HTTPException(status_code=400, detail="Эта статья уже существует!")
 
             query = articles.insert().values(article_values)
             article_id = await database.execute(query)
@@ -141,8 +143,19 @@ async def edit_article(token: str, article: article_schemas.ArticleEdit):
 
             article_dict = article.dict(exclude_unset=True)
             del article_dict["id"]
-
             if article_dict:
+                if (
+                        article_dict.get("name")
+                        and article_dict.get("name") != article_db.name
+                ) or article_dict.get("dc") != article_db.dc:
+                    exists = await check_article_exists(
+                        article_dict.get("name") if article_dict.get("name") else article_db.name,
+                        user.cashbox_id,
+                        article_dict.get("dc") if article_dict.get("dc") else article_db.dc,
+                    )
+                    if exists:
+                        raise HTTPException(status_code=400,
+                                            detail="Эта статья уже существует!")
                 article_dict["updated_at"] = int(datetime.now().timestamp())
                 query = (
                     articles.update()

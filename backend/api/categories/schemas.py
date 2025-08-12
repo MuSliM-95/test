@@ -8,6 +8,8 @@ class CategoryCreate(BaseModel):
     code: Optional[int]
     parent: Optional[int]
     status: bool = True
+    photo_id: Optional[int]
+    external_id: Optional[str]
 
     class Config:
         orm_mode = True
@@ -29,6 +31,7 @@ class Category(CategoryCreate):
     id: int
     updated_at: int
     created_at: int
+    picture: Optional[str]
 
     class Config:
         orm_mode = True
@@ -56,6 +59,7 @@ class CategoryTree(BaseModel):
     parent: Optional[int]
     children: Optional[List["CategoryTree"]]
     expanded_flag: bool
+    picture: Optional[str]
     updated_at: int
     created_at: int
 

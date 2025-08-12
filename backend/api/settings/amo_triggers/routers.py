@@ -1,12 +1,10 @@
-import json
-
 from fastapi import APIRouter, Request, Depends, HTTPException, Response
 from sqlalchemy import select, func, desc, case, and_, text, asc, update
 from database.db import database, amo_bots, table_triggers, table_triggers_events, amo_install_table_cashboxes
 from . import schemas
 from functions.helpers import get_user_by_token
 import uuid
-from database.enums import TriggerType, TriggerTime
+from database.enums import TriggerTime
 
 
 router = APIRouter(tags = ["amo_triggers"], prefix = "/settings")
@@ -116,7 +114,6 @@ async def patch_trigger(token: str, idx: int, trigger: schemas.PatchTrigger, use
             else:
                 updated_item = {**stored_item_model.copy(update = update_data).dict()}
 
-            print(updated_item)
             await database.execute(update(table_triggers).values(
                 {**updated_item
                  }
