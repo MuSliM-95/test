@@ -23,6 +23,7 @@ async def get_segment_ids():
         and_(
             segments.c.type_of_update == 'cron',
             segments.c.is_archived.isnot(True),
+            segments.c.is_deleted.isnot(True),
             segments.c.update_settings['interval_minutes'].isnot(None),
             or_(segments.c.updated_at.is_(None),
                 segments.c.updated_at <= func.now() - func.make_interval(
@@ -38,7 +39,3 @@ async def segment_update():
     segment_ids = await get_segment_ids()
     for segment_id in segment_ids:
         await update_segment_task(segment_id)
-
-
-
-
