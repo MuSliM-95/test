@@ -187,6 +187,9 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      S3_ACCESS: ${S3_ACCESS}
+      S3_SECRET: ${S3_SECRET}
+      S3_URL: ${S3_URL}
     networks:
       - nginx-proxy
       - infrastructure
