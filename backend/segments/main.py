@@ -77,6 +77,13 @@ class Segments:
 
 async def update_segment_task(segment_id: int):
     segment = Segments(segment_id)
+
     await segment.async_init()
+
+    if getattr(segment.segment_obj, "is_deleted", False):
+        logger.info(f"Segment {segment_id} is deleted; skip update.")
+        return
+    
+
     if segment.segment_obj:
         await segment.update_segment()
