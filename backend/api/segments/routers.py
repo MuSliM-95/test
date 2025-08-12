@@ -194,6 +194,14 @@ async def get_segment_data(idx: int, token: str):
     )
 
 
+import math
+
+def sanitize_float(value):
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None 
+    return value
+
 @router.get("/segments", response_model=List[schemas.SegmentWithContragents])
 async def get_user_segments(token: str):
     user = await get_user_by_token(token)
@@ -210,14 +218,33 @@ async def get_user_segments(token: str):
         if not segment.segment_obj or segment.segment_obj.cashbox_id != user.cashbox_id:
             raise HTTPException(status_code=404, detail="Сегмент не найден")
         contragents_data = await segment.collect_data()
+
+        
+        sanitized_criteria = json.loads(row.criteria)
+        sanitized_actions = json.loads(row.actions) if row.actions else {}
+        sanitized_update_settings = json.loads(row.update_settings)
+
+        
+        def deep_sanitize(obj):
+            if isinstance(obj, dict):
+                return {k: deep_sanitize(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [deep_sanitize(v) for v in obj]
+            else:
+                return sanitize_float(obj)
+
+        sanitized_criteria = deep_sanitize(sanitized_criteria)
+        sanitized_actions = deep_sanitize(sanitized_actions)
+        sanitized_update_settings = deep_sanitize(sanitized_update_settings)
+
         result.append(schemas.SegmentWithContragents(
             id=row.id,
             name=row.name,
-            criteria=json.loads(row.criteria),
-            actions=json.loads(row.actions) if row.actions else {},
+            criteria=sanitized_criteria,
+            actions=sanitized_actions,
             updated_at=row.updated_at,
             type_of_update=row.type_of_update,
-            update_settings=json.loads(row.update_settings),
+            update_settings=sanitized_update_settings,
             status=row.status,
             is_archived=row.is_archived,
             selection_field=row.selection_field,
