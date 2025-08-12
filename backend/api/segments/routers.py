@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Response
 
 from api.segments import schemas
 from database.db import segments, database, SegmentStatus
-from functions.helpers import get_user_by_token
+from functions.helpers import get_user_by_token, sanitize_float, deep_sanitize
 from segments.main import Segments, update_segment_task
 from sqlalchemy import func
 
@@ -194,14 +194,6 @@ async def get_segment_data(idx: int, token: str):
     )
 
 
-import math
-
-def sanitize_float(value):
-    if isinstance(value, float):
-        if math.isnan(value) or math.isinf(value):
-            return None 
-    return value
-
 @router.get("/segments", response_model=List[schemas.SegmentWithContragents])
 async def get_user_segments(token: str):
     user = await get_user_by_token(token)
@@ -223,15 +215,6 @@ async def get_user_segments(token: str):
         sanitized_criteria = json.loads(row.criteria)
         sanitized_actions = json.loads(row.actions) if row.actions else {}
         sanitized_update_settings = json.loads(row.update_settings)
-
-        
-        def deep_sanitize(obj):
-            if isinstance(obj, dict):
-                return {k: deep_sanitize(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [deep_sanitize(v) for v in obj]
-            else:
-                return sanitize_float(obj)
 
         sanitized_criteria = deep_sanitize(sanitized_criteria)
         sanitized_actions = deep_sanitize(sanitized_actions)
