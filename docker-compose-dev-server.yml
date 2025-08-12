@@ -193,6 +193,8 @@ services:
     networks:
       - nginx-proxy
       - infrastructure
+    env_file:
+      - .env
 
   message_consumer_task:
     build: ./backend
@@ -214,6 +216,8 @@ services:
     networks:
       - nginx-proxy
       - infrastructure
+    env_file:
+      - .env
 
 volumes:
   pgdata:
