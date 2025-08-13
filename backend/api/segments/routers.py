@@ -1,7 +1,7 @@
 import asyncio
 import json
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Response
 
@@ -195,10 +195,13 @@ async def get_segment_data(idx: int, token: str):
 
 
 @router.get("/segments", response_model=List[schemas.SegmentWithContragents])
-async def get_user_segments(token: str):
+async def get_user_segments(token: str, is_archived: Optional[bool] = None):
     user = await get_user_by_token(token)
 
     query = segments.select().where(segments.c.cashbox_id == user.cashbox_id, segments.c.is_deleted.isnot(True))
+
+    if is_archived is not None:
+        query = query.where(segments.c.is_archived == is_archived)
 
     rows = await database.fetch_all(query)
 
