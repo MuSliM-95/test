@@ -2095,6 +2095,27 @@ amo_lead_contacts = sqlalchemy.Table(
     ),
 )
 
+amo_webhooks = sqlalchemy.Table(
+    "amo_webhooks",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("amo_id", BigInteger),
+    sqlalchemy.Column("created_by", BigInteger),
+    sqlalchemy.Column("created_at", Integer),
+    sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("sort", Integer),
+    sqlalchemy.Column("disabled", Boolean, default=False),
+    sqlalchemy.Column("destination", String),
+    sqlalchemy.Column(
+        "settings",
+        ARRAY(String()),
+        nullable=False,
+        default=list,
+        server_default=text("'{}'::text[]"),
+    ),
+)
+
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_ASYNC = f"postgresql+asyncpg://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
 SQLALCHEMY_DATABASE_URL_JOB_STORE = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_job_store"
