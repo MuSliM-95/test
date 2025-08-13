@@ -181,3 +181,10 @@ async def get_token_by_segment_id(segment_id: int) -> str:
     )
     row = await database.fetch_one(query)
     return row.token if row else None
+
+async def fetch_contragent_by_id(cid):
+    row = await database.fetch_one(
+        select([contragents.c.name, contragents.c.phone])
+        .where(contragents.c.id == cid)
+    )
+    return row
