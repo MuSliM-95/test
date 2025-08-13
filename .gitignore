@@ -19,3 +19,4 @@ docker-compose.dev.yml
 /certs
 docker-compose-dev-https.yml
 .vscode
+/docker-compose-dev-https.yml

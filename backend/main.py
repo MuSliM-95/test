@@ -156,6 +156,7 @@ from api.docs_sales_utm_tags.routers import router as utm_router
 from api.segments.routers import router as segments_router
 from api.tags.routers import router as tags_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
+from api.segments_tags.routers import router as segments_tags_router
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
@@ -167,9 +168,8 @@ from api.settings.cashbox.routers import router as cashbox_settings_router
 # )
 
 
-
 app = FastAPI(
-    root_path="/api/v1",
+    root_path='/api/v1',
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0"
@@ -226,6 +226,7 @@ app.include_router(loyality_cards)
 app.include_router(loyality_transactions)
 app.include_router(loyality_settings)
 app.include_router(cashbox_settings_router)
+app.include_router(segments_tags_router)
 
 app.include_router(int_router)
 app.include_router(oauth_router)

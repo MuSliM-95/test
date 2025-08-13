@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, Union
 
 import aiohttp
+import math
 import pytz
 from databases.backends.postgres import Record
 from fastapi import HTTPException
@@ -869,3 +870,18 @@ async def update_entity_hash(table: Table, entity):
 
 
     
+
+def sanitize_float(value):
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None 
+    return value
+
+        
+def deep_sanitize(obj):
+    if isinstance(obj, dict):
+        return {k: deep_sanitize(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [deep_sanitize(v) for v in obj]
+    else:
+        return sanitize_float(obj)

@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from database.db import segments, database, SegmentStatus
+from database.db import segments, database, SegmentStatus, users_cboxes_relation
 
 from segments.logic.logic import SegmentLogic
 from segments.query.queries import SegmentCriteriaQuery
@@ -10,6 +10,9 @@ from segments.actions.actions import SegmentActions
 from segments.logic.collect_data import ContragentsData
 
 from segments.logger import logger
+from segments.websockets import notify
+from segments.query.queries import get_token_by_segment_id
+import asyncio
 
 
 class Segments:
@@ -76,14 +79,23 @@ class Segments:
 
 
 async def update_segment_task(segment_id: int):
+    token = await get_token_by_segment_id(segment_id)
+    await notify(ws_token=token, event="recalc_start", segment_id=segment_id)
+    logger.info(f"Starting update for segment {segment_id} with token {token}")
     segment = Segments(segment_id)
 
     await segment.async_init()
 
     if getattr(segment.segment_obj, "is_deleted", False):
         logger.info(f"Segment {segment_id} is deleted; skip update.")
+        await notify(ws_token=token, event="recalc_fail_410", segment_id=segment_id)
         return
     
 
     if segment.segment_obj:
         await segment.update_segment()
+        await notify(ws_token=token, event="recalc_finish", segment_id=segment_id)
+    else:
+        await notify(ws_token=token, event="recalc_fail_404", segment_id=segment_id)
+
+

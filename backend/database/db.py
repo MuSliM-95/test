@@ -2067,6 +2067,20 @@ contragents_tags = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint("tag_id", "contragent_id", name="unique_tag_id_contragent_id"),
 )
 
+segments_tags = sqlalchemy.Table(
+    "segments_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
+    sqlalchemy.Column("segment_id", Integer, ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
+    sqlalchemy.Column("created_at", DateTime(timezone=True),
+                      server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True),
+                      server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint("tag_id", "segment_id", name="unique_tag_id_segment_id"),
+)
+
 
 amo_lead_contacts = sqlalchemy.Table(
     "amo_lead_contacts",
@@ -2084,6 +2098,33 @@ amo_lead_contacts = sqlalchemy.Table(
         "lead_id",
         "contact_id",
         name="uq_amo_lead_contacts_group_lead_contact",
+    ),
+)
+
+amo_webhooks = sqlalchemy.Table(
+    "amo_webhooks",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("amo_id", BigInteger),
+    sqlalchemy.Column("created_by", BigInteger),
+    sqlalchemy.Column("created_at", Integer),
+    sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("sort", Integer),
+    sqlalchemy.Column("disabled", Boolean, default=False),
+    sqlalchemy.Column("destination", String),
+    sqlalchemy.Column(
+        "settings",
+        ARRAY(String()),
+        nullable=False,
+        default=list,
+        server_default=text("'{}'::text[]"),
+    ),
+
+    UniqueConstraint(
+        "amo_install_group_id",
+        "amo_id",
+        name="uq_amo_webhooks_amo_install_group_id_amo_id",
     ),
 )
 
