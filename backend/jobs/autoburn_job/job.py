@@ -35,7 +35,7 @@ class AutoBurn:
             select(loyality_transactions.c.id)
             .where(
                 loyality_transactions.c.loyality_card_id == self.card.id,
-                loyality_transactions.c.type.in_(["accrual", "withdraw"]),
+                loyality_transactions.c.type == "accrual",
                 loyality_transactions.c.amount > 0,
                 loyality_transactions.c.autoburned.is_not(True),
                 loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.utcnow(),
