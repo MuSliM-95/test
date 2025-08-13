@@ -45,14 +45,12 @@ async def read_payments_list(
 ):
     """Получение списка платежей (с фильтрами или без)"""
 
-    async def _get_pays_list(pays_db):
+    async def _get_pays_list(pays_db, cashbox_user):
         payments_list = []
         for pay in pays_db:
             pay_dict = dict(pay)
 
             # определяем может ли юзер изменять payment
-            q = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
-            cashbox_user = await database.fetch_one(q)
             pay_dict["can_be_deleted_or_edited"] = await can_user_edit_payment(cashbox_user, pay_dict)
             pay_dict["repeat"] = {
                 "repeat_parent_id": pay_dict["repeat_parent_id"],
@@ -224,7 +222,7 @@ async def read_payments_list(
                 payments.parent_id IS NULL {filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
             pays = await database.fetch_all(query)
 
-            pays_list = await _get_pays_list(pays)
+            pays_list = await _get_pays_list(pays, user)
 
             total_pay_list.extend(pays_list)
 
@@ -244,7 +242,7 @@ async def read_payments_list(
             payments.parent_id IS NULL {filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
         pays = await database.fetch_all(query)
 
-        pays_list = await _get_pays_list(pays)
+        pays_list = await _get_pays_list(pays, user)
 
         c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters}"
         count = await database.fetch_one(c)
