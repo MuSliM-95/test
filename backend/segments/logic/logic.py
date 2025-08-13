@@ -55,7 +55,6 @@ class SegmentLogic:
     async def update_data(self, changes: dict):
         """Метод для записи среза (изменненых id объектов) в сегменте."""
 
-
         for object_type, value_data in changes.items():
             if value_data.get(SegmentChangeType.new.value):
                 added_data = []
@@ -67,7 +66,6 @@ class SegmentLogic:
                         "valid_from": datetime.now()
                     })
                 if added_data:
-
                     await insert_in_batches(segment_objects, added_data, batch_size=3000)
 
             if value_data.get(SegmentChangeType.removed.value):
@@ -85,9 +83,8 @@ class SegmentLogic:
         return
 
     async def update_segment_data_in_db(self, new_ids: dict):
-        """Обновление в БД"""
-
+        """Обновление в БД. Возвращаем changes чтобы верхний уровень мог использовать diff."""
         changes = await self.collect_id_changes(new_ids)
         await self.update_data(changes)
 
-
+        return changes
