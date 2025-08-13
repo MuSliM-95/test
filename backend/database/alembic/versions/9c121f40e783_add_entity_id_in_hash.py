@@ -1,7 +1,7 @@
 """add_entity_id_in_hash
 
 Revision ID: 9c121f40e783
-Revises: cd96cbf9e304
+Revises: 3a00d7970a8c
 Create Date: 2025-08-12 01:57:23.166556
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '9c121f40e783'
-down_revision = 'cd96cbf9e304'
+down_revision = '3a00d7970a8c'
 branch_labels = None
 depends_on = None
 
