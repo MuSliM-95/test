@@ -76,6 +76,9 @@ class Segments:
 
 
 async def update_segment_task(segment_id: int):
+    token = await get_token_by_segment_id(segment_id)
+    await notify(ws_token=token, event="recalc_start", segment_id=segment_id)
+    logger.info(f"Starting update for segment {segment_id} with token {token}")
     segment = Segments(segment_id)
 
     await segment.async_init()
