@@ -168,9 +168,8 @@ from api.settings.cashbox.routers import router as cashbox_settings_router
 # )
 
 
-
 app = FastAPI(
-    root_path="/api/v1",
+    root_path='/api/v1',
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0"

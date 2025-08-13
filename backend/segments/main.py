@@ -84,6 +84,7 @@ async def update_segment_task(segment_id: int):
     await asyncio.sleep(10) # Simulate some delay for the update process
     logger.info(f"Starting update for segment {segment_id} with token {token}")
     segment = Segments(segment_id)
+
     await segment.async_init()
 
     if getattr(segment.segment_obj, "is_deleted", False):

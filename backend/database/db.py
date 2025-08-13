@@ -1982,6 +1982,7 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
     sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
     sqlalchemy.Column("is_archived", Boolean, server_default='false', nullable=False),
+    sqlalchemy.Column("is_deleted", Boolean, server_default='false', nullable=False),
 )
 
 
