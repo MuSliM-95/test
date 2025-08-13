@@ -16,3 +16,5 @@ docker-compose.dev.yml
 /nginx/rootCA.crt
 /nginx/rootCA.pem
 /.nezuko
+/certs
+/.docker-compose-dev-https.yml
