@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from database.db import (
-    docs_sales, docs_sales_tags, OrderStatus, docs_sales_delivery_info, users_cboxes_relation, segments,
+    docs_sales, docs_sales_tags, OrderStatus, docs_sales_delivery_info,
     database, SegmentObjectType, contragents, contragents_tags, tags, loyality_cards, loyality_transactions
 )
 
@@ -170,14 +170,3 @@ class SegmentCriteriaQuery:
             self.base_query = self.base_query.outerjoin(table_obj, condition)
         elif join_type == "join":
             self.base_query = self.base_query.join(table_obj, condition)
-
-
-async def get_token_by_segment_id(segment_id: int) -> str:
-    """Получение токена по ID сегмента"""
-    query =(
-        select(users_cboxes_relation.c.token)
-        .join(segments, users_cboxes_relation.c.cashbox_id == segments.c.cashbox_id)
-        .where(segments.c.id == segment_id)
-    )
-    row = await database.fetch_one(query)
-    return row.token if row else None
