@@ -13,6 +13,9 @@ class TagCreate(BaseModel):
     emoji: Optional[str]
     description: Optional[str]
 
+class TagDelete(TagCreate):
+    pass
+
 
 class Tag(BaseModel):
     id: int

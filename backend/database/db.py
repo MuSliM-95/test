@@ -2061,6 +2061,20 @@ contragents_tags = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint("tag_id", "contragent_id", name="unique_tag_id_contragent_id"),
 )
 
+segments_tags = sqlalchemy.Table(
+    "segments_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
+    sqlalchemy.Column("segment_id", Integer, ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
+    sqlalchemy.Column("created_at", DateTime(timezone=True),
+                      server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True),
+                      server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint("tag_id", "segment_id", name="unique_tag_id_segment_id"),
+)
+
 
 amo_lead_contacts = sqlalchemy.Table(
     "amo_lead_contacts",
