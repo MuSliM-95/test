@@ -30,7 +30,9 @@ def upgrade() -> None:
         sa.Column('destination', sa.String(), nullable=True),
         sa.Column('settings', sa.ARRAY(sa.String()), server_default=sa.text("'{}'::text[]"), nullable=False),
         sa.ForeignKeyConstraint(['amo_install_group_id'], ['amo_install_groups.id'], ),
-        sa.PrimaryKeyConstraint('id')
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('amo_install_group_id', 'amo_id',
+                            name='uq_amo_webhooks_amo_install_group_id_amo_id')
     )
     # ### end Alembic commands ###
 

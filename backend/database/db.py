@@ -2114,6 +2114,12 @@ amo_webhooks = sqlalchemy.Table(
         default=list,
         server_default=text("'{}'::text[]"),
     ),
+
+    UniqueConstraint(
+        "amo_install_group_id",
+        "amo_id",
+        name="uq_amo_webhooks_amo_install_group_id_amo_id",
+    ),
 )
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{os.environ.get('POSTGRES_USER')}:{os.environ.get('POSTGRES_PASS')}@{os.environ.get('POSTGRES_HOST')}:{os.environ.get('POSTGRES_PORT')}/cash_2"
