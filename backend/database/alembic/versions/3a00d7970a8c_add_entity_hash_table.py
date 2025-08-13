@@ -12,7 +12,7 @@ import datetime
 
 # revision identifiers, used by Alembic.
 revision = '3a00d7970a8c'
-down_revision = 'e47810d2387e'
+down_revision = '1853c50d00b7'
 branch_labels = None
 depends_on = None
 
@@ -23,6 +23,7 @@ def upgrade() -> None:
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('type', sa.Enum('nomenclature', 'warehouses', name='hashableobject'), nullable=False),
     sa.Column('hash', sa.String(), nullable=False),
+    sa.Column('entity_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.PrimaryKeyConstraint('id')
