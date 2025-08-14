@@ -73,14 +73,14 @@ class ContragentsData:
 
     async def exited_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
-        
+
         query = (
-            select(contragents, segment_objects)
-            .select_from(
-                contragents.join(segment_objects, contragents.c.id == segment_objects.c.object_id)
-            )
-            .where(
-                contragents.c.id.in_(contragents_ids),
+            select(contragents).
+            select_from(
+                segment_objects.join(contragents, segment_objects.c.object_id == contragents.c.id)
+            ).where(
+                segment_objects.c.segment_id == self.segment_obj.id,
+                segment_objects.c.object_type == SegmentObjectType.contragents.value,
                 segment_objects.c.valid_to.isnot(None)
             )
         )
@@ -98,12 +98,12 @@ class ContragentsData:
     async def entered_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         query = (
-            select(contragents, segment_objects)
-            .select_from(
-                contragents.join(segment_objects, contragents.c.id == segment_objects.c.object_id)
-            )
-            .where(
-                contragents.c.id.in_(contragents_ids),
+            select(contragents).
+            select_from(
+                segment_objects.join(contragents, segment_objects.c.object_id == contragents.c.id)
+            ).where(
+                segment_objects.c.segment_id == self.segment_obj.id,
+                segment_objects.c.object_type == SegmentObjectType.contragents.value,
                 segment_objects.c.valid_to.is_(None)
             )
         )
