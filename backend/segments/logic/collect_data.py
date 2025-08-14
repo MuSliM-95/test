@@ -82,6 +82,7 @@ class ContragentsData:
                 and_(
                     segment_objects.c.object_id.in_(contragents_ids),
                     segment_objects.c.valid_to.isnot(None),
+                    contragents.c.id.in_(contragents_ids)
                 )
             )
         )
@@ -105,6 +106,7 @@ class ContragentsData:
                 and_(
                     segment_objects.c.object_id.in_(contragents_ids),
                     segment_objects.c.valid_to.is_(None),
+                    contragents.c.id.in_(contragents_ids)
                 )
             )
         )
