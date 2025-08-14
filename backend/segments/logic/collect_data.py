@@ -74,43 +74,45 @@ class ContragentsData:
     async def exited_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         
-        query = select(contragents, segment_objects).where(
-            contragents.c.id.in_(contragents_ids),
-            exists().where(
-                and_(
-                    segment_objects.c.object_id == contragents.c.id,
-                    segment_objects.c.valid_to.isnot(None),
-                )
+        query = (
+            select(contragents, segment_objects)
+            .select_from(
+                contragents.join(segment_objects, contragents.c.id == segment_objects.c.object_id)
+            )
+            .where(
+                contragents.c.id.in_(contragents_ids),
+                segment_objects.c.valid_to.isnot(None)
             )
         )
         objs = await database.fetch_all(query)
         print(f"EXITED {self.segment_obj.id}")
         print([dict(r) for r in objs])
-        # return [{
-        #     "id": obj.id,
-        #     "name": obj.name,
-        #     "phone": obj.phone,
-        # } for obj in objs]
+        return [{
+            "id": obj.id,
+            "name": obj.name,
+            "phone": obj.phone,
+        } for obj in objs]
 
         
 
     async def entered_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
-        query = select(contragents, segment_objects).where(
-            contragents.c.id.in_(contragents_ids),
-            exists().where(
-                and_(
-                    segment_objects.c.object_id == contragents.c.id,
-                    segment_objects.c.valid_to.is_(None),
-                )
+        query = (
+            select(contragents, segment_objects)
+            .select_from(
+                contragents.join(segment_objects, contragents.c.id == segment_objects.c.object_id)
+            )
+            .where(
+                contragents.c.id.in_(contragents_ids),
+                segment_objects.c.valid_to.is_(None)
             )
         )
         objs = await database.fetch_all(query)
         print(f"ENTERED {self.segment_obj.id}")
         print([dict(r) for r in objs])
-        # return [{
-        #     "id": obj.id,
-        #     "name": obj.name,
-        #     "phone": obj.phone,
-        # } for obj in objs]
+        return [{
+            "id": obj.id,
+            "name": obj.name,
+            "phone": obj.phone,
+        } for obj in objs]
 
