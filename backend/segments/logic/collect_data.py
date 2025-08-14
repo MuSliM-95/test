@@ -84,6 +84,8 @@ class ContragentsData:
             )
         )
         objs = await database.fetch_all(query)
+        print("EXITED")
+        print([dict(r) for r in objs])
         return [{
             "id": obj.id,
             "name": obj.name,
@@ -104,7 +106,8 @@ class ContragentsData:
             )
         )
         objs = await database.fetch_all(query)
-        print(objs)
+        print("ENTERED")
+        print([dict(r) for r in objs])
         return [{
             "id": obj.id,
             "name": obj.name,
