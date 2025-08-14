@@ -72,8 +72,6 @@ class ContragentsData:
 
 
     async def exited_contragents_data(self):
-        contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
-
         query = (
             select(contragents).
             select_from(
@@ -85,8 +83,6 @@ class ContragentsData:
             )
         )
         objs = await database.fetch_all(query)
-        print(f"EXITED {self.segment_obj.id}")
-        print([dict(r) for r in objs])
         return [{
             "id": obj.id,
             "name": obj.name,
@@ -96,7 +92,6 @@ class ContragentsData:
         
 
     async def entered_contragents_data(self):
-        contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         query = (
             select(contragents).
             select_from(
@@ -104,11 +99,9 @@ class ContragentsData:
             ).where(
                 segment_objects.c.segment_id == self.segment_obj.id,
                 segment_objects.c.object_type == SegmentObjectType.contragents.value,
-                segment_objects.c.valid_to.is_(None)
             )
         )
         objs = await database.fetch_all(query)
-        print(f"ENTERED {self.segment_obj.id}")
         print([dict(r) for r in objs])
         return [{
             "id": obj.id,
