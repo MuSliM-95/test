@@ -74,17 +74,13 @@ class ContragentsData:
     async def exited_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         query = (
-            select(contragents)
-            .select_from(
-                join(segment_objects, contragents, segment_objects.c.object_id == contragents.c.id)
-            )
-            .where(
-                and_(
-                    segment_objects.c.object_id.in_(contragents_ids),
-                    segment_objects.c.valid_to.isnot(None),
-                    contragents.c.id.in_(contragents_ids)
-                )
-            )
+            contragents.select()
+            .join(segment_objects, contragents.c.id == segment_objects.c.object_id)
+            .where(and_(
+                        contragents.c.id.in_(contragents_ids),
+                        segment_objects.c.valid_to.isnot(None),
+                    )
+                )   
         )
         objs = await database.fetch_all(query)
         return [{
@@ -98,17 +94,13 @@ class ContragentsData:
     async def entered_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         query = (
-            select(contragents)
-            .select_from(
-                join(segment_objects, contragents, segment_objects.c.object_id == contragents.c.id)
-            )
-            .where(
-                and_(
-                    segment_objects.c.object_id.in_(contragents_ids),
-                    segment_objects.c.valid_to.is_(None),
-                    contragents.c.id.in_(contragents_ids)
-                )
-            )
+            contragents.select()
+            .join(segment_objects, contragents.c.id == segment_objects.c.object_id)
+            .where(and_(
+                        contragents.c.id.in_(contragents_ids),
+                        segment_objects.c.valid_to.is_(None),
+                    )
+                )   
         )
         objs = await database.fetch_all(query)
         return [{
