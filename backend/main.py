@@ -367,10 +367,10 @@ async def startup():
 
     init_db()
     await database.connect()
-    # scheduler.start()
+    scheduler.start()
 
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
-    # scheduler.shutdown()
+    scheduler.shutdown()
