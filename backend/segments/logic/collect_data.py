@@ -99,7 +99,7 @@ class ContragentsData:
             exists().where(
                 and_(
                     segment_objects.c.object_id == contragents.c.id,
-                    segment_objects.c.valid_to.is(None),
+                    segment_objects.c.valid_to.is_(None),
                 )
             )
         )
