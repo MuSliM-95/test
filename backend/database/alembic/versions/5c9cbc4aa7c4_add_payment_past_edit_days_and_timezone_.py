@@ -1,7 +1,7 @@
 """add payment_past_edit_days and timezone in cashbox_user
 
 Revision ID: 5c9cbc4aa7c4
-Revises: 7f34773f5e73
+Revises: b9d5fafd393d
 Create Date: 2025-08-08 17:28:20.176235
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '5c9cbc4aa7c4'
-down_revision = '7f34773f5e73'
+down_revision = 'b9d5fafd393d'
 branch_labels = None
 depends_on = None
 
