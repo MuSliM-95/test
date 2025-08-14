@@ -83,7 +83,7 @@ class ContragentsData:
                 )
             )
         )
-        objs = await database.fetch_all(query)
+        print(objs)
         return [{
             "id": obj.id,
             "name": obj.name,
@@ -94,16 +94,17 @@ class ContragentsData:
 
     async def entered_contragents_data(self):
         contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
-        query = (
-            contragents.select()
-            .join(segment_objects, contragents.c.id == segment_objects.c.object_id)
-            .where(and_(
-                        contragents.c.id.in_(contragents_ids),
-                        segment_objects.c.valid_to.is_(None),
-                    )
-                )   
+        query = select(contragents).where(
+            contragents.c.id.in_(contragents_ids),
+            exists().where(
+                and_(
+                    segment_objects.c.object_id == contragents.c.id,
+                    segment_objects.c.valid_to.is(None),
+                )
+            )
         )
         objs = await database.fetch_all(query)
+        print(objs)
         return [{
             "id": obj.id,
             "name": obj.name,
