@@ -83,7 +83,7 @@ class ContragentsData:
                 )
             )
         )
-        print(objs)
+        objs = await database.fetch_all(query)
         return [{
             "id": obj.id,
             "name": obj.name,
