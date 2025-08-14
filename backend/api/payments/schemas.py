@@ -137,6 +137,7 @@ class PaymentInList(BaseModel):
     docs_sales_id: Optional[int]
     created_at: int
     updated_at: int
+    can_be_deleted_or_edited: bool = True
 
     class Config:
         orm_mode = True

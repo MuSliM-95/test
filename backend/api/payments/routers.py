@@ -1,17 +1,18 @@
+import asyncio
+from datetime import datetime
 from typing import List
 
+import pytz
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy import desc, func, select, distinct, and_
 
-from const import PaymentType
+import api.payments.schemas as pay_schemas
+import functions.filter_schemas as filter_schemas
 from api.articles.schemas import Article
 from api.cheques.schemas import Cheque
 from api.contragents.schemas import Contragent
 from api.projects.schemas import Project
-from ws_manager import manager
-
-from datetime import datetime
-
+from const import PaymentType
 from database.db import (
     database,
     users_cboxes_relation,
@@ -26,11 +27,7 @@ from database.db import (
 )
 from functions.helpers import get_filters, check_user_permission, hide_balance_for_non_admin
 from functions.users import raschet
-
-import api.payments.schemas as pay_schemas
-import functions.filter_schemas as filter_schemas
-
-import asyncio
+from ws_manager import manager
 
 router = APIRouter(tags=["payments"])
 
@@ -48,10 +45,13 @@ async def read_payments_list(
 ):
     """Получение списка платежей (с фильтрами или без)"""
 
-    async def _get_pays_list(pays_db):
+    async def _get_pays_list(pays_db, cashbox_user):
         payments_list = []
         for pay in pays_db:
             pay_dict = dict(pay)
+
+            # определяем может ли юзер изменять payment
+            pay_dict["can_be_deleted_or_edited"] = await can_user_edit_payment(cashbox_user, pay_dict)
             pay_dict["repeat"] = {
                 "repeat_parent_id": pay_dict["repeat_parent_id"],
                 "repeat_period": pay_dict["repeat_period"],
@@ -222,7 +222,7 @@ async def read_payments_list(
                 payments.parent_id IS NULL {filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
             pays = await database.fetch_all(query)
 
-            pays_list = await _get_pays_list(pays)
+            pays_list = await _get_pays_list(pays, user)
 
             total_pay_list.extend(pays_list)
 
@@ -242,7 +242,7 @@ async def read_payments_list(
             payments.parent_id IS NULL {filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
         pays = await database.fetch_all(query)
 
-        pays_list = await _get_pays_list(pays)
+        pays_list = await _get_pays_list(pays, user)
 
         c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters}"
         count = await database.fetch_one(c)
@@ -545,6 +545,10 @@ async def read_payment(token: str, id: int):
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
+async def can_user_edit_payment(cashbox_user, payment) -> bool:
+    # return (cashbox_user.payment_past_edit_days is None) or (datetime.utcnow().timestamp() - payment.get("created_at") <= timedelta(days=cashbox_user.payment_past_edit_days).total_seconds())
+    return (cashbox_user.payment_past_edit_days is None) or (datetime.now(pytz.timezone(cashbox_user.timezone)).date() - datetime.fromtimestamp(payment.get("created_at")).date()).days <= cashbox_user.payment_past_edit_days
+
 @router.put("/payments/{id}/", response_model=pay_schemas.PaymentInListWithData)
 async def update_payment(
         token: str, id: int, payment: pay_schemas.PaymentEdit, bg_tasks: BackgroundTasks
@@ -573,6 +577,12 @@ async def update_payment(
                 payments.c.id == id, payments.c.cashbox == user.cashbox_id
             )
             payment_db = await database.fetch_one(payment_q)
+
+            if not payment_db:
+                raise HTTPException(status_code=404, detail="Выбранный платеж не найден")
+
+            if not (await can_user_edit_payment(user, payment_db)):
+                raise HTTPException(status_code=403, detail="Вы не можете изменять настолько старый платеж")
 
             update_dict: dict = payment.dict(exclude_unset=True)
             if update_dict.get("repeat"):
@@ -736,6 +746,12 @@ async def delete_payment(token: str, payment_id: int):
         if user.status:
             q = payments.select().where(payments.c.id == payment_id)
             payment = await database.fetch_one(q)
+
+            if not payment:
+                raise HTTPException(status_code=404, detail="Выбранный платеж не найден")
+
+            if not (await can_user_edit_payment(user, payment)):
+                raise HTTPException(status_code=403, detail="Вы не можете изменять настолько старый платеж")
 
             if payment.cashbox == user.cashbox_id and payment.account == user.user:
 
