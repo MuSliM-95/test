@@ -137,22 +137,43 @@ class Segments:
 
 async def update_segment_task(segment_id: int):
     token = await get_token_by_segment_id(segment_id)
-    await notify(ws_token=token, event="recalc_start", segment_id=segment_id)
-    logger.info(f"Starting update for segment {segment_id} with token {token}")
     segment = Segments(segment_id)
+    logger.info(f"Starting update for segment {segment_id} with token {token}")
 
     await segment.async_init()
+    payload = {
+        "type": "recalc_start",
+        "segment_name": segment.segment_obj.name,
+        "segment_id": segment_id
+    }
+    await notify(ws_token=token, event="recalc_start", segment_id=segment_id, payload=payload)
+
 
     if getattr(segment.segment_obj, "is_deleted", False):
         logger.info(f"Segment {segment_id} is deleted; skip update.")
-        await notify(ws_token=token, event="recalc_fail_410", segment_id=segment_id)
+        payload = {
+            "type": "recalc_fail_410",
+            "segment_name": segment.segment_obj.name,
+            "segment_id": segment_id
+        }
+        await notify(ws_token=token, event="recalc_fail_410", segment_id=segment_id, payload=payload)
         return
     
 
     if segment.segment_obj:
         await segment.update_segment()
-        await notify(ws_token=token, event="recalc_finish", segment_id=segment_id)
+        payload = {
+            "type": "recalc_finish",
+            "segment_name": segment.segment_obj.name,
+            "segment_id": segment_id
+        }
+        await notify(ws_token=token, event="recalc_finish", segment_id=segment_id, payload=payload)
     else:
-        await notify(ws_token=token, event="recalc_fail_404", segment_id=segment_id)
+        payload = {
+            "type": "recalc_fail_404",
+            "segment_name": segment.segment_obj.name,
+            "segment_id": segment_id
+        }
+        await notify(ws_token=token, event="recalc_fail_404", segment_id=segment_id, payload=payload)
 
 
