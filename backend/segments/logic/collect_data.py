@@ -3,7 +3,7 @@ from database.db import (
 )
 
 from segments.helpers.collect_obj_ids import collect_objects
-from sqlalchemy.sql import select, join, and_
+from sqlalchemy.sql import select, join, and_, exists
 
 from segments.constants import SegmentChangeType
 
