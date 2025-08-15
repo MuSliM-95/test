@@ -547,7 +547,7 @@ async def read_payment(token: str, id: int):
 
 async def can_user_edit_payment(cashbox_user, payment) -> bool:
     # return (cashbox_user.payment_past_edit_days is None) or (datetime.utcnow().timestamp() - payment.get("created_at") <= timedelta(days=cashbox_user.payment_past_edit_days).total_seconds())
-    return (cashbox_user.payment_past_edit_days is None) or (datetime.now(pytz.timezone(cashbox_user.timezone)).date() - datetime.fromtimestamp(payment.get("created_at")).date()).days <= cashbox_user.payment_past_edit_days
+    return (cashbox_user.payment_past_edit_days is None) or (datetime.now(pytz.timezone(cashbox_user.timezone)).date() - datetime.fromtimestamp(payment.get("created_at")).date()).days < cashbox_user.payment_past_edit_days
 
 @router.put("/payments/{id}/", response_model=pay_schemas.PaymentInListWithData)
 async def update_payment(
