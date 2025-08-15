@@ -1,7 +1,9 @@
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
+
+from functions.helpers import sanitize_float
 
 
 class RepeatPeriod(str, Enum):
@@ -60,6 +62,22 @@ class PaymentCreate(BaseModel):
     preamount: Optional[float]
     percentamount: Optional[float]
 
+    @validator("amount")
+    def validate_amount(cls, value):
+        return sanitize_float(value)
+
+    @validator("amount_without_tax")
+    def validate_amount_without_tax(cls, value):
+        return sanitize_float(value)
+
+    @validator("preamount")
+    def validate_preamount(cls, value):
+        return sanitize_float(value)
+
+    @validator("percentamount")
+    def validate_percentamount(cls, value):
+        return sanitize_float(value)
+
     class Config:
         orm_mode = True
 
@@ -89,6 +107,14 @@ class PaymentGet(BaseModel):
     deb_cred: Optional[bool]
     cheque: Optional[int]
     docs_sales_id: Optional[int]
+
+    @validator("amount")
+    def validate_amount(cls, value):
+        return sanitize_float(value)
+
+    @validator("amount_without_tax")
+    def validate_amount_without_tax(cls, value):
+        return sanitize_float(value)
 
     class Config:
         orm_mode = True
@@ -139,6 +165,14 @@ class PaymentInList(BaseModel):
     updated_at: int
     can_be_deleted_or_edited: bool = True
 
+    @validator("amount")
+    def validate_amount(cls, value):
+        return sanitize_float(value)
+
+    @validator("amount_without_tax")
+    def validate_amount_without_tax(cls, value):
+        return sanitize_float(value)
+
     class Config:
         orm_mode = True
 
@@ -169,6 +203,14 @@ class PaymentEdit(BaseModel):
     deb_cred: Optional[bool]
     cheque: Optional[int]
     docs_sales_id: Optional[int]
+
+    @validator("amount")
+    def validate_amount(cls, value):
+        return sanitize_float(value)
+
+    @validator("amount_without_tax")
+    def validate_amount_without_tax(cls, value):
+        return sanitize_float(value)
 
     class Config:
         orm_mode = True
