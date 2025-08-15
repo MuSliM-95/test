@@ -63,9 +63,17 @@ def add_courier_filters(query: Select, courier_filters):
 def add_delivery_required_filters(query: Select, delivery_required: bool):
 
     if delivery_required is True:
-        query = query.where(docs_sales_delivery_info.c.docs_sales_id.isnot(None))
+        query = query.where(and_(
+            docs_sales_delivery_info.c.docs_sales_id.isnot(None),
+            docs_sales_delivery_info.c.address.isnot(None),
+            docs_sales_delivery_info.c.address != ""
+        ))
     elif delivery_required is False:
-        query = query.where(docs_sales_delivery_info.c.docs_sales_id.is_(None))
+        query = query.where(or_(
+            docs_sales_delivery_info.c.docs_sales_id.is_(None),
+            docs_sales_delivery_info.c.address.is_(None),
+            docs_sales_delivery_info.c.address == ""
+        ))
 
     return query
 
