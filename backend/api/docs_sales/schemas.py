@@ -4,7 +4,7 @@ import datetime
 
 from database.db import OrderStatus
 from database.enums import Repeatability
-from pydantic import BaseModel
+from pydantic import BaseModel, conint
 
 
 class Item(BaseModel):
@@ -63,6 +63,7 @@ class Create(BaseModel):
     paid_lt: Optional[float]
     status: Optional[bool]
     goods: Optional[List[Item]]
+    priority: Optional[conint(ge=0, le=10)] = None
 
     class Config:
         orm_mode = True
@@ -140,6 +141,14 @@ class ViewInList(BaseModel):
     has_contragent: Optional[bool] = False
     has_loyality_card: Optional[bool] = False
     color_status: Optional[str] = "default"
+    priority: Optional[int] = None
+    order_status: Optional[OrderStatus] = None
+    assigned_picker: Optional[int] = None
+    assigned_courier: Optional[int] = None
+    picker_started_at: Optional[datetime.datetime] = None
+    picker_finished_at: Optional[datetime.datetime] = None
+    courier_picked_at: Optional[datetime.datetime] = None
+    courier_delivered_at: Optional[datetime.datetime] = None
 
 
 class ViewInListResult(BaseModel):
@@ -186,6 +195,7 @@ class FilterSchema(BaseModel):
     created_at_to: Optional[int]
     updated_at_from: Optional[int]
     updated_at_to: Optional[int]
+    priority: Optional[conint(ge=0, le=10)] = None
 
 
 class NotifyType(str, Enum):
