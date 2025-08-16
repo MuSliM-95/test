@@ -283,6 +283,15 @@ async def get_list(
 
     filters_dict = filters.dict(exclude_none=True)
     filter_list = []
+    if "priority" in filters_dict:
+        value = filters_dict["priority"]
+        if isinstance(value, dict):
+            # Поддержка {">": 5, "<": 10}
+            for op, val in value.items():
+                if op == "gt": filter_list.append(docs_sales.c.priority > val)
+                if op == "lt": filter_list.append(docs_sales.c.priority < val)
+        else:
+            filter_list.append(docs_sales.c.priority == value)
     for k, v in filters_dict.items():
         if k.split("_")[-1] == "from":
             dated_from_param_value = func.to_timestamp(v)
@@ -523,6 +532,9 @@ async def create(
         instance_values["settings"] = await add_settings_docs_sales(
             instance_values.pop("settings", None)
         )
+        priority = instance_values.get("priority")
+        if priority is not None and (priority < 0 or priority > 10):
+            raise HTTPException(400, "Приоритет должен быть от 0 до 10")
 
         goods: Union[list, None] = instance_values.pop("goods", None)
 
