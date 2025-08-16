@@ -208,6 +208,9 @@ class CreateDocsSalesView:
 
                 last_number_by_org[doc.organization] = number_str
 
+            if doc.priority is not None and (doc.priority < 0 or doc.priority > 10):
+                raise HTTPException(400, "Приоритет должен быть от 0 до 10")   
+
             doc_dict = {
                 "number": number_str,
                 "dated": doc.dated,
@@ -224,7 +227,8 @@ class CreateDocsSalesView:
                 "created_by": user.id,
                 "sales_manager": doc.sales_manager or user.id,
                 "cashbox": user.cashbox_id,
-                "is_deleted": False
+                "is_deleted": False,
+                "priority": doc.priority,
             }
             docs_rows.append(doc_dict)
 
