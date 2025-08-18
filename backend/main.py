@@ -157,7 +157,7 @@ from api.segments.routers import router as segments_router
 from api.tags.routers import router as tags_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
-from jobs.jobs import scheduler
+# from jobs.jobs import scheduler
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
@@ -368,10 +368,10 @@ async def startup():
 
     init_db()
     await database.connect()
-    scheduler.start()
+    # scheduler.start()
 
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
-    scheduler.shutdown()
+    # scheduler.shutdown()
