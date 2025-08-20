@@ -1,4 +1,4 @@
-
+import time
 
 from database.db import database, segments
 from segments.main import update_segment_task
@@ -6,6 +6,7 @@ from segments.main import update_segment_task
 from sqlalchemy import select, cast, func, Integer, and_, or_
 from sqlalchemy.dialects.postgresql import JSONB
 
+from segments.logger import logger
 
 
 async def get_segment_ids():
@@ -37,5 +38,7 @@ async def get_segment_ids():
 
 async def segment_update():
     segment_ids = await get_segment_ids()
+    start = time.time()
     for segment_id in segment_ids:
         await update_segment_task(segment_id)
+    logger.info(f'Segments updated in {time.time() - start:.2f} seconds. Total segments: {len(segment_ids)}')

@@ -36,7 +36,7 @@ async def get_user_by_token(token: str):
             "first_name": user.first_name,
             "last_name": user.last_name, "username": user.username, "status": user_cbox.status,
             "is_admin": user_cbox.is_owner, "created_at": user.created_at, "updated_at": user.updated_at,
-            "tags": user_cbox.tags,
+            "tags": user_cbox.tags, "timezone": user_cbox.timezone, "payment_past_edit_days": user_cbox.payment_past_edit_days,
         }
 
     return user_dict

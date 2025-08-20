@@ -3,7 +3,7 @@ from database.db import (
 )
 
 from segments.helpers.collect_obj_ids import collect_objects
-from sqlalchemy.sql import select, join, and_
+from sqlalchemy.sql import select, join, and_, exists
 
 from segments.constants import SegmentChangeType
 
@@ -72,17 +72,14 @@ class ContragentsData:
 
 
     async def exited_contragents_data(self):
-        contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         query = (
-            select(contragents)
-            .select_from(
-                join(segment_objects, contragents, segment_objects.c.object_id == contragents.c.id)
-            )
-            .where(
-                and_(
-                    segment_objects.c.object_id.in_(contragents_ids),
-                    segment_objects.c.valid_to.isnot(None),
-                )
+            select(contragents).
+            select_from(
+                segment_objects.join(contragents, segment_objects.c.object_id == contragents.c.id)
+            ).where(
+                segment_objects.c.segment_id == self.segment_obj.id,
+                segment_objects.c.object_type == SegmentObjectType.contragents.value,
+                segment_objects.c.valid_to.isnot(None)
             )
         )
         objs = await database.fetch_all(query)
@@ -95,17 +92,13 @@ class ContragentsData:
         
 
     async def entered_contragents_data(self):
-        contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
         query = (
-            select(contragents)
-            .select_from(
-                join(segment_objects, contragents, segment_objects.c.object_id == contragents.c.id)
-            )
-            .where(
-                and_(
-                    segment_objects.c.object_id.in_(contragents_ids),
-                    segment_objects.c.valid_to.is_(None),
-                )
+            select(contragents).
+            select_from(
+                segment_objects.join(contragents, segment_objects.c.object_id == contragents.c.id)
+            ).where(
+                segment_objects.c.segment_id == self.segment_obj.id,
+                segment_objects.c.object_type == SegmentObjectType.contragents.value,
             )
         )
         objs = await database.fetch_all(query)

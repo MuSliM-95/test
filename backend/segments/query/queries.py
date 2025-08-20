@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from sqlalchemy import select
 
 from database.db import (
@@ -7,169 +9,214 @@ from database.db import (
 
 from segments.query import filters as filter_query
 
+from segments.logger import logger
 
+FILTER_PRIORYTY_TAGS = {
+    "self": 1,
+    "purchase": 2,
+    "delivery_info": 3,
+    "docs_sales_tags": 4,
+    "contragents_tags": 5,
+    "loyality": 6,
+}
+
+
+def chunk_list(lst, chunk_size=30000):
+    """Разбивает список на части заданного размера"""
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
 
 class SegmentCriteriaQuery:
 
     def __init__(self, cashbox_id, criteria_data: dict):
         self.criteria_data = criteria_data
-        self.base_query = (
-            select(docs_sales.c.id, docs_sales.c.contragent)
-            .outerjoin(contragents, docs_sales.c.contragent == contragents.c.id)
-            .where(docs_sales.c.cashbox == cashbox_id)
-        )
+        self.cashbox_id = cashbox_id
+        self.docs_sales_ids = []
         self.filters = filter_query
-        self.joined_tables = set()
-        self.criteria_table_dependencies = {
-            "picker": None,
-            "courier": None,
-            "purchases": None,
-            "created_at": None,
-            "delivery_required": ["docs_sales_delivery_info"],
-            "loyality": ["loyality_cards", "loyality_transactions"],
-            "tags": ["contragents_tags", "tags"],
-            "docs_sales_tags": ["docs_sales_tags"],
-            "delivery_info": ["docs_sales_delivery_info"]
-
-        }
-        self.table_join_configs = {
-            "docs_sales_delivery_info": {
-                "join_type": "outerjoin",
-                "table": docs_sales_delivery_info,
-                "condition": lambda: docs_sales_delivery_info.c.docs_sales_id == docs_sales.c.id
+        self.criteria_config = {
+            "picker": {
+                "handler": self.filters.add_picker_filters,
+                "filter_tag": "self",
             },
-            "loyality_cards": {
-                "join_type": "outerjoin",
-                "table": loyality_cards,
-                "condition": lambda: loyality_cards.c.contragent_id == contragents.c.id
+            "courier": {
+                "handler": self.filters.add_courier_filters,
+                "filter_tag": "self",
             },
-            "loyality_transactions": {
-                "join_type": "outerjoin",
-                "table": loyality_transactions,
-                "condition": lambda: loyality_transactions.c.loyality_card_id == loyality_cards.c.id,
-                "depends_on": ["loyality_cards"]
+            "delivery_required": {
+                "handler": self.filters.add_delivery_required_filters,
+                "filter_tag": "delivery_info",
             },
-            "contragents_tags": {
-                "join_type": "outerjoin",
-                "table": contragents_tags,
-                "condition": lambda: contragents_tags.c.contragent_id == contragents.c.id
+            "purchases": {
+                "handler": self.filters.add_purchase_filters,
+                "filter_tag": "purchase",
+            },
+            "loyality": {
+                "handeler": self.filters.add_loyality_filters,
+                "filter_tag": "loyality",
+            },
+            "created_at": {
+                "handler": self.filters.created_at_filters,
+                "filter_tag": "self",
             },
             "tags": {
-                "join_type": "outerjoin",
-                "table": tags,
-                "condition": lambda: tags.c.id == contragents_tags.c.tag_id,
-                "depends_on": ["contragents_tags"]
+                "handler": self.filters.tags_filters,
+                "filter_tag": "contragents_tags",
             },
             "docs_sales_tags": {
+                "handler": self.filters.docs_sales_tags_filters,
+                "filter_tag": "docs_sales_tags",
+            },
+            "delivery_info": {
+                "handler": self.filters.delivery_info_filters,
+                "filter_tag": "delivery_info",
+            }
+        }
+
+        self.filter_tag_dependencies = {
+            "self": None,
+            "purchase": None,
+            "delivery_info": {
                 "join_type": "outerjoin",
+                "table": docs_sales_delivery_info,
+                "condition": lambda
+                    base: docs_sales_delivery_info.c.docs_sales_id == base.c.id,
+            },
+            "docs_sales_tags": {
+                "join_type": "join",
                 "table": docs_sales_tags,
-                "condition": lambda: docs_sales_tags.c.docs_sales_id == docs_sales.c.id
+                "condition": lambda
+                    base: docs_sales_tags.c.docs_sales_id == base.c.id,
+            },
+            "contragents_tags": {
+                "join_type": "join",
+                "table": contragents_tags,
+                "condition": lambda
+                    base: contragents_tags.c.contragent_id == base.c.contragent,
+            },
+            "loyality": {
+                "join_type": "join",
+                "table": loyality_cards,
+                "condition": lambda
+                    base: loyality_cards.c.contragent_id == base.c.contragent,
             },
         }
-        self.criteria_handlers = {
-            "picker": self.filters.add_picker_filters,
-            "courier": self.filters.add_courier_filters,
-            "delivery_required": self.filters.add_delivery_required_filters,
-            "purchases": self.filters.add_purchase_filters,
-            "loyality": self.filters.add_loyality_filters,
-            "created_at": self.filters.created_at_filters,
-            "tags": self.filters.tags_filters,
-            "docs_sales_tags": self.filters.docs_sales_tags_filters,
-            "delivery_info": self.filters.delivery_info_filters,
 
-        }
+    def group_criteria_by_priority(self):
+        """
+        Группирует критерии по приоритету filter_tag.
+        Возвращает список сетов, где каждый сет — это группа критериев с одинаковым приоритетом.
+        """
+        grouped = defaultdict(set)
 
-    def get_query(self):
-        """Формируем запрос"""
-        required_tables = self._get_required_tables()
-
-        # 2. Присоединяем основные таблицы
-        if required_tables:
-            self._add_required_joins(required_tables)
-
-        for criterion, value in self.criteria_data.items():
-
-            handler = self.criteria_handlers.get(criterion)
-            if handler:
-                self.base_query = handler(self.base_query, value)
-
-        return self.base_query
-
-    async def collect_ids(self):
-        query = self.get_query()
-
-        rows = await database.fetch_all(query)
-        data = {
-            SegmentObjectType.docs_sales.value: [],
-            SegmentObjectType.contragents.value: []
-        }
-        for row in rows:
-            data[SegmentObjectType.docs_sales.value].append(row.id)
-            if not row.contragent:
+        for key, value in self.criteria_data.items():
+            if value in [{}, []]:
                 continue
-            data[SegmentObjectType.contragents.value].append(row.contragent)
-
-        data[SegmentObjectType.docs_sales.value] = set(data[SegmentObjectType.docs_sales.value])
-        data[SegmentObjectType.contragents.value] = set(data[SegmentObjectType.contragents.value])
-        return data
-
-    def _get_required_tables(self):
-        """Только основные таблицы, подкритерии обрабатываются в фильтрах"""
-        required_tables = set()
-
-        for criterion, value in self.criteria_data.items():
-
-            dependency = self.criteria_table_dependencies.get(criterion)
-            if dependency is None:
+            cfg = self.criteria_config.get(key)
+            if not cfg:
                 continue
-            elif isinstance(dependency, list):
-                required_tables.update(dependency)
+            tag = cfg["filter_tag"]
+            priority = FILTER_PRIORYTY_TAGS.get(tag,
+                                                999)  # дефолт — низший приоритет
+            grouped[priority].add(key)
 
-        return required_tables
+        # сортируем по приоритету и собираем как list[set]
+        return [grouped[p] for p in sorted(grouped.keys())]
 
-    def _add_required_joins(self, required_tables):
-        """Присоединяем необходимые JOINs"""
-        tables_to_join = self._sort_tables_by_dependencies(required_tables)
-        for table_name in tables_to_join:
-            if table_name not in self.joined_tables:
-                self._add_table_join(table_name)
-                self.joined_tables.add(table_name)
-
-    def _sort_tables_by_dependencies(self, tables):
-        """Сортировка присоединяемых таблиц по зависимостям"""
-        sorted_tables = []
-        remaining_tables = set(tables)
-
-        while remaining_tables:
-            ready_tables = []
-            for table in remaining_tables:
-                config = self.table_join_configs[table]
-                dependencies = config.get('depends_on', [])
-                if not dependencies or all(
-                        dep in self.joined_tables or dep in sorted_tables for
-                        dep in dependencies):
-                    ready_tables.append(table)
-
-            if not ready_tables:
-                ready_tables = [list(remaining_tables)[0]]
-
-            sorted_tables.extend(ready_tables)
-            remaining_tables -= set(ready_tables)
-
-        return sorted_tables
-
-    def _add_table_join(self, table_name):
-
-        config = self.table_join_configs[table_name]
-
+    def _add_table_join(self, subquery, tag):
+        query = select(subquery.c.id, subquery.c.contragent)
+        config = self.filter_tag_dependencies.get(tag)
+        if not config:
+            return query
         join_type = config["join_type"]
-        condition = config["condition"]()
+        condition = config["condition"](subquery)
         table_obj = config["table"]
 
         if join_type == "outerjoin":
-            self.base_query = self.base_query.outerjoin(table_obj, condition)
+            return query.outerjoin(table_obj, condition)
         elif join_type == "join":
-            self.base_query = self.base_query.join(table_obj, condition)
+            return query.join(table_obj, condition)
+
+    async def calculate(self):
+        """Собираем Id документов продаж"""
+        docs_sales_rows = await database.fetch_all(select(docs_sales.c.id).where(docs_sales.c.cashbox == self.cashbox_id))
+        self.docs_sales_ids = [row.id for row in docs_sales_rows]
+        groups = self.group_criteria_by_priority()
+        for group in groups:
+            if not self.docs_sales_ids:
+                return []
+
+            tag = self.criteria_config.get(list(group)[0]).get("filter_tag",
+                                                               "self")
+
+            # Обрабатываем ID частями
+            all_filtered_rows = []
+
+            for chunk_num, chunk_ids in enumerate(
+                    chunk_list(self.docs_sales_ids, 30000)):
+                # Создаем подзапрос для текущей части
+                subq = (
+                    select(docs_sales)
+                    .where(docs_sales.c.id.in_(chunk_ids))
+                    .subquery("sub")
+                )
+
+                # Добавляем джоины
+                query = self._add_table_join(subq, tag)
+
+                # Применяем обработчики критериев
+                for criteria in group:
+                    data = self.criteria_data.get(criteria)
+                    handler = self.criteria_config.get(criteria, {}).get(
+                        "handler")
+                    if handler:
+                        query = handler(query, data, subq)
+
+                # Выполняем запрос для части
+                try:
+                    chunk_rows = await database.fetch_all(query)
+                    all_filtered_rows.extend(chunk_rows)
+                except Exception as e:
+                    logger.error(f"Error processing chunk {chunk_num + 1}: {e}")
+                    raise
+
+            # Обновляем список ID результатами из всех частей
+            docs_sales_rows = all_filtered_rows
+            self.docs_sales_ids = [row.id for row in docs_sales_rows]
+
+        return self.docs_sales_ids
+
+    async def collect_ids(self):
+        docs_sales_ids = await self.calculate()
+
+        data = {
+            SegmentObjectType.docs_sales.value: set(),
+            SegmentObjectType.contragents.value: set()
+        }
+
+        # Обрабатываем ID частями
+        for chunk_num, chunk_ids in enumerate(
+                chunk_list(docs_sales_ids, 30000)):
+
+            # Создаем запрос для текущей части
+            query = select(docs_sales.c.id, docs_sales.c.contragent).where(
+                docs_sales.c.id.in_(chunk_ids)
+            )
+
+            try:
+                chunk_rows = await database.fetch_all(query)
+
+                # Обрабатываем результаты части
+                for row in chunk_rows:
+                    data[SegmentObjectType.docs_sales.value].add(row.id)
+                    if row.contragent:
+                        data[SegmentObjectType.contragents.value].add(
+                            row.contragent)
+
+            except Exception as e:
+                logger.error(f"Error processing chunk {chunk_num + 1}: {e}")
+                raise
+
+        return data
 
 
 async def get_token_by_segment_id(segment_id: int) -> str:
@@ -181,3 +228,10 @@ async def get_token_by_segment_id(segment_id: int) -> str:
     )
     row = await database.fetch_one(query)
     return row.token if row else None
+
+async def fetch_contragent_by_id(cid):
+    row = await database.fetch_one(
+        select([contragents.c.name, contragents.c.phone])
+        .where(contragents.c.id == cid)
+    )
+    return row

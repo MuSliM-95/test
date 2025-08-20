@@ -82,6 +82,8 @@ async def read_cashbox_users(
                     "created_at": tg_acc.created_at,
                     "updated_at": tg_acc.updated_at,
                     "tags": u.tags,
+                    "timezone": u.timezone,
+                    "payment_past_edit_days": u.payment_past_edit_days
                 }
 
                 users_list.append(user_dict)
@@ -99,14 +101,9 @@ async def edit_cashbox_user(token: str, user_id: int, data: Optional[CashboxUpda
     if not data:
         data = {}
     else:
-        data = data.dict()
-    if status is True or status is False:
+        data = data.dict(exclude_unset=True)
+    if status is not None:
         data["status"] = status
-
-    if "status" in data and data.get("status") is None:
-        del data["status"]
-    if "tags" in data and data.get("tags") is None:
-        del data["tags"]
 
     if user:
         if user.is_owner:
@@ -141,6 +138,8 @@ async def edit_cashbox_user(token: str, user_id: int, data: Optional[CashboxUpda
                 "created_at": tg_acc.created_at,
                 "updated_at": tg_acc.updated_at,
                 "tags": owner.tags,
+                "timezone": owner.timezone,
+                "payment_past_edit_days": owner.payment_past_edit_days
             }
 
             if data.get("status") is not None:

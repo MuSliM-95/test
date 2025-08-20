@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from database.db import segments, database, SegmentStatus, users_cboxes_relation
+from database.db import segments, database, SegmentStatus, users_cboxes_relation, SegmentObjectType
 
 from segments.logic.logic import SegmentLogic
 from segments.query.queries import SegmentCriteriaQuery
@@ -11,7 +11,8 @@ from segments.logic.collect_data import ContragentsData
 
 from segments.logger import logger
 from segments.websockets import notify
-from segments.query.queries import get_token_by_segment_id
+from segments.query.queries import get_token_by_segment_id, fetch_contragent_by_id
+from segments.helpers.functions import format_contragent_text_notifications
 import asyncio
 
 
@@ -64,7 +65,63 @@ class Segments:
             start = datetime.now()
             await self.set_status_in_progress()
             new_ids = await self.query.collect_ids()
-            await self.logic.update_segment_data_in_db(new_ids)
+
+            # теперь update_segment_data_in_db возвращает changes
+            changes = await self.logic.update_segment_data_in_db(new_ids)
+            # changes пример:
+            # {
+            #   "contragents": {"new": [...], "removed": [...], "active": [...]},
+            #   "docs_sales": {...}
+            # }
+
+            # получаем token для отправки WS
+            token = await get_token_by_segment_id(self.segment_id)
+
+            # собираем задачи по уведомлениям
+            notify_tasks = []
+
+            contr_changes = changes.get(SegmentObjectType.contragents.value, {})
+            # добавленные
+            for cid in contr_changes.get("new", []):
+                row = await fetch_contragent_by_id(cid)
+                if not row:
+                    continue
+                name = getattr(row, "name", None) or row.get("name")
+                phone = getattr(row, "phone", None) or row.get("phone")
+                text = format_contragent_text_notifications("new_contragent", self.segment_obj.name, name or "", phone or "")
+                payload = {
+                    "type": "contragent_added",
+                    "text": text,
+                    "contragent": {"id": cid, "name": name, "phone": phone}
+                }
+                notify_tasks.append(
+                    notify(ws_token=token, event="segment_member_added", segment_id=self.segment_id, payload=payload)
+                )
+
+            # удалённые
+            for cid in contr_changes.get("removed", []):
+                row = await fetch_contragent_by_id(cid)
+                # Если контрагент был удалён из справочника — всё равно отправим базовый текст
+                name = None
+                phone = None
+                if row:
+                    name = getattr(row, "name", None) or row.get("name")
+                    phone = getattr(row, "phone", None) or row.get("phone")
+                text = format_contragent_text_notifications("removed_contragent", self.segment_obj.name, name or "Неизвестно", phone or "Неизвестно")
+                payload = {
+                    "type": "contragent_removed",
+                    "text": text,
+                    "contragent": {"id": cid, "name": name, "phone": phone}
+                }
+                notify_tasks.append(
+                    notify(ws_token=token, event="segment_member_removed", segment_id=self.segment_id, payload=payload)
+                )
+
+            if notify_tasks:
+                # параллельно отправляем все уведомления
+                await asyncio.gather(*notify_tasks)
+
+            # далее стандартная логика
             await self.actions.start_actions()
             await self.update_segment_datetime()
             await self.set_status_calculated()
@@ -80,22 +137,43 @@ class Segments:
 
 async def update_segment_task(segment_id: int):
     token = await get_token_by_segment_id(segment_id)
-    await notify(ws_token=token, event="recalc_start", segment_id=segment_id)
-    logger.info(f"Starting update for segment {segment_id} with token {token}")
     segment = Segments(segment_id)
+    logger.info(f"Starting update for segment {segment_id} with token {token}")
 
     await segment.async_init()
+    payload = {
+        "type": "recalc_start",
+        "segment_name": segment.segment_obj.name,
+        "segment_id": segment_id
+    }
+    await notify(ws_token=token, event="recalc_start", segment_id=segment_id, payload=payload)
+
 
     if getattr(segment.segment_obj, "is_deleted", False):
         logger.info(f"Segment {segment_id} is deleted; skip update.")
-        await notify(ws_token=token, event="recalc_fail_410", segment_id=segment_id)
+        payload = {
+            "type": "recalc_fail_410",
+            "segment_name": segment.segment_obj.name,
+            "segment_id": segment_id
+        }
+        await notify(ws_token=token, event="recalc_fail_410", segment_id=segment_id, payload=payload)
         return
     
 
     if segment.segment_obj:
         await segment.update_segment()
-        await notify(ws_token=token, event="recalc_finish", segment_id=segment_id)
+        payload = {
+            "type": "recalc_finish",
+            "segment_name": segment.segment_obj.name,
+            "segment_id": segment_id
+        }
+        await notify(ws_token=token, event="recalc_finish", segment_id=segment_id, payload=payload)
     else:
-        await notify(ws_token=token, event="recalc_fail_404", segment_id=segment_id)
+        payload = {
+            "type": "recalc_fail_404",
+            "segment_name": segment.segment_obj.name,
+            "segment_id": segment_id
+        }
+        await notify(ws_token=token, event="recalc_fail_404", segment_id=segment_id, payload=payload)
 
 

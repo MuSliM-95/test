@@ -124,6 +124,8 @@ class OrderStatus(str, ENUM):
     collected = "collected"
     picked = "picked"
     delivered = "delivered"
+    closed = "closed"
+    success = "success"
 
 
 class SegmentStatus(str, ENUM):
@@ -868,6 +870,8 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("is_owner", Boolean, default=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("timezone", String),
+    sqlalchemy.Column("payment_past_edit_days", Integer)
 )
 
 contragents = sqlalchemy.Table(
@@ -1215,6 +1219,8 @@ docs_sales = sqlalchemy.Table(
     
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+
+    sqlalchemy.Column("priority", Integer, nullable=True)
 )
 
 docs_sales_tags = sqlalchemy.Table(
