@@ -140,7 +140,7 @@ class SegmentCriteriaQuery:
                 return []
             tag = self.criteria_config.get(list(group)[0]).get("filter_tag", "self")
             subq = docs_sales.select().where(
-                docs_sales.c.id.in_(self.docs_sales_ids)).subquery("sub")
+                docs_sales.c.id(self.docs_sales_ids)).subquery("sub")
             query = self._add_table_join(subq, tag)
             for criteria in group:
                 data = self.criteria_data.get(criteria)
