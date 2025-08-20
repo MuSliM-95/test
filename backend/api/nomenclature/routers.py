@@ -7,7 +7,7 @@ import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
     warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups, \
-    nomenclature_attributes, nomenclature_attributes_value
+    nomenclature_attributes, nomenclature_attributes_value, warehouse_hash, nomenclature_hash
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body, Query
 
@@ -482,7 +482,7 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
 
         query = nomenclature.insert().values(nomenclature_values)
         nomenclature_id = await database.execute(query)
-        await create_entity_hash(nomenclature, nomenclature_id)
+        await create_entity_hash(nomenclature, nomenclature_hash, nomenclature_id)
         inserted_ids.add(nomenclature_id)
 
     query = nomenclature.select().where(nomenclature.c.cashbox == user.cashbox_id, nomenclature.c.id.in_(inserted_ids))
@@ -530,7 +530,7 @@ async def edit_nomenclature(
         )
         await database.execute(query)
         nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
-        await update_entity_hash(table=nomenclature, entity=nomenclature_db)
+        await update_entity_hash(table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db)
 
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
@@ -572,7 +572,7 @@ async def edit_nomenclature_mass(
             )
             await database.execute(query)
             nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
-            await update_entity_hash(table=nomenclature, entity=nomenclature_db)
+            await update_entity_hash(table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db)
 
         nomenclature_db = datetime_to_timestamp(nomenclature_db)
 

@@ -28,7 +28,7 @@ from database.db import (
     units,
     entity_or_function,
     fifo_settings, docs_sales_settings,
-    user_permissions, entity_hash
+    user_permissions
 )
 
 
@@ -835,7 +835,7 @@ async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
     return True if article_exists else False
 
 
-async def create_entity_hash(table: Table, idx: int):
+async def create_entity_hash(table: Table, table_hash: Table, idx: int):
     query = table.select().with_only_columns(
         table.c.id,
         table.c.created_at,
@@ -847,24 +847,26 @@ async def create_entity_hash(table: Table, idx: int):
            "created_at": entity.created_at,
            "updated_at": entity.updated_at})
     
-    hash_string = hashlib.sha256(data.encode("utf-8")).hexdigest()
-    hash_data = {"type": table.name,
-                 "hash": hash_string,
-                 "entity_id": entity.id,
+    hash_string = f"{table.name}_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
+    hash_data = {"hash": hash_string,
+                 f"{table.name}_id": entity.id,
                  "created_at": datetime.now(),
                  "updated_at": datetime.now()}
-    insert_query = entity_hash.insert().values(hash_data)
+    insert_query = table_hash.insert().values(hash_data)
     await database.execute(insert_query)
 
-async def update_entity_hash(table: Table, entity):
+async def update_entity_hash(table: Table, table_hash: Table, entity):
     data = str({"type": table.name,
            "id": entity.id,
            "created_at": entity.created_at,
            "updated_at": entity.updated_at})
     
-    hash_string = hashlib.sha256(data.encode("utf-8")).hexdigest()
-    hash_data = {"type": table.name, "hash": hash_string, "entity_id": entity.id, "updated_at": datetime.now()}
-    update_query = entity_hash.update().where(entity_hash.c.entity_id==entity.id).values(hash_data)
+    hash_string = f"{table.name}_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
+    hash_data = {"hash": hash_string, f"{table.name}_id": entity.id, "updated_at": datetime.now()}
+    if table.name == "nomenclature":
+        update_query = table_hash.update().where(table_hash.c.nomenclature_id==entity.id).values(hash_data)
+    else:
+        update_query = table_hash.update().where(table_hash.c.warehouses_id==entity.id).values(hash_data)
     await database.execute(update_query)
     
 
