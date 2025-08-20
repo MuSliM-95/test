@@ -3,6 +3,7 @@ import string
 import hashlib
 from datetime import datetime
 from typing import Optional, Union
+import json
 
 import aiohttp
 import math
@@ -849,15 +850,6 @@ def deep_sanitize(obj):
         return [deep_sanitize(v) for v in obj]
     else:
         return sanitize_float(obj)
-
-from fastapi import APIRouter, Request
-from starlette.datastructures import QueryParams
-import json
-import datetime
-from typing import Dict, Any, List
-
-router = APIRouter()
-
 
 def coerce_value(v: str):
     """Приведение строк из query к bool/int/float/list/json."""
