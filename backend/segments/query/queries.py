@@ -9,7 +9,7 @@ from database.db import (
 
 from segments.query import filters as filter_query
 
-from backend.segments.logger import logger
+from segments.logger import logger
 
 FILTER_PRIORYTY_TAGS = {
     "self": 1,
