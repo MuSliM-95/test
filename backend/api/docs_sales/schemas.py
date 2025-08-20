@@ -4,7 +4,7 @@ import datetime
 
 from database.db import OrderStatus
 from database.enums import Repeatability
-from pydantic import BaseModel
+from pydantic import BaseModel, conint
 
 
 class Item(BaseModel):
@@ -63,6 +63,7 @@ class Create(BaseModel):
     paid_lt: Optional[float]
     status: Optional[bool]
     goods: Optional[List[Item]]
+    priority: Optional[conint(ge=0, le=10)] = None
 
     class Config:
         orm_mode = True
@@ -107,6 +108,11 @@ class ResponseDeliveryInfoSchema(DeliveryInfoSchema):
     docs_sales_id: int
 
 
+class UserShort(BaseModel):
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
 class ViewInList(BaseModel):
     id: int
     number: Optional[str]
@@ -123,6 +129,7 @@ class ViewInList(BaseModel):
     comment: Optional[str]
     client: Optional[int]
     contragent: Optional[int]
+    contragent_segments: Optional[List[int]]
     contragent_name: Optional[str]
     contract: Optional[int]
     organization: Optional[int]
@@ -140,6 +147,17 @@ class ViewInList(BaseModel):
     has_contragent: Optional[bool] = False
     has_loyality_card: Optional[bool] = False
     color_status: Optional[str] = "default"
+    priority: Optional[int] = None
+    order_status: Optional[OrderStatus] = None
+
+    # теперь поддерживаем либо id (int) либо развёрнутый объект UserShort
+    assigned_picker: Optional[Union[int, UserShort]] = None
+    assigned_courier: Optional[Union[int, UserShort]] = None
+
+    picker_started_at: Optional[datetime.datetime] = None
+    picker_finished_at: Optional[datetime.datetime] = None
+    courier_picked_at: Optional[datetime.datetime] = None
+    courier_delivered_at: Optional[datetime.datetime] = None
 
 
 class ViewInListResult(BaseModel):
@@ -186,6 +204,18 @@ class FilterSchema(BaseModel):
     created_at_to: Optional[int]
     updated_at_from: Optional[int]
     updated_at_to: Optional[int]
+    priority: Optional[conint(ge=0, le=10)] = None
+
+    has_delivery: Optional[bool] = None
+    has_picker: Optional[bool] = None
+    has_courier: Optional[bool] = None
+    order_status: Optional[str] = None
+
+    delivery_date_from: Optional[int] = None
+    delivery_date_to: Optional[int] = None
+
+    picker_id: Optional[int] = None
+    courier_id: Optional[int] = None
 
 
 class NotifyType(str, Enum):

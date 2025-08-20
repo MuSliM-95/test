@@ -9,6 +9,8 @@ from database.db import (
 
 from segments.query import filters as filter_query
 
+from backend.segments.logger import logger
+
 FILTER_PRIORYTY_TAGS = {
     "self": 1,
     "purchase": 2,
@@ -18,6 +20,11 @@ FILTER_PRIORYTY_TAGS = {
     "loyality": 6,
 }
 
+
+def chunk_list(lst, chunk_size=30000):
+    """Разбивает список на части заданного размера"""
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
 
 class SegmentCriteriaQuery:
 
@@ -133,21 +140,47 @@ class SegmentCriteriaQuery:
         """Собираем Id документов продаж"""
         docs_sales_rows = await database.fetch_all(select(docs_sales.c.id).where(docs_sales.c.cashbox == self.cashbox_id))
         self.docs_sales_ids = [row.id for row in docs_sales_rows]
-
         groups = self.group_criteria_by_priority()
         for group in groups:
             if not self.docs_sales_ids:
                 return []
-            tag = self.criteria_config.get(list(group)[0]).get("filter_tag", "self")
-            subq = docs_sales.select().where(
-                docs_sales.c.id(self.docs_sales_ids)).subquery("sub")
-            query = self._add_table_join(subq, tag)
-            for criteria in group:
-                data = self.criteria_data.get(criteria)
-                handler = self.criteria_config.get(criteria, {}).get("handler")
-                if handler:
-                    query = handler(query, data, subq)
-            docs_sales_rows = await database.fetch_all(query)
+
+            tag = self.criteria_config.get(list(group)[0]).get("filter_tag",
+                                                               "self")
+
+            # Обрабатываем ID частями
+            all_filtered_rows = []
+
+            for chunk_num, chunk_ids in enumerate(
+                    chunk_list(self.docs_sales_ids, 30000)):
+                # Создаем подзапрос для текущей части
+                subq = (
+                    select(docs_sales)
+                    .where(docs_sales.c.id.in_(chunk_ids))
+                    .subquery("sub")
+                )
+
+                # Добавляем джоины
+                query = self._add_table_join(subq, tag)
+
+                # Применяем обработчики критериев
+                for criteria in group:
+                    data = self.criteria_data.get(criteria)
+                    handler = self.criteria_config.get(criteria, {}).get(
+                        "handler")
+                    if handler:
+                        query = handler(query, data, subq)
+
+                # Выполняем запрос для части
+                try:
+                    chunk_rows = await database.fetch_all(query)
+                    all_filtered_rows.extend(chunk_rows)
+                except Exception as e:
+                    logger.error(f"Error processing chunk {chunk_num + 1}: {e}")
+                    raise
+
+            # Обновляем список ID результатами из всех частей
+            docs_sales_rows = all_filtered_rows
             self.docs_sales_ids = [row.id for row in docs_sales_rows]
 
         return self.docs_sales_ids
@@ -155,20 +188,34 @@ class SegmentCriteriaQuery:
     async def collect_ids(self):
         docs_sales_ids = await self.calculate()
 
-        query = select(docs_sales.c.id, docs_sales.c.contragent).where(docs_sales.c.id.in_(docs_sales_ids))
-        rows = await database.fetch_all(query)
         data = {
-            SegmentObjectType.docs_sales.value: [],
-            SegmentObjectType.contragents.value: []
+            SegmentObjectType.docs_sales.value: set(),
+            SegmentObjectType.contragents.value: set()
         }
-        for row in rows:
-            data[SegmentObjectType.docs_sales.value].append(row.id)
-            if not row.contragent:
-                continue
-            data[SegmentObjectType.contragents.value].append(row.contragent)
 
-        data[SegmentObjectType.docs_sales.value] = set(data[SegmentObjectType.docs_sales.value])
-        data[SegmentObjectType.contragents.value] = set(data[SegmentObjectType.contragents.value])
+        # Обрабатываем ID частями
+        for chunk_num, chunk_ids in enumerate(
+                chunk_list(docs_sales_ids, 30000)):
+
+            # Создаем запрос для текущей части
+            query = select(docs_sales.c.id, docs_sales.c.contragent).where(
+                docs_sales.c.id.in_(chunk_ids)
+            )
+
+            try:
+                chunk_rows = await database.fetch_all(query)
+
+                # Обрабатываем результаты части
+                for row in chunk_rows:
+                    data[SegmentObjectType.docs_sales.value].add(row.id)
+                    if row.contragent:
+                        data[SegmentObjectType.contragents.value].add(
+                            row.contragent)
+
+            except Exception as e:
+                logger.error(f"Error processing chunk {chunk_num + 1}: {e}")
+                raise
+
         return data
 
 
