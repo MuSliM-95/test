@@ -3,6 +3,7 @@ import string
 import hashlib
 from datetime import datetime
 from typing import Optional, Union
+import json
 
 import aiohttp
 import math
@@ -849,3 +850,31 @@ def deep_sanitize(obj):
         return [deep_sanitize(v) for v in obj]
     else:
         return sanitize_float(obj)
+
+def coerce_value(v: str):
+    """Приведение строк из query к bool/int/float/list/json."""
+    if v is None:
+        return None
+    s = v.strip()
+    # bool
+    if s.lower() in ("true", "false"):
+        return s.lower() == "true"
+    # int
+    if s.isdigit():
+        try:
+            return int(s)
+        except:
+            pass
+    # float (включая отрицательные)
+    try:
+        if '.' in s or (s.startswith('-') and s[1:].replace('.', '', 1).isdigit()):
+            return float(s)
+    except:
+        pass
+    # JSON
+    if (s.startswith('{') and s.endswith('}')) or (s.startswith('[') and s.endswith(']')):
+        try:
+            return json.loads(s)
+        except:
+            pass
+    return s

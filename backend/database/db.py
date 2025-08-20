@@ -124,6 +124,8 @@ class OrderStatus(str, ENUM):
     collected = "collected"
     picked = "picked"
     delivered = "delivered"
+    closed = "closed"
+    success = "success"
 
 
 class SegmentStatus(str, ENUM):
