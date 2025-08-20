@@ -17,7 +17,7 @@ class GetAllCategoriesView:
         self,
         token: str, limit: int = 100, offset: int = 0
     ):
-        """Получение списка категорий"""
+        """Получение списка категорий, отсортированных по дате создания"""
         user = await get_user_by_token(token)
 
         s3_client = self.__s3_factory()
@@ -32,7 +32,7 @@ class GetAllCategoriesView:
             .where(
                 categories.c.cashbox == user.cashbox_id,
                 categories.c.is_deleted.is_not(True),
-            )
+            ).order_by(categories.c.created_at.desc())
             .limit(limit)
             .offset(offset)
         )

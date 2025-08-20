@@ -17,11 +17,45 @@ router = APIRouter(tags=["categories"])
 @router.get("/categories/{idx}/", response_model=schemas.Category)
 async def get_category_by_id(token: str, idx: int):
     """Получение категории по ID"""
+    
     user = await get_user_by_token(token)
-    category_db = await get_entity_by_id(categories, idx, user.id)
+    category_db = await get_entity_by_id(categories, idx, user.cashbox_id)
     category_db = datetime_to_timestamp(category_db)
     return category_db
 
+
+@router.delete("/categories/{idx}/photo", response_model=schemas.Category)
+async def delete_category_photo(token: str, idx: int):
+    """Установка в pictures is_deleted=True и установка category.photo_id = None"""
+    user = await get_user_by_token(token)
+    # Делаем запрос к categories, чтобы получить photo_id до удаления
+    query = categories.select().where(categories.c.id==idx,
+                                      categories.c.cashbox==user.cashbox_id,
+                                      categories.c.photo_id.is_not(None))
+    record_photo_id = await database.fetch_one(query)
+    if not record_photo_id:
+        raise HTTPException(status_code=404, detail="Категория не найдена или вам не принадлежит")
+    photo_id = record_photo_id.get("photo_id")
+    
+    query = categories.update().where(categories.c.id == idx,
+                                      categories.c.cashbox==user.cashbox_id,
+                                      categories.c.photo_id.is_not(None)).values({"photo_id": None}).returning(categories)
+    category_db = await database.fetch_one(query)
+
+    query = pictures.update().where(pictures.c.id == photo_id,
+                                    pictures.c.cashbox==user.cashbox_id,
+                                    pictures.c.is_deleted.is_not(True)
+                                    ).values({"is_deleted": True}).returning(pictures)
+    
+    picture_db = await database.fetch_one(query)
+
+    if not picture_db:
+        raise HTTPException(status_code=404, detail="photo_id удалена, но фотография не найдена или вам не принадлежит")
+    
+    category_db = datetime_to_timestamp(category_db)
+
+    return category_db
+ 
 
 async def build_hierarchy(data, parent_id = None, name = None):
     @cached(max_size=128, algorithm=CachingAlgorithmFlag.FIFO, thread_safe=False)
@@ -104,6 +138,8 @@ async def new_categories(token: str, categories_data: schemas.CategoryCreateMass
         raise HTTPException(400, "Не были добавлены следующие записи: " + ", ".join(exceptions))
 
     return categories_db
+
+
 
 
 @router.patch("/categories/{idx}/", response_model=schemas.Category)

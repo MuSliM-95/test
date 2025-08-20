@@ -1,0 +1,257 @@
+---
+slug: segments-api
+title: API создание сегмента
+authors:
+  name: Alexandr F.
+  title: Команда Tablecrm.com
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# API создание сегмента
+
+## Пример запроса
+
+```json
+{
+  "name": "Активные пользователи за месяц",
+  "type_of_update": "cron",
+  "update_settings": {
+    "interval_minutes": 5
+  },
+  "is_archived": false,
+  "criteria": {},
+  "actions": {}
+}
+```
+
+> **Обязательные поля:**
+> - `name` — обязательно.
+> - `type_of_update` — обязательно, возможные значения: `"cron"` или `"request"`.
+> - При выборе `cron` необходимо указать поле `"update_settings": { "interval_minutes": 5 }` (минимальное значение — 5 минут).
+
+---
+
+## Критерии фильтрации
+
+> **Общие параметры:**
+> - `gte` — >=
+> - 'lte' - <=
+> - 'eq' - ==
+> - дата должна быть указана в формате YYYY-MM-DD
+
+<Tabs>
+<TabItem value="purchases" label="Покупки">
+
+```json
+{
+  "purchases": {
+    "total_amount": {"gte": 0, "lte": 0, "eq": 0},
+    "count": {"gte": 0, "lte": 0, "eq": 0},
+    "last_purchase_days_ago": {"gte": 0, "lte": 0, "eq": 0},
+    "amount_per_check": {"gte": 0, "lte": 0, "eq": 0},
+    "date_range": {
+      "gte": "string",
+      "lte": "string",
+      "gte_seconds_ago": 0,
+      "lte_seconds_ago": 0
+    },
+    "categories": ["string"],
+    "nomenclatures": ["string"]
+  }
+}
+```
+
+> **Все поля отностся к клиенту:**
+> - `total_amount` — Общая сумма покупок клиента
+> - 'count' - Количество покупок (документов покупок) клиента
+> - 'last_purchase_days_ago' - Последняя покупка * дней назад
+> - 'amount_per_check' - Сумма чека
+> - 'date_range' - Даты покупок
+> - 'categories' - Категории в которых находятся товары в документах продаж. Частичное совпадение ilike(f"%{cat}%")
+> - 'nomenclatures' - Наименование товаров в документах продаж. Частичное совпадение ilike(f"%{nom}%")
+
+</TabItem>
+<TabItem value="loyality" label="Лояльность">
+
+```json
+{
+  "loyality": {
+    "balance": {"gte": 0, "lte": 0, "eq": 0, "is_none": true},
+    "expires_in_days": {"gte": 0, "lte": 0, "eq": 0, "is_none": true}
+  }
+}
+```
+
+> **Все поля отностся к клиенту:**
+> - `balance` — Баланс бонусного кошелька
+> - 'expires_in_days' - через сколько дней сгорают бонусы
+
+</TabItem>
+<TabItem value="created_at" label="Дата создания">
+
+```json
+{
+  "created_at": {
+    "gte": "string",
+    "lte": "string",
+    "gte_seconds_ago": 0,
+    "lte_seconds_ago": 0
+  }
+}
+```
+
+> **Поле относится к документу продаж:**
+> - `created_at` — Дата создания
+
+</TabItem>
+<TabItem value="picker" label="Сборщик">
+
+```json
+{
+  "picker": {
+    "assigned": true,
+    "start": {
+      "gte": "string",
+      "lte": "string",
+      "gte_seconds_ago": 0,
+      "lte_seconds_ago": 0
+    },
+    "finish": {
+      "gte": "string",
+      "lte": "string",
+      "gte_seconds_ago": 0,
+      "lte_seconds_ago": 0
+    }
+  }
+}
+```
+
+> **Поля относятся к полям сборщика и датах старта и окончания сборки в документах продаж:**
+> - `assigned` — Назначен ли сборщик. true or false
+> - 'start' - Дата начала сборки
+> - 'finish' - Дата окончания сборки
+
+</TabItem>
+<TabItem value="courier" label="Курьер">
+
+```json
+{
+  "courier": {
+    "assigned": true,
+    "start": {
+      "gte": "string",
+      "lte": "string",
+      "gte_seconds_ago": 0,
+      "lte_seconds_ago": 0,
+      "is_none": true
+    },
+    "finish": {
+      "gte": "string",
+      "lte": "string",
+      "gte_seconds_ago": 0,
+      "lte_seconds_ago": 0,
+      "is_none": true
+    }
+  }
+}
+```
+
+> **Поля относятся к полям доставщика и датах старта и окончания доставки в документах продаж:**
+> - `assigned` — Назначен ли сборщик. true or false
+> - 'start' - Дата начала сборки
+> - 'finish' - Дата окончания сборки
+
+</TabItem>
+<TabItem value="other" label="Прочее">
+
+```json
+{
+  "tags": ["string"],
+  "delivery_required": true
+}
+```
+
+</TabItem>
+</Tabs>
+
+---
+
+## Действия
+
+<Tabs>
+<TabItem value="add_existed_tags" label="Добавить существующие теги">
+
+Позволяет добавить ранее созданные теги по именам тегов к выбранным клиентам.
+
+```json
+{
+  "add_existed_tags": {
+    "name": ["string"]
+  }
+}
+```
+
+</TabItem>
+<TabItem value="remove_tags" label="Удалить теги">
+
+Позволяет удалить теги клиентов по именам
+
+```json
+{
+  "remove_tags": {
+    "name": ["string"]
+  }
+}
+```
+
+</TabItem>
+<TabItem value="client_tags" label="Добавить клиентские теги">
+
+Позволяет создать тег и привязать его к клиенту. Если тег с таким именем существует - привязывается уже существующий тег.
+
+```json
+{
+  "client_tags": {
+    "tags": [
+      {
+        "name": "string",
+        "emoji": "string",
+        "color": "#a728c4",
+        "description": "string"
+      }
+    ]
+  }
+}
+
+```
+
+**Формат поля color - #FFFFFF**
+
+</TabItem>
+<TabItem value="send_tg_notification" label="Отправить уведомление в Telegram">
+
+Позволяет отправить сообщение пользователям кассы с определенным тегом. Или отправить сообщение сборщику или доставщику
+
+```json
+{
+  "send_tg_notification": {
+    "trigger_on_new": true,
+    "message": "string",
+    "user_tag": "string",
+    "send_to": "picker"
+  }
+}
+```
+
+**'send_to' - может быть picker или courier. Назначенные пользователи кассы на доставку или сборку**
+> **Требования к полям:**
+> - `message` — Обязательное поле. Сообщение которое будет отправлено в Телеграм
+> - 'user_tag' - Тег юзера кассы кому оно будет отправлено.
+> -  'send_to' - может быть picker или courier. Назначенные пользователи кассы на доставку или сборку
+
+**Одно из полей send_to или user_tag должно быть указано для фильтрации пользователей кому отправлять сообщение**
+
+</TabItem>
+</Tabs>

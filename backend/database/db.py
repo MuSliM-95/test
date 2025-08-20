@@ -79,7 +79,6 @@ class TypeCustomField(str, ENUM):
     Contact = "Контакт"
     Lead = "Сделка"
 
-
 class BookingStatus(str, ENUM):
     new = "Новый"
     confirmed = "Подтвержден"
@@ -118,20 +117,17 @@ class TgBillStatus(str, ENUM):
     PAID = "PAID"
     ERROR = "ERROR"
 
-
 class TgBillApproveStatus(str, ENUM):
     NEW = "NEW"
     APPROVED = "APPROVED"
     CANCELED = "CANCELED"
-
 
 class NomenclatureCashbackType(str, ENUM):
     percent = "percent"
     const = "const"
     no_cashback = "no_cashback"
     lcard_cashback = "lcard_cashback"
-
-
+    
 class OrderStatus(str, ENUM):
     received = "received"
     processed = "processed"
@@ -147,13 +143,18 @@ class SegmentStatus(str, ENUM):
     calculated = "calculated"
 
 
-class SegmentStatusHistory(str, ENUM):
-    added = "added"
-    deleted = "deleted"
-
-
 metadata = sqlalchemy.MetaData()
 Base = declarative_base(metadata=metadata)
+
+cashbox_settings = sqlalchemy.Table(
+    "cashbox_settings",
+    metadata,
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("require_photo_for_writeoff", Boolean, nullable=False, server_default=sqlalchemy.false()),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("is_deleted", Boolean, nullable=False, server_default=sqlalchemy.false()),
+)
 
 yookassa_install = sqlalchemy.Table(
     "yookassa_install",
@@ -876,6 +877,8 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("is_owner", Boolean, default=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("timezone", String),
+    sqlalchemy.Column("payment_past_edit_days", Integer)
 )
 
 contragents = sqlalchemy.Table(
@@ -1223,6 +1226,8 @@ docs_sales = sqlalchemy.Table(
     
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+
+    sqlalchemy.Column("priority", Integer, nullable=True)
 )
 
 docs_sales_tags = sqlalchemy.Table(
@@ -1985,7 +1990,7 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("criteria", JSON, nullable=False),
     sqlalchemy.Column("actions", JSON, nullable=True),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), index=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True)),
     sqlalchemy.Column("type_of_update", String, nullable=False),
@@ -1993,30 +1998,29 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
     sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
     sqlalchemy.Column("is_archived", Boolean, server_default='false', nullable=False),
-    sqlalchemy.Column("selection_field", String, nullable=True),
-    sqlalchemy.Column("current_ids", ARRAY(item_type=Integer), nullable=True),
-    sqlalchemy.Column("last_added_ids", ARRAY(item_type=Integer), nullable=True),
-    sqlalchemy.Column("last_removed_ids", ARRAY(item_type=Integer), nullable=True),
-
-
+    sqlalchemy.Column("is_deleted", Boolean, server_default='false', nullable=False),
 )
-client_segments = sqlalchemy.Table(
-    "client_segments",
+
+
+class SegmentObjectType(enum.Enum):
+    docs_sales = "docs_sales"
+    contragents = "contragents"
+
+
+segment_objects = sqlalchemy.Table(
+    "segment_objects",
     metadata,
     sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("segment_id", ForeignKey("segments.id"), nullable=False),
-    sqlalchemy.Column("contragent_id", ForeignKey("contragents.id")),
+    sqlalchemy.Column("segment_id", BigInteger, ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("object_id", BigInteger, nullable=False, index=True),
+    sqlalchemy.Column("object_type", Enum(SegmentObjectType, name="segment_object_type"), nullable=False, index=True),
+    sqlalchemy.Column("valid_from", DateTime(timezone=True), nullable=False),
+    sqlalchemy.Column("valid_to", DateTime(timezone=True), nullable=True),
+    sqlalchemy.UniqueConstraint("segment_id", "object_id", "object_type", "valid_from", "valid_to", name="uq_svo_unique_object_per_move"),
 )
 
-client_segment_history = sqlalchemy.Table(
-    "client_segment_history",
-    metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("segment_id", ForeignKey("segments.id"), nullable=False),
-    sqlalchemy.Column("contragent_id", ForeignKey("contragents.id")),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
-    sqlalchemy.Column("status", Enum(SegmentStatusHistory), nullable=False),
-)
+Index("ix_svo_segment_valid_from", segment_objects.c.segment_id, segment_objects.c.valid_from)
+Index("ix_svo_segment_valid_to", segment_objects.c.segment_id, segment_objects.c.valid_to)
 
 
 user_permissions = sqlalchemy.Table(
@@ -2073,6 +2077,20 @@ contragents_tags = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint("tag_id", "contragent_id", name="unique_tag_id_contragent_id"),
 )
 
+segments_tags = sqlalchemy.Table(
+    "segments_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
+    sqlalchemy.Column("segment_id", Integer, ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
+    sqlalchemy.Column("created_at", DateTime(timezone=True),
+                      server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True),
+                      server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint("tag_id", "segment_id", name="unique_tag_id_segment_id"),
+)
+
 
 amo_lead_contacts = sqlalchemy.Table(
     "amo_lead_contacts",
@@ -2090,6 +2108,33 @@ amo_lead_contacts = sqlalchemy.Table(
         "lead_id",
         "contact_id",
         name="uq_amo_lead_contacts_group_lead_contact",
+    ),
+)
+
+amo_webhooks = sqlalchemy.Table(
+    "amo_webhooks",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column("amo_id", BigInteger),
+    sqlalchemy.Column("created_by", BigInteger),
+    sqlalchemy.Column("created_at", Integer),
+    sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("sort", Integer),
+    sqlalchemy.Column("disabled", Boolean, default=False),
+    sqlalchemy.Column("destination", String),
+    sqlalchemy.Column(
+        "settings",
+        ARRAY(String()),
+        nullable=False,
+        default=list,
+        server_default=text("'{}'::text[]"),
+    ),
+
+    UniqueConstraint(
+        "amo_install_group_id",
+        "amo_id",
+        name="uq_amo_webhooks_amo_install_group_id_amo_id",
     ),
 )
 

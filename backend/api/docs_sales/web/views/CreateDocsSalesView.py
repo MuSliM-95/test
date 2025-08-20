@@ -208,6 +208,9 @@ class CreateDocsSalesView:
 
                 last_number_by_org[doc.organization] = number_str
 
+            if doc.priority is not None and (doc.priority < 0 or doc.priority > 10):
+                raise HTTPException(400, "Приоритет должен быть от 0 до 10")   
+
             doc_dict = {
                 "number": number_str,
                 "dated": doc.dated,
@@ -224,7 +227,8 @@ class CreateDocsSalesView:
                 "created_by": user.id,
                 "sales_manager": doc.sales_manager or user.id,
                 "cashbox": user.cashbox_id,
-                "is_deleted": False
+                "is_deleted": False,
+                "priority": doc.priority,
             }
             docs_rows.append(doc_dict)
 
@@ -511,10 +515,21 @@ class CreateDocsSalesView:
                     "current_amount": prev - qty,
                     "cashbox_id": user.cashbox_id,
                 })
-            await database.execute_many(warehouse_balances.insert(), wb_to_insert)
+
+            # Выбираем номенклатуры, которые являются ("product", "property"):
+            filtered_wb_to_insert = []
+            for record in wb_to_insert:
+                nomenclature_id = record["nomenclature_id"]
+                nomenclature_db = nomenclature_cache.get(nomenclature_id)
+                if nomenclature_db and nomenclature_db.type in ("product", "property"):
+                    filtered_wb_to_insert.append(record)
+            # Вставляем только те записи, которые соответствуют условиям
+            if filtered_wb_to_insert:
+                await database.execute_many(warehouse_balances.insert(), filtered_wb_to_insert)
 
         for payload, goods in out_docs:
             asyncio.create_task(create_warehouse_docs(token, {**payload, "goods": goods}, user.cashbox_id))
+
 
         asyncio.create_task(raschet(user, token))
         for card_id in set(list(card_withdraw_total) + list(card_accrual_total)):
@@ -608,32 +623,33 @@ class CreateDocsSalesView:
                                 ))
                 sum_goods_diff = [decimal.Decimal(item.amount.value)*int(item.quantity) for item in payment_items_data]
 
-                await yookassa_api_service.api_create_payment(
-                    user.cashbox_id,
-                    data.warehouse,
-                    created["id"],
-                    payment_id.get("id"),
-                    PaymentCreateModel(
-                        amount = AmountModel(
-                            value = str(round(sum(sum_goods_diff), 2)),
-                            currency = "RUB"
-                        ),
-                        description = f"Оплата по документу {created['number']}",
-                        capture = True,
-                        receipt = ReceiptModel(
-                            customer = CustomerModel(
-                                full_name = contragent_data.name,
-                                email = contragent_data.email,
-                                phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
+                if round(sum(sum_goods_diff), 2):
+                    await yookassa_api_service.api_create_payment(
+                        user.cashbox_id,
+                        data.warehouse,
+                        created["id"],
+                        payment_id.get("id"),
+                        PaymentCreateModel(
+                            amount = AmountModel(
+                                value = str(round(sum(sum_goods_diff), 2)),
+                                currency = "RUB"
                             ),
-                            items = payment_items_data,
-                        ),
-                        confirmation = ConfirmationRedirect(
-                            type = "redirect",
-                            return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+                            description = f"Оплата по документу {created['number']}",
+                            capture = True,
+                            receipt = ReceiptModel(
+                                customer = CustomerModel(
+                                    full_name = contragent_data.name,
+                                    email = contragent_data.email,
+                                    phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
+                                ),
+                                items = payment_items_data,
+                            ),
+                            confirmation = ConfirmationRedirect(
+                                type = "redirect",
+                                return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+                            )
                         )
                     )
-                )
 
         # юкасса
 

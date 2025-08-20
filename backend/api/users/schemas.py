@@ -15,6 +15,8 @@ class CBUsers(BaseModel):
     created_at: int
     updated_at: int
     tags: Optional[List[str]]
+    timezone: Optional[str]
+    payment_past_edit_days: Optional[int]
 
     class Config:
         orm_mode = True

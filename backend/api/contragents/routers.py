@@ -14,7 +14,7 @@ from database.db import database, users_cboxes_relation, contragents, tags, cont
 import api.contragents.schemas as ca_schemas
 import functions.filter_schemas as filter_schemas
 
-from functions.helpers import get_filters_ca
+from functions.helpers import get_filters_ca, clear_phone_number
 from datetime import datetime
 
 router = APIRouter(tags=["contragents"])
@@ -126,12 +126,23 @@ async def create_contragent(token: str, ca_body: Union[ca_schemas.ContragentCrea
                             phone_number = update_dict['phone']
                             is_phone_formatted = False
 
-                    q = (
-                        contragents.select()
-                        .where(
-                            contragents.c.cashbox == user.cashbox_id, contragents.c.phone == phone_number
+                    normalized_phone = clear_phone_number(phone_number)
+                    if normalized_phone:
+                        q = (
+                            contragents.select()
+                            .where(
+                                contragents.c.cashbox == user.cashbox_id,
+                                func.regexp_replace(contragents.c.phone, r'[^\d]', '', 'g') == normalized_phone
+                            )
                         )
-                    )
+                    else:
+                        q = (
+                            contragents.select()
+                            .where(
+                                contragents.c.cashbox == user.cashbox_id, contragents.c.phone == phone_number
+                            )
+                        )
+                        
                     contr = await database.fetch_one(q)
                     if contr:
                         continue

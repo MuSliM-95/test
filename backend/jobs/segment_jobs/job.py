@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
+import time
 
 from database.db import database, segments
 from segments.main import update_segment_task
 
 from sqlalchemy import select, cast, func, Integer, and_, or_
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql.psycopg2 import dialect
+
+from segments.logger import logger
 
 
 async def get_segment_ids():
@@ -23,6 +24,7 @@ async def get_segment_ids():
         and_(
             segments.c.type_of_update == 'cron',
             segments.c.is_archived.isnot(True),
+            segments.c.is_deleted.isnot(True),
             segments.c.update_settings['interval_minutes'].isnot(None),
             or_(segments.c.updated_at.is_(None),
                 segments.c.updated_at <= func.now() - func.make_interval(
@@ -36,9 +38,7 @@ async def get_segment_ids():
 
 async def segment_update():
     segment_ids = await get_segment_ids()
+    start = time.time()
     for segment_id in segment_ids:
         await update_segment_task(segment_id)
-
-
-
-
+    logger.info(f'Segments updated in {time.time() - start:.2f} seconds. Total segments: {len(segment_ids)}')

@@ -35,12 +35,11 @@ s3_data = {
 bucket_name = "5075293c-docs_generated"
 
 
-
 @router.get("/pictures/{idx}/", response_model=schemas.Picture)
 async def get_picture_by_id(token: str, idx: int):
     """Получение картинки по ID"""
     user = await get_user_by_token(token)
-    picture_db = await get_entity_by_id(pictures, idx, user.id)
+    picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
     picture_db = datetime_to_timestamp(picture_db)
     return picture_db
 
@@ -176,7 +175,7 @@ async def new_picture(
 
     query = pictures.insert().values(picture_values)
     picture_id = await database.execute(query)
-
+    
     query = pictures.select().where(
         pictures.c.id == picture_id,
         pictures.c.owner == user.id,
@@ -211,7 +210,7 @@ async def edit_picture(
 ):
     """Редактирование картинки"""
     user = await get_user_by_token(token)
-    picture_db = await get_entity_by_id(pictures, idx, user.id)
+    picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
     picture_values = picture.dict(exclude_unset=True)
 
     if picture_values:
@@ -221,7 +220,7 @@ async def edit_picture(
             .values(picture_values)
         )
         await database.execute(query)
-        picture_db = await get_entity_by_id(pictures, idx, user.id)
+        picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
 
     picture_db = datetime_to_timestamp(picture_db)
 
@@ -238,7 +237,7 @@ async def delete_picture(token: str, idx: int):
     """Удаление картинки"""
     user = await get_user_by_token(token)
 
-    await get_entity_by_id(pictures, idx, user.id)
+    await get_entity_by_id(pictures, idx, user.cashbox_id)
 
     query = (
         pictures.update()

@@ -5,10 +5,11 @@ from datetime import datetime
 from typing import Optional, Union
 
 import aiohttp
+import math
 import pytz
 from databases.backends.postgres import Record
 from fastapi import HTTPException
-from sqlalchemy import Table, cast, String, and_, or_
+from sqlalchemy import Table, cast, String, and_, or_, func
 
 from database.db import articles
 
@@ -356,7 +357,14 @@ def get_filters_ca(table, filters):
                 filters_list.append(table.c.inn.ilike(r"%{}%".format(value)))
         elif filter == "phone":
             if value:
-                filters_list.append(table.c.phone.ilike(r"%{}%".format(value)))
+                normalized_search_phone = clear_phone_number(value)
+                if normalized_search_phone:
+                    normalized_phone_in_db = func.regexp_replace(table.c.phone, r'[^\d]', '', 'g')
+                    filters_list.append(
+                        normalized_phone_in_db.ilike(f"%{normalized_search_phone}%")
+                    )
+                else:
+                    filters_list.append(table.c.phone.ilike(r"%{}%".format(value)))
         elif filter == "external_id":
             if value:
                 filters_list.append(table.c.external_id.ilike(r"%{}%".format(value)))
@@ -825,3 +833,19 @@ async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
     ))
     article_exists = await database.fetch_all(check_query)
     return True if article_exists else False
+
+
+def sanitize_float(value):
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None 
+    return value
+
+        
+def deep_sanitize(obj):
+    if isinstance(obj, dict):
+        return {k: deep_sanitize(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [deep_sanitize(v) for v in obj]
+    else:
+        return sanitize_float(obj)
