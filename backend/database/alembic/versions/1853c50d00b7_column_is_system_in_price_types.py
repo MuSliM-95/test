@@ -1,7 +1,7 @@
 """column_is_system_in_price_types
 
 Revision ID: 1853c50d00b7
-Revises: 7f34773f5e73
+Revises: f4d18b4db9a1
 Create Date: 2025-08-09 15:06:49.136476
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '1853c50d00b7'
-down_revision = 'ded27e5f734b'
+down_revision = 'f4d18b4db9a1'
 branch_labels = None
 depends_on = None
 
