@@ -1,8 +1,13 @@
+import asyncio
 import json
 
 from api.docs_sales.routers import generate_and_save_order_links
 
-from database.db import docs_sales_delivery_info, database
+from database.db import (
+    docs_sales_delivery_info, database, docs_sales, warehouses, users,
+    users_cboxes_relation, docs_sales_goods
+)
+from sqlalchemy import select, func
 
 
 def format_contragent_text_notifications(action: str, segment_name: str, name: str, phone: str):
@@ -15,10 +20,49 @@ def format_contragent_text_notifications(action: str, segment_name: str, name: s
 
 async def create_replacements(order_id:int) -> dict:
     replacements = {}
-    await link_replacements(replacements, order_id)
-    await create_delivery_info_text(replacements, order_id)
+    await asyncio.gather(
+        add_warehouse_info_to_replacements(replacements, order_id),
+        add_manager_info_to_replacements(replacements, order_id),
+        add_docs_sales_goods_info_to_replacements(replacements, order_id),
+        link_replacements(replacements, order_id),
+        create_delivery_info_text(replacements, order_id)
+    )
     return replacements
 
+
+async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
+    data = {}
+    query = warehouses.select().join(docs_sales, docs_sales.c.warehouse == warehouses.c.id).where(docs_sales.c.id == order_id)
+    row = await database.fetch_one(query)
+    if row:
+        data["warehouse"] = "\n"
+        if row.name:
+            data["warehouse"] += f"Склад: <b>{row.name}</b>\n"
+        if row.address:
+            data["warehouse"] += f"Адрес склада:\n {row.address}\n"
+        if row.phone:
+            data["warehouse"] += f"Телефон: {row.phone}\n"
+    replacements.update(data)
+
+async def add_manager_info_to_replacements(replacements:dict, order_id:int):
+    data = {}
+    order_query = docs_sales.select().where(docs_sales.c.id == order_id)
+    order = await database.fetch_one(order_query)
+    if not order:
+        return
+    data["order_sum"] = f"\nСумма заказа: {order.sum}\n"
+    query = users.select().join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
+    user = await database.fetch_one(query)
+    if user:
+        data["manager"] = "\n<b>Менеджер:</b>\n"
+        if user.first_name:
+            data["manager"] += f"{user.first_name} "
+        if user.last_name:
+            data["manager"] += f"{user.last_name}"
+        if user.phone_number:
+            data["manager"] += f"\nТелефон: {user.phone_number}\n"
+
+    replacements.update(data)
 
 async def link_replacements(replacements, order_id):
     data = {}
@@ -36,16 +80,24 @@ async def create_delivery_info_text(replacements: dict, docs_sales_id: int):
     if delivery_info is None:
         return data
     if delivery_info.address:
-        data["delivery_address"] = f"\n<b>Адрес доставки:</b>\n{delivery_info.address}\n\n"
+        data["delivery_address"] = f"\n<b>Адрес доставки:</b>\n{delivery_info.address}\n"
     if delivery_info.note:
-        data["delivery_note"] = f"\n<b>Комментарий к доставке:</b>\n{delivery_info.note}\n\n"
+        data["delivery_note"] = f"\n<b>Комментарий к доставке:</b>\n{delivery_info.note}\n"
     if delivery_info.delivery_date:
-        data["delivery_date"] = f"\n<b>Дата доставки:</b>\n{delivery_info.delivery_date}\n\n"
+        data["delivery_date"] = f"\n<b>Дата доставки:</b>\n{delivery_info.delivery_date}\n"
     if delivery_info.recipient:
         reciient_data = json.loads(delivery_info.recipient)
         data["delivery_recipient"] = (
-            f"\n<b>Получатель:</b>\n{reciient_data.get('name')}\n\n"
-            f"<b>Телефон:</b>\n{reciient_data.get('phone')}\n\n"
+            f"\n<b>Получатель:</b>\n{reciient_data.get('name')}\n"
+            f"<b>Телефон:</b>\n{reciient_data.get('phone')}\n"
         )
     replacements.update(data)
 
+
+async def add_docs_sales_goods_info_to_replacements(replacements:dict, docs_sales_id:int):
+    data = {}
+    query = select(func.count(docs_sales_goods.c.id)).where(docs_sales_goods.c.docs_sales_id == docs_sales_id)
+    count = await database.execute(query)
+    if count:
+        data["goods_count"] = f"\nКоличество товаров в заказе: {count}"
+    replacements.update(data)
