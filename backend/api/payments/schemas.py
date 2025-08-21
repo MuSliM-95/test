@@ -137,11 +137,11 @@ class PaymentInList(BaseModel):
     name: Optional[str]
     external_id: Optional[str]
     tags: Optional[str]
-    amount_without_tax: float
+    amount_without_tax: Optional[float]
     article: Optional[str]
     article_id: Optional[int]
     project_id: Optional[int]
-    amount: float
+    amount: Optional[float]
     description: Optional[str]
     paybox: int
     paybox_to: Optional[int]
