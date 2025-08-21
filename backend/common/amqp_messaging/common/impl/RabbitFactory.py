@@ -26,10 +26,18 @@ class RabbitFactory(IRabbitFactory):
         amqp_connection = AmqpConnection(
             settings=self.__settings
         )
-        await amqp_connection.install()
+        try:
+            await amqp_connection.install()
+        except Exception as e:
+            print("ошибка в install", e)
+            raise e
 
-        channels: Dict[str, AbstractRobustChannel] = {}
-        channels[f"publication"] = aio_pika.abc.AbstractChannel = await amqp_connection.get_channel()
+        try:
+            channels: Dict[str, AbstractRobustChannel] = {}
+            channels[f"publication"] = aio_pika.abc.AbstractChannel = await amqp_connection.get_channel()
+        except Exception as e:
+            print('ошибка в каналах', e)
+            raise e
 
         rabbit_channel = RabbitChannel(
             channels=channels,
