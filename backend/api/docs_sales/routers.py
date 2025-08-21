@@ -1478,6 +1478,8 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                 if paid_lt > 0:
                     paybox_q = loyality_cards.select().where(loyality_cards.c.id == lt)
                     payboxes = await database.fetch_one(paybox_q)
+                    lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
+                    lcard = await database.fetch_one(lcard_q)
 
                     rubles_body = {
                         "loyality_card_id": lt,
