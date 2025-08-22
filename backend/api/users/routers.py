@@ -4,13 +4,17 @@ from functions import users as func
 from database.db import database, users, users_cboxes_relation, user_permissions, pboxes
 from sqlalchemy import select, func as fsql, or_, and_
 
+from functions.helpers import raise_wrong_token
+
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/", response_model=schemas.CBUsers)
 async def get_user_by_token_route(token: str):
-    return await func.get_user_by_token(token=token)
-
+    res = await func.get_user_by_token(token=token)
+    if res:
+        return res
+    raise_wrong_token()
 
 @router.get("/list/", response_model=schemas.CBUsersListShort)
 async def get_user_list(token: str, name: str = None, limit: int = 100, offset: int = 0):
