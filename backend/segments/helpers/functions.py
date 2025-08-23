@@ -1,6 +1,5 @@
 import asyncio
 import json
-from datetime import datetime
 
 from api.docs_sales.routers import generate_and_save_order_links
 
@@ -37,13 +36,12 @@ async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
     query = warehouses.select().join(docs_sales, docs_sales.c.warehouse == warehouses.c.id).where(docs_sales.c.id == order_id)
     row = await database.fetch_one(query)
     if row:
-        data["warehouse"] = "\n"
         if row.name:
-            data["warehouse"] += f"Склад: <b>{row.name}</b>\n"
+            data["warehouse_name"] = row.name
         if row.address:
-            data["warehouse"] += f"Адрес склада:\n {row.address}\n"
+            data["warehouse_address"] = row.address
         if row.phone:
-            data["warehouse"] += f"Телефон: {row.phone}\n"
+            data["warehouse_phone"] = row.phone
     replacements.update(data)
 
 async def add_manager_info_to_replacements(replacements:dict, order_id:int):
@@ -55,13 +53,13 @@ async def add_manager_info_to_replacements(replacements:dict, order_id:int):
     query = users.select().join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
     user = await database.fetch_one(query)
     if user:
-        data["manager"] = "<b>Менеджер:</b>\n"
+        data["manager_name"] = ""
         if user.first_name:
-            data["manager"] += f"{user.first_name} "
+            data["manager_name"] += f"{user.first_name} "
         if user.last_name:
-            data["manager"] += f"{user.last_name}"
+            data["manager_name"] += f"{user.last_name}"
         if user.phone_number:
-            data["manager"] += f"\nТелефон: {user.phone_number}\n"
+            data["manager_phone"] = user.phone_number
 
     replacements.update(data)
 
@@ -81,17 +79,16 @@ async def create_delivery_info_text(replacements: dict, docs_sales_id: int):
     if delivery_info is None:
         return data
     if delivery_info.address:
-        data["delivery_address"] = f"<b>Адрес доставки:</b>\n{delivery_info.address}\n"
+        data["delivery_address"] = delivery_info.address
     if delivery_info.note:
-        data["delivery_note"] = f"<b>Комментарий к доставке:</b>\n{delivery_info.note}\n"
+        data["delivery_note"] = delivery_info.note
     if delivery_info.delivery_date:
-        data["delivery_date"] = f"<b>Дата доставки:</b>\n{delivery_info.delivery_date.strftime('%d.%m.%Y %H:%M')}\n"
+        data["delivery_date"] = delivery_info.delivery_date.strftime('%d.%m.%Y %H:%M')
     if delivery_info.recipient:
-        reciient_data = json.loads(delivery_info.recipient)
-        data["delivery_recipient"] = (
-            f"<b>Получатель:</b>\nИмя: {reciient_data.get('name')}\n"
-            f"<b>Телефон:</b> {reciient_data.get('phone')}\n"
-        )
+        recipient_data = json.loads(delivery_info.recipient)
+        data["delivery_recipient_name"] = recipient_data.get('name')
+        data["delivery_recipient_phone"] =recipient_data.get('phone')
+
     replacements.update(data)
 
 
@@ -114,8 +111,8 @@ async def add_docs_sales_goods_info_to_replacements(replacements:dict, docs_sale
                 f" x {good.price} р = {good.quantity * good.price} р\n"
             )
             sum += good.quantity * good.price
-        data["goods_count"] = f"\nКоличество товаров в заказе: {len(goods)}"
-        data["order_sum"] = f"Сумма заказа: {sum}\n"
+        data["goods_count"] = len(goods)
+        data["order_sum"] = sum
     replacements.update(data)
 
 
@@ -129,8 +126,8 @@ async def add_contragent_info_to_replacements(replacements: dict, docs_sales_id:
     )
     contragent = await database.fetch_one(query)
     if contragent:
-        data["contragent"] = f"Заказчик: \nИмя: {contragent.name}\n"
+        data["contragent_name"] = contragent.name
         if contragent.phone:
-            data["contragent"] += f"Телефон: {contragent.phone}\n"
+            data["contragent_phone"] = contragent.phone
 
     replacements.update(data)
