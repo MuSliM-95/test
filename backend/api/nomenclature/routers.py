@@ -7,7 +7,7 @@ import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
     warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups, \
-    nomenclature_attributes, nomenclature_attributes_value
+    nomenclature_attributes, nomenclature_attributes_value, locations
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body, Query
 
@@ -19,8 +19,10 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
+from apps.geocoders.instance import geocoder
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ws_manager import manager
 import memoization
 
@@ -446,46 +448,92 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
     categories_cache = set()
     manufacturers_cache = set()
     units_cache = set()
+    location_cache = set()
     exceptions = []
-    for nomenclature_values in nomenclature_data.dict()["__root__"]:
-        nomenclature_values["cashbox"] = user.cashbox_id
-        nomenclature_values["owner"] = user.id
-        nomenclature_values["is_deleted"] = False
+    async with database.transaction():
+        for nomenclature_values in nomenclature_data.dict()["__root__"]:
+            nomenclature_values["cashbox"] = user.cashbox_id
+            nomenclature_values["owner"] = user.id
+            nomenclature_values["is_deleted"] = False
+    
+            if nomenclature_values.get("category") is not None:
+                if nomenclature_values["category"] not in categories_cache:
+                    try:
+                        await check_entity_exists(categories, nomenclature_values["category"], user.cashbox_id)
+                        categories_cache.add(nomenclature_values["category"])
+                    except HTTPException as e:
+                        exceptions.append(str(nomenclature_values) + " " + e.detail)
+                        continue
+    
+            if nomenclature_values.get("manufacturer") is not None:
+                if nomenclature_values["manufacturer"] not in manufacturers_cache:
+                    try:
+                        await check_entity_exists(manufacturers, nomenclature_values["manufacturer"], user.id)
+                        manufacturers_cache.add(nomenclature_values["manufacturer"])
+                    except HTTPException as e:
+                        exceptions.append(str(nomenclature_values) + " " + e.detail)
+                        continue
+    
+            if nomenclature_values.get("unit") is not None:
+                if nomenclature_values["unit"] not in units_cache:
+                    try:
+                        await check_unit_exists(nomenclature_values["unit"])
+                        units_cache.add(nomenclature_values["unit"])
+                    except HTTPException as e:
+                        exceptions.append(str(nomenclature_values) + " " + e.detail)
+                        continue
+    
+            city = nomenclature_values.get("city", None)
+            address = nomenclature_values.get("address", None)
+            address_fields = {
+                "street": None,
+                "house": None,
+                "apartment": None,
+                "city": None,
+            }
+    
+            if address is not None and city is not None:
+                address = [i.strip() for i in address.split(",")]
+                full_address = f"{city}, {', '.join(address)}"
+                if full_address not in location_cache:
+                    location = await geocoder.validate_address(address=full_address)
+                    if location is False:
+                        exceptions.append(str(nomenclature_values) + f"Address {city}, {', '.join(address)} is not found")
+                        continue
+                    location_cache.add(full_address)
+                address_length = len(address)
+                address_fields["street"] = address[0] if address_length >= 1 else None
+                address_fields["house"] = address[1] if address_length >= 2 else None
+                address_fields["apartment"] = address[2] if address_length >= 3 else None
+                address_fields["city"] = city
+            elif city is not None:
+                if city not in location_cache:
+                    location = await geocoder.validate_address(address=city)
+                    if location is False:
+                        exceptions.append(str(nomenclature_values) + f"City {city} not found") 
+                        continue
+                    location_cache.add(city)
+                address_fields["city"] = city
+    
+            if address_fields.get("city", None):
+                query = (
+                   pg_insert(locations)
+                   .values(**address_fields)
+                   .on_conflict_do_nothing()
+                   .returning(locations.c.id)
+                )
+                location_id = await database.execute(query)
+                nomenclature_values["location"] = location_id
 
-        if nomenclature_values.get("category") is not None:
-            if nomenclature_values["category"] not in categories_cache:
-                try:
-                    await check_entity_exists(categories, nomenclature_values["category"], user.cashbox_id)
-                    categories_cache.add(nomenclature_values["category"])
-                except HTTPException as e:
-                    exceptions.append(str(nomenclature_values) + " " + e.detail)
-                    continue
-
-        if nomenclature_values.get("manufacturer") is not None:
-            if nomenclature_values["manufacturer"] not in manufacturers_cache:
-                try:
-                    await check_entity_exists(manufacturers, nomenclature_values["manufacturer"], user.id)
-                    manufacturers_cache.add(nomenclature_values["manufacturer"])
-                except HTTPException as e:
-                    exceptions.append(str(nomenclature_values) + " " + e.detail)
-                    continue
-
-        if nomenclature_values.get("unit") is not None:
-            if nomenclature_values["unit"] not in units_cache:
-                try:
-                    await check_unit_exists(nomenclature_values["unit"])
-                    units_cache.add(nomenclature_values["unit"])
-                except HTTPException as e:
-                    exceptions.append(str(nomenclature_values) + " " + e.detail)
-                    continue
-
-        query = nomenclature.insert().values(nomenclature_values)
-        nomenclature_id = await database.execute(query)
-        inserted_ids.add(nomenclature_id)
-
-    query = nomenclature.select().where(nomenclature.c.cashbox == user.cashbox_id, nomenclature.c.id.in_(inserted_ids))
-    nomenclature_db = await database.fetch_all(query)
-    nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+            nomenclature_values.pop("address", None)
+    
+            query = nomenclature.insert().values(nomenclature_values)
+            nomenclature_id = await database.execute(query)
+            inserted_ids.add(nomenclature_id)
+    
+        query = nomenclature.select().where(nomenclature.c.cashbox == user.cashbox_id, nomenclature.c.id.in_(inserted_ids))
+        nomenclature_db = await database.fetch_all(query)
+        nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
     await manager.send_message(
         token,

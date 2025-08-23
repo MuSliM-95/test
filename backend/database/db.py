@@ -564,11 +564,22 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("category", Integer, ForeignKey("categories.id")),
     sqlalchemy.Column("tags", ARRAY(item_type=String), nullable=True),
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
+    sqlalchemy.Column("location", Integer, ForeignKey("locations.id"), nullable=True),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+locations = sqlalchemy.Table(
+    "locations",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("city", String, nullable=False),
+    sqlalchemy.Column("street", String, nullable=True),
+    sqlalchemy.Column("house", String, nullable=True),
+    sqlalchemy.Column("apartment", String, nullable=True),
 )
 
 nomenclature_attributes = sqlalchemy.Table(
