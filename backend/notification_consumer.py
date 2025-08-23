@@ -222,10 +222,11 @@ async def process_notification(message):
                 else:
                     print(f"Failed to send legacy notification to {recipient_id}")
         elif data.get("type") == "segment_notification":
-            await sleep(0.05)
+
             text = data.get("text", "")
             recipients = data.get("recipients", [])
             for recipient_id in recipients:
+                await sleep(0.05)
                 success = await send_notification(recipient_id, text)
                 if success:
                     print(f"Legacy notification sent to {recipient_id}")
