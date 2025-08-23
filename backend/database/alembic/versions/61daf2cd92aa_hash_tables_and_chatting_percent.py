@@ -36,7 +36,6 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['nomenclature_id'], ['nomenclature.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.drop_table('hash')
     op.add_column('nomenclature', sa.Column('chatting_percent', sa.Integer(), nullable=True))
     # ### end Alembic commands ###
 
