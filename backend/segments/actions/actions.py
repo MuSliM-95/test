@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import List
 
 from database.db import (
@@ -139,15 +140,37 @@ class SegmentActions:
 
         await self.add_existed_tags(contragents_ids, {"name": names})
 
+    def _check_recipient_conditions(self, data: dict):
+        now = datetime.now()
+        if data.get("time_range"):
+            pass
+        if data.get("weekdays"):
+            pass
+        if data.get("month_days"):
+            pass
+        if data.get("month_day_modulo"):
+            pass
+        return True
+
+
     async def send_tg_notification(self, order_ids:List[int], data: dict):
         chat_ids = []
         message = data.get("message")
         send_to = data.get("send_to")
         user_tag = data.get("user_tag")
+        recipients = data.get("recipients")
         if not message or (not send_to and not user_tag):
             return
         if send_to is None or send_to not in ["picker", "courier"]:
             chat_ids = await self.get_user_chat_ids_by_tag(user_tag)
+
+        if recipients:
+            for recipient in recipients:
+                if self._check_recipient_conditions(recipient.conditions):
+                    chat_ids.append(
+                        await self.get_user_chat_ids_by_tag(recipient.user_tag)
+                    )
+
         for order_id in order_ids:
             message_text = f'Заказ # - {str(order_id)}\n\n' + message
 
@@ -160,7 +183,7 @@ class SegmentActions:
                 chat_ids = await self.get_courier_chat_id(order_id)
 
             await send_segment_notification(
-                recipient_ids=chat_ids,
+                recipient_ids=set(chat_ids),
                 notification_text=message_text,
                 segment_id=self.segment_obj.id,
             )
