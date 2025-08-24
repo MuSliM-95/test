@@ -141,15 +141,50 @@ class SegmentActions:
         await self.add_existed_tags(contragents_ids, {"name": names})
 
     def _check_recipient_conditions(self, data: dict):
+        """
+        Проверяет, соответствует ли текущее время всем заданным условиям.
+        Возвращает True, если все условия выполнены или не заданы.
+        """
         now = datetime.now()
+
+        # Проверка временного диапазона
         if data.get("time_range"):
-            pass
+            time_range = data["time_range"]
+            current_time = now.time()
+
+            # Парсим время начала и конца
+            from_time = datetime.strptime(time_range["from"], "%H:%M").time()
+            to_time = datetime.strptime(time_range["to"], "%H:%M").time()
+
+            # Проверяем, попадает ли текущее время в диапазон
+            if from_time <= to_time:
+                # Обычный случай: диапазон в пределах одних суток (например, 09:00-17:00)
+                if not (from_time <= current_time <= to_time):
+                    return False
+            else:
+                # Диапазон через полночь (например, 22:00-06:00)
+                if not (current_time >= from_time or current_time <= to_time):
+                    return False
+
+        # Проверка дней недели (1=понедельник, 7=воскресенье)
         if data.get("weekdays"):
-            pass
+            current_weekday = now.isoweekday()  # 1=понедельник, 7=воскресенье
+            if current_weekday not in data["weekdays"]:
+                return False
+
+        # Проверка дней месяца
         if data.get("month_days"):
-            pass
+            current_day = now.day
+            if current_day not in data["month_days"]:
+                return False
+
+        # Проверка модуло дня месяца
         if data.get("month_day_modulo"):
-            pass
+            modulo = data["month_day_modulo"]
+            current_day = now.day
+            if current_day % modulo["divisor"] != modulo["remainder"]:
+                return False
+
         return True
 
 
