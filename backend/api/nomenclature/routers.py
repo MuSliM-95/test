@@ -7,7 +7,7 @@ import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
     warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups, \
-    nomenclature_attributes, nomenclature_attributes_value, locations
+    nomenclature_attributes, nomenclature_attributes_value
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body, Query
 
@@ -448,7 +448,6 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
     categories_cache = set()
     manufacturers_cache = set()
     units_cache = set()
-    location_cache = set()
     exceptions = []
     async with database.transaction():
         for nomenclature_values in nomenclature_data.dict()["__root__"]:
@@ -482,50 +481,6 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
                     except HTTPException as e:
                         exceptions.append(str(nomenclature_values) + " " + e.detail)
                         continue
-    
-            city = nomenclature_values.get("city", None)
-            address = nomenclature_values.get("address", None)
-            address_fields = {
-                "street": None,
-                "house": None,
-                "apartment": None,
-                "city": None,
-            }
-    
-            if address is not None and city is not None:
-                address = [i.strip() for i in address.split(",")]
-                full_address = f"{city}, {', '.join(address)}"
-                if full_address not in location_cache:
-                    location = await geocoder.validate_address(address=full_address)
-                    if location is False:
-                        exceptions.append(str(nomenclature_values) + f"Address {city}, {', '.join(address)} is not found")
-                        continue
-                    location_cache.add(full_address)
-                address_length = len(address)
-                address_fields["street"] = address[0] if address_length >= 1 else None
-                address_fields["house"] = address[1] if address_length >= 2 else None
-                address_fields["apartment"] = address[2] if address_length >= 3 else None
-                address_fields["city"] = city
-            elif city is not None:
-                if city not in location_cache:
-                    location = await geocoder.validate_address(address=city)
-                    if location is False:
-                        exceptions.append(str(nomenclature_values) + f"City {city} not found") 
-                        continue
-                    location_cache.add(city)
-                address_fields["city"] = city
-    
-            if address_fields.get("city", None):
-                query = (
-                   pg_insert(locations)
-                   .values(**address_fields)
-                   .on_conflict_do_nothing()
-                   .returning(locations.c.id)
-                )
-                location_id = await database.execute(query)
-                nomenclature_values["location"] = location_id
-
-            nomenclature_values.pop("address", None)
     
             query = nomenclature.insert().values(nomenclature_values)
             nomenclature_id = await database.execute(query)

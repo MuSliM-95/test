@@ -3,6 +3,7 @@ import asyncio
 from typing import Union
 
 from apps.geocoders.core.base_instance import BaseGeocoder
+from apps.geocoders.schemas import GeocoderSearchResponse
 from apps.geocoders.utils import AsyncLRU
 
 
@@ -43,26 +44,39 @@ class Geoapify(BaseGeocoder):
         except aiohttp.ClientError as e:
             return []
 
-    async def validate_address(self, address: str, limit=1) -> bool:
+    async def validate_address(self, address: str, limit=1) -> Union[GeocoderSearchResponse, None]:
         return await self.search_cache.get(address, func=self._validate_address, address=address, limit=limit)
 
-    async def _validate_address(self, address: str, limit=1) -> bool:
+    async def _validate_address(self, address: str, limit=1) -> Union[GeocoderSearchResponse, None]:
         try:
             session = await self._get_session()
             params = {"text": address, "apiKey": self.api_key, "limit": limit, "lang": "ru"}
             async with session.get(self.search_url, params=params) as resp:
                 resp.raise_for_status()
-                data = await resp.json()
-                features = data.get("features")
-                if features:
-                    return True if features[0]["properties"] else False
-                else:
-                    return False
+                resp = await resp.json()
+                return self._parse_response(resp)
         except aiohttp.ClientError as e:
-            return False
+            return None
+
+    def _parse_response(self, resp) -> Union[GeocoderSearchResponse, None]:
+        features = resp.get("features")
+        if features:
+            properties = features[0].get("properties")
+            return GeocoderSearchResponse(
+                country=properties.get("country"),
+                state=properties.get("state"),
+                city=properties.get("city"),
+                street=properties.get("street"),
+                housenumber=properties.get("housenumber"),
+                timezone=properties.get("timezone", {}).get("name"),
+                postcode=properties.get("postcode"),
+                latitude=properties.get("lat"),
+                longitude=properties.get("lon"),
+            )
+        else:
+            return None
 
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
             self._session = None
-

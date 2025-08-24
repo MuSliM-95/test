@@ -35,8 +35,6 @@ class NomenclatureCreate(BaseModel):
     cashback_value: Optional[int] = 0
     external_id: Optional[str]
     tags: Optional[List[str]] = []
-    city: Optional[str]
-    address: Optional[str]
 
     class Config:
         orm_mode = True
@@ -59,13 +57,6 @@ class NomenclatureCreate(BaseModel):
                 )
 
         return tag_list
-
-    @root_validator()
-    def validate_address(cls, values):
-        city, address = values.get("city", None), values.get("address", None) 
-        if address and not city:
-            raise ValueError("Нельзя указать адрес без города")
-        return values
 
 class NomenclatureCreateMass(BaseModel):
     __root__: List[NomenclatureCreate]
