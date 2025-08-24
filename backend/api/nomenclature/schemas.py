@@ -35,6 +35,9 @@ class NomenclatureCreate(BaseModel):
     cashback_value: Optional[int] = 0
     external_id: Optional[str]
     tags: Optional[List[str]] = []
+    seo_title: Optional[str]
+    seo_description: Optional[str]
+    seo_keywords: Optional[List[str]] = []
 
     class Config:
         orm_mode = True

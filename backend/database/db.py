@@ -571,6 +571,9 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("seo_title", String),
+    sqlalchemy.Column("seo_description", String),
+    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String))
 )
 
 nomenclature_attributes = sqlalchemy.Table(
