@@ -677,6 +677,8 @@ warehouses = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("address", String),
+    sqlalchemy.Column("latitude", Float),
+    sqlalchemy.Column("longitude", Float),
     sqlalchemy.Column("phone", String),
     sqlalchemy.Column("parent", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),

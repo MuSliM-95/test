@@ -131,6 +131,7 @@ from api.distribution_docs.routers import router as distribution_docs_router
 from api.fifo_settings.routers import router as fifo_settings_router
 from api.warehouse_balances.routers import router as warehouse_balances_router
 from api.gross_profit_docs.routers import router as gross_profit_docs_router
+from api.autosuggestion.routers import router as autosuggestion_router
 
 from api.loyality_cards.routers import router as loyality_cards
 from api.loyality_transactions.routers import router as loyality_transactions
@@ -242,6 +243,7 @@ app.include_router(reports_router)
 app.include_router(module_bank_router)
 app.include_router(utm_router)
 app.include_router(segments_router)
+app.include_router(autosuggestion_router)
 
 
 @app.get("/health")

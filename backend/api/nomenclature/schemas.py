@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, root_validator
 from typing import Optional, List
 
 from api.prices.schemas import PriceInList, PriceGetWithNomenclature
@@ -60,7 +60,6 @@ class NomenclatureCreate(BaseModel):
                 )
 
         return tag_list
-
 
 class NomenclatureCreateMass(BaseModel):
     __root__: List[NomenclatureCreate]
