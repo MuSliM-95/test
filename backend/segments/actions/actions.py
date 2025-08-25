@@ -195,8 +195,10 @@ class SegmentActions:
         
         chat_ids = []
         
+        # Проверяем назначенного сборщика
         if order.assigned_picker:
-            if await check_user_on_shift(order.assigned_picker):
+            # Проверяем смену с учетом настроек пользователя
+            if await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
                 query = (
                     select(users.c.chat_id)
                     .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
@@ -206,9 +208,12 @@ class SegmentActions:
                 if picker and picker.chat_id:
                     chat_ids.append(picker.chat_id)
         
-        # Если нет назначенного сборщика или он не на смене
+        # Если нет назначенного сборщика или он не на смене, ищем доступных
         if not chat_ids:
-            available_pickers = await get_available_pickers_on_shift(self.segment_obj.cashbox_id)
+            available_pickers = await get_available_pickers_on_shift(
+                self.segment_obj.cashbox_id, 
+                check_shift_settings=True
+            )
             
             if available_pickers:
                 query = (
@@ -227,6 +232,7 @@ class SegmentActions:
         return chat_ids
 
 
+
     async def get_courier_chat_id(self, order_id: int):
         order_query = docs_sales.select().where(
             and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id)
@@ -239,7 +245,7 @@ class SegmentActions:
         chat_ids = []
         
         if order.assigned_courier:
-            if await check_user_on_shift(order.assigned_courier):
+            if await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
                 query = (
                     select(users.c.chat_id)
                     .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
@@ -249,9 +255,11 @@ class SegmentActions:
                 if courier and courier.chat_id:
                     chat_ids.append(courier.chat_id)
         
-        # Если нет назначенного курьера или он не на смене
         if not chat_ids:
-            available_couriers = await get_available_couriers_on_shift(self.segment_obj.cashbox_id)
+            available_couriers = await get_available_couriers_on_shift(
+                self.segment_obj.cashbox_id,
+                check_shift_settings=True
+            )
             
             if available_couriers:
                 query = (

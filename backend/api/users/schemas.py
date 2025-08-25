@@ -17,6 +17,7 @@ class CBUsers(BaseModel):
     tags: Optional[List[str]]
     timezone: Optional[str]
     payment_past_edit_days: Optional[int]
+    shift_work_enabled: Optional[bool] = False
 
     class Config:
         orm_mode = True
@@ -85,3 +86,33 @@ class UserPermissionsResult(BaseModel):
     last_name: Optional[str]
     username: Optional[str]
     permissions: List[UserPermissionsList]
+
+
+class UserShiftSettings(BaseModel):
+    shift_work_enabled: bool
+
+class UserShiftSettingsResponse(BaseModel):
+    success: bool
+    message: str
+    shift_work_enabled: bool
+
+class UserWithShiftInfo(BaseModel):
+    id: int
+    first_name: str
+    last_name: Optional[str] = ""
+    username: Optional[str] = ""
+    photo: Optional[str] = ""
+    shift_work_enabled: bool = False
+    current_shift_status: Optional[str] = None
+    shift_duration_minutes: Optional[int] = None
+
+class CBUsersListShortWithShifts(BaseModel):
+    result: List[UserWithShiftInfo]
+    count: int
+    on_shift_total: int = 0  # Общее количество на сменах
+
+class ShiftStatistics(BaseModel):
+    on_shift_count: int = 0
+    on_break_count: int = 0
+    total_active: int = 0
+    shift_enabled_users: int = 0

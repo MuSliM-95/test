@@ -1,22 +1,33 @@
 from typing import List, Optional
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, func
 from datetime import datetime, timedelta
 
 from database.db import database, employee_shifts, users_cboxes_relation
 from .schemas import ShiftStatus
 
 
-async def check_user_on_shift(user_id: int) -> bool:
+async def check_user_on_shift(user_id: int, check_shift_settings: bool = False) -> bool:
     """
     Проверить, что пользователь на смене (не на перерыве и не завершил смену)
     
     Args:
         user_id: ID пользователя
+        check_shift_settings: Проверять ли настройку shift_work_enabled (по умолчанию False для обратной совместимости)
         
     Returns:
         bool: True если пользователь на смене, False иначе
     """
     try:
+        if check_shift_settings:
+            # Проверяем что у пользователя включены смены
+            user_query = users_cboxes_relation.select().where(
+                users_cboxes_relation.c.id == user_id
+            )
+            user_settings = await database.fetch_one(user_query)
+            
+            if not user_settings or not user_settings.shift_work_enabled:
+                return False
+        
         query = employee_shifts.select().where(
             and_(
                 employee_shifts.c.user_id == user_id,
@@ -33,13 +44,14 @@ async def check_user_on_shift(user_id: int) -> bool:
         return False
 
 
-async def get_available_workers_on_shift(cashbox_id: int, role_filter: str = None) -> List[int]:
+async def get_available_workers_on_shift(cashbox_id: int, role_filter: str = None, check_shift_settings: bool = True) -> List[int]:
     """
     Получить список ID сотрудников, которые сейчас на смене
     
     Args:
         cashbox_id: ID кассы
         role_filter: Фильтр по роли ("picker", "courier", или None для всех)
+        check_shift_settings: Проверять ли настройку shift_work_enabled (по умолчанию True)
         
     Returns:
         List[int]: Список ID пользователей на смене
@@ -58,9 +70,13 @@ async def get_available_workers_on_shift(cashbox_id: int, role_filter: str = Non
             )
         )
         
+        if check_shift_settings:
+            query = query.where(users_cboxes_relation.c.shift_work_enabled == True)
+        
         if role_filter:
+            from sqlalchemy.dialects.postgresql import ARRAY
             query = query.where(
-                users_cboxes_relation.c.role.like(f"%{role_filter}%")
+                users_cboxes_relation.c.tags.contains([role_filter])
             )
         
         workers = await database.fetch_all(query)
@@ -71,30 +87,32 @@ async def get_available_workers_on_shift(cashbox_id: int, role_filter: str = Non
         return []
 
 
-async def get_available_pickers_on_shift(cashbox_id: int) -> List[int]:
+async def get_available_pickers_on_shift(cashbox_id: int, check_shift_settings: bool = True) -> List[int]:
     """
     Получить список ID сборщиков на смене
     
     Args:
         cashbox_id: ID кассы
+        check_shift_settings: Проверять ли настройку shift_work_enabled (по умолчанию True)
         
     Returns:
         List[int]: Список ID сборщиков на смене
     """
-    return await get_available_workers_on_shift(cashbox_id, "picker")
+    return await get_available_workers_on_shift(cashbox_id, "picker", check_shift_settings)
 
 
-async def get_available_couriers_on_shift(cashbox_id: int) -> List[int]:
+async def get_available_couriers_on_shift(cashbox_id: int, check_shift_settings: bool = True) -> List[int]:
     """
     Получить список ID курьеров на смене
     
     Args:
         cashbox_id: ID кассы
+        check_shift_settings: Проверять ли настройку shift_work_enabled (по умолчанию True)
         
     Returns:
         List[int]: Список ID курьеров на смене
     """
-    return await get_available_workers_on_shift(cashbox_id, "courier")
+    return await get_available_workers_on_shift(cashbox_id, "courier", check_shift_settings)
 
 
 async def auto_end_expired_breaks():

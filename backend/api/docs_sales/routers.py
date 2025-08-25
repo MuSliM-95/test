@@ -2629,7 +2629,7 @@ async def notify_order(
 
     if notify_config.type == schemas.NotifyType.assembly:
         if order.assigned_picker:
-            if await check_user_on_shift(order.assigned_picker):
+            if await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
                 picker_query = (
                     select([users.c.chat_id])
                     .select_from(
@@ -2665,7 +2665,7 @@ async def notify_order(
 
     elif notify_config.type == schemas.NotifyType.delivery:
         if order.assigned_courier:
-            if await check_user_on_shift(order.assigned_courier):
+            if await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
                 courier_query = (
                     select([users.c.chat_id])
                     .select_from(
@@ -2700,7 +2700,7 @@ async def notify_order(
                         recipients.append(courier.chat_id)
 
     elif notify_config.type == schemas.NotifyType.general:
-        if order.assigned_picker and await check_user_on_shift(order.assigned_picker):
+        if order.assigned_picker and await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
             picker_query = (
                 select([users.c.chat_id])
                 .select_from(
@@ -2715,7 +2715,7 @@ async def notify_order(
             if picker and picker.chat_id:
                 recipients.append(picker.chat_id)
         
-        if order.assigned_courier and await check_user_on_shift(order.assigned_courier):
+        if order.assigned_courier and await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
             courier_query = (
                 select([users.c.chat_id])
                 .select_from(
@@ -2732,11 +2732,11 @@ async def notify_order(
         
         if not recipients:
             all_available = []
-            available_pickers = await get_available_pickers_on_shift(order.cashbox)
-            available_couriers = await get_available_couriers_on_shift(order.cashbox)
+            available_pickers = await get_available_pickers_on_shift(order.cashbox)  # По умолчанию учитывает настройки
+            available_couriers = await get_available_couriers_on_shift(order.cashbox)  # По умолчанию учитывает настройки
             all_available.extend(available_pickers)
             all_available.extend(available_couriers)
-            all_available = list(set(all_available))
+            all_available = list(set(all_available)) 
             
             if all_available:
                 workers_query = (
@@ -2754,6 +2754,7 @@ async def notify_order(
                     if worker.chat_id:
                         recipients.append(worker.chat_id)
 
+    # Если никого не найдено среди работников со сменами - уведомляем админа
     if not recipients:
         owner_query = (
             select([users.c.chat_id])
