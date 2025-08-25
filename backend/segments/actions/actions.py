@@ -145,6 +145,7 @@ class SegmentActions:
         Проверяет, соответствует ли текущее время всем заданным условиям.
         Возвращает True, если все условия выполнены или не заданы.
         """
+
         now = datetime.now()
 
         # Проверка временного диапазона
@@ -153,8 +154,8 @@ class SegmentActions:
             current_time = now.time()
 
             # Парсим время начала и конца
-            from_time = datetime.strptime(time_range["from"], "%H:%M").time()
-            to_time = datetime.strptime(time_range["to"], "%H:%M").time()
+            from_time = datetime.strptime(time_range["from_"], "%H:%M").time()
+            to_time = datetime.strptime(time_range["to_"], "%H:%M").time()
 
             # Проверяем, попадает ли текущее время в диапазон
             if from_time <= to_time:
@@ -189,21 +190,21 @@ class SegmentActions:
 
 
     async def send_tg_notification(self, order_ids:List[int], data: dict):
-        chat_ids = []
+        chat_ids = set()
         message = data.get("message")
         send_to = data.get("send_to")
         user_tag = data.get("user_tag")
         recipients = data.get("recipients")
-        if not message or (not send_to and not user_tag):
+        if not message or (not send_to and not user_tag and not recipients):
             return
-        if send_to is None or send_to not in ["picker", "courier"]:
-            chat_ids = await self.get_user_chat_ids_by_tag(user_tag)
+        if user_tag:
+            chat_ids.update(await self.get_user_chat_ids_by_tag(user_tag))
 
         if recipients:
             for recipient in recipients:
-                if self._check_recipient_conditions(recipient.conditions):
-                    chat_ids.append(
-                        await self.get_user_chat_ids_by_tag(recipient.user_tag)
+                if self._check_recipient_conditions(recipient.get("conditions", {})):
+                    chat_ids.update(
+                        await self.get_user_chat_ids_by_tag(recipient.get("user_tag"))
                     )
 
         for order_id in order_ids:
@@ -213,12 +214,13 @@ class SegmentActions:
 
             message_text = replace_masks(message_text, replacements)
             if send_to == "picker":
-                chat_ids = await self.get_picker_chat_id(order_id)
+                chat_ids.update(await self.get_picker_chat_id(order_id))
             elif send_to == "courier":
-                chat_ids = await self.get_courier_chat_id(order_id)
-
+                chat_ids.update(await self.get_courier_chat_id(order_id))
+            if not chat_ids:
+                return False
             await send_segment_notification(
-                recipient_ids=set(chat_ids),
+                recipient_ids=list(chat_ids),
                 notification_text=message_text,
                 segment_id=self.segment_obj.id,
             )

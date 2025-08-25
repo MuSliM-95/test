@@ -30,11 +30,14 @@ class TimeRange(BaseModel):
     from_: str = Field(..., alias="from")
     to_: str = Field(..., alias="to")
 
-    @root_validator("from_", "to_")
+    @root_validator(pre=True)
     def validate_time_format(cls, value):
+        from_ = value.get("from")
+        to_ = value.get("to")
         try:
             # Попробуем распарсить в формате ЧЧ:ММ (24-часовой)
-            datetime.strptime(value, "%H:%M")
+            datetime.strptime(from_, "%H:%M")
+            datetime.strptime(to_, "%H:%M")
         except ValueError:
             raise ValueError(
                 "Время должно быть в формате HH:MM (например, 09:30)")
@@ -59,27 +62,27 @@ class TgNotificationsConditions(BaseModel):
         if not all(1 <= day <= 7 for day in v):
             raise ValueError(
                 'Weekdays must be integers between 1 and 7 (1=Monday, 7=Sunday)')
-        return set(sorted(v))
+        return list(set(v))
 
     @validator('month_days')
-    def validate_weekdays(cls, v):
+    def validate_month_days(cls, v):
         if v is None:
             return v
         if not all(1 <= day <= 31 for day in v):
             raise ValueError(
                 'Day of month must be integers between 1 and 31')
-        return set(sorted(v))
+        return list(set(v))
 
 
 class Recipient(BaseModel):
     user_tag: str
-    conditions: TgNotificationsConditions
+    conditions: Optional[TgNotificationsConditions]
 
 
 class TgNotificationsAction(BaseModel):
     trigger_on_new: bool = True
     message: str
-    user_tag: str
+    user_tag: Optional[str]
     send_to: Optional[Literal["picker", "courier"]]
     recipients: Optional[List[Recipient]]
 
