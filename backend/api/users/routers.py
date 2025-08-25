@@ -1,13 +1,11 @@
 from api.users import schemas as schemas
 from fastapi import APIRouter, HTTPException
 from functions import users as func
-from database.db import database, users, users_cboxes_relation, user_permissions, pboxes
-from sqlalchemy import select, func as fsql, or_, and_
+from database.db import database, users, users_cboxes_relation, user_permissions, pboxes, employee_shifts
+from sqlalchemy import select, func as fsql, or_, and_, desc
+from datetime import datetime, timedelta
 
 from functions.helpers import raise_wrong_token
-
-from database.db import database, users, users_cboxes_relation, user_permissions, pboxes, employee_shifts
-from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -409,7 +407,7 @@ async def update_user_shift_settings(user_id: int, settings: schemas.UserShiftSe
     if not current_user or not current_user.is_owner:
         raise HTTPException(status_code=403, detail="Только администратор может управлять настройками смен")
     
-    # Проверяем что целевой пользователь существует и принадлежит к той же кассе
+    # Проверяем что целевой пользователь принадлежит к той же кассе
     target_user_query = users_cboxes_relation.select().where(
         and_(
             users_cboxes_relation.c.id == user_id,
@@ -422,11 +420,11 @@ async def update_user_shift_settings(user_id: int, settings: schemas.UserShiftSe
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     # Обновляем настройки смены
-    update_query = users_cboxes_relation.update().where(
-        users_cboxes_relation.c.id == user_id
-    ).values(shift_work_enabled=settings.shift_work_enabled)
-    
-    await database.execute(update_query)
+    await database.execute(
+        users_cboxes_relation.update().where(
+            users_cboxes_relation.c.id == user_id
+        ).values(shift_work_enabled=settings.shift_work_enabled)
+    )
     
     # Если отключаем смены - завершаем активную смену
     if not settings.shift_work_enabled:
@@ -440,16 +438,17 @@ async def update_user_shift_settings(user_id: int, settings: schemas.UserShiftSe
         active_shift = await database.fetch_one(active_shift_query)
         
         if active_shift:
-            end_shift_query = employee_shifts.update().where(
-                employee_shifts.c.id == active_shift.id
-            ).values(
-                shift_end=datetime.utcnow(),
-                status="off_shift",
-                break_start=None,
-                break_duration=None,
-                updated_at=datetime.utcnow()
+            await database.execute(
+                employee_shifts.update().where(
+                    employee_shifts.c.id == active_shift.id
+                ).values(
+                    shift_end=datetime.utcnow(),
+                    status="off_shift",
+                    break_start=None,
+                    break_duration=None,
+                    updated_at=datetime.utcnow()
+                )
             )
-            await database.execute(end_shift_query)
     
     return schemas.UserShiftSettingsResponse(
         success=True,
@@ -481,41 +480,42 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
             users.c.username.ilike(f"%{name}%")
         ))
     
-    # Основной запрос пользователей
-    users_query = select(
+    users_with_shifts_query = select(
         users_cboxes_relation.c.id,
         users.c.first_name,
         users.c.last_name,
         users.c.username,
         users.c.photo,
-        users_cboxes_relation.c.shift_work_enabled
-    ).where(and_(*filters)).join(
-        users, users.c.id == users_cboxes_relation.c.user
-    ).limit(limit).offset(offset)
-    
-    users_data = await database.fetch_all(users_query)
-    
-    # Получаем информацию о текущих сменах для каждого пользователя
-    result_users = []
-    for user in users_data:
-        # Получаем информацию о текущей смене
-        shift_query = employee_shifts.select().where(
+        users_cboxes_relation.c.shift_work_enabled,
+        employee_shifts.c.status.label('current_shift_status'),
+        employee_shifts.c.shift_start,
+        employee_shifts.c.break_start,
+        employee_shifts.c.break_duration
+    ).select_from(
+        users_cboxes_relation
+        .join(users, users.c.id == users_cboxes_relation.c.user)
+        .outerjoin(
+            employee_shifts,
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == users_cboxes_relation.c.id,
                 employee_shifts.c.shift_end.is_(None)
             )
-        ).order_by(desc(employee_shifts.c.created_at))
-        
-        current_shift = await database.fetch_one(shift_query)
-        
+        )
+    ).where(
+        and_(*filters)
+    ).limit(limit).offset(offset)
+    
+    users_data = await database.fetch_all(users_with_shifts_query)
+    
+    # Обрабатываем данные пользователей
+    result_users = []
+    for user in users_data:
         shift_duration_minutes = None
-        current_shift_status = None
         
-        if current_shift:
-            current_shift_status = current_shift.status
-            if current_shift.shift_start:
-                duration = datetime.utcnow() - current_shift.shift_start
-                shift_duration_minutes = int(duration.total_seconds() / 60)
+        # Если есть активная смена, считаем длительность
+        if user.current_shift_status and user.shift_start:
+            duration = datetime.utcnow() - user.shift_start
+            shift_duration_minutes = int(duration.total_seconds() / 60)
         
         result_users.append(schemas.UserWithShiftInfo(
             id=user.id,
@@ -524,7 +524,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
             username=user.username or "",
             photo=user.photo or "",
             shift_work_enabled=user.shift_work_enabled or False,
-            current_shift_status=current_shift_status,
+            current_shift_status=user.current_shift_status,
             shift_duration_minutes=shift_duration_minutes
         ))
     
@@ -563,29 +563,21 @@ async def get_shifts_statistics(token: str):
     if not current_user:
         raise HTTPException(status_code=401, detail="Неверный токен")
     
-    # Статистика по сменам в данной кассе
-    on_shift_query = select(fsql.count(employee_shifts.c.id)).select_from(
+    stats_query = select([
+        fsql.count(employee_shifts.c.id).filter(employee_shifts.c.status == "on_shift").label('on_shift_count'),
+        fsql.count(employee_shifts.c.id).filter(employee_shifts.c.status == "on_break").label('on_break_count')
+    ]).select_from(
         employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
     ).where(
         and_(
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
-            employee_shifts.c.status == "on_shift",
             employee_shifts.c.shift_end.is_(None)
         )
     )
-    on_shift_count = await database.fetch_val(on_shift_query) or 0
     
-    on_break_query = select(fsql.count(employee_shifts.c.id)).select_from(
-        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
-    ).where(
-        and_(
-            users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
-            employee_shifts.c.status == "on_break",
-            employee_shifts.c.shift_end.is_(None)
-        )
-    )
-    on_break_count = await database.fetch_val(on_break_query) or 0
+    shift_stats = await database.fetch_one(stats_query)
     
+    # Отдельный запрос для подсчета пользователей с включенными сменами
     shift_enabled_query = select(fsql.count(users_cboxes_relation.c.id)).where(
         and_(
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
@@ -595,8 +587,8 @@ async def get_shifts_statistics(token: str):
     shift_enabled_count = await database.fetch_val(shift_enabled_query) or 0
     
     return schemas.ShiftStatistics(
-        on_shift_count=on_shift_count,
-        on_break_count=on_break_count,
-        total_active=on_shift_count + on_break_count,
+        on_shift_count=shift_stats.on_shift_count or 0,
+        on_break_count=shift_stats.on_break_count or 0,
+        total_active=(shift_stats.on_shift_count or 0) + (shift_stats.on_break_count or 0),
         shift_enabled_users=shift_enabled_count
     )

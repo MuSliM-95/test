@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, select
 from datetime import datetime, timedelta
 
 from database.db import database, employee_shifts, users_cboxes_relation
@@ -17,31 +17,25 @@ async def check_user_on_shift(user_id: int, check_shift_settings: bool = False) 
     Returns:
         bool: True если пользователь на смене, False иначе
     """
-    try:
-        if check_shift_settings:
-            # Проверяем что у пользователя включены смены
-            user_query = users_cboxes_relation.select().where(
-                users_cboxes_relation.c.id == user_id
-            )
-            user_settings = await database.fetch_one(user_query)
-            
-            if not user_settings or not user_settings.shift_work_enabled:
-                return False
-        
-        query = employee_shifts.select().where(
-            and_(
-                employee_shifts.c.user_id == user_id,
-                employee_shifts.c.status == ShiftStatus.on_shift,
-                employee_shifts.c.shift_end.is_(None)
-            )
+    if check_shift_settings:
+        user_query = users_cboxes_relation.select().where(
+            users_cboxes_relation.c.id == user_id
         )
+        user_settings = await database.fetch_one(user_query)
         
-        shift = await database.fetch_one(query)
-        return shift is not None
-        
-    except Exception as e:
-        print(f"Ошибка при проверке статуса смены пользователя {user_id}: {e}")
-        return False
+        if not user_settings or not user_settings.shift_work_enabled:
+            return False
+    
+    query = employee_shifts.select().where(
+        and_(
+            employee_shifts.c.user_id == user_id,
+            employee_shifts.c.status == ShiftStatus.on_shift,
+            employee_shifts.c.shift_end.is_(None)
+        )
+    )
+    
+    shift = await database.fetch_one(query)
+    return shift is not None
 
 
 async def get_available_workers_on_shift(cashbox_id: int, role_filter: str = None, check_shift_settings: bool = True) -> List[int]:
@@ -56,35 +50,29 @@ async def get_available_workers_on_shift(cashbox_id: int, role_filter: str = Non
     Returns:
         List[int]: Список ID пользователей на смене
     """
-    try:
-        query = select([users_cboxes_relation.c.id]).select_from(
-            users_cboxes_relation.join(
-                employee_shifts,
-                users_cboxes_relation.c.id == employee_shifts.c.user_id
-            )
-        ).where(
-            and_(
-                users_cboxes_relation.c.cashbox_id == cashbox_id,
-                employee_shifts.c.status == ShiftStatus.on_shift,
-                employee_shifts.c.shift_end.is_(None)
-            )
+    query = select([users_cboxes_relation.c.id]).select_from(
+        users_cboxes_relation.join(
+            employee_shifts,
+            users_cboxes_relation.c.id == employee_shifts.c.user_id
         )
-        
-        if check_shift_settings:
-            query = query.where(users_cboxes_relation.c.shift_work_enabled == True)
-        
-        if role_filter:
-            from sqlalchemy.dialects.postgresql import ARRAY
-            query = query.where(
-                users_cboxes_relation.c.tags.contains([role_filter])
-            )
-        
-        workers = await database.fetch_all(query)
-        return [worker.id for worker in workers]
-        
-    except Exception as e:
-        print(f"Ошибка при получении доступных сотрудников: {e}")
-        return []
+    ).where(
+        and_(
+            users_cboxes_relation.c.cashbox_id == cashbox_id,
+            employee_shifts.c.status == ShiftStatus.on_shift,
+            employee_shifts.c.shift_end.is_(None)
+        )
+    )
+    
+    if check_shift_settings:
+        query = query.where(users_cboxes_relation.c.shift_work_enabled == True)
+    
+    if role_filter:
+        query = query.where(
+            users_cboxes_relation.c.tags.contains([role_filter])
+        )
+    
+    workers = await database.fetch_all(query)
+    return [worker.id for worker in workers]
 
 
 async def get_available_pickers_on_shift(cashbox_id: int, check_shift_settings: bool = True) -> List[int]:
@@ -120,44 +108,40 @@ async def auto_end_expired_breaks():
     Автоматически завершить истекшие перерывы
     Эта функция может вызываться периодически (например, через Celery)
     """
-    try:
-        current_time = datetime.utcnow()
+    current_time = datetime.utcnow()
+    
+    query = employee_shifts.select().where(
+        and_(
+            employee_shifts.c.status == ShiftStatus.on_break,
+            employee_shifts.c.break_start.is_not(None),
+            employee_shifts.c.break_duration.is_not(None),
+            employee_shifts.c.shift_end.is_(None)
+        )
+    )
+    
+    active_breaks = await database.fetch_all(query)
+    
+    expired_shift_ids = []
+    for shift in active_breaks:
+        break_end_time = shift.break_start + timedelta(minutes=shift.break_duration)
+        if current_time >= break_end_time:
+            expired_shift_ids.append(shift.id)
+    
+    if expired_shift_ids:
+        update_data = {
+            "status": ShiftStatus.on_shift,
+            "break_start": None,
+            "break_duration": None,
+            "updated_at": current_time
+        }
         
-        query = employee_shifts.select().where(
-            and_(
-                employee_shifts.c.status == ShiftStatus.on_break,
-                employee_shifts.c.break_start.is_not(None),
-                employee_shifts.c.break_duration.is_not(None),
-                employee_shifts.c.shift_end.is_(None)
-            )
+        await database.execute(
+            employee_shifts.update()
+            .where(employee_shifts.c.id.in_(expired_shift_ids))
+            .values(update_data)
         )
         
-        active_breaks = await database.fetch_all(query)
-        
-        expired_shift_ids = []
-        for shift in active_breaks:
-            break_end_time = shift.break_start + timedelta(minutes=shift.break_duration)
-            if current_time >= break_end_time:
-                expired_shift_ids.append(shift.id)
-        
-        if expired_shift_ids:
-            update_data = {
-                "status": ShiftStatus.on_shift,
-                "break_start": None,
-                "break_duration": None,
-                "updated_at": current_time
-            }
-            
-            await database.execute(
-                employee_shifts.update()
-                .where(employee_shifts.c.id.in_(expired_shift_ids))
-                .values(update_data)
-            )
-            
-            print(f"Автоматически завершено {len(expired_shift_ids)} перерывов")
-        
-    except Exception as e:
-        print(f"Ошибка при автоматическом завершении перерывов: {e}")
+        print(f"Автоматически завершено {len(expired_shift_ids)} перерывов")
 
 
 async def get_user_shift_info(user_id: int) -> Optional[dict]:
@@ -170,17 +154,12 @@ async def get_user_shift_info(user_id: int) -> Optional[dict]:
     Returns:
         dict или None: Информация о смене
     """
-    try:
-        query = employee_shifts.select().where(
-            and_(
-                employee_shifts.c.user_id == user_id,
-                employee_shifts.c.shift_end.is_(None)
-            )
-        ).order_by(employee_shifts.c.created_at.desc())
-        
-        shift = await database.fetch_one(query)
-        return dict(shift) if shift else None
-        
-    except Exception as e:
-        print(f"Ошибка при получении информации о смене пользователя {user_id}: {e}")
-        return None
+    query = employee_shifts.select().where(
+        and_(
+            employee_shifts.c.user_id == user_id,
+            employee_shifts.c.shift_end.is_(None)
+        )
+    ).order_by(employee_shifts.c.created_at.desc())
+    
+    shift = await database.fetch_one(query)
+    return dict(shift) if shift else None
