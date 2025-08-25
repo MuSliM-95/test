@@ -866,13 +866,13 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("user", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("token", String),
     sqlalchemy.Column("status", Boolean, default=True),
-    sqlalchemy.Column("shift_work_enabled", Boolean, default=False),
     sqlalchemy.Column("tags", ARRAY(item_type=String), nullable=True),
     sqlalchemy.Column("is_owner", Boolean, default=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
     sqlalchemy.Column("timezone", String),
-    sqlalchemy.Column("payment_past_edit_days", Integer)
+    sqlalchemy.Column("payment_past_edit_days", Integer),
+    sqlalchemy.Column("shift_work_enabled", Boolean, default=False),
 )
 
 contragents = sqlalchemy.Table(

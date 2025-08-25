@@ -17,7 +17,7 @@ class CBUsers(BaseModel):
     tags: Optional[List[str]]
     timezone: Optional[str]
     payment_past_edit_days: Optional[int]
-    shift_work_enabled: Optional[bool] = False
+    shift_work_enabled: Optional[bool]
 
     class Config:
         orm_mode = True
@@ -33,6 +33,7 @@ class CBUsersShort(BaseModel):
     first_name: str
     last_name: Optional[str]
     status: bool
+    shift_work_enabled: Optional[bool] = False
 
     class Config:
         orm_mode = True

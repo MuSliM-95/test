@@ -1,288 +1,388 @@
-from fastapi import APIRouter, Header, HTTPException, status
-from sqlalchemy import and_, desc, select
+from fastapi import APIRouter, HTTPException
+from database.db import database, users, users_cboxes_relation, employee_shifts
+from sqlalchemy import select, func, or_, and_
 from datetime import datetime, timedelta
-from typing import List
-
-from database.db import database, employee_shifts, users_cboxes_relation
-from functions.users import get_user_id_cashbox_id_by_token
 from .schemas import (
-    StartShiftRequest,
-    EndShiftRequest, 
-    CreateBreakRequest,
-    ShiftResponse,
-    ShiftStatusResponse,
-    ShiftStatus
+    ShiftStatus, ShiftResponse, ShiftStatusResponse
 )
+from api.users.schemas import UserWithShiftInfo, CBUsersListShortWithShifts, ShiftStatistics
 
-router = APIRouter(tags=["employee_shifts"], prefix="/employee_shifts")
+router = APIRouter(prefix="/employee-shifts", tags=["employee_shifts"])
 
 
 @router.post("/start", response_model=ShiftResponse)
-async def start_shift(
-    request: StartShiftRequest,
-    token: str = Header(..., description="Токен авторизации")
-):
+async def start_shift(token: str):
     """Начать смену"""
-    # Получаем текущего пользователя
-    user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный токен авторизации"
-        )
+    
+    # Получаем пользователя по токену
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    if not user.shift_work_enabled:
+        raise HTTPException(status_code=400, detail="Работа по сменам отключена для данного пользователя")
     
     # Проверяем, нет ли уже активной смены
-    existing_shift_query = employee_shifts.select().where(
-        and_(
-            employee_shifts.c.user_id == user_id,
-            employee_shifts.c.status.in_(["on_shift", "on_break"]),
-            employee_shifts.c.shift_end.is_(None)
+    existing_shift = await database.fetch_one(
+        employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.shift_end.is_(None)
+            )
         )
     )
-    existing_shift = await database.fetch_one(existing_shift_query)
     
     if existing_shift:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="У вас уже есть активная смена"
-        )
+        raise HTTPException(status_code=400, detail="Смена уже начата")
     
+    now = datetime.utcnow()
     shift_data = {
-        "user_id": user_id,
-        "cashbox_id": cashbox_id,
-        "shift_start": datetime.utcnow(),
+        "user_id": user.id,
+        "cashbox_id": user.cashbox_id,
+        "shift_start": now,
         "status": ShiftStatus.on_shift,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": now,
+        "updated_at": now
     }
     
-    created_shift = await database.fetch_one(
-        employee_shifts.insert().values(shift_data).returning(*employee_shifts.c)
+    new_shift = await database.fetch_one(
+        employee_shifts.insert().values(shift_data).returning(
+            employee_shifts.c.id,
+            employee_shifts.c.user_id,
+            employee_shifts.c.cashbox_id,
+            employee_shifts.c.shift_start,
+            employee_shifts.c.shift_end,
+            employee_shifts.c.status,
+            employee_shifts.c.break_start,
+            employee_shifts.c.break_duration,
+            employee_shifts.c.created_at,
+            employee_shifts.c.updated_at
+        )
     )
     
-    return ShiftResponse(**dict(created_shift))
+    return ShiftResponse(**dict(new_shift))
 
 
 @router.post("/end", response_model=ShiftResponse)
-async def end_shift(
-    request: EndShiftRequest,
-    token: str = Header(..., description="Токен авторизации")
-):
+async def end_shift(token: str):
     """Завершить смену"""
-    # Получаем текущего пользователя
-    user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный токен авторизации"
-        )
+    
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
     
     # Находим активную смену
-    active_shift_query = employee_shifts.select().where(
-        and_(
-            employee_shifts.c.user_id == user_id,
-            employee_shifts.c.status.in_(["on_shift", "on_break"]),
-            employee_shifts.c.shift_end.is_(None)
+    active_shift = await database.fetch_one(
+        employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.shift_end.is_(None)
+            )
         )
     )
-    active_shift = await database.fetch_one(active_shift_query)
     
     if not active_shift:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="У вас нет активной смены"
-        )
+        raise HTTPException(status_code=400, detail="Активная смена не найдена")
     
-    update_data = {
-        "shift_end": datetime.utcnow(),
-        "status": ShiftStatus.off_shift,
-        "break_start": None,  # Сбрасываем перерыв при завершении смены
-        "break_duration": None,
-        "updated_at": datetime.utcnow()
-    }
-    
+
+    now = datetime.utcnow()
     updated_shift = await database.fetch_one(
-        employee_shifts.update()
-        .where(employee_shifts.c.id == active_shift.id)
-        .values(update_data)
-        .returning(*employee_shifts.c)
+        employee_shifts.update().where(
+            employee_shifts.c.id == active_shift.id
+        ).values(
+            shift_end=now,
+            status=ShiftStatus.off_shift,
+            break_start=None,
+            break_duration=None,
+            updated_at=now
+        ).returning(
+            employee_shifts.c.id,
+            employee_shifts.c.user_id,
+            employee_shifts.c.cashbox_id,
+            employee_shifts.c.shift_start,
+            employee_shifts.c.shift_end,
+            employee_shifts.c.status,
+            employee_shifts.c.break_start,
+            employee_shifts.c.break_duration,
+            employee_shifts.c.created_at,
+            employee_shifts.c.updated_at
+        )
     )
     
     return ShiftResponse(**dict(updated_shift))
 
 
 @router.post("/break", response_model=ShiftResponse)
-async def create_break(
-    request: CreateBreakRequest,
-    token: str = Header(..., description="Токен авторизации")
-):
-    """Создать перерыв на N минут"""
-    # Получаем текущего пользователя
-    user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный токен авторизации"
-        )
+async def create_break(token: str, duration_minutes: int):
+    """Создать перерыв"""
     
-    if request.duration_minutes <= 0 or request.duration_minutes > 480:  # Нужно поменять на нужное количество
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Продолжительность перерыва должна быть от 1 до 480 минут"
-        )
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
     
-    active_shift_query = employee_shifts.select().where(
-        and_(
-            employee_shifts.c.user_id == user_id,
-            employee_shifts.c.status == ShiftStatus.on_shift,
-            employee_shifts.c.shift_end.is_(None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    # Проверяем, что пользователь на смене
+    active_shift = await database.fetch_one(
+        employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.status == ShiftStatus.on_shift,
+                employee_shifts.c.shift_end.is_(None)
+            )
         )
     )
-    active_shift = await database.fetch_one(active_shift_query)
     
     if not active_shift:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="У вас нет активной смены или вы уже на перерыве"
-        )
+        raise HTTPException(status_code=400, detail="Пользователь должен быть на смене для создания перерыва")
     
-    update_data = {
-        "status": ShiftStatus.on_break,
-        "break_start": datetime.utcnow(),
-        "break_duration": request.duration_minutes,
-        "updated_at": datetime.utcnow()
-    }
-    
+    now = datetime.utcnow()
     updated_shift = await database.fetch_one(
-        employee_shifts.update()
-        .where(employee_shifts.c.id == active_shift.id)
-        .values(update_data)
-        .returning(*employee_shifts.c)
-    )
-    
-    return ShiftResponse(**dict(updated_shift))
-
-
-@router.post("/break/end", response_model=ShiftResponse)
-async def end_break(
-    token: str = Header(..., description="Токен авторизации")
-):
-    """Завершить перерыв и вернуться на смену"""
-    # Получаем текущего пользователя
-    user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный токен авторизации"
+        employee_shifts.update().where(
+            employee_shifts.c.id == active_shift.id
+        ).values(
+            status=ShiftStatus.on_break,
+            break_start=now,
+            break_duration=duration_minutes,
+            updated_at=now
+        ).returning(
+            employee_shifts.c.id,
+            employee_shifts.c.user_id,
+            employee_shifts.c.cashbox_id,
+            employee_shifts.c.shift_start,
+            employee_shifts.c.shift_end,
+            employee_shifts.c.status,
+            employee_shifts.c.break_start,
+            employee_shifts.c.break_duration,
+            employee_shifts.c.created_at,
+            employee_shifts.c.updated_at
         )
-    
-    # Находим смену на перерыве
-    break_shift_query = employee_shifts.select().where(
-        and_(
-            employee_shifts.c.user_id == user_id,
-            employee_shifts.c.status == ShiftStatus.on_break,
-            employee_shifts.c.shift_end.is_(None)
-        )
-    )
-    break_shift = await database.fetch_one(break_shift_query)
-    
-    if not break_shift:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="У вас нет активного перерыва"
-        )
-    
-    update_data = {
-        "status": ShiftStatus.on_shift,
-        "break_start": None,
-        "break_duration": None,
-        "updated_at": datetime.utcnow()
-    }
-    
-    updated_shift = await database.fetch_one(
-        employee_shifts.update()
-        .where(employee_shifts.c.id == break_shift.id)
-        .values(update_data)
-        .returning(*employee_shifts.c)
     )
     
     return ShiftResponse(**dict(updated_shift))
 
 
 @router.get("/status", response_model=ShiftStatusResponse)
-async def get_shift_status(
-    token: str = Header(..., description="Токен авторизации")
-):
-    """Получить текущий статус смены"""
-    # Получаем текущего пользователя
-    user_id, cashbox_id = await get_user_id_cashbox_id_by_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный токен авторизации"
+async def get_shift_status(token: str):
+    """Получить текущий статус смены пользователя"""
+    
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    if not user.shift_work_enabled:
+        return ShiftStatusResponse(
+            is_on_shift=False,
+            status=ShiftStatus.off_shift,
+            current_shift=None,
+            message="Работа по сменам отключена"
         )
     
     # Ищем активную смену
-    active_shift_query = employee_shifts.select().where(
-        and_(
-            employee_shifts.c.user_id == user_id,
-            employee_shifts.c.shift_end.is_(None)
+    active_shift = await database.fetch_one(
+        employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.shift_end.is_(None)
+            )
         )
-    ).order_by(desc(employee_shifts.c.created_at))
-    
-    active_shift = await database.fetch_one(active_shift_query)
+    )
     
     if not active_shift:
         return ShiftStatusResponse(
             is_on_shift=False,
             status=ShiftStatus.off_shift,
             current_shift=None,
-            message="Вы не на смене"
+            message="Смена не начата"
         )
     
-    # Проверяем, не истек ли перерыв
+    # Проверяем истек ли перерыв и обновляем при необходимости
+    current_shift_data = dict(active_shift)
     if (active_shift.status == ShiftStatus.on_break and 
         active_shift.break_start and 
         active_shift.break_duration):
         
         break_end_time = active_shift.break_start + timedelta(minutes=active_shift.break_duration)
         if datetime.utcnow() >= break_end_time:
-            update_data = {
-                "status": ShiftStatus.on_shift,
-                "break_start": None,
-                "break_duration": None,
-                "updated_at": datetime.utcnow()
-            }
-            
-            active_shift = await database.fetch_one(
-                employee_shifts.update()
-                .where(employee_shifts.c.id == active_shift.id)
-                .values(update_data)
-                .returning(*employee_shifts.c)
+            now = datetime.utcnow()
+            updated_shift = await database.fetch_one(
+                employee_shifts.update().where(
+                    employee_shifts.c.id == active_shift.id
+                ).values(
+                    status=ShiftStatus.on_shift,
+                    break_start=None,
+                    break_duration=None,
+                    updated_at=now
+                ).returning(
+                    employee_shifts.c.id,
+                    employee_shifts.c.user_id,
+                    employee_shifts.c.cashbox_id,
+                    employee_shifts.c.shift_start,
+                    employee_shifts.c.shift_end,
+                    employee_shifts.c.status,
+                    employee_shifts.c.break_start,
+                    employee_shifts.c.break_duration,
+                    employee_shifts.c.created_at,
+                    employee_shifts.c.updated_at
+                )
             )
-    
-    is_on_shift = active_shift.status in [ShiftStatus.on_shift, ShiftStatus.on_break]
-    
-    status_messages = {
-        ShiftStatus.on_shift: "Вы на смене",
-        ShiftStatus.on_break: f"Вы на перерыве (осталось {_get_remaining_break_time(active_shift)} мин.)",
-        ShiftStatus.off_shift: "Вы не на смене"
-    }
+            current_shift_data = dict(updated_shift)
     
     return ShiftStatusResponse(
-        is_on_shift=is_on_shift,
-        status=active_shift.status,
-        current_shift=ShiftResponse(**dict(active_shift)),
-        message=status_messages.get(active_shift.status, "Неизвестный статус")
+        is_on_shift=current_shift_data["status"] in [ShiftStatus.on_shift, ShiftStatus.on_break],
+        status=ShiftStatus(current_shift_data["status"]),
+        current_shift=ShiftResponse(**current_shift_data),
+        message=f"Статус: {current_shift_data['status']}"
     )
 
 
-def _get_remaining_break_time(shift) -> int:
-    """Вспомогательная функция для подсчета оставшегося времени перерыва"""
-    if not shift.break_start or not shift.break_duration:
-        return 0
+# Админские эндпоинты
+@router.get("/list-with-shifts/", response_model=CBUsersListShortWithShifts)
+async def get_users_list_with_shift_info(token: str, name: str = None, limit: int = 100, offset: int = 0):
+    """Получить список пользователей с информацией о сменах (админ)"""
     
-    break_end_time = shift.break_start + timedelta(minutes=shift.break_duration)
-    remaining = break_end_time - datetime.utcnow()
+    # Получаем текущего пользователя
+    current_user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    current_user = await database.fetch_one(current_user_query)
     
-    return max(0, int(remaining.total_seconds() / 60))
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    # Фильтры для поиска пользователей
+    filters = [users_cboxes_relation.c.cashbox_id == current_user.cashbox_id]
+    
+    if name:
+        filters.append(or_(
+            users.c.first_name.ilike(f"%{name}%"),
+            users.c.last_name.ilike(f"%{name}%"),
+            users.c.username.ilike(f"%{name}%")
+        ))
+    
+    users_with_shifts_query = select([
+        users_cboxes_relation.c.id,
+        users.c.first_name,
+        users.c.last_name,
+        users.c.username,
+        users.c.photo,
+        users_cboxes_relation.c.shift_work_enabled,
+        employee_shifts.c.status.label('current_shift_status'),
+        employee_shifts.c.shift_start,
+        employee_shifts.c.break_start,
+        employee_shifts.c.break_duration
+    ]).select_from(
+        users_cboxes_relation
+        .join(users, users.c.id == users_cboxes_relation.c.user)
+        .outerjoin(
+            employee_shifts,
+            and_(
+                employee_shifts.c.user_id == users_cboxes_relation.c.id,
+                employee_shifts.c.shift_end.is_(None)
+            )
+        )
+    ).where(
+        and_(*filters)
+    ).limit(limit).offset(offset)
+    
+    users_data = await database.fetch_all(users_with_shifts_query)
+    
+    result_users = []
+    on_shift_count = 0
+    
+    for user in users_data:
+        shift_duration_minutes = None
+        
+        # Если есть активная смена, считаем длительность
+        if user.current_shift_status and user.shift_start:
+            duration = datetime.utcnow() - user.shift_start
+            shift_duration_minutes = int(duration.total_seconds() / 60)
+            
+            # Считаем людей на смене
+            if user.current_shift_status in ["on_shift", "on_break"]:
+                on_shift_count += 1
+        
+        result_users.append(UserWithShiftInfo(
+            id=user.id,
+            first_name=user.first_name or "",
+            last_name=user.last_name or "",
+            username=user.username or "",
+            photo=user.photo or "",
+            shift_work_enabled=user.shift_work_enabled or False,
+            current_shift_status=user.current_shift_status,
+            shift_duration_minutes=shift_duration_minutes
+        ))
+    
+    # Один запрос для count
+    count_query = select([func.count(users_cboxes_relation.c.id)]).select_from(
+        users_cboxes_relation.join(users, users.c.id == users_cboxes_relation.c.user)
+    ).where(and_(*filters))
+    
+    total_count = await database.fetch_val(count_query) or 0
+    
+    return CBUsersListShortWithShifts(
+        result=result_users,
+        count=total_count,
+        on_shift_total=on_shift_count
+    )
+
+
+@router.get("/shifts-statistics/", response_model=ShiftStatistics)
+async def get_shifts_statistics(token: str):
+    """Получить статистику по сменам (админ)"""
+    
+    # Получаем текущего пользователя
+    current_user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    current_user = await database.fetch_one(current_user_query)
+    
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    stats_query = select([
+        func.count().label('total_active_shifts'),
+        func.sum(func.case([(employee_shifts.c.status == 'on_shift', 1)], else_=0)).label('on_shift_count'),
+        func.sum(func.case([(employee_shifts.c.status == 'on_break', 1)], else_=0)).label('on_break_count')
+    ]).select_from(
+        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
+    ).where(
+        and_(
+            users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
+            employee_shifts.c.shift_end.is_(None),
+            employee_shifts.c.status.in_(["on_shift", "on_break"])
+        )
+    )
+    
+    stats = await database.fetch_one(stats_query)
+    
+    # Отдельный запрос для пользователей с включенными сменами
+    shift_enabled_query = select([func.count(users_cboxes_relation.c.id)]).where(
+        and_(
+            users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
+            users_cboxes_relation.c.shift_work_enabled == True
+        )
+    )
+    
+    shift_enabled_count = await database.fetch_val(shift_enabled_query) or 0
+    
+    return ShiftStatistics(
+        on_shift_count=int(stats.on_shift_count or 0),
+        on_break_count=int(stats.on_break_count or 0),
+        total_active=int(stats.total_active_shifts or 0),
+        shift_enabled_users=shift_enabled_count
+    )
