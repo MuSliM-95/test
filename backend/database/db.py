@@ -134,6 +134,7 @@ class SegmentStatus(str, ENUM):
     calculated = "calculated"
 
 
+
 metadata = sqlalchemy.MetaData()
 
 cashbox_settings = sqlalchemy.Table(
@@ -568,6 +569,7 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
+    sqlalchemy.Column("chatting_percent", Integer, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -727,6 +729,7 @@ price_types = sqlalchemy.Table(
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("is_system", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -2164,4 +2167,24 @@ docs_sales_links = sqlalchemy.Table(
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now),
     sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
+)
+
+nomenclature_hash = sqlalchemy.Table(
+    "nomenclature_hash",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column("hash", String, nullable=False),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+)
+
+warehouse_hash = sqlalchemy.Table(
+    "warehouse_hash",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True),
+    sqlalchemy.Column("warehouses_id", Integer, ForeignKey("warehouses.id"), nullable=False),
+    sqlalchemy.Column("hash", String, nullable=False),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 )

@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from functions.helpers import gen_token
-from database.db import database, cboxes, pboxes, users, users_cboxes_relation, cashbox_settings
+from database.db import database, cboxes, pboxes, users, users_cboxes_relation, price_types, cashbox_settings
+
 
 import websockets
 import json
@@ -67,9 +68,16 @@ async def create_cbox(user):
     )
 
     rl_id = await database.execute(relship)
-
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.id == rl_id)
     rl = await database.fetch_one(query)
+
+    query = price_types.insert().values(
+        name="chatting",
+        owner=rl.id,
+        cashbox=cashbox.id,
+        is_system=True
+    )
+    await database.execute(query)
 
     return rl
 
