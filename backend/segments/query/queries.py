@@ -51,7 +51,7 @@ class SegmentCriteriaQuery:
                 "filter_tag": "purchase",
             },
             "loyality": {
-                "handeler": self.filters.add_loyality_filters,
+                "handler": self.filters.add_loyality_filters,
                 "filter_tag": "loyality",
             },
             "created_at": {
