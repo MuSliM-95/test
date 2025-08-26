@@ -20,8 +20,10 @@ from functions.helpers import (
     nomenclature_unit_id_to_name,
     create_entity_hash, update_entity_hash
 )
+from apps.geocoders.instance import geocoder
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ws_manager import manager
 import memoization
 
@@ -448,46 +450,46 @@ async def new_nomenclature(token: str, nomenclature_data: schemas.NomenclatureCr
     manufacturers_cache = set()
     units_cache = set()
     exceptions = []
-    for nomenclature_values in nomenclature_data.dict()["__root__"]:
-        nomenclature_values["cashbox"] = user.cashbox_id
-        nomenclature_values["owner"] = user.id
-        nomenclature_values["is_deleted"] = False
-
-        if nomenclature_values.get("category") is not None:
-            if nomenclature_values["category"] not in categories_cache:
-                try:
-                    await check_entity_exists(categories, nomenclature_values["category"], user.cashbox_id)
-                    categories_cache.add(nomenclature_values["category"])
-                except HTTPException as e:
-                    exceptions.append(str(nomenclature_values) + " " + e.detail)
-                    continue
-
-        if nomenclature_values.get("manufacturer") is not None:
-            if nomenclature_values["manufacturer"] not in manufacturers_cache:
-                try:
-                    await check_entity_exists(manufacturers, nomenclature_values["manufacturer"], user.id)
-                    manufacturers_cache.add(nomenclature_values["manufacturer"])
-                except HTTPException as e:
-                    exceptions.append(str(nomenclature_values) + " " + e.detail)
-                    continue
-
-        if nomenclature_values.get("unit") is not None:
-            if nomenclature_values["unit"] not in units_cache:
-                try:
-                    await check_unit_exists(nomenclature_values["unit"])
-                    units_cache.add(nomenclature_values["unit"])
-                except HTTPException as e:
-                    exceptions.append(str(nomenclature_values) + " " + e.detail)
-                    continue
-
-        query = nomenclature.insert().values(nomenclature_values)
-        nomenclature_id = await database.execute(query)
-        await create_entity_hash(nomenclature, nomenclature_hash, nomenclature_id)
-        inserted_ids.add(nomenclature_id)
-
-    query = nomenclature.select().where(nomenclature.c.cashbox == user.cashbox_id, nomenclature.c.id.in_(inserted_ids))
-    nomenclature_db = await database.fetch_all(query)
-    nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+    async with database.transaction():
+        for nomenclature_values in nomenclature_data.dict()["__root__"]:
+            nomenclature_values["cashbox"] = user.cashbox_id
+            nomenclature_values["owner"] = user.id
+            nomenclature_values["is_deleted"] = False
+    
+            if nomenclature_values.get("category") is not None:
+                if nomenclature_values["category"] not in categories_cache:
+                    try:
+                        await check_entity_exists(categories, nomenclature_values["category"], user.cashbox_id)
+                        categories_cache.add(nomenclature_values["category"])
+                    except HTTPException as e:
+                        exceptions.append(str(nomenclature_values) + " " + e.detail)
+                        continue
+    
+            if nomenclature_values.get("manufacturer") is not None:
+                if nomenclature_values["manufacturer"] not in manufacturers_cache:
+                    try:
+                        await check_entity_exists(manufacturers, nomenclature_values["manufacturer"], user.id)
+                        manufacturers_cache.add(nomenclature_values["manufacturer"])
+                    except HTTPException as e:
+                        exceptions.append(str(nomenclature_values) + " " + e.detail)
+                        continue
+    
+            if nomenclature_values.get("unit") is not None:
+                if nomenclature_values["unit"] not in units_cache:
+                    try:
+                        await check_unit_exists(nomenclature_values["unit"])
+                        units_cache.add(nomenclature_values["unit"])
+                    except HTTPException as e:
+                        exceptions.append(str(nomenclature_values) + " " + e.detail)
+                        continue
+    
+            query = nomenclature.insert().values(nomenclature_values)
+            nomenclature_id = await database.execute(query)
+            inserted_ids.add(nomenclature_id)
+    
+        query = nomenclature.select().where(nomenclature.c.cashbox == user.cashbox_id, nomenclature.c.id.in_(inserted_ids))
+        nomenclature_db = await database.fetch_all(query)
+        nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
 
     await manager.send_message(
         token,

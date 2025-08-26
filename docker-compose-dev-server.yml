@@ -109,6 +109,7 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_PORT: ${RABBITMQ_PORT}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      GEOAPIFY_SECRET: ${GEOAPIFY_SECRET}
     networks:
       - nginx-proxy
       - infrastructure

@@ -2,6 +2,8 @@ from typing import Optional
 
 import api.warehouses.schemas as schemas
 from database.db import database, warehouses, warehouse_hash
+from apps.geocoders.instance import geocoder
+from database.db import database, warehouses, warehouse_hash
 from fastapi import APIRouter, HTTPException
 from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token, create_entity_hash, update_entity_hash
 from sqlalchemy import func, select
@@ -65,6 +67,30 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
                 except HTTPException as e:
                     exceptions.append(str(warehouse_values) + " " + e.detail)
                     continue
+
+        if warehouse_values.get("address") is None:
+            exceptions.append(str(warehouse_values) + " missing address field")
+            continue
+
+        structured_geo = await geocoder.validate_address(warehouse_values.get("address"))
+
+        if structured_geo is None:
+            exceptions.append(str(warehouse_values) + " incorrect address field")
+            continue
+        
+        warehouse_values.update(
+            {
+                "address": ", ".join(
+                    filter(None, [
+                        structured_geo.city, 
+                        structured_geo.street,  
+                        structured_geo.housenumber,    
+                    ])
+                ),
+                "latitude": structured_geo.latitude,
+                "longitude": structured_geo.longitude,
+            }
+        )
 
         query = warehouses.insert().values(warehouse_values)
         warehouse_id = await database.execute(query)

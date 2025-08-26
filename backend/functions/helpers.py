@@ -777,8 +777,10 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
 def clear_phone_number(phone_number: str) -> Union[int, None]:
     if not phone_number:
         return None
-    return int(''.join(i for i in phone_number if i in string.digits))
-
+    try:
+        return int(''.join(i for i in phone_number if i in string.digits))
+    except ValueError: # если телефон состоит из букв, а не цифр
+        return None
 
 async def get_statement(statement_id: str, account_id: str, access_token: str):
     async with aiohttp.ClientSession() as session:

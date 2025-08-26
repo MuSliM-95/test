@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, root_validator, Field
 from typing import Optional, List
 
 from api.prices.schemas import PriceInList, PriceGetWithNomenclature
@@ -37,6 +37,9 @@ class NomenclatureCreate(BaseModel):
 
     external_id: Optional[str]
     tags: Optional[List[str]] = []
+    seo_title: Optional[str]
+    seo_description: Optional[str]
+    seo_keywords: Optional[List[str]] = []
 
     class Config:
         orm_mode = True
@@ -59,7 +62,6 @@ class NomenclatureCreate(BaseModel):
                 )
 
         return tag_list
-
 
 class NomenclatureCreateMass(BaseModel):
     __root__: List[NomenclatureCreate]

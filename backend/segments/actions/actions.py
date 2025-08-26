@@ -11,11 +11,11 @@ from sqlalchemy.dialects.postgresql import insert
 from segments.actions.segment_tg_notification import send_segment_notification
 from segments.masks import replace_masks
 
-from api.docs_sales.routers import generate_and_save_order_links
-
 from segments.helpers.collect_obj_ids import collect_objects
 
 from segments.constants import SegmentChangeType
+
+from segments.helpers.functions import create_replacements
 
 
 class SegmentActions:
@@ -151,7 +151,7 @@ class SegmentActions:
         for order_id in order_ids:
             message_text = f'Заказ # - {str(order_id)}\n\n' + message
 
-            replacements = await self.link_replacements(order_id)
+            replacements = await create_replacements(order_id)
 
             message_text = replace_masks(message_text, replacements)
             if send_to == "picker":
@@ -164,13 +164,6 @@ class SegmentActions:
                 notification_text=message_text,
                 segment_id=self.segment_obj.id,
             )
-
-    async def link_replacements(self, order_id):
-        links = await generate_and_save_order_links(order_id)
-        replacements = {}
-        for k,v in links.items():
-            replacements[k] = f"\n\n<a href='{v['url']}'>Открыть заказ</a>"
-        return replacements
 
     async def get_user_chat_ids_by_tag(self, user_tag: str):
         query = (
