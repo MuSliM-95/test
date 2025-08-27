@@ -201,7 +201,7 @@ async def get_user_segments(token: str, is_archived: Optional[bool] = None):
     query = segments.select().where(segments.c.cashbox_id == user.cashbox_id, segments.c.is_deleted.isnot(True))
 
     if is_archived is not None:
-        query = query.where(segments.c.is_archived == is_archived)
+        query = query.where(segments.c.is_archived == (not is_archived))
 
     rows = await database.fetch_all(query)
 
