@@ -876,7 +876,8 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
     sqlalchemy.Column("timezone", String),
-    sqlalchemy.Column("payment_past_edit_days", Integer)
+    sqlalchemy.Column("payment_past_edit_days", Integer),
+    sqlalchemy.Column("shift_work_enabled", Boolean, default=False),
 )
 
 contragents = sqlalchemy.Table(
@@ -2167,6 +2168,27 @@ docs_sales_links = sqlalchemy.Table(
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now),
     sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
+)
+
+
+class ShiftStatus(str, Enum):
+    on_shift = "on_shift"
+    off_shift = "off_shift"
+    on_break = "on_break"
+
+employee_shifts = sqlalchemy.Table(
+    "employee_shifts",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, index=True),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("shift_start", sqlalchemy.DateTime, nullable=False),
+    sqlalchemy.Column("shift_end", sqlalchemy.DateTime, nullable=True),
+    sqlalchemy.Column("status", Enum("on_shift", "off_shift", "on_break", name="shiftstatus"), nullable=False, server_default="off_shift"),
+    sqlalchemy.Column("break_start", sqlalchemy.DateTime, nullable=True),
+    sqlalchemy.Column("break_duration", sqlalchemy.Integer, nullable=True),  # в минутах
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, server_default=func.now()),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, server_default=func.now(), onupdate=func.now()),
 )
 
 nomenclature_hash = sqlalchemy.Table(
