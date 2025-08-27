@@ -6,6 +6,8 @@ from .schemas import (
     ShiftStatus, ShiftResponse, ShiftStatusResponse
 )
 from api.users.schemas import UserWithShiftInfo, CBUsersListShortWithShifts, ShiftStatistics
+from ws_manager import manager
+from .websocket_service import send_shift_update_to_admins, send_statistics_update
 
 router = APIRouter(prefix="/employee-shifts", tags=["employee_shifts"])
 
@@ -64,7 +66,31 @@ async def start_shift(token: str):
         )
     )
     
-    return ShiftResponse(**dict(new_shift))
+    shift_response = ShiftResponse(**dict(new_shift))
+    
+    # Отправляем веб-сокет уведомление пользователю
+    await manager.send_message(
+        token,
+        {
+            "action": "start_shift",
+            "target": "employee_shifts", 
+            "result": dict(shift_response),
+            "user_id": user.id,
+            "cashbox_id": user.cashbox_id
+        }
+    )
+    
+    # Отправляем уведомление администраторам
+    await send_shift_update_to_admins(
+        cashbox_id=user.cashbox_id,
+        shift_data=dict(shift_response),
+        action="start_shift"
+    )
+    
+    # Обновляем статистику для админов
+    await send_statistics_update(user.cashbox_id)
+    
+    return shift_response
 
 
 @router.post("/end", response_model=ShiftResponse)
@@ -117,7 +143,31 @@ async def end_shift(token: str):
         )
     )
     
-    return ShiftResponse(**dict(updated_shift))
+    shift_response = ShiftResponse(**dict(updated_shift))
+    
+    # Отправляем веб-сокет уведомление пользователю
+    await manager.send_message(
+        token,
+        {
+            "action": "end_shift",
+            "target": "employee_shifts",
+            "result": dict(shift_response),
+            "user_id": user.id,
+            "cashbox_id": user.cashbox_id
+        }
+    )
+    
+    # Отправляем уведомление администраторам
+    await send_shift_update_to_admins(
+        cashbox_id=user.cashbox_id,
+        shift_data=dict(shift_response),
+        action="end_shift"
+    )
+    
+    # Обновляем статистику для админов
+    await send_statistics_update(user.cashbox_id)
+    
+    return shift_response
 
 
 @router.post("/break", response_model=ShiftResponse)
@@ -169,7 +219,31 @@ async def create_break(token: str, duration_minutes: int):
         )
     )
     
-    return ShiftResponse(**dict(updated_shift))
+    shift_response = ShiftResponse(**dict(updated_shift))
+    
+    # Отправляем веб-сокет уведомление пользователю
+    await manager.send_message(
+        token,
+        {
+            "action": "start_break",
+            "target": "employee_shifts",
+            "result": dict(shift_response),
+            "user_id": user.id,
+            "cashbox_id": user.cashbox_id
+        }
+    )
+    
+    # Отправляем уведомление администраторам
+    await send_shift_update_to_admins(
+        cashbox_id=user.cashbox_id,
+        shift_data=dict(shift_response),
+        action="start_break"
+    )
+    
+    # Обновляем статистику для админов
+    await send_statistics_update(user.cashbox_id)
+    
+    return shift_response
 
 
 @router.get("/status", response_model=ShiftStatusResponse)
@@ -212,6 +286,8 @@ async def get_shift_status(token: str):
     
     # Проверяем истек ли перерыв и обновляем при необходимости
     current_shift_data = dict(active_shift)
+    auto_updated = False
+    
     if (active_shift.status == ShiftStatus.on_break and 
         active_shift.break_start and 
         active_shift.break_duration):
@@ -241,6 +317,31 @@ async def get_shift_status(token: str):
                 )
             )
             current_shift_data = dict(updated_shift)
+            auto_updated = True
+    
+    # Если произошло автоматическое обновление, отправляем уведомление
+    if auto_updated:
+        shift_response = ShiftResponse(**current_shift_data)
+        await manager.send_message(
+            token,
+            {
+                "action": "auto_end_break",
+                "target": "employee_shifts",
+                "result": dict(shift_response),
+                "user_id": user.id,
+                "cashbox_id": user.cashbox_id
+            }
+        )
+        
+        # Уведомляем администраторов об автоматическом завершении перерыва
+        await send_shift_update_to_admins(
+            cashbox_id=user.cashbox_id,
+            shift_data=dict(shift_response),
+            action="auto_end_break"
+        )
+        
+        # Обновляем статистику для админов
+        await send_statistics_update(user.cashbox_id)
     
     return ShiftStatusResponse(
         is_on_shift=current_shift_data["status"] in [ShiftStatus.on_shift, ShiftStatus.on_break],
@@ -386,3 +487,79 @@ async def get_shifts_statistics(token: str):
         total_active=int(stats.total_active_shifts or 0),
         shift_enabled_users=shift_enabled_count
     )
+
+
+@router.post("/break/end", response_model=ShiftResponse)
+async def end_break_early(token: str):
+    """Завершить перерыв досрочно"""
+    
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    #  Проверяем, что пользователь на перерыве
+    active_shift = await database.fetch_one(
+        employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.status == ShiftStatus.on_break,
+                employee_shifts.c.shift_end.is_(None)
+            )
+        )
+    )
+    
+    if not active_shift:
+        raise HTTPException(status_code=400, detail="Пользователь не на перерыве")
+    
+    now = datetime.utcnow()
+    updated_shift = await database.fetch_one(
+        employee_shifts.update().where(
+            employee_shifts.c.id == active_shift.id
+        ).values(
+            status=ShiftStatus.on_shift,
+            break_start=None,
+            break_duration=None,
+            updated_at=now
+        ).returning(
+            employee_shifts.c.id,
+            employee_shifts.c.user_id,
+            employee_shifts.c.cashbox_id,
+            employee_shifts.c.shift_start,
+            employee_shifts.c.shift_end,
+            employee_shifts.c.status,
+            employee_shifts.c.break_start,
+            employee_shifts.c.break_duration,
+            employee_shifts.c.created_at,
+            employee_shifts.c.updated_at
+        )
+    )
+    
+    shift_response = ShiftResponse(**dict(updated_shift))
+    
+    # Отправляем веб-сокет уведомление пользователю
+    await manager.send_message(
+        token,
+        {
+            "action": "end_break",
+            "target": "employee_shifts",
+            "result": dict(shift_response),
+            "user_id": user.id,
+            "cashbox_id": user.cashbox_id
+        }
+    )
+    
+    # Отправляем уведомление администраторам
+    await send_shift_update_to_admins(
+        cashbox_id=user.cashbox_id,
+        shift_data=dict(shift_response),
+        action="end_break"
+    )
+    
+    # Обновляем статистику для админов
+    await send_statistics_update(user.cashbox_id)
+    
+    return shift_response
