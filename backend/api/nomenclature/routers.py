@@ -7,7 +7,7 @@ import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
     warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups, \
-    nomenclature_attributes, nomenclature_attributes_value
+    nomenclature_attributes, nomenclature_attributes_value, warehouse_hash, nomenclature_hash
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body, Query
 
@@ -18,6 +18,7 @@ from functions.helpers import (
     get_entity_by_id,
     get_user_by_token,
     nomenclature_unit_id_to_name,
+    create_entity_hash, update_entity_hash
 )
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
@@ -530,6 +531,7 @@ async def edit_nomenclature(
         )
         await database.execute(query)
         nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+        await update_entity_hash(table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db)
 
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
@@ -571,6 +573,7 @@ async def edit_nomenclature_mass(
             )
             await database.execute(query)
             nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+            await update_entity_hash(table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db)
 
         nomenclature_db = datetime_to_timestamp(nomenclature_db)
 

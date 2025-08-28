@@ -1,8 +1,9 @@
 from api.users import schemas as schemas
 from fastapi import APIRouter, HTTPException
 from functions import users as func
-from database.db import database, users, users_cboxes_relation, user_permissions, pboxes
+from database.db import database, users, users_cboxes_relation, user_permissions, pboxes, employee_shifts
 from sqlalchemy import select, func as fsql, or_, and_
+from datetime import datetime
 
 from functions.helpers import raise_wrong_token
 
@@ -36,7 +37,8 @@ async def get_user_list(token: str, name: str = None, limit: int = 100, offset: 
         users.c.external_id,
         users.c.first_name,
         users.c.last_name,
-        users_cboxes_relation.c.status
+        users_cboxes_relation.c.status,
+        users_cboxes_relation.c.shift_work_enabled
     ).\
         where(*filters).\
         join(users, users.c.id == users_cboxes_relation.c.user).\
@@ -392,3 +394,65 @@ async def get_my_permissions(token: str):
         "username": target_user.username,
         "permissions": permissions_list
     }
+
+
+@router.patch("/{user_id}/shift-settings", response_model=schemas.UserShiftSettingsResponse)
+async def update_user_shift_settings(user_id: int, settings: schemas.UserShiftSettings, token: str):
+    """Включить/выключить работу по сменам для пользователя"""
+    
+    current_user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    current_user = await database.fetch_one(current_user_query)
+    
+    if not current_user or not current_user.is_owner:
+        raise HTTPException(status_code=403, detail="Только администратор может управлять настройками смен")
+    
+    # Проверяем что целевой пользователь принадлежит к той же кассе
+    target_user_query = users_cboxes_relation.select().where(
+        and_(
+            users_cboxes_relation.c.id == user_id,
+            users_cboxes_relation.c.cashbox_id == current_user.cashbox_id
+        )
+    )
+    target_user = await database.fetch_one(target_user_query)
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # Обновляем настройки смены
+    await database.execute(
+        users_cboxes_relation.update().where(
+            users_cboxes_relation.c.id == user_id
+        ).values(shift_work_enabled=settings.shift_work_enabled)
+    )
+    
+    # Если отключаем смены - завершаем активную смену
+    if not settings.shift_work_enabled:
+        active_shift_query = employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user_id,
+                employee_shifts.c.status.in_(["on_shift", "on_break"]),
+                employee_shifts.c.shift_end.is_(None)
+            )
+        )
+        active_shift = await database.fetch_one(active_shift_query)
+        
+        if active_shift:
+            await database.execute(
+                employee_shifts.update().where(
+                    employee_shifts.c.id == active_shift.id
+                ).values(
+                    shift_end=datetime.utcnow(),
+                    status="off_shift",
+                    break_start=None,
+                    break_duration=None,
+                    updated_at=datetime.utcnow()
+                )
+            )
+    
+    return schemas.UserShiftSettingsResponse(
+        success=True,
+        message=f"Настройки смены {'включены' if settings.shift_work_enabled else 'выключены'}",
+        shift_work_enabled=settings.shift_work_enabled
+    )

@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 
-from pydantic import BaseModel, validator, root_validator
+from pydantic import BaseModel, validator, root_validator, Field
 from typing import Optional, List
 
 from api.prices.schemas import PriceInList, PriceGetWithNomenclature
@@ -31,8 +31,10 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
+    chatting_percent: Optional[int] = Field(default=None, le=100, gt=0)
     cashback_type: Optional[NomenclatureCashbackType] = NomenclatureCashbackType.lcard_cashback
     cashback_value: Optional[int] = 0
+
     external_id: Optional[str]
     tags: Optional[List[str]] = []
     seo_title: Optional[str]
@@ -106,6 +108,7 @@ class NomenclatureGet(NomenclatureCreate):
     group_id: Optional[int]
     group_name: Optional[str]
     is_main: Optional[bool]
+    chatting_percent: Optional[int] = Field(None, gt=0, le=100)
     updated_at: int
     created_at: int
 

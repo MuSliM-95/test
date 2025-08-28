@@ -6,7 +6,7 @@ from sqlalchemy.sql import Select
 from database.db import (
     docs_sales, OrderStatus, docs_sales_delivery_info, docs_sales_goods,
     nomenclature, categories, contragents, loyality_cards,
-    loyality_transactions, contragents_tags, tags, docs_sales_tags
+    loyality_transactions, contragents_tags, tags, docs_sales_tags, pictures
 )
 from segments.ranges import apply_range, apply_date_range
 
@@ -16,6 +16,31 @@ def add_picker_filters(query: Select, picker_filters, sub):
     where_clauses = []
 
     assigned = picker_filters.get("assigned")
+
+    photos_not_added_minutes = picker_filters.get("photos_not_added_minutes")
+
+    if photos_not_added_minutes is not None and isinstance(photos_not_added_minutes, int):
+        sales_entity = "docs_sales"
+
+        pictures_of_sales = pictures.c.entity == sales_entity
+        pictures_of_order = pictures.c.entity_id == sub.c.id
+
+        # year,month,week,days,hour,min,sec
+        interval = func.make_interval(0, 0, 0, 0, 0, photos_not_added_minutes, 0)
+
+        picker_finished = sub.c.picker_finished_at.isnot(None)
+
+        not_any_photo = ~exists(
+            select(1).where(and_(
+                pictures_of_sales,
+                pictures_of_order
+            )))
+
+        picker_late_photos = func.now() >= sub.c.picker_finished_at + interval
+
+        photo_filter = and_(picker_finished, not_any_photo, picker_late_photos)
+
+        where_clauses.append(photo_filter)
 
     if assigned is not None:
         apply_range(sub.c.assigned_picker,

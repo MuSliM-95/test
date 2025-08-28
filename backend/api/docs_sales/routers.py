@@ -93,6 +93,12 @@ from ws_manager import manager
 from . import schemas
 from .notify_service import format_notification_text, send_order_notification
 
+from api.employee_shifts.service import (
+    check_user_on_shift,
+    get_available_pickers_on_shift,
+    get_available_couriers_on_shift
+)
+
 router = APIRouter(tags=["docs_sales"])
 
 contragents_cache = set()
@@ -2623,6 +2629,78 @@ async def notify_order(
 
     if notify_config.type == schemas.NotifyType.assembly:
         if order.assigned_picker:
+            if await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
+                picker_query = (
+                    select([users.c.chat_id])
+                    .select_from(
+                        users.join(
+                            users_cboxes_relation,
+                            users.c.id == users_cboxes_relation.c.user,
+                        )
+                    )
+                    .where(users_cboxes_relation.c.id == order.assigned_picker)
+                )
+                picker = await database.fetch_one(picker_query)
+                if picker and picker.chat_id:
+                    recipients.append(picker.chat_id)
+        
+        if not recipients:
+            available_pickers = await get_available_pickers_on_shift(order.cashbox)
+            
+            if available_pickers:
+                pickers_query = (
+                    select([users.c.chat_id])
+                    .select_from(
+                        users.join(
+                            users_cboxes_relation,
+                            users.c.id == users_cboxes_relation.c.user,
+                        )
+                    )
+                    .where(users_cboxes_relation.c.id.in_(available_pickers))
+                )
+                pickers = await database.fetch_all(pickers_query)
+                for picker in pickers:
+                    if picker.chat_id:
+                        recipients.append(picker.chat_id)
+
+    elif notify_config.type == schemas.NotifyType.delivery:
+        if order.assigned_courier:
+            if await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
+                courier_query = (
+                    select([users.c.chat_id])
+                    .select_from(
+                        users.join(
+                            users_cboxes_relation,
+                            users.c.id == users_cboxes_relation.c.user,
+                        )
+                    )
+                    .where(users_cboxes_relation.c.id == order.assigned_courier)
+                )
+                courier = await database.fetch_one(courier_query)
+                if courier and courier.chat_id:
+                    recipients.append(courier.chat_id)
+        
+        if not recipients:
+            available_couriers = await get_available_couriers_on_shift(order.cashbox)
+            
+            if available_couriers:
+                couriers_query = (
+                    select([users.c.chat_id])
+                    .select_from(
+                        users.join(
+                            users_cboxes_relation,
+                            users.c.id == users_cboxes_relation.c.user,
+                        )
+                    )
+                    .where(users_cboxes_relation.c.id.in_(available_couriers))
+                )
+                couriers = await database.fetch_all(couriers_query)
+                for courier in couriers:
+                    if courier.chat_id:
+                        recipients.append(courier.chat_id)
+
+    elif notify_config.type == schemas.NotifyType.general:
+        if order.assigned_picker and await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
             picker_query = (
                 select([users.c.chat_id])
                 .select_from(
@@ -2636,9 +2714,8 @@ async def notify_order(
             picker = await database.fetch_one(picker_query)
             if picker and picker.chat_id:
                 recipients.append(picker.chat_id)
-
-    elif notify_config.type == schemas.NotifyType.delivery:
-        if order.assigned_courier:
+        
+        if order.assigned_courier and await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
             courier_query = (
                 select([users.c.chat_id])
                 .select_from(
@@ -2652,7 +2729,32 @@ async def notify_order(
             courier = await database.fetch_one(courier_query)
             if courier and courier.chat_id:
                 recipients.append(courier.chat_id)
+        
+        if not recipients:
+            all_available = []
+            available_pickers = await get_available_pickers_on_shift(order.cashbox)  # По умолчанию учитывает настройки
+            available_couriers = await get_available_couriers_on_shift(order.cashbox)  # По умолчанию учитывает настройки
+            all_available.extend(available_pickers)
+            all_available.extend(available_couriers)
+            all_available = list(set(all_available)) 
+            
+            if all_available:
+                workers_query = (
+                    select([users.c.chat_id])
+                    .select_from(
+                        users.join(
+                            users_cboxes_relation,
+                            users.c.id == users_cboxes_relation.c.user,
+                        )
+                    )
+                    .where(users_cboxes_relation.c.id.in_(all_available))
+                )
+                workers = await database.fetch_all(workers_query)
+                for worker in workers:
+                    if worker.chat_id:
+                        recipients.append(worker.chat_id)
 
+    # Если никого не найдено среди работников со сменами - уведомляем админа
     if not recipients:
         owner_query = (
             select([users.c.chat_id])
@@ -2750,25 +2852,42 @@ async def update_order_status(
         # Если сборщик еще не назначен, назначаем текущего пользователя
         if not order.assigned_picker:
             update_values["assigned_picker"] = user.id
-        if order.assigned_picker:
-            notification_recipients.append(order.assigned_picker)
+        
+        # Проверяем назначенного сборщика
+        assigned_picker = order.assigned_picker or user.id
+        if await check_user_on_shift(assigned_picker):
+            notification_recipients.append(assigned_picker)
+        else:
+            # Ищем всех доступных сборщиков на смене
+            available_pickers = await get_available_pickers_on_shift(order.cashbox)
+            notification_recipients.extend(available_pickers)
 
-    # Автоматическое назначение курьера при переходе в статус "Передан курьеру"
     elif target_status == OrderStatus.picked:
         update_values["courier_picked_at"] = datetime.datetime.now()
         # Если курьер еще не назначен, назначаем текущего пользователя
         if not order.assigned_courier:
             update_values["assigned_courier"] = user.id
-        if order.assigned_courier:
-            notification_recipients.append(order.assigned_courier)
+        
+        assigned_courier = order.assigned_courier or user.id
+        if await check_user_on_shift(assigned_courier):
+            notification_recipients.append(assigned_courier)
+        else:
+            available_couriers = await get_available_couriers_on_shift(order.cashbox)
+            notification_recipients.extend(available_couriers)
 
     elif target_status == OrderStatus.collected:
         update_values["picker_finished_at"] = datetime.datetime.now()
         if order.assigned_courier:
-            notification_recipients.append(order.assigned_courier)
+            if await check_user_on_shift(order.assigned_courier):
+                notification_recipients.append(order.assigned_courier)
+            else:
+                available_couriers = await get_available_couriers_on_shift(order.cashbox)
+                notification_recipients.extend(available_couriers)
 
     elif target_status == OrderStatus.delivered:
         update_values["courier_delivered_at"] = datetime.datetime.now()
+
+    notification_recipients = list(set(notification_recipients))
 
     if status_update.comment:
         update_values["comment"] = (
@@ -2982,6 +3101,7 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
                 courier_data["delivery"] = {
                     "address": delivery.address,
                     "delivery_date": delivery.delivery_date,
+                    "delivery_price": delivery.delivery_price,
                     "recipient": delivery.recipient,
                     "note": delivery.note,
                 }
