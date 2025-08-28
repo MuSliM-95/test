@@ -99,6 +99,7 @@ class RecipientInfoSchema(BaseModel):
 class DeliveryInfoSchema(BaseModel):
     address: Optional[str]
     delivery_date: Optional[int]
+    delivery_price: Optional[float]
     recipient: Optional[RecipientInfoSchema]
     note: Optional[str]
 
