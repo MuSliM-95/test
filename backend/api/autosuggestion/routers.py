@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from apps.geocoders.instance import geocoder
+from common.geocoders.instance import geocoder
 
 from api.autosuggestion.schemas import AutosuggestResponse
 

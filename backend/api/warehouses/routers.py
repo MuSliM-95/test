@@ -1,7 +1,7 @@
 from typing import Optional
 
 import api.warehouses.schemas as schemas
-from apps.geocoders.instance import geocoder
+from common.geocoders.instance import geocoder
 from database.db import database, warehouses
 from fastapi import APIRouter, HTTPException
 from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token

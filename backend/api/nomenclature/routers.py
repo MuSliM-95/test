@@ -19,7 +19,6 @@ from functions.helpers import (
     get_user_by_token,
     nomenclature_unit_id_to_name,
 )
-from apps.geocoders.instance import geocoder
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
 from sqlalchemy.dialects.postgresql import insert as pg_insert

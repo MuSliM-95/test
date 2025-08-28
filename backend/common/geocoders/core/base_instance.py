@@ -1,4 +1,4 @@
-from apps.geocoders.schemas import GeocoderSearchResponse
+from common.geocoders.schemas import GeocoderSearchResponse
 from abc import ABC, abstractmethod
 from typing import Union, List
 

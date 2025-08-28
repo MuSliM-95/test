@@ -2,9 +2,9 @@ import aiohttp
 import asyncio
 from typing import Union
 
-from apps.geocoders.core.base_instance import BaseGeocoder
-from apps.geocoders.schemas import GeocoderSearchResponse
-from apps.geocoders.utils import AsyncLRU
+from common.geocoders.core.base_instance import BaseGeocoder
+from common.geocoders.schemas import GeocoderSearchResponse
+from common.geocoders.utils import AsyncLRU
 
 
 class Geoapify(BaseGeocoder):
