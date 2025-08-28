@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import List
 
 from database.db import (
@@ -145,15 +146,73 @@ class SegmentActions:
 
         await self.add_existed_tags(contragents_ids, {"name": names})
 
+    def _check_recipient_conditions(self, data: dict):
+        """
+        Проверяет, соответствует ли текущее время всем заданным условиям.
+        Возвращает True, если все условия выполнены или не заданы.
+        """
+
+        now = datetime.now()
+
+        # Проверка временного диапазона
+        if data.get("time_range"):
+            time_range = data["time_range"]
+            current_time = now.time()
+
+            # Парсим время начала и конца
+            from_time = datetime.strptime(time_range["from_"], "%H:%M").time()
+            to_time = datetime.strptime(time_range["to_"], "%H:%M").time()
+
+            # Проверяем, попадает ли текущее время в диапазон
+            if from_time <= to_time:
+                # Обычный случай: диапазон в пределах одних суток (например, 09:00-17:00)
+                if not (from_time <= current_time <= to_time):
+                    return False
+            else:
+                # Диапазон через полночь (например, 22:00-06:00)
+                if not (current_time >= from_time or current_time <= to_time):
+                    return False
+
+        # Проверка дней недели (1=понедельник, 7=воскресенье)
+        if data.get("weekdays"):
+            current_weekday = now.isoweekday()  # 1=понедельник, 7=воскресенье
+            if current_weekday not in data["weekdays"]:
+                return False
+
+        # Проверка дней месяца
+        if data.get("month_days"):
+            current_day = now.day
+            if current_day not in data["month_days"]:
+                return False
+
+        # Проверка модуло дня месяца
+        if data.get("month_day_modulo"):
+            modulo = data["month_day_modulo"]
+            current_day = now.day
+            if current_day % modulo["divisor"] != modulo["remainder"]:
+                return False
+
+        return True
+
+
     async def send_tg_notification(self, order_ids:List[int], data: dict):
-        chat_ids = []
+        chat_ids = set()
         message = data.get("message")
         send_to = data.get("send_to")
         user_tag = data.get("user_tag")
-        if not message or (not send_to and not user_tag):
+        recipients = data.get("recipients")
+        if not message or (not send_to and not user_tag and not recipients):
             return
-        if send_to is None or send_to not in ["picker", "courier"]:
-            chat_ids = await self.get_user_chat_ids_by_tag(user_tag)
+        if user_tag:
+            chat_ids.update(await self.get_user_chat_ids_by_tag(user_tag))
+
+        if recipients:
+            for recipient in recipients:
+                if self._check_recipient_conditions(recipient.get("conditions", {})):
+                    chat_ids.update(
+                        await self.get_user_chat_ids_by_tag(recipient.get("user_tag"))
+                    )
+
         for order_id in order_ids:
             message_text = f'Заказ # - {str(order_id)}\n\n' + message
 
@@ -161,12 +220,13 @@ class SegmentActions:
 
             message_text = replace_masks(message_text, replacements)
             if send_to == "picker":
-                chat_ids = await self.get_picker_chat_id(order_id)
+                chat_ids.update(await self.get_picker_chat_id(order_id))
             elif send_to == "courier":
-                chat_ids = await self.get_courier_chat_id(order_id)
-
+                chat_ids.update(await self.get_courier_chat_id(order_id))
+            if not chat_ids:
+                return False
             await send_segment_notification(
-                recipient_ids=chat_ids,
+                recipient_ids=list(chat_ids),
                 notification_text=message_text,
                 segment_id=self.segment_obj.id,
             )
