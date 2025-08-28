@@ -12,6 +12,17 @@ from .websocket_service import send_shift_update_to_admins, send_statistics_upda
 router = APIRouter(prefix="/employee-shifts", tags=["employee_shifts"])
 
 
+def serialize_shift_data(shift_data: dict) -> dict:
+    """Преобразует datetime поля в строки для JSON сериализации"""
+    serialized = {}
+    for key, value in shift_data.items():
+        if isinstance(value, datetime):
+            serialized[key] = value.isoformat()
+        else:
+            serialized[key] = value
+    return serialized
+
+
 @router.post("/start", response_model=ShiftResponse)
 async def start_shift(token: str):
     """Начать смену"""
@@ -67,6 +78,8 @@ async def start_shift(token: str):
     )
     
     shift_response = ShiftResponse(**dict(new_shift))
+    shift_response_dict = shift_response.dict()
+    serialized_data = serialize_shift_data(shift_response_dict)
     
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -74,7 +87,7 @@ async def start_shift(token: str):
         {
             "action": "start_shift",
             "target": "employee_shifts", 
-            "result": dict(shift_response),
+            "result": serialized_data,
             "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
@@ -83,7 +96,7 @@ async def start_shift(token: str):
     # Отправляем уведомление администраторам
     await send_shift_update_to_admins(
         cashbox_id=user.cashbox_id,
-        shift_data=dict(shift_response),
+        shift_data=serialized_data,
         action="start_shift"
     )
     
@@ -144,6 +157,8 @@ async def end_shift(token: str):
     )
     
     shift_response = ShiftResponse(**dict(updated_shift))
+    shift_response_dict = shift_response.dict()
+    serialized_data = serialize_shift_data(shift_response_dict)
     
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -151,7 +166,7 @@ async def end_shift(token: str):
         {
             "action": "end_shift",
             "target": "employee_shifts",
-            "result": dict(shift_response),
+            "result": serialized_data,
             "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
@@ -160,7 +175,7 @@ async def end_shift(token: str):
     # Отправляем уведомление администраторам
     await send_shift_update_to_admins(
         cashbox_id=user.cashbox_id,
-        shift_data=dict(shift_response),
+        shift_data=serialized_data,
         action="end_shift"
     )
     
@@ -220,6 +235,8 @@ async def create_break(token: str, duration_minutes: int):
     )
     
     shift_response = ShiftResponse(**dict(updated_shift))
+    shift_response_dict = shift_response.dict()
+    serialized_data = serialize_shift_data(shift_response_dict)
     
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -227,7 +244,7 @@ async def create_break(token: str, duration_minutes: int):
         {
             "action": "start_break",
             "target": "employee_shifts",
-            "result": dict(shift_response),
+            "result": serialized_data,
             "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
@@ -236,7 +253,7 @@ async def create_break(token: str, duration_minutes: int):
     # Отправляем уведомление администраторам
     await send_shift_update_to_admins(
         cashbox_id=user.cashbox_id,
-        shift_data=dict(shift_response),
+        shift_data=serialized_data,
         action="start_break"
     )
     
@@ -322,12 +339,15 @@ async def get_shift_status(token: str):
     # Если произошло автоматическое обновление, отправляем уведомление
     if auto_updated:
         shift_response = ShiftResponse(**current_shift_data)
+        shift_response_dict = shift_response.dict()
+        serialized_data = serialize_shift_data(shift_response_dict)
+        
         await manager.send_message(
             token,
             {
                 "action": "auto_end_break",
                 "target": "employee_shifts",
-                "result": dict(shift_response),
+                "result": serialized_data,
                 "user_id": user.id,
                 "cashbox_id": user.cashbox_id
             }
@@ -336,7 +356,7 @@ async def get_shift_status(token: str):
         # Уведомляем администраторов об автоматическом завершении перерыва
         await send_shift_update_to_admins(
             cashbox_id=user.cashbox_id,
-            shift_data=dict(shift_response),
+            shift_data=serialized_data,
             action="auto_end_break"
         )
         
@@ -539,6 +559,8 @@ async def end_break_early(token: str):
     )
     
     shift_response = ShiftResponse(**dict(updated_shift))
+    shift_response_dict = shift_response.dict()
+    serialized_data = serialize_shift_data(shift_response_dict)
     
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -546,7 +568,7 @@ async def end_break_early(token: str):
         {
             "action": "end_break",
             "target": "employee_shifts",
-            "result": dict(shift_response),
+            "result": serialized_data,
             "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
@@ -555,7 +577,7 @@ async def end_break_early(token: str):
     # Отправляем уведомление администраторам
     await send_shift_update_to_admins(
         cashbox_id=user.cashbox_id,
-        shift_data=dict(shift_response),
+        shift_data=serialized_data,
         action="end_break"
     )
     

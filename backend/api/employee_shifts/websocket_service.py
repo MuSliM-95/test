@@ -7,6 +7,19 @@ from ws_manager import manager
 from .schemas import ShiftStatus
 
 
+def serialize_datetime_fields(data: dict) -> dict:
+    """
+    Преобразует все datetime поля в строки для JSON сериализации
+    """
+    serialized = {}
+    for key, value in data.items():
+        if isinstance(value, datetime):
+            serialized[key] = value.isoformat()
+        else:
+            serialized[key] = value
+    return serialized
+
+
 async def send_shift_time_updates():
     """
     Отправляет обновления времени для всех активных смен
@@ -50,7 +63,10 @@ async def send_shift_time_updates():
                     "user_id": shift.user_id,
                     "shift_duration_minutes": shift_duration_minutes,
                     "status": shift.status,
-                    "cashbox_id": shift.cashbox_id
+                    "cashbox_id": shift.cashbox_id,
+                    "shift_start": shift.shift_start.isoformat() if shift.shift_start else None,
+                    "break_start": shift.break_start.isoformat() if shift.break_start else None,
+                    "break_duration": shift.break_duration
                 },
                 "timestamp": datetime.utcnow().isoformat()
             }
@@ -75,6 +91,9 @@ async def send_shift_update_to_admins(cashbox_id: int, shift_data: dict, action:
         action: Тип действия (start_shift, end_shift, start_break, end_break)
     """
     try:
+        # Сериализуем datetime поля
+        serialized_data = serialize_datetime_fields(shift_data)
+        
         # Находим всех администраторов кассы
         admin_query = select([users_cboxes_relation.c.token]).where(
             and_(
@@ -93,7 +112,7 @@ async def send_shift_update_to_admins(cashbox_id: int, shift_data: dict, action:
                     {
                         "action": f"admin_{action}",
                         "target": "employee_shifts",
-                        "result": shift_data,
+                        "result": serialized_data,
                         "timestamp": datetime.utcnow().isoformat()
                     }
                 )
@@ -110,24 +129,32 @@ async def send_statistics_update(cashbox_id: int):
         cashbox_id: ID кассы
     """
     try:
-        # Получаем актуальную статистику
         from sqlalchemy import func
         
-        stats_query = select([
-            func.count().label('total_active_shifts'),
-            func.sum(func.case([(employee_shifts.c.status == 'on_shift', 1)], else_=0)).label('on_shift_count'),
-            func.sum(func.case([(employee_shifts.c.status == 'on_break', 1)], else_=0)).label('on_break_count')
-        ]).select_from(
+        # Подсчитываем людей на смене
+        on_shift_query = select([func.count(employee_shifts.c.id)]).select_from(
             employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
         ).where(
             and_(
                 users_cboxes_relation.c.cashbox_id == cashbox_id,
                 employee_shifts.c.shift_end.is_(None),
-                employee_shifts.c.status.in_(["on_shift", "on_break"])
+                employee_shifts.c.status == 'on_shift'
             )
         )
         
-        stats = await database.fetch_one(stats_query)
+        # Подсчитываем людей на перерыве
+        on_break_query = select([func.count(employee_shifts.c.id)]).select_from(
+            employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
+        ).where(
+            and_(
+                users_cboxes_relation.c.cashbox_id == cashbox_id,
+                employee_shifts.c.shift_end.is_(None),
+                employee_shifts.c.status == 'on_break'
+            )
+        )
+        
+        on_shift_count = await database.fetch_val(on_shift_query) or 0
+        on_break_count = await database.fetch_val(on_break_query) or 0
         
         # Пользователи с включенными сменами
         shift_enabled_query = select([func.count(users_cboxes_relation.c.id)]).where(
@@ -140,10 +167,10 @@ async def send_statistics_update(cashbox_id: int):
         shift_enabled_count = await database.fetch_val(shift_enabled_query) or 0
         
         statistics_data = {
-            "on_shift_count": int(stats.on_shift_count or 0),
-            "on_break_count": int(stats.on_break_count or 0), 
-            "total_active": int(stats.total_active_shifts or 0),
-            "shift_enabled_users": shift_enabled_count
+            "on_shift_count": int(on_shift_count),
+            "on_break_count": int(on_break_count), 
+            "total_active": int(on_shift_count + on_break_count),
+            "shift_enabled_users": int(shift_enabled_count)
         }
         
         # Находим всех администраторов кассы
