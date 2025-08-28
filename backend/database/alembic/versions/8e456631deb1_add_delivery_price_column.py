@@ -1,6 +1,6 @@
 """Add delivery_price column
 
-Revision ID: 8e456631deb1
+Revision ID: 3df9a9052a94
 Revises: 1c68f42fc047
 Create Date: 2025-08-28 15:36:34.341204
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '8e456631deb1'
+revision = '3df9a9052a94'
 down_revision = '1c68f42fc047'
 branch_labels = None
 depends_on = None
