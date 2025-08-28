@@ -2982,6 +2982,7 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
                 courier_data["delivery"] = {
                     "address": delivery.address,
                     "delivery_date": delivery.delivery_date,
+                    "delivery_price": delivery.delivery_price,
                     "recipient": delivery.recipient,
                     "note": delivery.note,
                 }

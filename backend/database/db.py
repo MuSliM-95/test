@@ -1238,6 +1238,7 @@ docs_sales_delivery_info = sqlalchemy.Table(
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("address", String),
     sqlalchemy.Column("delivery_date", DateTime(timezone=True)),
+    sqlalchemy.Column("delivery_price", Float),
     sqlalchemy.Column("recipient", JSON),
     sqlalchemy.Column("note", String),
 )

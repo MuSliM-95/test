@@ -822,6 +822,7 @@ async def add_delivery_info_to_doc(doc: dict) -> dict:
         doc["delivery_info"] = {
             "address": delivery_info.get('address'),
             "delivery_date": delivery_info['delivery_date'].timestamp() if delivery_info.get('delivery_date') else None,
+            "delivery_price": delivery_info['delivery_price'],
             "recipient": delivery_info.get('recipient'),
             "note": delivery_info.get('note'),
         }
