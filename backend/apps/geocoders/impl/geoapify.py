@@ -40,7 +40,7 @@ class Geoapify(BaseGeocoder):
             async with session.get(self.autocomplete_url, params=params) as resp:
                 resp.raise_for_status()
                 data = await resp.json()
-                return [f["properties"]["formatted"].split(",") for f in data.get("features", [])]
+                return [f["properties"]["formatted"] for f in data.get("features", [])]
         except aiohttp.ClientError as e:
             return []
 
