@@ -81,9 +81,12 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
             {
                 "address": ", ".join(
                     filter(None, [
+                        structured_geo.country,
+                        structured_geo.state,
                         structured_geo.city, 
                         structured_geo.street,  
                         structured_geo.housenumber,    
+                        structured_geo.postcode,
                     ])
                 ),
                 "latitude": structured_geo.latitude,

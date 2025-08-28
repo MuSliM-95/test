@@ -31,6 +31,8 @@ class Warehouse(WarehouseCreate):
     id: int
     updated_at: int
     created_at: int
+    longitude: float
+    latitude: float
 
     class Config:
         orm_mode = True
