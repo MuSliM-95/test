@@ -1,4 +1,4 @@
-from apps.geocoders.impl.geoapify import Geoapify
+from common.geocoders.impl.geoapify import Geoapify
 from dotenv import load_dotenv
 import os
 

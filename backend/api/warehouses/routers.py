@@ -2,7 +2,7 @@ from typing import Optional
 
 import api.warehouses.schemas as schemas
 from database.db import database, warehouses, warehouse_hash
-from apps.geocoders.instance import geocoder
+from common.geocoders.instance import geocoder
 from database.db import database, warehouses, warehouse_hash
 from fastapi import APIRouter, HTTPException
 from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token, create_entity_hash, update_entity_hash
@@ -82,9 +82,12 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
             {
                 "address": ", ".join(
                     filter(None, [
+                        structured_geo.country,
+                        structured_geo.state,
                         structured_geo.city, 
                         structured_geo.street,  
                         structured_geo.housenumber,    
+                        structured_geo.postcode,
                     ])
                 ),
                 "latitude": structured_geo.latitude,

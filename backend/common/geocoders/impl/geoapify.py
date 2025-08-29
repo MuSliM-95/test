@@ -2,9 +2,9 @@ import aiohttp
 import asyncio
 from typing import Union
 
-from apps.geocoders.core.base_instance import BaseGeocoder
-from apps.geocoders.schemas import GeocoderSearchResponse
-from apps.geocoders.utils import AsyncLRU
+from common.geocoders.core.base_instance import BaseGeocoder
+from common.geocoders.schemas import GeocoderSearchResponse
+from common.geocoders.utils import AsyncLRU
 
 
 class Geoapify(BaseGeocoder):
@@ -40,7 +40,7 @@ class Geoapify(BaseGeocoder):
             async with session.get(self.autocomplete_url, params=params) as resp:
                 resp.raise_for_status()
                 data = await resp.json()
-                return [f["properties"]["formatted"].split(",")[0] for f in data.get("features", [])]
+                return [f["properties"]["formatted"] for f in data.get("features", [])]
         except aiohttp.ClientError as e:
             return []
 

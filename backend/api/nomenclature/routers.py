@@ -20,7 +20,6 @@ from functions.helpers import (
     nomenclature_unit_id_to_name,
     create_entity_hash, update_entity_hash
 )
-from apps.geocoders.instance import geocoder
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
 from sqlalchemy.dialects.postgresql import insert as pg_insert
