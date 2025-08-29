@@ -47,6 +47,9 @@ from jobs.tochka_bank_job.job import tochka_update_transaction
 from jobs.check_account.job import check_account
 from jobs.segment_jobs.job import segment_update
 
+# Добавляем импорт для обновления времени смен
+from api.employee_shifts.websocket_service import send_shift_time_updates
+
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
 )
@@ -85,6 +88,8 @@ scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", m
 scheduler.add_job(func=check_account, trigger="interval", seconds=accountant_interval, id="check_account", max_instances=1, replace_existing=True)
 scheduler.add_job(func=segment_update, trigger="interval", seconds=60, id="segment_update", max_instances=1, replace_existing=True)
 
+# Добавляем джоб для обновления времени смен каждую минуту
+scheduler.add_job(func=send_shift_time_updates, trigger="interval", minutes=1, id="shift_time_updates", max_instances=1, replace_existing=True)
 
 scheduler.add_jobstore(jobstore)
 

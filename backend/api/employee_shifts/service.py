@@ -67,9 +67,8 @@ async def get_available_workers_on_shift(cashbox_id: int, role_filter: str = Non
         query = query.where(users_cboxes_relation.c.shift_work_enabled == True)
     
     if role_filter:
-        query = query.where(
-            users_cboxes_relation.c.tags.contains([role_filter])
-        )
+        # Правильный способ фильтрации по массиву в PostgreSQL
+        query = query.where(users_cboxes_relation.c.tags.any(role_filter))
     
     workers = await database.fetch_all(query)
     return [worker.id for worker in workers]
