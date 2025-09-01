@@ -76,6 +76,7 @@ class TgNotificationsConditions(BaseModel):
 
 class Recipient(BaseModel):
     user_tag: str
+    shift_status: Optional[Literal["on_shift", "off_shift", "on_break"]]
     conditions: Optional[TgNotificationsConditions]
 
 
@@ -83,6 +84,7 @@ class TgNotificationsAction(BaseModel):
     trigger_on_new: bool = True
     message: str
     user_tag: Optional[str]
+    shift_status: Optional[Literal["on_shift", "off_shift", "on_break"]]
     send_to: Optional[Literal["picker", "courier"]]
     recipients: Optional[List[Recipient]]
 

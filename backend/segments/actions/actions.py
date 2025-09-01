@@ -4,7 +4,7 @@ from typing import List
 
 from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
-    users_cboxes_relation, docs_sales, docs_sales_tags
+    users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts
 )
 from sqlalchemy import select, and_, func, literal
 from sqlalchemy.dialects.postgresql import insert
@@ -17,12 +17,6 @@ from segments.helpers.collect_obj_ids import collect_objects
 from segments.constants import SegmentChangeType
 
 from segments.helpers.functions import create_replacements
-
-from api.employee_shifts.service import (
-    check_user_on_shift,
-    get_available_pickers_on_shift,
-    get_available_couriers_on_shift, get_available_workers_on_shift
-)
 
 
 class SegmentActions:
@@ -201,17 +195,17 @@ class SegmentActions:
         send_to = data.get("send_to")
         user_tag = data.get("user_tag")
         recipients = data.get("recipients")
-        only_for_shift = data.get("only_for_shift")
-        if not message or (not send_to and not user_tag and not recipients) or only_for_shift is None:
+        shift_status = data.get("shift_status")
+        if not message or (not send_to and not user_tag and not recipients):
             return
         if user_tag:
-            chat_ids.update(await self.get_user_chat_ids_by_tag(user_tag))
+            chat_ids.update(await self.get_user_chat_ids_by_tag(user_tag, shift_status))
 
         if recipients:
             for recipient in recipients:
                 if self._check_recipient_conditions(recipient.get("conditions", {})):
                     chat_ids.update(
-                        await self.get_user_chat_ids_by_tag(recipient.get("user_tag"))
+                        await self.get_user_chat_ids_by_tag(recipient.get("user_tag"), recipient.get("shift_status"))
                     )
 
         for order_id in order_ids:
@@ -232,142 +226,46 @@ class SegmentActions:
                 segment_id=self.segment_obj.id,
             )
 
-    async def get_user_chat_ids_by_tag(self, user_tag: str, only_for_shift: bool):
-        if only_for_shift:
-            available_workers = await get_available_workers_on_shift(
-                self.segment_obj.cashbox_id,
-                user_tag,
-                check_shift_settings=True
-            )
-            res = []
-            for i in available_workers:
-                query = select(users.c.chat_id).where(users.c.id == i)
-                res.append(await database.fetch_one(query))
-            return res
-        else:
+    async def get_user_chat_ids_by_tag(self, user_tag: str, shift_status: str = None):
+        subquery = (
+            select(users.c.chat_id, users_cboxes_relation.c.id.label("relation_id"))
+            .join(users_cboxes_relation,
+                  users_cboxes_relation.c.user == users.c.id)
+            .where(and_(
+                users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
+                literal(user_tag) == func.any(users_cboxes_relation.c.tags)
+            ))
+        ).subquery("sub")
+        query = select(subquery.c.chat_id)
+        if shift_status:
             query = (
-                select(users.c.chat_id)
-                .join(users_cboxes_relation,
-                      users_cboxes_relation.c.user == users.c.id)
-                .where(and_(
-                    users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
-                    literal(user_tag) == func.any(users_cboxes_relation.c.tags)
-                ))
+                query
+                .join(employee_shifts, subquery.c.relation_id == employee_shifts.c.user_id)
+                .where(employee_shifts.c.status == shift_status)
             )
-            rows = await database.fetch_all(query)
-            return [row.chat_id for row in rows]
+        rows = await database.fetch_all(query)
+        return [row.chat_id for row in rows]
 
-    async def get_picker_chat_id(self, order_id: int, only_for_shift: bool):
-        if only_for_shift:
-            order_query = docs_sales.select().where(
-                and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id)
-            )
-            order = await database.fetch_one(order_query)
-
-            if not order:
-                return []
-
-            chat_ids = []
-
-            # Проверяем назначенного сборщика
-            if order.assigned_picker:
-                # Проверяем смену с учетом настроек пользователя
-                if await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
-                    query = (
-                        select(users.c.chat_id)
-                        .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-                        .where(users_cboxes_relation.c.id == order.assigned_picker)
-                    )
-                    picker = await database.fetch_one(query)
-                    if picker and picker.chat_id:
-                        chat_ids.append(picker.chat_id)
-
-            # Если нет назначенного сборщика или он не на смене, ищем доступных
-            if not chat_ids:
-                available_pickers = await get_available_pickers_on_shift(
-                    self.segment_obj.cashbox_id,
-                    check_shift_settings=True
-                )
-
-                if available_pickers:
-                    query = (
-                        select(users.c.chat_id)
-                        .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-                        .where(
-                            and_(
-                                users_cboxes_relation.c.id.in_(available_pickers),
-                                users.c.chat_id.is_not(None)
-                            )
-                        )
-                    )
-                    rows = await database.fetch_all(query)
-                    chat_ids = [row.chat_id for row in rows if row.chat_id]
-
-            return chat_ids
-        else:
-            query = (
-                select(users.c.chat_id)
-                .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-                .outerjoin(docs_sales, docs_sales.c.assigned_picker == users_cboxes_relation.c.id)
-                .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
-            )
-            rows = await database.fetch_all(query)
-            return [row.chat_id for row in rows]
+    async def get_picker_chat_id(self, order_id: int):
+        query = (
+            select(users.c.chat_id)
+            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
+            .outerjoin(docs_sales, docs_sales.c.assigned_picker == users_cboxes_relation.c.id)
+            .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
+        )
+        rows = await database.fetch_all(query)
+        return [row.chat_id for row in rows]
 
 
-    async def get_courier_chat_id(self, order_id: int, only_for_shift: bool):
-        if only_for_shift:
-            order_query = docs_sales.select().where(
-                and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id)
-            )
-            order = await database.fetch_one(order_query)
-
-            if not order:
-                return []
-
-            chat_ids = []
-
-            if order.assigned_courier:
-                if await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
-                    query = (
-                        select(users.c.chat_id)
-                        .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-                        .where(users_cboxes_relation.c.id == order.assigned_courier)
-                    )
-                    courier = await database.fetch_one(query)
-                    if courier and courier.chat_id:
-                        chat_ids.append(courier.chat_id)
-
-            if not chat_ids:
-                available_couriers = await get_available_couriers_on_shift(
-                    self.segment_obj.cashbox_id,
-                    check_shift_settings=True
-                )
-
-                if available_couriers:
-                    query = (
-                        select(users.c.chat_id)
-                        .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-                        .where(
-                            and_(
-                                users_cboxes_relation.c.id.in_(available_couriers),
-                                users.c.chat_id.is_not(None)
-                            )
-                        )
-                    )
-                    rows = await database.fetch_all(query)
-                    chat_ids = [row.chat_id for row in rows if row.chat_id]
-
-            return chat_ids
-        else:
-            query = (
-                select(users.c.chat_id)
-                .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-                .outerjoin(docs_sales, docs_sales.c.assigned_courier == users_cboxes_relation.c.id)
-                .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
-            )
-            rows = await database.fetch_all(query)
-            return [row.chat_id for row in rows]
+    async def get_courier_chat_id(self, order_id: int):
+        query = (
+            select(users.c.chat_id)
+            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
+            .outerjoin(docs_sales, docs_sales.c.assigned_courier == users_cboxes_relation.c.id)
+            .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
+        )
+        rows = await database.fetch_all(query)
+        return [row.chat_id for row in rows]
 
     async def add_docs_sales_tags(self, docs_ids:List[int], data: dict):
 
