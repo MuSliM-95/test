@@ -423,7 +423,7 @@ async def update_user_shift_settings(user_id: int, settings: schemas.UserShiftSe
     # Обновляем настройки смены
     await database.execute(
         users_cboxes_relation.update().where(
-            users_cboxes_relation.c.id == user_id
+            users_cboxes_relation.c.user == user_id
         ).values(shift_work_enabled=settings.shift_work_enabled)
     )
     
