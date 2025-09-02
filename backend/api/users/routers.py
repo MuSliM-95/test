@@ -411,14 +411,13 @@ async def update_user_shift_settings(user_id: int, settings: schemas.UserShiftSe
     # Проверяем что целевой пользователь принадлежит к той же кассе
     target_user_query = users_cboxes_relation.select().where(
         and_(
-            users_cboxes_relation.c.id == user_id,
+            users_cboxes_relation.c.user == user_id,
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id
         )
     )
     target_user = await database.fetch_one(target_user_query)
     
     if not target_user:
-        print('target_user not found', user_id, current_user.cashbox_id)
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     # Обновляем настройки смены
