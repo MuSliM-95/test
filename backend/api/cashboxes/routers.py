@@ -67,8 +67,10 @@ async def read_cashbox_users(
             )
 
         cb_users = await database.fetch_all(q)
-
+        user_ids = []
         for u in cb_users:
+            if u.user in user_ids: # для избежания дубликатов
+                continue
             q = users.select(users.c.id == u.user).filter(*filters)
             tg_acc = await database.fetch_one(q)
 
@@ -91,6 +93,7 @@ async def read_cashbox_users(
             }
 
             users_list.append(user_dict)
+            user_ids.append(u.user)
 
         return {"result": users_list, "count": count}
 
