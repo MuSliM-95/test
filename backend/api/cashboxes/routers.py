@@ -31,102 +31,70 @@ async def read_cashbox_users(
     
     if not user or not user.status:
         raise_wrong_token()
-    
-    filters = get_filters_users(users, filters)
-    users_list = []
 
-    sort_list = sort.split(":")
-    if sort_list[0] not in ["created_at", "updated_at"]:
-        raise HTTPException(
-            status_code=400, detail="Вы ввели некорректный параметр сортировки!"
-        )
-    
-    # ОПТИМИЗИРОВАННЫЙ ЗАПРОС С JOIN
-    if sort_list[1] == "desc":
-        q = (
-            select([
-                users.c.id,
-                users.c.external_id,
-                users.c.photo,
-                users.c.first_name,
-                users.c.last_name,
-                users.c.username,
-                users_cboxes_relation.c.status,
-                users_cboxes_relation.c.is_owner,
-                users.c.created_at,  # ← Исправлено
-                users.c.updated_at,  # ← Исправлено
-                users_cboxes_relation.c.tags,
-                users_cboxes_relation.c.timezone,
-                users_cboxes_relation.c.payment_past_edit_days,
-                users_cboxes_relation.c.shift_work_enabled
-            ])
-            .select_from(users_cboxes_relation.join(users, users.c.id == users_cboxes_relation.c.user))
-            .where(users_cboxes_relation.c.cashbox_id == user.cashbox_id)
-            .filter(*filters)
-            .order_by(desc(getattr(users_cboxes_relation.c, sort_list[0])))
-            .offset(offset)
-            .limit(limit)
-        )
-    elif sort_list[1] == "asc":
-        q = (
-            select([
-                users.c.id,
-                users.c.external_id,
-                users.c.photo,
-                users.c.first_name,
-                users.c.last_name,
-                users.c.username,
-                users_cboxes_relation.c.status,
-                users_cboxes_relation.c.is_owner,
-                users.c.created_at,  # ← Исправлено
-                users.c.updated_at,  # ← Исправлено
-                users_cboxes_relation.c.tags,
-                users_cboxes_relation.c.timezone,
-                users_cboxes_relation.c.payment_past_edit_days,
-                users_cboxes_relation.c.shift_work_enabled
-            ])
-            .select_from(users_cboxes_relation.join(users, users.c.id == users_cboxes_relation.c.user))
-            .where(users_cboxes_relation.c.cashbox_id == user.cashbox_id)
-            .filter(*filters)
-            .order_by(asc(getattr(users_cboxes_relation.c, sort_list[0])))
-            .offset(offset)
-            .limit(limit)
-        )
-    else:
-        raise HTTPException(
-            status_code=400, detail="Вы ввели некорректный параметр сортировки!"
-        )
+    if user.status:
+        filters = get_filters_users(users, filters)
+        users_list = []
+        count = 0
 
-    results = await database.fetch_all(q)
+        sort_list = sort.split(":")
+        if sort_list[0] not in ["created_at", "updated_at"]:
+            raise HTTPException(
+                status_code=400, detail="Вы ввели некорректный параметр сортировки!"
+            )
+        if sort_list[1] == "desc":
+            q = (
+                users_cboxes_relation.select()
+                .where(users_cboxes_relation.c.cashbox_id == user.cashbox_id)
+                .filter(*filters)
+                .order_by(desc(getattr(users_cboxes_relation.c, sort_list[0])))
+                .offset(offset)
+                .limit(limit)
+            )
 
-    count_query = (
-        select([func.count()])
-        .select_from(users_cboxes_relation)
-        .where(users_cboxes_relation.c.cashbox_id == user.cashbox_id)
-        .filter(*filters)
-    )
-    count = await database.fetch_val(count_query)
+        elif sort_list[1] == "asc":
+            q = (
+                users_cboxes_relation.select()
+                .where(users_cboxes_relation.c.cashbox_id == user.cashbox_id)
+                .filter(*filters)
+                .order_by(asc(getattr(users_cboxes_relation.c, sort_list[0])))
+                .offset(offset)
+                .limit(limit)
+            )
+        else:
+            raise HTTPException(
+                status_code=400, detail="Вы ввели некорректный параметр сортировки!"
+            )
 
-    for result in results:
-        user_dict = {
-            "id": result.id,
-            "external_id": result.external_id,
-            "photo": result.photo,
-            "first_name": result.first_name,
-            "last_name": result.last_name,
-            "username": result.username,
-            "status": result.status,
-            "is_admin": result.is_owner,
-            "created_at": result.created_at,
-            "updated_at": result.updated_at,
-            "tags": result.tags,
-            "timezone": result.timezone,
-            "payment_past_edit_days": result.payment_past_edit_days,
-            "shift_work_enabled": result.shift_work_enabled
-        }
-    users_list.append(user_dict)
+        cb_users = await database.fetch_all(q)
 
-    return {"result": users_list, "count": count}
+        for u in cb_users:
+            q = users.select(users.c.id == u.user).filter(*filters)
+            tg_acc = await database.fetch_one(q)
+
+            count += 1
+            user_dict = {
+                "id": tg_acc.id,
+                "external_id": tg_acc.external_id,
+                "photo": tg_acc.photo,
+                "first_name": tg_acc.first_name,
+                "last_name": tg_acc.last_name,
+                "username": tg_acc.username,
+                "status": u.status,
+                "is_admin": u.is_owner,
+                "created_at": tg_acc.created_at,
+                "updated_at": tg_acc.updated_at,
+                "tags": u.tags,
+                "timezone": u.timezone,
+                "payment_past_edit_days": u.payment_past_edit_days,
+                "shift_work_enabled": u.shift_work_enabled
+            }
+
+            users_list.append(user_dict)
+
+        return {"result": users_list, "count": count}
+
+    raise_wrong_token()
 
 
 @router.put("/cashbox_users/", response_model=user_schemas.CBUsers)
