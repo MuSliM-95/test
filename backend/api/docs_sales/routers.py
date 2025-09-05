@@ -3159,6 +3159,21 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
         if goods:
             order_dict["goods"] = goods
 
+        # собираем инфу о доставке
+        query = docs_sales_delivery_info.select().where(
+            docs_sales_delivery_info.c.docs_sales_id == order_id
+        )
+        delivery = await database.fetch_one(query)
+
+        if delivery:
+            order_dict["delivery"] = {
+                "address": delivery.address,
+                "delivery_date": delivery.delivery_date,
+                "delivery_price": delivery.delivery_price,
+                "recipient": delivery.recipient,
+                "note": delivery.note,
+            }
+
         return order_dict
     else:
         raise HTTPException(status_code=400, detail="Неизвестная роль")

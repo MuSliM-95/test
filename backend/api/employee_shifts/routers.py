@@ -88,7 +88,7 @@ async def start_shift(token: str):
             "action": "start_shift",
             "target": "employee_shifts", 
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -167,7 +167,7 @@ async def end_shift(token: str):
             "action": "end_shift",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -245,7 +245,7 @@ async def create_break(token: str, duration_minutes: int):
             "action": "start_break",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -348,7 +348,7 @@ async def get_shift_status(token: str):
                 "action": "auto_end_break",
                 "target": "employee_shifts",
                 "result": serialized_data,
-                "user_id": user.id,
+                "user_id": user.user,
                 "cashbox_id": user.cashbox_id
             }
         )
@@ -569,7 +569,7 @@ async def end_break_early(token: str):
             "action": "end_break",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
