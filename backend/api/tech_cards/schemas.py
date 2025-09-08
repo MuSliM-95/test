@@ -43,6 +43,7 @@ class TechCardItemCreate(BaseModel):
     waste_from_heat_processing: float = Field(0, gt=0)
     quantity: float = Field(0, gt=0)
     gross_weight: float = Field(0, gt=0)
+    output: float = Field(0, gt=0)
 
 
 class TechCardCreate(TechCardBase):

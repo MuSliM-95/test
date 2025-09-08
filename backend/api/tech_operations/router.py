@@ -14,6 +14,9 @@ from api.tech_operations.models import (
     TechOperationComponentDB,
     TechOperationPaymentDB,
 )
+
+from database.db import warehouses, warehouse_balances, warehouse_register_movement
+
 from api.deps import get_db, get_user_by_token
 import uuid
 
@@ -65,7 +68,24 @@ async def create_tech_operation(
     db.add(db_tech_operation)
     db.commit()
     db.refresh(db_tech_operation)
-    return db_tech_operation
+
+    result = {
+        "id": db_tech_operation.id,
+        "user_id": db_tech_operation.user_id,
+        "tech_card_id": db_tech_operation.tech_card_id,
+        "output_quantity": db_tech_operation.output_quantity,
+        "from_warehouse_id": db_tech_operation.from_warehouse_id,
+        "to_warehouse_id": db_tech_operation.to_warehouse_id,
+        "nomenclature_id": db_tech_operation.nomenclature_id,
+        "status": db_tech_operation.status,
+        "created_at": db_tech_operation.created_at,
+        "production_order_id": db_tech_operation.production_order_id,
+        "consumption_order_id": db_tech_operation.consumption_order_id,
+        "component_quantities": tech_operation.component_quantities,
+        "payment_ids": tech_operation.payment_ids,
+    }
+
+    return result
 
 
 @router.post(
