@@ -74,7 +74,7 @@ class TechCardWarehouseOperationHandler(IEventHandler[TechCardWarehouseOperation
                 query_current_amount = warehouse_balances.select().where(
                     warehouse_balances.c.cashbox_id == user.cashbox_id,
                     warehouse_balances.c.nomenclature_id == row['nomenclature_id']
-                )
+                ).order_by(warehouse_balances.c.id.desc())
                 warehouse_balances_db = await database.fetch_one(query_current_amount)
                 current_amount = warehouse_balances_db.current_amount if warehouse_balances_db else 0
                 incloming_produced_product_query = warehouse_balances.insert().values(
