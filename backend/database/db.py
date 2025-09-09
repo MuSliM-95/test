@@ -136,12 +136,15 @@ class OrderStatus(str, ENUM):
     collected = "collected"
     picked = "picked"
     delivered = "delivered"
+    closed = "closed"
+    success = "success"
 
 
 class SegmentStatus(str, ENUM):
     created = "created"
     in_process = "in_process"
     calculated = "calculated"
+
 
 
 metadata = sqlalchemy.MetaData()
@@ -579,9 +582,13 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
+    sqlalchemy.Column("chatting_percent", Integer, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("seo_title", String),
+    sqlalchemy.Column("seo_description", String),
+    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String))
 )
 
 nomenclature_attributes = sqlalchemy.Table(
@@ -685,6 +692,8 @@ warehouses = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("address", String),
+    sqlalchemy.Column("latitude", Float),
+    sqlalchemy.Column("longitude", Float),
     sqlalchemy.Column("phone", String),
     sqlalchemy.Column("parent", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
@@ -733,6 +742,7 @@ price_types = sqlalchemy.Table(
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("is_system", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -879,7 +889,8 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
     sqlalchemy.Column("timezone", String),
-    sqlalchemy.Column("payment_past_edit_days", Integer)
+    sqlalchemy.Column("payment_past_edit_days", Integer),
+    sqlalchemy.Column("shift_work_enabled", Boolean, default=False),
 )
 
 contragents = sqlalchemy.Table(
@@ -1246,6 +1257,7 @@ docs_sales_delivery_info = sqlalchemy.Table(
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("address", String),
     sqlalchemy.Column("delivery_date", DateTime(timezone=True)),
+    sqlalchemy.Column("delivery_price", Float),
     sqlalchemy.Column("recipient", JSON),
     sqlalchemy.Column("note", String),
 )
@@ -2170,4 +2182,45 @@ docs_sales_links = sqlalchemy.Table(
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now),
     sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
+)
+
+
+class ShiftStatus(str, Enum):
+    on_shift = "on_shift"
+    off_shift = "off_shift"
+    on_break = "on_break"
+
+employee_shifts = sqlalchemy.Table(
+    "employee_shifts",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, index=True),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("shift_start", sqlalchemy.DateTime, nullable=False),
+    sqlalchemy.Column("shift_end", sqlalchemy.DateTime, nullable=True),
+    sqlalchemy.Column("status", Enum("on_shift", "off_shift", "on_break", name="shiftstatus"), nullable=False, server_default="off_shift"),
+    sqlalchemy.Column("break_start", sqlalchemy.DateTime, nullable=True),
+    sqlalchemy.Column("break_duration", sqlalchemy.Integer, nullable=True),  # в минутах
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, server_default=func.now()),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, server_default=func.now(), onupdate=func.now()),
+)
+
+nomenclature_hash = sqlalchemy.Table(
+    "nomenclature_hash",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column("hash", String, nullable=False),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+)
+
+warehouse_hash = sqlalchemy.Table(
+    "warehouse_hash",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True),
+    sqlalchemy.Column("warehouses_id", Integer, ForeignKey("warehouses.id"), nullable=False),
+    sqlalchemy.Column("hash", String, nullable=False),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 )

@@ -5,7 +5,7 @@ from database.db import database, price_types
 import api.price_types.schemas as schemas
 
 from functions.helpers import datetime_to_timestamp, get_entity_by_id
-from functions.helpers import get_user_by_token
+from functions.helpers import get_user_by_token, raise_bad_request
 
 from ws_manager import manager
 from sqlalchemy import select, func
@@ -88,6 +88,10 @@ async def edit_price_type(
     """Редактирование типа цен"""
     user = await get_user_by_token(token)
     price_type_db = await get_entity_by_id(price_types, idx, user.cashbox_id)
+
+    if price_type_db.is_system:
+        raise_bad_request("Невозможно редактировать системный вид цены")
+
     price_type_values = price_type.dict(exclude_unset=True)
 
     if price_type_values:
@@ -114,8 +118,11 @@ async def delete_price_type(token: str, idx: int):
     """Удаление типа цен"""
     user = await get_user_by_token(token)
 
-    await get_entity_by_id(price_types, idx, user.cashbox_id)
+    price_type_db = await get_entity_by_id(price_types, idx, user.cashbox_id)
 
+    if price_type_db.is_system:
+        raise_bad_request("Невозможно удалить системный вид цены")
+    
     query = (
         price_types.update()
         .where(price_types.c.id == idx, price_types.c.cashbox == user.cashbox_id)

@@ -130,6 +130,7 @@ from api.distribution_docs.routers import router as distribution_docs_router
 from api.fifo_settings.routers import router as fifo_settings_router
 from api.warehouse_balances.routers import router as warehouse_balances_router
 from api.gross_profit_docs.routers import router as gross_profit_docs_router
+from api.autosuggestion.routers import router as autosuggestion_router
 
 from api.loyality_cards.routers import router as loyality_cards
 from api.loyality_transactions.routers import router as loyality_transactions
@@ -158,6 +159,7 @@ from api.tech_cards.router import router as tech_cards_router
 from api.tech_operations.router import router as tech_operations_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
+from api.employee_shifts.routers import router as employee_shifts_router
 # from jobs.jobs import scheduler
 
 # sentry_sdk.init(
@@ -244,6 +246,9 @@ app.include_router(utm_router)
 app.include_router(segments_router)
 app.include_router(tech_cards_router)
 app.include_router(tech_operations_router)
+app.include_router(autosuggestion_router)
+
+app.include_router(employee_shifts_router)
 
 
 @app.get("/health")
