@@ -13,14 +13,15 @@ class TechCardStatus(str, Enum):
 
 class TechOperationComponentQuantities(BaseModel):
     name: str = Field(..., min_length=1)
+    nomenclature_id: int
     quantity: float
 
 
 class TechOperationBase(BaseModel):
     tech_card_id: UUID
     output_quantity: float
-    from_warehouse_id: UUID
-    to_warehouse_id: UUID
+    from_warehouse_id: int
+    to_warehouse_id: int
     nomenclature_id: int
     # количество выпускаемого изделия
     component_quantities: List[TechOperationComponentQuantities]
@@ -47,5 +48,6 @@ class TechOperationComponentCreate(BaseModel):
     # component_id: UUID
     name: str = Field(..., min_length=1)
     quantity: float
+    nomeclature_id: int
     gross_weight: Optional[float] = None
     net_weight: Optional[float] = None

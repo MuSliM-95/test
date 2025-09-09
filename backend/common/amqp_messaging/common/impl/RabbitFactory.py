@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict
 
 import aio_pika
@@ -22,14 +23,24 @@ class RabbitFactory(IRabbitFactory):
     async def __call__(
         self
     ) -> IRabbitFactory:
-
         amqp_connection = AmqpConnection(
             settings=self.__settings
         )
-        await amqp_connection.install()
+
+        retries = 3
+        for i in range(retries):
+            try:
+                await amqp_connection.install()
+            except Exception as e:
+                if retries == 0:
+                    raise Exception(f'ошибка в инсталл {e}')
+                print('retry', retries)
+                retries -= 1
+                await asyncio.sleep(1 * retries)
 
         channels: Dict[str, AbstractRobustChannel] = {}
         channels[f"publication"] = aio_pika.abc.AbstractChannel = await amqp_connection.get_channel()
+
 
         rabbit_channel = RabbitChannel(
             channels=channels,

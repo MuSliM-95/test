@@ -3,6 +3,7 @@ import string
 import hashlib
 from datetime import datetime
 from typing import Optional, Union
+import json
 
 import aiohttp
 import math
@@ -28,7 +29,7 @@ from database.db import (
     units,
     entity_or_function,
     fifo_settings, docs_sales_settings,
-    user_permissions,
+    user_permissions
 )
 
 
@@ -776,8 +777,10 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
 def clear_phone_number(phone_number: str) -> Union[int, None]:
     if not phone_number:
         return None
-    return int(''.join(i for i in phone_number if i in string.digits))
-
+    try:
+        return int(''.join(i for i in phone_number if i in string.digits))
+    except ValueError: # если телефон состоит из букв, а не цифр
+        return None
 
 async def get_statement(statement_id: str, account_id: str, access_token: str):
     async with aiohttp.ClientSession() as session:
@@ -819,6 +822,7 @@ async def add_delivery_info_to_doc(doc: dict) -> dict:
         doc["delivery_info"] = {
             "address": delivery_info.get('address'),
             "delivery_date": delivery_info['delivery_date'].timestamp() if delivery_info.get('delivery_date') else None,
+            "delivery_price": delivery_info['delivery_price'],
             "recipient": delivery_info.get('recipient'),
             "note": delivery_info.get('note'),
         }
@@ -835,6 +839,44 @@ async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
     return True if article_exists else False
 
 
+async def create_entity_hash(table: Table, table_hash: Table, idx: int):
+    query = table.select().with_only_columns(
+        table.c.id,
+        table.c.created_at,
+        table.c.updated_at
+    ).where(table.c.id == idx)
+    entity = await database.fetch_one(query)
+    data = str({"type": table.name,
+           "id": entity.id,
+           "created_at": entity.created_at,
+           "updated_at": entity.updated_at})
+    
+    hash_string = f"{table.name}_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
+    hash_data = {"hash": hash_string,
+                 f"{table.name}_id": entity.id,
+                 "created_at": datetime.now(),
+                 "updated_at": datetime.now()}
+    insert_query = table_hash.insert().values(hash_data)
+    await database.execute(insert_query)
+
+async def update_entity_hash(table: Table, table_hash: Table, entity):
+    data = str({"type": table.name,
+           "id": entity.id,
+           "created_at": entity.created_at,
+           "updated_at": entity.updated_at})
+    
+    hash_string = f"{table.name}_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
+    hash_data = {"hash": hash_string, f"{table.name}_id": entity.id, "updated_at": datetime.now()}
+    if table.name == "nomenclature":
+        update_query = table_hash.update().where(table_hash.c.nomenclature_id==entity.id).values(hash_data)
+    else:
+        update_query = table_hash.update().where(table_hash.c.warehouses_id==entity.id).values(hash_data)
+    await database.execute(update_query)
+    
+
+
+    
+
 def sanitize_float(value):
     if isinstance(value, float):
         if math.isnan(value) or math.isinf(value):
@@ -849,3 +891,34 @@ def deep_sanitize(obj):
         return [deep_sanitize(v) for v in obj]
     else:
         return sanitize_float(obj)
+
+
+def coerce_value(v: str):
+    """Приведение строк из query к bool/int/float/list/json."""
+    if v is None:
+        return None
+    s = v.strip()
+    # bool
+    if s.lower() in ("true", "false"):
+        return s.lower() == "true"
+    # int
+    if s.isdigit():
+        try:
+            return int(s)
+        except:
+            pass
+    # float (включая отрицательные)
+    try:
+        if '.' in s or (s.startswith('-') and s[1:].replace('.', '', 1).isdigit()):
+            return float(s)
+    except:
+        pass
+    # JSON
+    if (s.startswith('{') and s.endswith('}')) or (s.startswith('[') and s.endswith(']')):
+        try:
+            return json.loads(s)
+        except:
+            pass
+
+    return s
+

@@ -29,6 +29,7 @@ class PickerCourierSchema(BaseModel):
     assigned: Optional[bool]
     start: Optional[DateRange]
     finish: Optional[DateRange]
+    photos_not_added_minutes: Optional[int]
 
 
 class RecipientInfoSchema(BaseModel):

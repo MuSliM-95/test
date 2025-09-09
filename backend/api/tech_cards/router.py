@@ -20,14 +20,12 @@ async def create_tech_card(
     items_data = tech_card_data.pop("items", [])
     db_tech_card = TechCardDB(**tech_card_data, id=uuid.uuid4(), user_id=user.id)
     db.add(db_tech_card)
-    db.commit()
 
     for items in items_data:
         db_component = TechCardItemDB(tech_card_id=db_tech_card.id, **items)
         db.add(db_component)
 
     db.commit()
-
     db.refresh(db_tech_card)
     return db_tech_card
 

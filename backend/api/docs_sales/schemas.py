@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Union
+from uuid import UUID
 import datetime
 
 from database.db import OrderStatus
@@ -62,6 +63,7 @@ class Create(BaseModel):
     paid_rubles: Optional[float]
     paid_lt: Optional[float]
     status: Optional[bool]
+    tech_card_operation_uuid: Optional[UUID] = None
     goods: Optional[List[Item]]
     priority: Optional[conint(ge=0, le=10)] = None
 
@@ -99,6 +101,7 @@ class RecipientInfoSchema(BaseModel):
 class DeliveryInfoSchema(BaseModel):
     address: Optional[str]
     delivery_date: Optional[int]
+    delivery_price: Optional[float]
     recipient: Optional[RecipientInfoSchema]
     note: Optional[str]
 
@@ -107,6 +110,11 @@ class ResponseDeliveryInfoSchema(DeliveryInfoSchema):
     id: int
     docs_sales_id: int
 
+
+class UserShort(BaseModel):
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 class ViewInList(BaseModel):
     id: int
@@ -124,6 +132,7 @@ class ViewInList(BaseModel):
     comment: Optional[str]
     client: Optional[int]
     contragent: Optional[int]
+    contragent_segments: Optional[List[int]]
     contragent_name: Optional[str]
     contract: Optional[int]
     organization: Optional[int]
@@ -143,8 +152,11 @@ class ViewInList(BaseModel):
     color_status: Optional[str] = "default"
     priority: Optional[int] = None
     order_status: Optional[OrderStatus] = None
-    assigned_picker: Optional[int] = None
-    assigned_courier: Optional[int] = None
+
+    # теперь поддерживаем либо id (int) либо развёрнутый объект UserShort
+    assigned_picker: Optional[Union[int, UserShort]] = None
+    assigned_courier: Optional[Union[int, UserShort]] = None
+
     picker_started_at: Optional[datetime.datetime] = None
     picker_finished_at: Optional[datetime.datetime] = None
     courier_picked_at: Optional[datetime.datetime] = None
@@ -196,6 +208,17 @@ class FilterSchema(BaseModel):
     updated_at_from: Optional[int]
     updated_at_to: Optional[int]
     priority: Optional[conint(ge=0, le=10)] = None
+
+    has_delivery: Optional[bool] = None
+    has_picker: Optional[bool] = None
+    has_courier: Optional[bool] = None
+    order_status: Optional[str] = None
+
+    delivery_date_from: Optional[int] = None
+    delivery_date_to: Optional[int] = None
+
+    picker_id: Optional[int] = None
+    courier_id: Optional[int] = None
 
 
 class NotifyType(str, Enum):

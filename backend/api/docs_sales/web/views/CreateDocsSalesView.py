@@ -15,6 +15,8 @@ from api.docs_sales import schemas
 # from api.docs_sales.events.loyalty_points.messages.RecalculateLoyaltyPointsMessageModel import \
 #     RecalculateLoyaltyPointsMessageModel
 
+from api.docs_sales.messages.TechCardWarehouseOperationMessage import TechCardWarehouseOperationMessage
+
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
 from apps.yookassa.functions.impl.GetOauthCredentialFunction import GetOauthCredentialFunction
@@ -56,7 +58,6 @@ class CreateDocsSalesView:
         generate_out: bool = True
     ):
         rabbitmq_messaging: IRabbitMessaging = await self.__rabbitmq_messaging_factory()
-
         user = await get_user_by_token(token)
 
         fks = defaultdict(set)
@@ -562,97 +563,105 @@ class CreateDocsSalesView:
 
         # Юкасса
 
-        yookassa_oauth_service = OauthService(
-            oauth_repository = YookassaOauthRepository(),
-            request_repository = YookassaRequestRepository(),
-            get_oauth_credential_function = GetOauthCredentialFunction()
-        )
+        # yookassa_oauth_service = OauthService(
+        #     oauth_repository = YookassaOauthRepository(),
+        #     request_repository = YookassaRequestRepository(),
+        #     get_oauth_credential_function = GetOauthCredentialFunction()
+        # )
+        #
+        # yookassa_api_service = YookassaApiService(
+        #     request_repository = YookassaRequestRepository(),
+        #     oauth_repository = YookassaOauthRepository(),
+        #     payments_repository = YookassaPaymentsRepository(),
+        #     crm_payments_repository = YookassaCrmPaymentsRepository(),
+        #     table_nomenclature_repository = YookassaTableNomenclature(),
+        #     amo_table_crm_repository = YookasssaAmoTableCrmRepository(),
+        # )
+        # payments_ids = await database.fetch_all(
+        #     select(
+        #         payments.c.id
+        #     ).where(
+        #         payments.c.docs_sales_id.in_([doc["id"] for doc in inserted_docs])
+        #     )
+        # )
+        #
+        # contragents_data = await database.fetch_all(
+        #     select(
+        #         contragents.c.id,
+        #         contragents.c.name,
+        #         contragents.c.phone,
+        #         contragents.c.email
+        #     ).where(
+        #         contragents.c.id.in_([doc.contragent for doc in docs_sales_data.__root__])
+        #     )
+        # )
+        #
+        # payment_subject = {
+        #     "product":"commodity",
+        #     "service":"service"
+        # }
+        #
+        # for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
+        #     if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
+        #         payment_items_data = []
+        #
+        #         goods_sum_item = sum([good.price*good.quantity for good in data.goods])
+        #
+        #         discount_sum_item = round(abs(data.paid_rubles - goods_sum_item), 2)
+        #
+        #         for index, good in enumerate(data.goods):
+        #             payment_items_data.append(
+        #                 ItemModel(
+        #                             description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).name or "Товар",
+        #                             amount = AmountModel(
+        #                                 value = str(round((good.price*good.quantity - discount_sum_item*(good.price*good.quantity/goods_sum_item))/good.quantity, 2)),
+        #                                 currency = "RUB"
+        #                             ),
+        #                             payment_mode = "full_payment",
+        #                             payment_subject = payment_subject.get((await database.fetch_one(select(nomenclature.c.type).where(nomenclature.c.id == int(good.nomenclature)))).type),
+        #                             quantity = good.quantity,
+        #                             vat_code = "1"
+        #                         ))
+        #         sum_goods_diff = [decimal.Decimal(item.amount.value)*int(item.quantity) for item in payment_items_data]
+        #
+        #         if round(sum(sum_goods_diff), 2):
+        #             await yookassa_api_service.api_create_payment(
+        #                 user.cashbox_id,
+        #                 data.warehouse,
+        #                 created["id"],
+        #                 payment_id.get("id"),
+        #                 PaymentCreateModel(
+        #                     amount = AmountModel(
+        #                         value = str(round(sum(sum_goods_diff), 2)),
+        #                         currency = "RUB"
+        #                     ),
+        #                     description = f"Оплата по документу {created['number']}",
+        #                     capture = True,
+        #                     receipt = ReceiptModel(
+        #                         customer = CustomerModel(
+        #                             full_name = contragent_data.name,
+        #                             email = contragent_data.email,
+        #                             phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
+        #                         ),
+        #                         items = payment_items_data,
+        #                     ),
+        #                     confirmation = ConfirmationRedirect(
+        #                         type = "redirect",
+        #                         return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
+        #                     )
+        #                 )
+        #             )
 
-        yookassa_api_service = YookassaApiService(
-            request_repository = YookassaRequestRepository(),
-            oauth_repository = YookassaOauthRepository(),
-            payments_repository = YookassaPaymentsRepository(),
-            crm_payments_repository = YookassaCrmPaymentsRepository(),
-            table_nomenclature_repository = YookassaTableNomenclature(),
-            amo_table_crm_repository = YookasssaAmoTableCrmRepository(),
-        )
-        payments_ids = await database.fetch_all(
-            select(
-                payments.c.id
-            ).where(
-                payments.c.docs_sales_id.in_([doc["id"] for doc in inserted_docs])
-            )
-        )
-
-        contragents_data = await database.fetch_all(
-            select(
-                contragents.c.id,
-                contragents.c.name,
-                contragents.c.phone,
-                contragents.c.email
-            ).where(
-                contragents.c.id.in_([doc.contragent for doc in docs_sales_data.__root__])
-            )
-        )
-
-        payment_subject = {
-            "product":"commodity",
-            "service":"service"
-        }
-
-        for created, data, payment_id, contragent_data in zip(inserted_docs, docs_sales_data.__root__, payments_ids, contragents_data):
-            if await yookassa_oauth_service.validation_oauth(user.cashbox_id, data.warehouse):
-                payment_items_data = []
-
-                goods_sum_item = sum([good.price*good.quantity for good in data.goods])
-
-                discount_sum_item = round(abs(data.paid_rubles - goods_sum_item), 2)
-
-                for index, good in enumerate(data.goods):
-                    payment_items_data.append(
-                        ItemModel(
-                                    description = (await database.fetch_one(select(nomenclature.c.name).where(nomenclature.c.id == int(good.nomenclature)))).name or "Товар",
-                                    amount = AmountModel(
-                                        value = str(round((good.price*good.quantity - discount_sum_item*(good.price*good.quantity/goods_sum_item))/good.quantity, 2)),
-                                        currency = "RUB"
-                                    ),
-                                    payment_mode = "full_payment",
-                                    payment_subject = payment_subject.get((await database.fetch_one(select(nomenclature.c.type).where(nomenclature.c.id == int(good.nomenclature)))).type),
-                                    quantity = good.quantity,
-                                    vat_code = "1"
-                                ))
-                sum_goods_diff = [decimal.Decimal(item.amount.value)*int(item.quantity) for item in payment_items_data]
-
-                if round(sum(sum_goods_diff), 2):
-                    await yookassa_api_service.api_create_payment(
-                        user.cashbox_id,
-                        data.warehouse,
-                        created["id"],
-                        payment_id.get("id"),
-                        PaymentCreateModel(
-                            amount = AmountModel(
-                                value = str(round(sum(sum_goods_diff), 2)),
-                                currency = "RUB"
-                            ),
-                            description = f"Оплата по документу {created['number']}",
-                            capture = True,
-                            receipt = ReceiptModel(
-                                customer = CustomerModel(
-                                    full_name = contragent_data.name,
-                                    email = contragent_data.email,
-                                    phone = f'{phonenumbers.parse(contragent_data.phone,"RU").country_code}{phonenumbers.parse(contragent_data.phone,"RU").national_number}',
-                                ),
-                                items = payment_items_data,
-                            ),
-                            confirmation = ConfirmationRedirect(
-                                type = "redirect",
-                                return_url = f"https://${os.getenv('APP_URL')}/?token=${token}"
-                            )
-                        )
-                    )
-
-        # юкасса
-
+        for create in docs_sales_data.__root__:
+            if create.tech_card_operation_uuid:
+                await rabbitmq_messaging.publish(
+                    TechCardWarehouseOperationMessage(
+                        message_id=uuid.uuid4(),
+                        tech_card_operation_uuid=create.tech_card_operation_uuid,
+                        token=token
+                    ),
+                    routing_key="teach_card_operation"
+                )
         return result
 
     async def _validate_fk(self, table, ids: Set[int], name: str):

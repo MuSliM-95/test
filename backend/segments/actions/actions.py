@@ -1,9 +1,10 @@
 import json
+from datetime import datetime
 from typing import List
 
 from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
-    users_cboxes_relation, docs_sales, docs_sales_tags
+    users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts
 )
 from sqlalchemy import select, and_, func, literal
 from sqlalchemy.dialects.postgresql import insert
@@ -11,11 +12,11 @@ from sqlalchemy.dialects.postgresql import insert
 from segments.actions.segment_tg_notification import send_segment_notification
 from segments.masks import replace_masks
 
-from api.docs_sales.routers import generate_and_save_order_links
-
 from segments.helpers.collect_obj_ids import collect_objects
 
 from segments.constants import SegmentChangeType
+
+from segments.helpers.functions import create_replacements
 
 
 class SegmentActions:
@@ -139,49 +140,109 @@ class SegmentActions:
 
         await self.add_existed_tags(contragents_ids, {"name": names})
 
+    def _check_recipient_conditions(self, data: dict):
+        """
+        Проверяет, соответствует ли текущее время всем заданным условиям.
+        Возвращает True, если все условия выполнены или не заданы.
+        """
+
+        now = datetime.now()
+
+        # Проверка временного диапазона
+        if data.get("time_range"):
+            time_range = data["time_range"]
+            current_time = now.time()
+
+            # Парсим время начала и конца
+            from_time = datetime.strptime(time_range["from_"], "%H:%M").time()
+            to_time = datetime.strptime(time_range["to_"], "%H:%M").time()
+
+            # Проверяем, попадает ли текущее время в диапазон
+            if from_time <= to_time:
+                # Обычный случай: диапазон в пределах одних суток (например, 09:00-17:00)
+                if not (from_time <= current_time <= to_time):
+                    return False
+            else:
+                # Диапазон через полночь (например, 22:00-06:00)
+                if not (current_time >= from_time or current_time <= to_time):
+                    return False
+
+        # Проверка дней недели (1=понедельник, 7=воскресенье)
+        if data.get("weekdays"):
+            current_weekday = now.isoweekday()  # 1=понедельник, 7=воскресенье
+            if current_weekday not in data["weekdays"]:
+                return False
+
+        # Проверка дней месяца
+        if data.get("month_days"):
+            current_day = now.day
+            if current_day not in data["month_days"]:
+                return False
+
+        # Проверка модуло дня месяца
+        if data.get("month_day_modulo"):
+            modulo = data["month_day_modulo"]
+            current_day = now.day
+            if current_day % modulo["divisor"] != modulo["remainder"]:
+                return False
+
+        return True
+
+
     async def send_tg_notification(self, order_ids:List[int], data: dict):
-        chat_ids = []
+        chat_ids = set()
         message = data.get("message")
         send_to = data.get("send_to")
         user_tag = data.get("user_tag")
-        if not message or (not send_to and not user_tag):
+        recipients = data.get("recipients")
+        shift_status = data.get("shift_status")
+        if not message or (not send_to and not user_tag and not recipients):
             return
-        if send_to is None or send_to not in ["picker", "courier"]:
-            chat_ids = await self.get_user_chat_ids_by_tag(user_tag)
+        if user_tag:
+            chat_ids.update(await self.get_user_chat_ids_by_tag(user_tag, shift_status))
+
+        if recipients:
+            for recipient in recipients:
+                if self._check_recipient_conditions(recipient.get("conditions", {})):
+                    chat_ids.update(
+                        await self.get_user_chat_ids_by_tag(recipient.get("user_tag"), recipient.get("shift_status"))
+                    )
+
         for order_id in order_ids:
             message_text = f'Заказ # - {str(order_id)}\n\n' + message
 
-            replacements = await self.link_replacements(order_id)
+            replacements = await create_replacements(order_id)
 
             message_text = replace_masks(message_text, replacements)
             if send_to == "picker":
-                chat_ids = await self.get_picker_chat_id(order_id)
+                chat_ids.update(await self.get_picker_chat_id(order_id))
             elif send_to == "courier":
-                chat_ids = await self.get_courier_chat_id(order_id)
-
+                chat_ids.update(await self.get_courier_chat_id(order_id))
+            if not chat_ids:
+                return False
             await send_segment_notification(
-                recipient_ids=chat_ids,
+                recipient_ids=list(chat_ids),
                 notification_text=message_text,
                 segment_id=self.segment_obj.id,
             )
 
-    async def link_replacements(self, order_id):
-        links = await generate_and_save_order_links(order_id)
-        replacements = {}
-        for k,v in links.items():
-            replacements[k] = f"\n\n<a href='{v['url']}'>Открыть заказ</a>"
-        return replacements
-
-    async def get_user_chat_ids_by_tag(self, user_tag: str):
-        query = (
-            select(users.c.chat_id)
+    async def get_user_chat_ids_by_tag(self, user_tag: str, shift_status: str = None):
+        subquery = (
+            select(users.c.chat_id, users_cboxes_relation.c.id.label("relation_id"))
             .join(users_cboxes_relation,
                   users_cboxes_relation.c.user == users.c.id)
             .where(and_(
                 users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
                 literal(user_tag) == func.any(users_cboxes_relation.c.tags)
             ))
-        )
+        ).subquery("sub")
+        query = select(subquery.c.chat_id)
+        if shift_status:
+            query = (
+                query
+                .join(employee_shifts, subquery.c.relation_id == employee_shifts.c.user_id)
+                .where(employee_shifts.c.status == shift_status)
+            )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
 
@@ -194,6 +255,7 @@ class SegmentActions:
         )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
+
 
     async def get_courier_chat_id(self, order_id: int):
         query = (
