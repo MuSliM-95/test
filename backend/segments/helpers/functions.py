@@ -86,8 +86,9 @@ async def create_delivery_info_text(replacements: dict, docs_sales_id: int):
         data["delivery_date"] = delivery_info.delivery_date.strftime('%d.%m.%Y %H:%M')
     if delivery_info.recipient:
         recipient_data = json.loads(delivery_info.recipient)
-        data["delivery_recipient_name"] = recipient_data.get('name')
-        data["delivery_recipient_phone"] =recipient_data.get('phone')
+        if recipient_data:
+            data["delivery_recipient_name"] = recipient_data.get('name')
+            data["delivery_recipient_phone"] =recipient_data.get('phone')
 
     replacements.update(data)
 
