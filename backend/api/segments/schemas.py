@@ -18,7 +18,7 @@ class Segment(BaseModel):
     actions: Optional[dict] = None
     updated_at: Optional[datetime] = None
     type_of_update: str
-    update_settings: dict
+    update_settings: Optional[dict]
     status: str
     is_archived: bool
 

@@ -53,7 +53,7 @@ async def send_segment_notification(
             )
 
         print(
-            f"Notification 'segment_notification' for segment {segment_id} queued successfully"
+            f"Notification 'segment_notification' for segment {segment_id} queued successfully. {recipient_ids}"
         )
         return True
 
