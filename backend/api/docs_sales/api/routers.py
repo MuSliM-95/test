@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import hashlib
 import os
-import secrets
 from typing import Any, Dict, Optional, Union
 
 from api.docs_warehouses.routers import update as update_warehouse_doc
@@ -90,14 +89,16 @@ from producer import queue_notification
 from sqlalchemy import and_, desc, func, select, exists, or_, String, cast
 from ws_manager import manager
 
-from . import schemas
-from .notify_service import format_notification_text, send_order_notification
+from api.docs_sales import schemas
+from api.docs_sales.notify_service import format_notification_text, send_order_notification
 
 from api.employee_shifts.service import (
     check_user_on_shift,
     get_available_pickers_on_shift,
     get_available_couriers_on_shift
 )
+
+from api.docs_sales.application.queries.GetDocsSalesListQuery import GetDocsSalesListQuery
 
 router = APIRouter(tags=["docs_sales"])
 
@@ -342,322 +343,11 @@ async def get_list(
     token: str,
     limit: int = 100,
     offset: int = 0,
-    show_goods: bool = False,
-    filters: schemas.FilterSchema = Depends(),
-    kanban: bool = False,
+    filters: schemas.FilterSchema = Depends()
 ):
-    """Получение списка документов"""
     user = await get_user_by_token(token)
-
-    query = (
-        select(*docs_sales.columns, contragents.c.name.label("contragent_name"))
-        .select_from(docs_sales)
-        .outerjoin(contragents, docs_sales.c.contragent == contragents.c.id)
-        .where(
-            docs_sales.c.is_deleted.is_not(True),
-            docs_sales.c.cashbox == user.cashbox_id,
-        )
-        .limit(limit)
-        .offset(offset)
-        .order_by(desc(docs_sales.c.id))
-    )
-    count_query = (
-        select(func.count())
-        .select_from(docs_sales)
-        .where(
-            docs_sales.c.is_deleted.is_not(True),
-            docs_sales.c.cashbox == user.cashbox_id,
-        )
-    )
-
-    filters_dict = filters.dict(exclude_none=True)
-    filter_list = []
-
-    # Фильтрация по конкретному сборщику
-    if "picker_id" in filters_dict:
-        pid = filters_dict["picker_id"]
-        # предполагается, что docs_sales_links.c.user_id содержит ID сотрудника
-        picker_exists = exists().where(
-            and_(
-                docs_sales_links.c.docs_sales_id == docs_sales.c.id,
-                docs_sales_links.c.role == Role.picker,
-            )
-        )
-        filter_list.append(picker_exists)
-
-    # Фильтрация по конкретному курьеру/логисту
-    if "courier_id" in filters_dict:
-        cid = filters_dict["courier_id"]
-        courier_exists = exists().where(
-            and_(
-                docs_sales_links.c.docs_sales_id == docs_sales.c.id,
-                docs_sales_links.c.role == Role.courier,
-            )
-        )
-        filter_list.append(courier_exists)
-
-    if "delivery_date_from" in filters_dict or "delivery_date_to" in filters_dict:
-        # Присоединяем таблицу с информацией о доставке
-        query = query.outerjoin(
-            docs_sales_delivery_info,
-            docs_sales_delivery_info.c.docs_sales_id == docs_sales.c.id
-        )
-
-        # Фильтр по началу периода доставки
-        if "delivery_date_from" in filters_dict:
-            filter_list.append(
-                docs_sales_delivery_info.c.delivery_date >= datetime.datetime.fromtimestamp(filters_dict["delivery_date_from"])
-            )
-
-        # Фильтр по концу периода доставки
-        if "delivery_date_to" in filters_dict:
-            filter_list.append(
-                docs_sales_delivery_info.c.delivery_date <= datetime.datetime.fromtimestamp(filters_dict["delivery_date_to"])
-            )
-
-    # Обработка has_delivery
-    if "has_delivery" in filters_dict:
-        address_valid = and_(
-            docs_sales_delivery_info.c.address.isnot(None),
-            func.trim(cast(docs_sales_delivery_info.c.address, String)) != ''
-        )
-
-        note_valid = and_(
-            docs_sales_delivery_info.c.note.isnot(None),
-            func.trim(cast(docs_sales_delivery_info.c.note, String)) != ''
-        )
-
-        # delivery_date: если у вас timestamp -> просто isnot(None); 
-        # если у вас unix-int и 0 означает "пусто" — добавьте != 0
-        delivery_date_valid = docs_sales_delivery_info.c.delivery_date.isnot(None)
-
-        # recipient: приводим к тексту и отсеиваем '{}' / 'null' / пустую строку
-        recipient_text = func.trim(cast(docs_sales_delivery_info.c.recipient, String))
-        recipient_valid = and_(
-            docs_sales_delivery_info.c.recipient.isnot(None),
-            recipient_text != '',
-            recipient_text != '{}',
-            recipient_text != 'null'
-        )
-
-        delivery_any_valid = or_(
-            address_valid,
-            note_valid,
-            delivery_date_valid,
-            recipient_valid,
-        )
-
-        # --- сам exists() ---
-        delivery_exists = exists().where(
-            and_(
-                docs_sales_delivery_info.c.docs_sales_id == docs_sales.c.id,
-                delivery_any_valid
-            )
-        )
-
-        # Вставляем в фильтр
-        if filters_dict.get("has_delivery") is True:
-            filter_list.append(delivery_exists)
-        elif filters_dict.get("has_delivery") is False:
-            filter_list.append(~delivery_exists)
-
-    # Обработка has_picker
-    if "has_picker" in filters_dict:
-        if filters_dict["has_picker"]:
-            picker_exists = exists().where(
-                docs_sales_links.c.docs_sales_id == docs_sales.c.id,
-                docs_sales_links.c.role == Role.picker
-            )
-            filter_list.append(picker_exists)
-        else:
-            picker_not_exists = ~exists().where(
-                docs_sales_links.c.docs_sales_id == docs_sales.c.id,
-                docs_sales_links.c.role == Role.picker
-            )
-            filter_list.append(picker_not_exists)
-
-    # Обработка has_courier
-    if "has_courier" in filters_dict:
-        if filters_dict["has_courier"]:
-            courier_exists = exists().where(
-                docs_sales_links.c.docs_sales_id == docs_sales.c.id,
-                docs_sales_links.c.role == Role.courier
-            )
-            filter_list.append(courier_exists)
-        else:
-            courier_not_exists = ~exists().where(
-                docs_sales_links.c.docs_sales_id == docs_sales.c.id,
-                docs_sales_links.c.role == Role.courier
-            )
-            filter_list.append(courier_not_exists)
-
-    if "order_status" in filters_dict:
-        statuses = filters_dict["order_status"].split(",")
-        if statuses:
-            filter_list.append(docs_sales.c.order_status.in_(statuses))
-
-    if "priority" in filters_dict:
-        value = filters_dict["priority"]
-        if isinstance(value, dict):
-            # Поддержка {">": 5, "<": 10}
-            for op, val in value.items():
-                if op == "gt": filter_list.append(docs_sales.c.priority > val)
-                if op == "lt": filter_list.append(docs_sales.c.priority < val)
-        else:
-            filter_list.append(docs_sales.c.priority == value)
-    for k, v in filters_dict.items():
-        if k in ["has_delivery", "has_picker", "has_courier", "priority", "order_status", "delivery_date_from", "delivery_date_to", "picker_id", "courier_id"]:
-            continue
-        if k.split("_")[-1] == "from":
-            dated_from_param_value = func.to_timestamp(v)
-            creation_date = func.to_timestamp(docs_sales.c.dated)
-            dated_to_param_value = func.to_timestamp(
-                filters_dict.get(k.replace("from", "to"))
-            )
-            filter_list.append(
-                and_(
-                    dated_from_param_value <= creation_date,
-                    creation_date <= dated_to_param_value,
-                )
-            )
-
-        elif k.split("_")[-1] == "to":
-            continue
-
-        elif type(v) is bool:
-            filter_list.append(and_(eval(f"docs_sales.c.{k}.is_({v})")))
-
-        elif type(v) is str:
-            filter_list.append(
-                and_(
-                    *list(
-                        map(
-                            lambda x: eval(
-                                f"docs_sales.c.{k}.ilike(f'%{x.strip().lower()}%')"
-                            ),
-                            v.strip().split(","),
-                        )
-                    )
-                )
-            )
-        else:
-            filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
-
-    query = query.filter(and_(*filter_list))
-
-    count_query = count_query.filter(and_(*filter_list))
-
-    items_db = await database.fetch_all(query)
-    count = await database.fetch_val(count_query)
-
-    items_db = [*map(datetime_to_timestamp, items_db)]
-
-    doc_ids = [item["id"] for item in items_db]
-
-    doc_has_loyality = {}
-
-    if doc_ids:
-        loyality_query = entity_to_entity.select().where(
-            and_(
-                entity_to_entity.c.from_entity == 7,  # docs_sales
-                entity_to_entity.c.from_id.in_(doc_ids),  # ID документов продаж
-                entity_to_entity.c.to_entity == 6,  # loyality_transactions
-                entity_to_entity.c.type
-                == "docs_sales_loyality_transactions",  # тип связи
-                entity_to_entity.c.status.is_(True),
-                entity_to_entity.c.delinked.is_not(True),
-            )
-        )
-
-        loyality_data = await database.fetch_all(loyality_query)
-
-        loyality_data = [dict(record) for record in loyality_data]
-        print("loyality_data", loyality_data)
-
-        for record in loyality_data:
-            doc_has_loyality[record["from_id"]] = record["to_id"]
-
-    goods_query = docs_sales_goods.select().where(
-        docs_sales_goods.c.docs_sales_id.in_(doc_ids)
-    )
-    goods_data = await database.fetch_all(goods_query)
-    goods_map = {}
-
-    for good in goods_data:
-        doc_id = good["docs_sales_id"]
-        if doc_id not in goods_map:
-            goods_map[doc_id] = []
-        goods_map[doc_id].append(good)
-
-    # --- предварительная обработка каждого item (delivery info, counts, скидки) ---
-    for item in items_db:
-        item = await add_delivery_info_to_doc(item)
-        goods = goods_map.get(item["id"], [])
-        item["nomenclature_count"] = len(goods)
-        item["doc_discount"] = round(
-            sum(good.get("sum_discounted", 0) or 0 for good in goods), 2
-        )
-
-        contragent_id = item.get("contragent")
-        item["has_contragent"] = bool(contragent_id)
-
-        if contragent_id:
-            query = (
-                select(segment_objects.c.segment_id)
-                .where(segment_objects.c.object_id == contragent_id,
-                       segment_objects.c.object_type == SegmentObjectType.contragents)
-                .distinct()
-            )
-            res = await database.fetch_all(query)
-            item["contragent_segments"] = [r["segment_id"] for r in res]
-
-        has_loyality = item["id"] in doc_has_loyality
-        item["has_loyality_card"] = has_loyality
-
-        if has_loyality:
-            item["color_status"] = "green"
-        elif item["has_contragent"]:
-            item["color_status"] = "blue"
-        else:
-            item["color_status"] = "default"
-
-    settings_ids = [item["settings"] for item in items_db]
-    settings_query = docs_sales_settings.select().where(
-        docs_sales_settings.c.id.in_(settings_ids)
-    )
-    settings_data = await database.fetch_all(settings_query)
-    settings_map = {setting["id"]: setting for setting in settings_data}
-
-    for item in items_db:
-        item["settings"] = settings_map.get(item["settings"])
-
-    items_db = await asyncio.gather(*[raschet_oplat(item) for item in items_db])
-
-    items_db = [*map(raschet_oplat, items_db)]
-    items_db = [await instance for instance in items_db]
-
-    if show_goods:
-        for item in items_db:
-            item_goods = goods_map.get(item["id"], [])
-            item["goods"] = [
-                add_nomenclature_name_to_goods(good) for good in item_goods
-            ]
-
-    if show_goods:
-        for item in items_db:
-            query = docs_sales_goods.select().where(
-                docs_sales_goods.c.docs_sales_id == item["id"]
-            )
-            goods_db = await database.fetch_all(query)
-            goods_db = [*map(datetime_to_timestamp, goods_db)]
-
-            goods_db = await asyncio.gather(
-                *[add_nomenclature_name_to_goods(good) for good in goods_db]
-            )
-
-            item["goods"] = goods_db
-
-    return {"result": items_db, "count": count}
+    query = GetDocsSalesListQuery()
+    return await query.execute(user.cashbox_id, limit, offset, filters)
 
 @router.get("/docs_sales/created/{date}", response_model=schemas.CountRes)
 async def get_list_by_created_date(
