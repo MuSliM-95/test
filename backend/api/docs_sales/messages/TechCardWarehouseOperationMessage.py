@@ -7,4 +7,4 @@ from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
 
 class TechCardWarehouseOperationMessage(BaseModelMessage):
     tech_card_operation_uuid: UUID
-    token: str
+    user_cashbox_id: int
