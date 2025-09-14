@@ -658,7 +658,7 @@ class CreateDocsSalesView:
                     TechCardWarehouseOperationMessage(
                         message_id=uuid.uuid4(),
                         tech_card_operation_uuid=create.tech_card_operation_uuid,
-                        token=token
+                        user_cashbox_id=user.cashbox_id,
                     ),
                     routing_key="teach_card_operation"
                 )
