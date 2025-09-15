@@ -438,7 +438,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
                 on_shift_count += 1
         
         result_users.append(UserWithShiftInfo(
-            id=user.id,
+            id=user.user,
             first_name=user.first_name or "",
             last_name=user.last_name or "",
             username=user.username or "",
