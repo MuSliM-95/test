@@ -123,7 +123,7 @@ from api.nomenclature.routers import router as nomenclature_router
 from api.pictures.routers import router as pictures_router
 from api.functions.routers import router as entity_functions_router
 from api.units.routers import router as units_router
-from api.docs_sales.routers import router as docs_sales_router
+from api.docs_sales.api.routers import router as docs_sales_router
 from api.docs_purchases.routers import router as docs_purchases_router
 from api.docs_warehouses.routers import router as docs_warehouses_router
 from api.docs_reconciliation.routers import router as docs_reconciliation_router

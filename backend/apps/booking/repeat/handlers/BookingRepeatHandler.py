@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from pydantic.validators import timedelta
 from sqlalchemy import select, and_, insert, or_
 
-from api.docs_sales.routers import create
+from api.docs_sales.api.routers import create
 from api.docs_sales.schemas import CreateMass, Create, Item
 from apps.amocrm.leads.models.NewLeadBaseModelMessage import NewLeadBaseModelMessage
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
@@ -15,7 +15,7 @@ from common.amqp_messaging.common.core.EventHandler import IEventHandler
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import booking, booking_nomenclature, database, nomenclature, docs_sales, docs_sales_goods, \
-    entity_to_entity, payments, loyality_transactions, amo_leads, amo_contacts, amo_lead_statuses, booking_tags
+    entity_to_entity, payments, loyality_transactions, amo_leads, amo_lead_statuses
 
 
 class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):
