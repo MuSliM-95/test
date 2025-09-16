@@ -26,7 +26,9 @@ class GetDocsSalesListQuery:
         cashbox_id: int,
         limit: int = 100,
         offset: int = 0,
-        filters: Optional[schemas.FilterSchema] = None
+        show_goods: bool = False,
+        filters: Optional[schemas.FilterSchema] = None,
+        kanban: bool = False,
     ) -> dict[str, Any]:
         items_db, count = await self._get_items_and_count_in_db(cashbox_id, limit, offset, filters)
         results_map = await self._get_all_maps(items_db)

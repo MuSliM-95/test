@@ -343,7 +343,9 @@ async def get_list(
     token: str,
     limit: int = 100,
     offset: int = 0,
-    filters: schemas.FilterSchema = Depends()
+    show_goods: bool = True,
+    filters: schemas.FilterSchema = Depends(),
+    kanban: bool = False,
 ):
     user = await get_user_by_token(token)
     query = GetDocsSalesListQuery()
