@@ -236,7 +236,7 @@ async def get_by_id(token: str, idx: int):
     """Получение документа по ID"""
     user = await get_user_by_token(token)
     query = GetDocSaleByIdQuery()
-    return await query.execute(idx=idx, user.cashbox_id)
+    return await query.execute(idx=idx, user_cashbox_id=user.cashbox_id)
 
 
 @router.get("/docs_sales/", response_model=schemas.CountRes)
