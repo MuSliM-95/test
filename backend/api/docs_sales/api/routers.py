@@ -234,9 +234,9 @@ async def update_settings_docs_sales(
 @router.get("/docs_sales/{idx}/", response_model=schemas.View)
 async def get_by_id(token: str, idx: int):
     """Получение документа по ID"""
-    await get_user_by_token(token)
+    user = await get_user_by_token(token)
     query = GetDocSaleByIdQuery()
-    return await query.execute(idx=idx)
+    return await query.execute(idx=idx, user.cashbox_id)
 
 
 @router.get("/docs_sales/", response_model=schemas.CountRes)

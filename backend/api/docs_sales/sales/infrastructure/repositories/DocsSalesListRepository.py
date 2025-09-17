@@ -5,9 +5,9 @@ from database.db import contragents, docs_sales, docs_sales_delivery_info
 
 class DocsSalesListRepository:
     @staticmethod
-    def get_doc_sale_by_id(id_doc: int):
+    def get_doc_sale_by_id(id_doc: int, user_cashbox_id: int):
         return docs_sales.select().where(
-            docs_sales.c.id == id_doc, docs_sales.c.is_deleted.is_not(True)
+            docs_sales.c.id == id_doc, docs_sales.c.is_deleted.is_not(True), docs_sales.c.cashbox == user_cashbox_id
         )
 
     @staticmethod

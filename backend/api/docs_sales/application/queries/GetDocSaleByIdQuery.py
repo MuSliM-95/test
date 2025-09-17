@@ -19,15 +19,15 @@ from api.docs_sales.sales.infrastructure.helpers.id_extractors import extract_us
 
 
 class GetDocSaleByIdQuery:
-    async def execute(self, idx: int) -> dict[str, Any]:
-        item_db = await self._get_item_in_db(idx)
+    async def execute(self, idx: int, user_cashbox_id: int) -> dict[str, Any]:
+        item_db = await self._get_item_in_db(idx, user_cashbox_id)
         results_map = await self._get_all_maps(item_db)
         item_db = self._enrich_doc_sale(item_db, results_map)
         return item_db
 
     @staticmethod
-    async def _get_item_in_db(doc_id: int) -> Dict[str, Any]:
-        query = DocsSalesListRepository().get_doc_sale_by_id(doc_id)
+    async def _get_item_in_db(doc_id: int, user_cashbox_id: int) -> Dict[str, Any]:
+        query = DocsSalesListRepository().get_doc_sale_by_id(doc_id, user_cashbox_id)
         item_db_raw = await database.fetch_one(query)
 
         if not item_db_raw:
