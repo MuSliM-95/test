@@ -396,7 +396,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         ))
     
     users_with_shifts_query = select([
-        users_cboxes_relation.c.id,
+        users_cboxes_relation.c.user,
         users.c.first_name,
         users.c.last_name,
         users.c.username,
@@ -438,7 +438,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
                 on_shift_count += 1
         
         result_users.append(UserWithShiftInfo(
-            id=user.id,
+            id=user.user,
             first_name=user.first_name or "",
             last_name=user.last_name or "",
             username=user.username or "",
@@ -449,7 +449,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         ))
     
     # Один запрос для count
-    count_query = select([func.count(users_cboxes_relation.c.id)]).select_from(
+    count_query = select([func.count(users_cboxes_relation.c.user)]).select_from(
         users_cboxes_relation.join(users, users.c.id == users_cboxes_relation.c.user)
     ).where(and_(*filters))
     
