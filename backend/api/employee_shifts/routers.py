@@ -54,7 +54,7 @@ async def start_shift(token: str):
     
     now = datetime.utcnow()
     shift_data = {
-        "user_id": user.user,
+        "user_id": user.id,
         "cashbox_id": user.cashbox_id,
         "shift_start": now,
         "status": ShiftStatus.on_shift,
