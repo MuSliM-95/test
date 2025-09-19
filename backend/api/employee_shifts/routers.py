@@ -43,7 +43,7 @@ async def start_shift(token: str):
     existing_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -54,7 +54,7 @@ async def start_shift(token: str):
     
     now = datetime.utcnow()
     shift_data = {
-        "user_id": user.id,
+        "user_id": user.user,
         "cashbox_id": user.cashbox_id,
         "shift_start": now,
         "status": ShiftStatus.on_shift,
@@ -122,7 +122,7 @@ async def end_shift(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -201,7 +201,7 @@ async def create_break(token: str, duration_minutes: int):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.status == ShiftStatus.on_shift,
                 employee_shifts.c.shift_end.is_(None)
             )
@@ -287,7 +287,7 @@ async def get_shift_status(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -525,7 +525,7 @@ async def end_break_early(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.status == ShiftStatus.on_break,
                 employee_shifts.c.shift_end.is_(None)
             )
