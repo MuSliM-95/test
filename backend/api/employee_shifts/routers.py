@@ -412,7 +412,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         .outerjoin(
             employee_shifts,
             and_(
-                employee_shifts.c.user_id == users_cboxes_relation.c.id,
+                employee_shifts.c.user_id == users_cboxes_relation.c.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
