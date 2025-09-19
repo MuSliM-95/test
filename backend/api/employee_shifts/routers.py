@@ -54,7 +54,7 @@ async def start_shift(token: str):
     
     now = datetime.utcnow()
     shift_data = {
-        "user_id": user.id,
+        "user_id": user.user,
         "cashbox_id": user.cashbox_id,
         "shift_start": now,
         "status": ShiftStatus.on_shift,
@@ -122,7 +122,7 @@ async def end_shift(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -201,7 +201,7 @@ async def create_break(token: str, duration_minutes: int):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.status == ShiftStatus.on_shift,
                 employee_shifts.c.shift_end.is_(None)
             )
@@ -287,7 +287,7 @@ async def get_shift_status(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -480,7 +480,7 @@ async def get_shifts_statistics(token: str):
         func.sum(func.case([(employee_shifts.c.status == 'on_shift', 1)], else_=0)).label('on_shift_count'),
         func.sum(func.case([(employee_shifts.c.status == 'on_break', 1)], else_=0)).label('on_break_count')
     ]).select_from(
-        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
+        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.user)
     ).where(
         and_(
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
@@ -492,7 +492,7 @@ async def get_shifts_statistics(token: str):
     stats = await database.fetch_one(stats_query)
     
     # Отдельный запрос для пользователей с включенными сменами
-    shift_enabled_query = select([func.count(users_cboxes_relation.c.id)]).where(
+    shift_enabled_query = select([func.count(users_cboxes_relation.c.user)]).where(
         and_(
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
             users_cboxes_relation.c.shift_work_enabled == True
@@ -525,7 +525,7 @@ async def end_break_early(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.status == ShiftStatus.on_break,
                 employee_shifts.c.shift_end.is_(None)
             )
