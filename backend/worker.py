@@ -7,6 +7,8 @@ from api.docs_sales.handlers.RecalculateFinancialsHandler import RecalculateFina
 from api.docs_sales.handlers.RecalculateLoyaltyPointsHandler import RecalculateLoyaltyPointsHandler
 from api.docs_sales.messages.RecalculateFinancialsMessageModel import RecalculateFinancialsMessageModel
 from api.docs_sales.messages.RecalculateLoyaltyPointsMessageModel import RecalculateLoyaltyPointsMessageModel
+from api.docs_sales.messages.TechCardWarehouseOperationMessage import TechCardWarehouseOperationMessage
+from api.docs_sales.handlers.TechCardWarehouseOperationHandler import TechCardWarehouseOperationHandler
 from apps.amocrm.leads.handlers.impl.PostLeadEvent import PostLeadEvent
 from apps.amocrm.leads.models.NewLeadBaseModelMessage import NewLeadBaseModelMessage
 from apps.amocrm.leads.repositories.impl.LeadsRepository import LeadsRepository
@@ -41,6 +43,8 @@ async def startup():
     await rabbitmq_messaging.subscribe(NewLeadBaseModelMessage, PostLeadEvent(
         leads_repository=LeadsRepository()
     ))
+    await rabbitmq_messaging.subscribe(TechCardWarehouseOperationMessage, TechCardWarehouseOperationHandler())
+    
     await rabbitmq_messaging.install([
         QueueSettingsModel(
             queue_name="recalculate.financials",
@@ -56,6 +60,10 @@ async def startup():
         ),
         QueueSettingsModel(
             queue_name="post_amo_lead",
+            prefetch_count=1
+        ),
+        QueueSettingsModel(
+            queue_name='teach_card_operation',
             prefetch_count=1
         )
     ])

@@ -15,6 +15,8 @@ from api.docs_sales import schemas
 # from api.docs_sales.events.loyalty_points.messages.RecalculateLoyaltyPointsMessageModel import \
 #     RecalculateLoyaltyPointsMessageModel
 
+from api.docs_sales.messages.TechCardWarehouseOperationMessage import TechCardWarehouseOperationMessage
+
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
 from apps.yookassa.functions.impl.GetOauthCredentialFunction import GetOauthCredentialFunction
@@ -56,7 +58,6 @@ class CreateDocsSalesView:
         generate_out: bool = True
     ):
         rabbitmq_messaging: IRabbitMessaging = await self.__rabbitmq_messaging_factory()
-
         user = await get_user_by_token(token)
 
         fks = defaultdict(set)
@@ -651,8 +652,16 @@ class CreateDocsSalesView:
         #                 )
         #             )
 
-        # юкасса
-
+        for create in docs_sales_data.__root__:
+            if create.tech_card_operation_uuid:
+                await rabbitmq_messaging.publish(
+                    TechCardWarehouseOperationMessage(
+                        message_id=uuid.uuid4(),
+                        tech_card_operation_uuid=create.tech_card_operation_uuid,
+                        user_cashbox_id=user.cashbox_id,
+                    ),
+                    routing_key="teach_card_operation"
+                )
         return result
 
     async def _validate_fk(self, table, ids: Set[int], name: str):

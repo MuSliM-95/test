@@ -15,6 +15,7 @@ docker-compose.dev.yml
 /nginx/rootCA.key
 /nginx/rootCA.crt
 /nginx/rootCA.pem
+.vscode
 /.nezuko
 /certs
 docker-compose-dev-https.yml
