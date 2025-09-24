@@ -3,7 +3,7 @@ from database.db import database, users, users_cboxes_relation, employee_shifts
 from sqlalchemy import select, func, or_, and_
 from datetime import datetime, timedelta
 from .schemas import (
-    ShiftStatus, ShiftResponse, ShiftStatusResponse
+    ShiftStatus, ShiftResponse, ShiftStatusResponse, ShiftData
 )
 from api.users.schemas import UserWithShiftInfo, CBUsersListShortWithShifts, ShiftStatistics
 from ws_manager import manager
@@ -53,14 +53,17 @@ async def start_shift(token: str):
         raise HTTPException(status_code=400, detail="Смена уже начата")
     
     now = datetime.utcnow()
-    shift_data = {
-        "user_id": user.user,
-        "cashbox_id": user.cashbox_id,
-        "shift_start": now,
-        "status": ShiftStatus.on_shift,
-        "created_at": now,
-        "updated_at": now
-    }
+    shift_data = ShiftData(
+        user_id=user.user,
+        cashbox_id=user.cashbox_id,
+        shift_start=now,
+        shift_end=None,
+        status=ShiftStatus.on_shift,
+        break_start=None,
+        break_end=None,
+        created_at=now,
+        updated_at=now,
+    ).json()
 
     existing_stopped_shift = await database.fetch_one(
         employee_shifts.select().where(
@@ -71,7 +74,7 @@ async def start_shift(token: str):
         )
     )
     if existing_stopped_shift:
-        new_shift =  await database.fetch_one(
+        new_shift = await database.fetch_one(
             employee_shifts.update().where(employee_shifts.c.user_id == user.id).values(shift_data).returning(
                 employee_shifts.c.id,
                 employee_shifts.c.user_id,
