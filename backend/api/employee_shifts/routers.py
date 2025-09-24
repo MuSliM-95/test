@@ -60,7 +60,7 @@ async def start_shift(token: str):
         shift_end=None,
         status=ShiftStatus.on_shift,
         break_start=None,
-        break_end=None,
+        break_duration=None,
         created_at=now,
         updated_at=now,
     ).dict()

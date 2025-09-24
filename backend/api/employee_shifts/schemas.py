@@ -61,6 +61,6 @@ class ShiftData(BaseModel):
     shift_end: Optional[datetime] = None
     status: ShiftStatus
     break_start: Optional[datetime] = None
-    break_end: Optional[int] = None
+    break_duration: Optional[int] = None
     created_at: datetime
     updated_at: datetime
