@@ -238,13 +238,19 @@ class SegmentActions:
         ).subquery("sub")
         query = select(subquery.c.chat_id)
         if shift_status:
+            if shift_status == 'off_shift':
+                where_clause = or_(
+                        employee_shifts.c.user_id.is_(None),
+                        employee_shifts.c.status == shift_status
+                    )
+            else:
+                where_clause = or_(
+                        employee_shifts.c.status == shift_status
+                    )
             query = (
                 query
                 .outerjoin(employee_shifts, subquery.c.user_id == employee_shifts.c.user_id)
-                .where(or_(
-                    employee_shifts.c.user_id.is_(None),
-                    employee_shifts.c.status == shift_status
-                ))
+                .where(where_clause)
             )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
