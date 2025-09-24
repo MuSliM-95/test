@@ -23,7 +23,7 @@ class EndShiftRequest(BaseModel):
 class CreateBreakRequest(BaseModel):
     """Запрос на создание перерыва"""
     duration_minutes: int
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -52,3 +52,16 @@ class ShiftStatusResponse(BaseModel):
     status: ShiftStatus
     current_shift: Optional[ShiftResponse] = None
     message: str
+
+
+class ShiftData(BaseModel):
+    """Схема отражающая модель в БД"""
+    user_id: int
+    cashbox_id: int
+    shift_start: datetime
+    shift_end: Optional[datetime] = None
+    status: ShiftStatus
+    break_start: Optional[datetime] = None
+    break_duration: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
