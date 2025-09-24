@@ -61,21 +61,45 @@ async def start_shift(token: str):
         "created_at": now,
         "updated_at": now
     }
-    
-    new_shift = await database.fetch_one(
-        employee_shifts.insert().values(shift_data).returning(
-            employee_shifts.c.id,
-            employee_shifts.c.user_id,
-            employee_shifts.c.cashbox_id,
-            employee_shifts.c.shift_start,
-            employee_shifts.c.shift_end,
-            employee_shifts.c.status,
-            employee_shifts.c.break_start,
-            employee_shifts.c.break_duration,
-            employee_shifts.c.created_at,
-            employee_shifts.c.updated_at
+
+    existing_stopped_shift = await database.fetch_one(
+        employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.shift_end.is_not(None)
+            )
         )
     )
+    if existing_stopped_shift:
+        new_shift =  await database.fetch_one(
+            employee_shifts.update().where(employee_shifts.c.user_id == user.id).values(shift_data).returning(
+                employee_shifts.c.id,
+                employee_shifts.c.user_id,
+                employee_shifts.c.cashbox_id,
+                employee_shifts.c.shift_start,
+                employee_shifts.c.shift_end,
+                employee_shifts.c.status,
+                employee_shifts.c.break_start,
+                employee_shifts.c.break_duration,
+                employee_shifts.c.created_at,
+                employee_shifts.c.updated_at
+            )
+        )
+    else:
+        new_shift = await database.fetch_one(
+            employee_shifts.insert().values(shift_data).returning(
+                employee_shifts.c.id,
+                employee_shifts.c.user_id,
+                employee_shifts.c.cashbox_id,
+                employee_shifts.c.shift_start,
+                employee_shifts.c.shift_end,
+                employee_shifts.c.status,
+                employee_shifts.c.break_start,
+                employee_shifts.c.break_duration,
+                employee_shifts.c.created_at,
+                employee_shifts.c.updated_at
+            )
+        )
     
     shift_response = ShiftResponse(**dict(new_shift))
     shift_response_dict = shift_response.dict()
