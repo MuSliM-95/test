@@ -63,7 +63,7 @@ async def start_shift(token: str):
         break_end=None,
         created_at=now,
         updated_at=now,
-    ).json()
+    ).dict()
 
     existing_stopped_shift = await database.fetch_one(
         employee_shifts.select().where(
