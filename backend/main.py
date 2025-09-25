@@ -159,6 +159,7 @@ from api.tags.routers import router as tags_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
 from api.employee_shifts.routers import router as employee_shifts_router
+from api.feeds.routers import router as feeds_router
 # from jobs.jobs import scheduler
 
 # sentry_sdk.init(
@@ -247,6 +248,8 @@ app.include_router(segments_router)
 app.include_router(autosuggestion_router)
 
 app.include_router(employee_shifts_router)
+
+app.include_router(feeds_router)
 
 
 @app.get("/health")
