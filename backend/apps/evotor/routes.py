@@ -1,11 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from api.loyality_cards.routers import get_cards
-from api.docs_sales.routers import create as createDocSales
+from api.docs_sales.api.routers import create as createDocSales
 from api.nomenclature.routers import new_nomenclature
 from api.nomenclature.schemas import NomenclatureCreateMass
-from api.prices.routers import new_price
-from api.prices.schemas import PriceCreateMass, PriceCreate
 from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from database.db import database, integrations, integrations_to_cashbox, evotor_credentials, warehouses, users_cboxes_relation, nomenclature, prices

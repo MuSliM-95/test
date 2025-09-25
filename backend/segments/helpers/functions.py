@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from api.docs_sales.routers import generate_and_save_order_links
+from api.docs_sales.api.routers import generate_and_save_order_links
 
 from database.db import (
     docs_sales_delivery_info, database, docs_sales, warehouses, users,

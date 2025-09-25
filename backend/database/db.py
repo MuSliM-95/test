@@ -1,9 +1,8 @@
 import os
-import uuid
 from enum import Enum as ENUM
 import databases
 import sqlalchemy
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 from sqlalchemy import (
     ARRAY,
@@ -18,7 +17,11 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger, BIGINT, text, Index
+    UniqueConstraint,
+    SmallInteger,
+    BIGINT,
+    text,
+    Index,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -27,7 +30,16 @@ import enum
 import datetime
 from dotenv import load_dotenv
 
-from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
+from database.enums import (
+    Repeatability,
+    DebitCreditType,
+    Gender,
+    ContragentType,
+    TriggerType,
+    TriggerTime,
+)
+from sqlalchemy import Column
+from sqlalchemy.orm import relationship
 
 
 load_dotenv()
@@ -136,6 +148,7 @@ class SegmentStatus(str, ENUM):
 
 
 metadata = sqlalchemy.MetaData()
+Base = declarative_base(metadata=metadata)
 
 cashbox_settings = sqlalchemy.Table(
     "cashbox_settings",

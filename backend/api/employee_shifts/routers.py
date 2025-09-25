@@ -3,7 +3,7 @@ from database.db import database, users, users_cboxes_relation, employee_shifts
 from sqlalchemy import select, func, or_, and_
 from datetime import datetime, timedelta
 from .schemas import (
-    ShiftStatus, ShiftResponse, ShiftStatusResponse
+    ShiftStatus, ShiftResponse, ShiftStatusResponse, ShiftData
 )
 from api.users.schemas import UserWithShiftInfo, CBUsersListShortWithShifts, ShiftStatistics
 from ws_manager import manager
@@ -53,29 +53,56 @@ async def start_shift(token: str):
         raise HTTPException(status_code=400, detail="Смена уже начата")
     
     now = datetime.utcnow()
-    shift_data = {
-        "user_id": user.id,
-        "cashbox_id": user.cashbox_id,
-        "shift_start": now,
-        "status": ShiftStatus.on_shift,
-        "created_at": now,
-        "updated_at": now
-    }
-    
-    new_shift = await database.fetch_one(
-        employee_shifts.insert().values(shift_data).returning(
-            employee_shifts.c.id,
-            employee_shifts.c.user_id,
-            employee_shifts.c.cashbox_id,
-            employee_shifts.c.shift_start,
-            employee_shifts.c.shift_end,
-            employee_shifts.c.status,
-            employee_shifts.c.break_start,
-            employee_shifts.c.break_duration,
-            employee_shifts.c.created_at,
-            employee_shifts.c.updated_at
+    shift_data = ShiftData(
+        user_id=user.user,
+        cashbox_id=user.cashbox_id,
+        shift_start=now,
+        shift_end=None,
+        status=ShiftStatus.on_shift,
+        break_start=None,
+        break_duration=None,
+        created_at=now,
+        updated_at=now,
+    ).dict()
+
+    existing_stopped_shift = await database.fetch_one(
+        employee_shifts.select().where(
+            and_(
+                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.shift_end.is_not(None)
+            )
         )
     )
+    if existing_stopped_shift:
+        new_shift = await database.fetch_one(
+            employee_shifts.update().where(employee_shifts.c.user_id == user.id).values(shift_data).returning(
+                employee_shifts.c.id,
+                employee_shifts.c.user_id,
+                employee_shifts.c.cashbox_id,
+                employee_shifts.c.shift_start,
+                employee_shifts.c.shift_end,
+                employee_shifts.c.status,
+                employee_shifts.c.break_start,
+                employee_shifts.c.break_duration,
+                employee_shifts.c.created_at,
+                employee_shifts.c.updated_at
+            )
+        )
+    else:
+        new_shift = await database.fetch_one(
+            employee_shifts.insert().values(shift_data).returning(
+                employee_shifts.c.id,
+                employee_shifts.c.user_id,
+                employee_shifts.c.cashbox_id,
+                employee_shifts.c.shift_start,
+                employee_shifts.c.shift_end,
+                employee_shifts.c.status,
+                employee_shifts.c.break_start,
+                employee_shifts.c.break_duration,
+                employee_shifts.c.created_at,
+                employee_shifts.c.updated_at
+            )
+        )
     
     shift_response = ShiftResponse(**dict(new_shift))
     shift_response_dict = shift_response.dict()
@@ -122,7 +149,7 @@ async def end_shift(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -201,7 +228,7 @@ async def create_break(token: str, duration_minutes: int):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.status == ShiftStatus.on_shift,
                 employee_shifts.c.shift_end.is_(None)
             )
@@ -287,7 +314,7 @@ async def get_shift_status(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -396,7 +423,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         ))
     
     users_with_shifts_query = select([
-        users_cboxes_relation.c.id,
+        users_cboxes_relation.c.user,
         users.c.first_name,
         users.c.last_name,
         users.c.username,
@@ -412,7 +439,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         .outerjoin(
             employee_shifts,
             and_(
-                employee_shifts.c.user_id == users_cboxes_relation.c.id,
+                employee_shifts.c.user_id == users_cboxes_relation.c.user,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -438,7 +465,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
                 on_shift_count += 1
         
         result_users.append(UserWithShiftInfo(
-            id=user.id,
+            id=user.user,
             first_name=user.first_name or "",
             last_name=user.last_name or "",
             username=user.username or "",
@@ -449,7 +476,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         ))
     
     # Один запрос для count
-    count_query = select([func.count(users_cboxes_relation.c.id)]).select_from(
+    count_query = select([func.count(users_cboxes_relation.c.user)]).select_from(
         users_cboxes_relation.join(users, users.c.id == users_cboxes_relation.c.user)
     ).where(and_(*filters))
     
@@ -480,7 +507,7 @@ async def get_shifts_statistics(token: str):
         func.sum(func.case([(employee_shifts.c.status == 'on_shift', 1)], else_=0)).label('on_shift_count'),
         func.sum(func.case([(employee_shifts.c.status == 'on_break', 1)], else_=0)).label('on_break_count')
     ]).select_from(
-        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
+        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.user)
     ).where(
         and_(
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
@@ -492,7 +519,7 @@ async def get_shifts_statistics(token: str):
     stats = await database.fetch_one(stats_query)
     
     # Отдельный запрос для пользователей с включенными сменами
-    shift_enabled_query = select([func.count(users_cboxes_relation.c.id)]).where(
+    shift_enabled_query = select([func.count(users_cboxes_relation.c.user)]).where(
         and_(
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
             users_cboxes_relation.c.shift_work_enabled == True
@@ -525,7 +552,7 @@ async def end_break_early(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.id,
+                employee_shifts.c.user_id == user.user,
                 employee_shifts.c.status == ShiftStatus.on_break,
                 employee_shifts.c.shift_end.is_(None)
             )

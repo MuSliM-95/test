@@ -2,7 +2,6 @@ import json
 import os
 import time
 
-import aiohttp
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -123,7 +122,7 @@ from api.nomenclature.routers import router as nomenclature_router
 from api.pictures.routers import router as pictures_router
 from api.functions.routers import router as entity_functions_router
 from api.units.routers import router as units_router
-from api.docs_sales.routers import router as docs_sales_router
+from api.docs_sales.api.routers import router as docs_sales_router
 from api.docs_purchases.routers import router as docs_purchases_router
 from api.docs_warehouses.routers import router as docs_warehouses_router
 from api.docs_reconciliation.routers import router as docs_reconciliation_router
@@ -156,6 +155,8 @@ from api.trigger_notification.routers import router as triggers_notification
 from api.docs_sales_utm_tags.routers import router as utm_router
 from api.segments.routers import router as segments_router
 from api.tags.routers import router as tags_router
+from api.tech_cards.router import router as tech_cards_router
+from api.tech_operations.router import router as tech_operations_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
 from api.employee_shifts.routers import router as employee_shifts_router
@@ -170,7 +171,6 @@ from api.feeds.routers import router as feeds_router
 #     # We recommend adjusting this value in production,
 #     traces_sample_rate=1.0,
 # )
-
 
 app = FastAPI(
     root_path='/api/v1',
@@ -245,6 +245,8 @@ app.include_router(reports_router)
 app.include_router(module_bank_router)
 app.include_router(utm_router)
 app.include_router(segments_router)
+app.include_router(tech_cards_router)
+app.include_router(tech_operations_router)
 app.include_router(autosuggestion_router)
 
 app.include_router(employee_shifts_router)

@@ -6,7 +6,7 @@ from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
     users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts
 )
-from sqlalchemy import select, and_, func, literal
+from sqlalchemy import select, and_, func, literal, or_
 from sqlalchemy.dialects.postgresql import insert
 
 from segments.actions.segment_tg_notification import send_segment_notification
@@ -228,7 +228,7 @@ class SegmentActions:
 
     async def get_user_chat_ids_by_tag(self, user_tag: str, shift_status: str = None):
         subquery = (
-            select(users.c.chat_id, users_cboxes_relation.c.id.label("relation_id"))
+            select(users.c.chat_id, users_cboxes_relation.c.id.label("relation_id"), users_cboxes_relation.c.user.label("user_id"))
             .join(users_cboxes_relation,
                   users_cboxes_relation.c.user == users.c.id)
             .where(and_(
@@ -240,8 +240,11 @@ class SegmentActions:
         if shift_status:
             query = (
                 query
-                .join(employee_shifts, subquery.c.relation_id == employee_shifts.c.user_id)
-                .where(employee_shifts.c.status == shift_status)
+                .outerjoin(employee_shifts, subquery.c.user_id == employee_shifts.c.user_id)
+                .where(or_(
+                    employee_shifts.c.user_id.is_(None),
+                    employee_shifts.c.status == shift_status
+                ))
             )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]

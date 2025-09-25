@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Union
+from uuid import UUID
 import datetime
 
 from database.db import OrderStatus
@@ -62,6 +63,7 @@ class Create(BaseModel):
     paid_rubles: Optional[float]
     paid_lt: Optional[float]
     status: Optional[bool]
+    tech_card_operation_uuid: Optional[UUID] = None
     goods: Optional[List[Item]]
     priority: Optional[conint(ge=0, le=10)] = None
 
