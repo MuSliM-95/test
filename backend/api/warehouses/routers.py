@@ -68,32 +68,30 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
                     exceptions.append(str(warehouse_values) + " " + e.detail)
                     continue
 
-        if warehouse_values.get("address") is None:
-            exceptions.append(str(warehouse_values) + " missing address field")
-            continue
+        if warehouse_values.get("address") is not None:
 
-        structured_geo = await geocoder.validate_address(warehouse_values.get("address"))
+            structured_geo = await geocoder.validate_address(warehouse_values.get("address"))
 
-        if structured_geo is None:
-            exceptions.append(str(warehouse_values) + " incorrect address field")
-            continue
-        
-        warehouse_values.update(
-            {
-                "address": ", ".join(
-                    filter(None, [
-                        structured_geo.country,
-                        structured_geo.state,
-                        structured_geo.city, 
-                        structured_geo.street,  
-                        structured_geo.housenumber,    
-                        structured_geo.postcode,
-                    ])
-                ),
-                "latitude": structured_geo.latitude,
-                "longitude": structured_geo.longitude,
-            }
-        )
+            if structured_geo is None:
+                exceptions.append(str(warehouse_values) + " incorrect address field")
+                continue
+
+            warehouse_values.update(
+                {
+                    "address": ", ".join(
+                        filter(None, [
+                            structured_geo.country,
+                            structured_geo.state,
+                            structured_geo.city,
+                            structured_geo.street,
+                            structured_geo.housenumber,
+                            structured_geo.postcode,
+                        ])
+                    ),
+                    "latitude": structured_geo.latitude,
+                    "longitude": structured_geo.longitude,
+                }
+            )
 
         query = warehouses.insert().values(warehouse_values)
         warehouse_id = await database.execute(query)
