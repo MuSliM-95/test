@@ -2181,7 +2181,7 @@ employee_shifts = sqlalchemy.Table(
     "employee_shifts",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, index=True),
-    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("tg_accounts.id"), nullable=False),
     sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("cashboxes.id"), nullable=False),
     sqlalchemy.Column("shift_start", sqlalchemy.DateTime, nullable=False),
     sqlalchemy.Column("shift_end", sqlalchemy.DateTime, nullable=True),
