@@ -115,7 +115,7 @@ async def start_shift(token: str):
             "action": "start_shift",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -193,7 +193,7 @@ async def end_shift(token: str):
             "action": "end_shift",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -271,7 +271,7 @@ async def create_break(token: str, duration_minutes: int):
             "action": "start_break",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -374,7 +374,7 @@ async def get_shift_status(token: str):
                 "action": "auto_end_break",
                 "target": "employee_shifts",
                 "result": serialized_data,
-                "user_id": user.id,
+                "user_id": user.user,
                 "cashbox_id": user.cashbox_id
             }
         )
@@ -423,6 +423,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
 
     users_with_shifts_query = select([
         users_cboxes_relation.c.id,
+        users_cboxes_relation.c.user,
         users.c.first_name,
         users.c.last_name,
         users.c.username,
@@ -464,7 +465,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
                 on_shift_count += 1
 
         result_users.append(UserWithShiftInfo(
-            id=user.id,
+            id=user.user,
             first_name=user.first_name or "",
             last_name=user.last_name or "",
             username=user.username or "",
@@ -595,7 +596,7 @@ async def end_break_early(token: str):
             "action": "end_break",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id
         }
     )
