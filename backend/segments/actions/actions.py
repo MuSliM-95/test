@@ -228,7 +228,7 @@ class SegmentActions:
 
     async def get_user_chat_ids_by_tag(self, user_tag: str, shift_status: str = None):
         subquery = (
-            select(users.c.chat_id, users_cboxes_relation.c.id.label("relation_id"), users_cboxes_relation.c.user.label("user_id"))
+            select(users.c.chat_id, users_cboxes_relation.c.id.label("relation_id"))
             .join(users_cboxes_relation,
                   users_cboxes_relation.c.user == users.c.id)
             .where(and_(
@@ -249,7 +249,7 @@ class SegmentActions:
                     )
             query = (
                 query
-                .outerjoin(employee_shifts, subquery.c.user_id == employee_shifts.c.user_id)
+                .outerjoin(employee_shifts, subquery.c.relation_id == employee_shifts.c.user_id)
                 .where(where_clause)
             )
         rows = await database.fetch_all(query)

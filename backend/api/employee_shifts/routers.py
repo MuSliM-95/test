@@ -54,7 +54,7 @@ async def start_shift(token: str):
 
     now = datetime.utcnow()
     shift_data = ShiftData(
-        user_id=user.user,
+        user_id=user.id,
         cashbox_id=user.cashbox_id,
         shift_start=now,
         shift_end=None,
@@ -68,14 +68,14 @@ async def start_shift(token: str):
     existing_stopped_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.user,
+                employee_shifts.c.user_id == user.id,
                 employee_shifts.c.shift_end.is_not(None)
             )
         )
     )
     if existing_stopped_shift:
         new_shift = await database.fetch_one(
-            employee_shifts.update().where(employee_shifts.c.user_id == user.user).values(shift_data).returning(
+            employee_shifts.update().where(employee_shifts.c.user_id == user.id).values(shift_data).returning(
                 employee_shifts.c.id,
                 employee_shifts.c.user_id,
                 employee_shifts.c.cashbox_id,
@@ -115,7 +115,7 @@ async def start_shift(token: str):
             "action": "start_shift",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.user,
+            "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -149,7 +149,7 @@ async def end_shift(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.user,
+                employee_shifts.c.user_id == user.id,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -193,7 +193,7 @@ async def end_shift(token: str):
             "action": "end_shift",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.user,
+            "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -227,7 +227,7 @@ async def create_break(token: str, duration_minutes: int):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.user,
+                employee_shifts.c.user_id == user.id,
                 employee_shifts.c.status == ShiftStatus.on_shift,
                 employee_shifts.c.shift_end.is_(None)
             )
@@ -271,7 +271,7 @@ async def create_break(token: str, duration_minutes: int):
             "action": "start_break",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.user,
+            "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
     )
@@ -313,7 +313,7 @@ async def get_shift_status(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.user,
+                employee_shifts.c.user_id == user.id,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -374,7 +374,7 @@ async def get_shift_status(token: str):
                 "action": "auto_end_break",
                 "target": "employee_shifts",
                 "result": serialized_data,
-                "user_id": user.user,
+                "user_id": user.id,
                 "cashbox_id": user.cashbox_id
             }
         )
@@ -422,7 +422,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         ))
 
     users_with_shifts_query = select([
-        users_cboxes_relation.c.user,
+        users_cboxes_relation.c.id,
         users.c.first_name,
         users.c.last_name,
         users.c.username,
@@ -438,7 +438,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         .outerjoin(
             employee_shifts,
             and_(
-                employee_shifts.c.user_id == users_cboxes_relation.c.user,
+                employee_shifts.c.user_id == users_cboxes_relation.c.id,
                 employee_shifts.c.shift_end.is_(None)
             )
         )
@@ -464,7 +464,7 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
                 on_shift_count += 1
 
         result_users.append(UserWithShiftInfo(
-            id=user.user,
+            id=user.id,
             first_name=user.first_name or "",
             last_name=user.last_name or "",
             username=user.username or "",
@@ -475,8 +475,8 @@ async def get_users_list_with_shift_info(token: str, name: str = None, limit: in
         ))
 
     # Один запрос для count
-    count_query = select([func.count(users_cboxes_relation.c.user)]).select_from(
-        users_cboxes_relation.join(users, users.c.id == users_cboxes_relation.c.user)
+    count_query = select([func.count(users_cboxes_relation.c.id)]).select_from(
+        users_cboxes_relation.join(users, users.c.id == users_cboxes_relation.c.id)
     ).where(and_(*filters))
 
     total_count = await database.fetch_val(count_query) or 0
@@ -506,7 +506,7 @@ async def get_shifts_statistics(token: str):
         func.sum(func.case([(employee_shifts.c.status == 'on_shift', 1)], else_=0)).label('on_shift_count'),
         func.sum(func.case([(employee_shifts.c.status == 'on_break', 1)], else_=0)).label('on_break_count')
     ]).select_from(
-        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.user)
+        employee_shifts.join(users_cboxes_relation, employee_shifts.c.user_id == users_cboxes_relation.c.id)
     ).where(
         and_(
             users_cboxes_relation.c.cashbox_id == current_user.cashbox_id,
@@ -551,7 +551,7 @@ async def end_break_early(token: str):
     active_shift = await database.fetch_one(
         employee_shifts.select().where(
             and_(
-                employee_shifts.c.user_id == user.user,
+                employee_shifts.c.user_id == user.id,
                 employee_shifts.c.status == ShiftStatus.on_break,
                 employee_shifts.c.shift_end.is_(None)
             )
@@ -595,7 +595,7 @@ async def end_break_early(token: str):
             "action": "end_break",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.user,
+            "user_id": user.id,
             "cashbox_id": user.cashbox_id
         }
     )
