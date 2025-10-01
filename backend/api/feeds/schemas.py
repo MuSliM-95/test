@@ -8,7 +8,7 @@ XML_TAG_RE = re.compile(r'^[A-Za-z_:][A-Za-z0-9._:\-]*$')
 
 XML_TAG = constr(regex=r'^[A-Za-z_:][A-Za-z0-9._:\-]*$')
 
-ALLOWED_DB_FIELDS = ['name', 'description', 'category', 'price', 'current_amount']
+ALLOWED_DB_FIELDS = ['name', 'description', 'category', 'price', 'current_amount', 'images']
 
 
 

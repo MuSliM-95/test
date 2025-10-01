@@ -44,12 +44,20 @@ class FeedGenerator:
                 val = r.get(field)
                 if val is None:
                     continue
-                text = escape(str(val))
-                parts.append(f"    <{xml_tag}>{text}</{xml_tag}>\n")
+                if isinstance(val, list):
+                    for v in val:
+                        text = escape(str(v))
+                        parts.append(f"    <{xml_tag}>{text}</{xml_tag}>\n")
+                else:
+                    text = escape(str(val))
+                    parts.append(f"    <{xml_tag}>{text}</{xml_tag}>\n")
             parts.append(f"  </{item_tag}>\n")
         parts.append(f"</{root_tag}>")
         xml_str = "".join(parts).encode("utf-8")
-        return Response(content=xml_str, media_type="application/xml")
+
+        response = Response(content=xml_str, media_type="application/xml")
+        response.headers["Cache-Control"] = "public, max-age=60"
+        return response
 
 
 

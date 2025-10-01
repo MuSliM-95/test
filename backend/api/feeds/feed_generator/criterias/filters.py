@@ -1,6 +1,8 @@
+from collections import defaultdict
+
 from sqlalchemy import case, select, func, and_
 
-from database.db import warehouse_register_movement, price_types, nomenclature, database, prices, categories
+from database.db import warehouse_register_movement, price_types, nomenclature, database, prices, categories, pictures
 
 
 class FeedCriteriaFilter:
@@ -94,4 +96,36 @@ class FeedCriteriaFilter:
 
         # выполняем запрос
         rows = await database.fetch_all(query)
-        return [dict(row) for row in rows]
+        results = [dict(row) for row in rows]
+
+        if not results:
+            return []
+
+        # достаём все id номенклатур
+        nomenclature_ids = [r["id"] for r in results]
+
+        # тянем картинки пачкой
+        images_query = (
+            select(
+                pictures.c.entity_id,
+                pictures.c.url
+            )
+            .where(
+                and_(
+                    pictures.c.entity == "nomenclature",
+                    pictures.c.entity_id.in_(nomenclature_ids)
+                )
+            )
+        )
+        images_rows = await database.fetch_all(images_query)
+
+        # группируем картинки по номенклатуре
+        images_map = defaultdict(list)
+        for row in images_rows:
+            images_map[row.entity_id].append(f"https://app.tablecrm.com/api/v1/{row.url}")
+
+        # добавляем картинки в результат
+        for r in results:
+            r["images"] = images_map.get(r["id"], None)
+
+        return results
