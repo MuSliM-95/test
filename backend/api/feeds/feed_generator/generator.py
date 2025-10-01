@@ -44,10 +44,16 @@ class FeedGenerator:
                 val = r.get(field)
                 if val is None:
                     continue
-                if isinstance(val, list):
+                elif isinstance(val, list):
                     for v in val:
                         text = escape(str(v))
                         parts.append(f"    <{xml_tag}>{text}</{xml_tag}>\n")
+
+                elif isinstance(val, dict):
+                    if field == "params":
+                        for k, v in val.items():
+                            parts.append(f'    <{xml_tag} name="{k}">{v}</{xml_tag}>\n')
+
                 else:
                     text = escape(str(val))
                     parts.append(f"    <{xml_tag}>{text}</{xml_tag}>\n")

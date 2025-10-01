@@ -2,7 +2,10 @@ from collections import defaultdict
 
 from sqlalchemy import case, select, func, and_
 
-from database.db import warehouse_register_movement, price_types, nomenclature, database, prices, categories, pictures
+from database.db import (
+    warehouse_register_movement, price_types, nomenclature, database, prices,
+    categories, pictures, nomenclature_attributes_value, nomenclature_attributes
+)
 
 
 class FeedCriteriaFilter:
@@ -124,8 +127,33 @@ class FeedCriteriaFilter:
         for row in images_rows:
             images_map[row.entity_id].append(f"https://app.tablecrm.com/api/v1/{row.url}")
 
-        # добавляем картинки в результат
+        # ---- атрибуты ----
+        attrs_query = (
+            select(
+                nomenclature_attributes_value.c.nomenclature_id,
+                nomenclature_attributes.c.name,
+                nomenclature_attributes_value.c.value,
+            )
+            .join(
+                nomenclature_attributes,
+                nomenclature_attributes.c.id == nomenclature_attributes_value.c.attribute_id,
+            )
+            .where(
+                and_(
+                    nomenclature_attributes_value.c.nomenclature_id.in_(
+                        nomenclature_ids),
+                    nomenclature_attributes.c.cashbox == self.cashbox_id,
+                )
+            )
+        )
+        attrs_rows = await database.fetch_all(attrs_query)
+        attrs_map = defaultdict(dict)
+        for row in attrs_rows:
+            attrs_map[row.nomenclature_id][row.name] = row.value
+
+        # ---- собираем финальный результат ----
         for r in results:
             r["images"] = images_map.get(r["id"], None)
+            r["params"] = attrs_map.get(r["id"], None)
 
         return results
