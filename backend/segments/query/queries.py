@@ -93,12 +93,7 @@ class SegmentCriteriaQuery:
                 "condition": lambda
                     base: contragents_tags.c.contragent_id == base.c.contragent,
             },
-            "loyality": {
-                "join_type": "join",
-                "table": loyality_cards,
-                "condition": lambda
-                    base: loyality_cards.c.contragent_id == base.c.contragent,
-            },
+            "loyality": None,
         }
 
     def group_criteria_by_priority(self):
@@ -170,7 +165,6 @@ class SegmentCriteriaQuery:
                         "handler")
                     if handler:
                         query = handler(query, data, subq)
-
                 # Выполняем запрос для части
                 try:
                     chunk_rows = await database.fetch_all(query)

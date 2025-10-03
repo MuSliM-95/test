@@ -1,12 +1,14 @@
+import asyncio
 import json
 from datetime import datetime
 from typing import List
 
 from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
-    users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts
+    users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts,
+    loyality_cards, loyality_transactions
 )
-from sqlalchemy import select, and_, func, literal, or_
+from sqlalchemy import select, and_, func, literal, or_, update
 from sqlalchemy.dialects.postgresql import insert
 
 from segments.actions.segment_tg_notification import send_segment_notification
@@ -17,6 +19,8 @@ from segments.helpers.collect_obj_ids import collect_objects
 from segments.constants import SegmentChangeType
 
 from segments.helpers.functions import create_replacements
+
+from api.loyality_transactions.routers import raschet_bonuses
 
 
 class SegmentActions:
@@ -46,6 +50,14 @@ class SegmentActions:
             "remove_docs_sales_tags": {
                 "obj_type": SegmentObjectType.docs_sales.value,
                 "method": self.remove_docs_sales_tags
+            },
+            "transform_loyality_card": {
+                "obj_type": SegmentObjectType.contragents.value,
+                "method": self.transform_loyality_card
+            },
+            "add_loyality_transaction": {
+                "obj_type": SegmentObjectType.contragents.value,
+                "method": self.add_loyality_transaction
             }
         }
 
@@ -300,3 +312,50 @@ class SegmentActions:
         ))
 
         await database.execute(query)
+
+    async def transform_loyality_card(self, contragents_ids: List[int], data: dict):
+        fields_for_update = {}
+
+
+        if data.get("cashback_percent"):
+            fields_for_update["cashback_percent"] = data.get("cashback_percent")
+        if data.get("max_withdraw_percentage"):
+            fields_for_update["max_withdraw_percentage"] = data.get("max_withdraw_percentage")
+        if data.get("lifetime"):
+            fields_for_update["lifetime"] = data.get("lifetime")
+        if data.get("tag"):
+            fields_for_update["tags"] = data.get("tag")
+        query = update(loyality_cards).where(
+            loyality_cards.c.contragent_id.in_(contragents_ids),
+            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
+        ).values(**fields_for_update)
+
+        await database.execute(query)
+
+
+    async def add_loyality_transaction(self, contragents_ids: List[int], data: dict):
+        insert_data = {}
+        insert_data["amount"] = data.get("amount")
+        insert_data["type"] = "accrual" if data.get("direction") == "plus" else "withdraw"
+        if data.get("comment"):
+            insert_data["name"] = data.get("comment")
+        else:
+            insert_data["name"] = "Обновление условий карты лояльности"
+        insert_data["is_deleted"] = False
+        insert_data["status"] = True
+        insert_data["cashbox"] = self.segment_obj.cashbox_id
+
+        query = select(loyality_cards).where(
+            loyality_cards.c.contragent_id.in_(contragents_ids),
+            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
+        )
+        cards = await database.fetch_all(query)
+        for card in cards:
+            insert_data["loyality_card_id"] = card.id
+            await database.execute(
+                loyality_transactions.insert().values(insert_data)
+            )
+            await asyncio.gather(asyncio.create_task(raschet_bonuses(card.id)))
+
+
+
