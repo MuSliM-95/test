@@ -261,8 +261,11 @@ class SegmentActions:
                     )
             query = (
                 query
-                .outerjoin(employee_shifts, subquery.c.relation_id == employee_shifts.c.user_id)
-                .where(where_clause)
+                .outerjoin(employee_shifts, subquery.c.user_id == employee_shifts.c.user_id)
+                .where(or_(
+                    employee_shifts.c.user_id.is_(None),
+                    employee_shifts.c.status == shift_status
+                ))
             )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
