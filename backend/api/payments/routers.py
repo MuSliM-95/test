@@ -238,8 +238,17 @@ async def read_payments_list(
             SELECT *,
             (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents 
             WHERE contragents.id = payments.contragent) END) AS contragent_name
-            FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.is_deleted = false AND 
-            payments.parent_id IS NULL {filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
+            FROM payments 
+            WHERE 
+                payments.cashbox = {user.cashbox_id} 
+                AND payments.is_deleted = false 
+                AND payments.parent_id IS NULL 
+                {filters} 
+            ORDER BY 
+                payments.{sort_list[0]} {order_by_type},
+                payments.id { 'ASC' if order_by_type == 'ASC' else 'DESC' }
+            LIMIT {limit} OFFSET {offset};
+        """
         pays = await database.fetch_all(query)
 
         pays_list = await _get_pays_list(pays, user)
