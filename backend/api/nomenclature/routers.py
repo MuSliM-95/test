@@ -440,7 +440,7 @@ async def get_nomenclature(
             )
             attributes_list = await database.fetch_all(attributes_query)
             nomenclature_info["attributes"] = attributes_list
-    print("Finish")
+
     return {"result": nomenclature_db, "count": nomenclature_db_count}
 
 
