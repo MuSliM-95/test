@@ -345,6 +345,7 @@ async def get_list(
     show_goods: bool = False,
     filters: schemas.FilterSchema = Depends(),
     kanban: bool = False,
+    sort: Optional[str] = "created_at:desc",
 ):
     """Получение списка документов"""
     user = await get_user_by_token(token)
@@ -359,7 +360,6 @@ async def get_list(
         )
         .limit(limit)
         .offset(offset)
-        .order_by(desc(docs_sales.c.id))
     )
     count_query = (
         select(func.count())
@@ -544,6 +544,25 @@ async def get_list(
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
 
     query = query.filter(and_(*filter_list))
+
+    if sort:
+        order_fields = {"created_at", "updated_at"}
+        directions = {"asc", "desc"}
+
+        if (
+                len(sort.split(":")) != 2
+                or sort.split(":")[1].lower() not in directions
+                or sort.split(":")[0].lower() not in order_fields
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Вы ввели некорректный параметр сортировки!")
+        order_by, direction = sort.split(":")
+
+        column = docs_sales.c[order_by]
+        if direction.lower() == "desc":
+            column = column.desc()
+        query = query.order_by(column)
 
     count_query = count_query.filter(and_(*filter_list))
 

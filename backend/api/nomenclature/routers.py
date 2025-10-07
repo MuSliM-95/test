@@ -175,7 +175,6 @@ async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example
             nomenclature.c.category.in_(ids)
         )
         .group_by(nomenclature.c.id, units.c.convent_national_view)
-        .order_by(asc(nomenclature.c.id))
     )
 
     nomenclature_db = await database.fetch_all(query)
@@ -247,7 +246,7 @@ async def get_nomenclature(
         only_main_from_group: bool = False,
         min_price: Optional[float] = Query(None, description="Минимальная цена для фильтрации"),
         max_price: Optional[float] = Query(None, description="Максимальная цена для фильтрации"),
-        filters_query: NomenclatureFilter = Depends(),
+        sort: Optional[str] = "created_at:desc",
 ):
     start_time = time.time()
     """Получение списка категорий"""
@@ -320,18 +319,24 @@ async def get_nomenclature(
 
     query = query.where(and_(*conditions))
 
-    if filters_query.order_created_at:
-        if filters_query.order_created_at == SortOrder.ASC:
-            query = query.order_by(asc(nomenclature.c.created_at))
-        else:
-            query = query.order_by(desc(nomenclature.c.created_at))
-    elif filters_query.order_name:
-        if filters_query.order_name == SortOrder.ASC:
-            query = query.order_by(asc(nomenclature.c.name))
-        else:
-            query = query.order_by(desc(nomenclature.c.name))
-    else:
-        query = query.order_by(desc(nomenclature.c.id))
+    if sort:
+        order_fields = {"created_at", "updated_at", "name"}
+        directions = {"asc", "desc"}
+
+        if (
+                len(sort.split(":")) != 2
+                or sort.split(":")[1].lower() not in directions
+                or sort.split(":")[0].lower() not in order_fields
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Вы ввели некорректный параметр сортировки!")
+        order_by, direction = sort.split(":")
+
+        column = nomenclature.c[order_by]
+        if direction.lower() == "desc":
+            column = column.desc()
+        query = query.order_by(column)
 
     query = query.group_by(nomenclature.c.id, units.c.convent_national_view)
 
@@ -435,7 +440,7 @@ async def get_nomenclature(
             )
             attributes_list = await database.fetch_all(attributes_query)
             nomenclature_info["attributes"] = attributes_list
-
+    print("Finish")
     return {"result": nomenclature_db, "count": nomenclature_db_count}
 
 
