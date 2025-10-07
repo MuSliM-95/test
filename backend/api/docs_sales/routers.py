@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import hashlib
 import os
+import pprint
 import secrets
 from typing import Any, Dict, Optional, Union
 
@@ -657,6 +658,7 @@ async def get_list(
 
             item["goods"] = goods_db
 
+    pprint.pprint(items_db)
     return {"result": items_db, "count": count}
 
 @router.get("/docs_sales/created/{date}", response_model=schemas.CountRes)
