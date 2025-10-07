@@ -2516,24 +2516,26 @@ async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
     if not item_db:
         raise HTTPException(404, "Документ не найден!")
 
-    check_delivery_info_query = select(docs_sales_delivery_info.c.id).where(
-        docs_sales_delivery_info.c.docs_sales_id == idx
-    )
-    delivery_info_db = await database.fetch_one(check_delivery_info_query)
-    if delivery_info_db:
-        raise HTTPException(400, "Данные доставки уже добавлены.")
-
     data_dict = data.dict()
     data_dict["docs_sales_id"] = idx
     if data_dict.get("delivery_date") or data_dict.get("delivery_date") == 0:
         data_dict["delivery_date"] = datetime.datetime.fromtimestamp(
             data_dict["delivery_date"]
         )
-    insert_query = docs_sales_delivery_info.insert().values(data_dict)
-    inserted_entity_id = await database.execute(insert_query)
+
+    check_delivery_info_query = select(docs_sales_delivery_info.c.id).where(
+        docs_sales_delivery_info.c.docs_sales_id == idx
+    )
+    delivery_info_db = await database.fetch_one(check_delivery_info_query)
+    if delivery_info_db:
+        query = docs_sales_delivery_info.update().values(data_dict).where(docs_sales_delivery_info.c.docs_sales_id == idx).returning(docs_sales_delivery_info.c.id)
+    else:
+        query = docs_sales_delivery_info.insert().values(data_dict)
+
+    entity_id = await database.execute(query)
 
     return schemas.ResponseDeliveryInfoSchema(
-        id=inserted_entity_id, docs_sales_id=idx, **data.dict()
+        id=entity_id, docs_sales_id=idx, **data.dict()
     )
 
 
