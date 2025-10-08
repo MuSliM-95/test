@@ -25,7 +25,7 @@ from database.db import (
     contragents,
     user_permissions,
 )
-from functions.helpers import get_filters, check_user_permission, hide_balance_for_non_admin
+from functions.helpers import get_filters, check_user_permission, hide_balance_for_non_admin, build_sql_filters
 from functions.users import raschet
 from ws_manager import manager
 
@@ -36,6 +36,7 @@ router = APIRouter(tags=["payments"])
 async def read_payments_list(
         token: str,
         filters: filter_schemas.PaymentFiltersQuery = Depends(),
+        cu_filters: filter_schemas.CUIntegerFilters = Depends(),
         offset: int = 0,
         limit: int = 100,
         sort: str = "created_at:desc",
@@ -198,6 +199,8 @@ async def read_payments_list(
         )
     order_by_type = sort_list[1].upper()
 
+    cu_filters = build_sql_filters(cu_filters)
+
     if created_by:
         created_by_param = created_by.split(",")
         total_pay_list = []
@@ -219,14 +222,14 @@ async def read_payments_list(
                 (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents 
                 WHERE contragents.id = payments.contragent) END) AS contragent_name
                 FROM payments WHERE payments.cashbox = {created_by_user.cashbox_id} AND payments.is_deleted = false AND 
-                payments.parent_id IS NULL {filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
+                payments.parent_id IS NULL {filters} {cu_filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
             pays = await database.fetch_all(query)
 
             pays_list = await _get_pays_list(pays, user)
 
             total_pay_list.extend(pays_list)
 
-        c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {created_by_user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters}"
+        c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {created_by_user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters} {cu_filters}"
         count = await database.fetch_one(c)
 
         return {"result": total_pay_list, "count": dict(count)['count']}  # LOCAL
@@ -244,6 +247,7 @@ async def read_payments_list(
                 AND payments.is_deleted = false 
                 AND payments.parent_id IS NULL 
                 {filters} 
+                {cu_filters}
             ORDER BY 
                 payments.{sort_list[0]} {order_by_type},
                 payments.id { 'ASC' if order_by_type == 'ASC' else 'DESC' }
@@ -253,7 +257,7 @@ async def read_payments_list(
 
         pays_list = await _get_pays_list(pays, user)
 
-        c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters}"
+        c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters} {cu_filters}"
         count = await database.fetch_one(c)
 
         return {"result": pays_list, "count": dict(count)['count']}  # LOCAL

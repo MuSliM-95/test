@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from typing import List, Optional
 
 from starlette import status
@@ -18,8 +19,9 @@ from functions.helpers import (
     get_entity_by_id,
     get_user_by_token,
     nomenclature_unit_id_to_name,
-    create_entity_hash, update_entity_hash
+    create_entity_hash, update_entity_hash, build_filters
 )
+from functions.filter_schemas import CUIntegerFilters
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -246,6 +248,7 @@ async def get_nomenclature(
         only_main_from_group: bool = False,
         min_price: Optional[float] = Query(None, description="Минимальная цена для фильтрации"),
         max_price: Optional[float] = Query(None, description="Максимальная цена для фильтрации"),
+        cu_filters: CUIntegerFilters = Depends(),
         sort: Optional[str] = "created_at:desc",
 ):
     start_time = time.time()
@@ -255,6 +258,15 @@ async def get_nomenclature(
     if name and barcode:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Фильтр может быть задан или по имени или по штрихкоду")
 
+    filters_data = cu_filters.dict(exclude_none=True)
+    cu_filter_data = {}
+
+    for f in filters_data.keys():
+        if f in ["created_at__gte", "created_at__lte", "updated_at__gte",
+                 "updated_at__lte"]:
+            cu_filter_data[f] = datetime.fromtimestamp(filters_data[f])
+
+    filters = build_filters(nomenclature, cu_filter_data)
     price_subquery = None
     if min_price is not None or max_price is not None:
         price_subquery = select(
@@ -317,7 +329,7 @@ async def get_nomenclature(
     if max_price is not None:
         conditions.append(price_subquery.c.min_price <= max_price)
 
-    query = query.where(and_(*conditions))
+    query = query.where(and_(*conditions)).filter(*filters)
 
     if sort:
         order_fields = {"created_at", "updated_at", "name"}
@@ -342,7 +354,7 @@ async def get_nomenclature(
 
     count_query = (
         select(func.count(func.distinct(nomenclature.c.id)))
-        .select_from(nomenclature)
+        .select_from(nomenclature).filter(*filters)
     )
 
     if barcode:

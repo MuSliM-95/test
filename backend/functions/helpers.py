@@ -2,7 +2,7 @@ import random
 import string
 import hashlib
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, Union, Any, List
 import json
 
 import aiohttp
@@ -31,6 +31,7 @@ from database.db import (
     fifo_settings, docs_sales_settings,
     user_permissions
 )
+from sqlalchemy.sql import ColumnElement
 
 
 def gen_token():
@@ -922,3 +923,76 @@ def coerce_value(v: str):
 
     return s
 
+
+def build_filters(table: Table, filter_schema: Any) -> List[ColumnElement]:
+    """
+    Преобразует Pydantic-схему в список SQLAlchemy Core фильтров.
+    Возвращает список ColumnElement, пригодных для .where(*filters)
+    """
+    operators = {
+        "eq": lambda c, v: c == v,
+        "ne": lambda c, v: c != v,
+        "lt": lambda c, v: c < v,
+        "lte": lambda c, v: c <= v,
+        "gt": lambda c, v: c > v,
+        "gte": lambda c, v: c >= v,
+        "in": lambda c, v: c.in_(v if isinstance(v, list) else str(v).split(",")),
+    }
+
+    filters = []
+    if isinstance(filter_schema, dict):
+        filters_data = filter_schema.copy()
+    else:
+        filters_data = filter_schema.dict(exclude_none=True)
+    for key, value in filters_data.items():
+        if "__" in key:
+            field_name, op = key.split("__", 1)
+        else:
+            field_name, op = key, "eq"
+
+        if field_name not in table.c:
+            raise ValueError(f"Таблица {table.name} не содержит столбца '{field_name}'")
+
+        column = table.c[field_name]
+        if op not in operators:
+            raise ValueError(f"Неподдерживаемый оператор '{op}' в фильтре '{key}'")
+
+        filters.append(operators[op](column, value))
+
+    return filters
+
+
+def build_sql_filters(filter_schema: Any) -> str:
+    """
+    Генерирует строку SQL-фильтров (часть WHERE)
+    """
+    filters = []
+    for key, value in filter_schema.dict(exclude_none=True).items():
+        if "__" in key:
+            field_name, op = key.split("__", 1)
+        else:
+            field_name, op = key, "eq"
+
+        if isinstance(value, str):
+            value = f"'{value}'"
+        elif isinstance(value, list):
+            value = "(" + ", ".join(f"'{v}'" for v in value) + ")"
+
+        # SQL маппинг операторов
+        op_map = {
+            "eq": "=",
+            "ne": "!=",
+            "lt": "<",
+            "lte": "<=",
+            "gt": ">",
+            "gte": ">=",
+            "in": "IN",
+        }
+
+        sql_op = op_map.get(op)
+        if not sql_op:
+            raise ValueError(f"Unsupported operator '{op}'")
+
+        filters.append(f"AND payments.{field_name} {sql_op} {value}")
+
+    return " ".join(filters)
