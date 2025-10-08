@@ -217,6 +217,10 @@ class FilterSchema(BaseModel):
 
     picker_id: Optional[int] = None
     courier_id: Optional[int] = None
+    updated_at__gte: Optional[int] = None
+    updated_at__lte: Optional[int] = None
+    created_at__gte: Optional[int] = None
+    created_at__lte: Optional[int] = None
 
 
 class NotifyType(str, Enum):

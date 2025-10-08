@@ -84,6 +84,7 @@ from functions.helpers import (
     datetime_to_timestamp,
     get_user_by_token,
     raschet_oplat,
+    build_filters
 )
 from functions.users import raschet
 from producer import queue_notification
@@ -506,7 +507,11 @@ async def get_list(
         else:
             filter_list.append(docs_sales.c.priority == value)
     for k, v in filters_dict.items():
-        if k in ["has_delivery", "has_picker", "has_courier", "priority", "order_status", "delivery_date_from", "delivery_date_to", "picker_id", "courier_id"]:
+        if k in ["has_delivery", "has_picker", "has_courier", "priority",
+                 "order_status", "delivery_date_from", "delivery_date_to",
+                 "picker_id", "courier_id", "created_at__gte",
+                 "created_at__lte", "updated_at__gte",
+                 "updated_at__lte"]:
             continue
         if k.split("_")[-1] == "from":
             dated_from_param_value = func.to_timestamp(v)
@@ -542,6 +547,16 @@ async def get_list(
             )
         else:
             filter_list.append(and_(eval(f"docs_sales.c.{k} == {v}")))
+
+    cu_filter_data = {}
+
+    for f in filters_dict.keys():
+        if f in ["created_at__gte", "created_at__lte", "updated_at__gte",
+                 "updated_at__lte"]:
+            cu_filter_data[f] = datetime.datetime.fromtimestamp(filters_dict[f])
+
+    filters = build_filters(docs_sales, cu_filter_data)
+    filter_list += filters
 
     query = query.filter(and_(*filter_list))
 

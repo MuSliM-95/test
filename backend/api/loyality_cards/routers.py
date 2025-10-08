@@ -9,7 +9,12 @@ from database.db import database, loyality_cards, contragents, organizations, lo
 import api.loyality_cards.schemas as schemas
 from sqlalchemy import desc, or_, asc
 
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, add_status, get_entity_by_id_cashbox, contr_org_ids_to_name, get_entity_by_id_and_created_by, get_filters_cards, clear_phone_number
+from functions.helpers import (
+    datetime_to_timestamp, get_entity_by_id, add_status,
+    get_entity_by_id_cashbox, contr_org_ids_to_name,
+    get_entity_by_id_and_created_by, get_filters_cards, clear_phone_number,
+    build_filters
+)
 
 from ws_manager import manager
 from functions.helpers import get_user_by_token
@@ -98,6 +103,15 @@ async def get_cards(
             )
         else:
             raise HTTPException(404, "Такого пользователя не существует")
+
+    cu_filter_data = {}
+
+    for f in filters_dict.keys():
+        if f in ["created_at__gte", "created_at__lte", "updated_at__gte",
+                 "updated_at__lte"]:
+            cu_filter_data[f] = datetime.fromtimestamp(filters_dict[f])
+
+    filters += build_filters(loyality_cards, cu_filter_data)
 
     if filters:
         query = (
