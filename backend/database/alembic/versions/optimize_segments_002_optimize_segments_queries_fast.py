@@ -86,8 +86,8 @@ def upgrade():
 
     # 10. Теги контрагентов
     op.execute("""
-        CREATE INDEX IF NOT EXISTS idx_contragents_tags_contragent_name 
-        ON contragents_tags (contragent_id, name)
+        CREATE INDEX IF NOT EXISTS idx_contragents_tags_contragent_tag 
+        ON contragents_tags (contragent_id, tag_id)
     """)
 
     # 11. Информация о доставке
@@ -111,7 +111,7 @@ def downgrade():
     """Удаляет созданные индексы"""
 
     op.drop_index("idx_docs_sales_delivery_docs_address", "docs_sales_delivery_info")
-    op.drop_index("idx_contragents_tags_contragent_name", "contragents_tags")
+    op.drop_index("idx_contragents_tags_contragent_tag", "contragents_tags")
     op.drop_index("idx_docs_sales_tags_docs_name", "docs_sales_tags")
     op.drop_index("idx_docs_sales_contragent_aggregate", "docs_sales")
     op.drop_index("idx_contragents_id_phone_cashbox", "contragents")
