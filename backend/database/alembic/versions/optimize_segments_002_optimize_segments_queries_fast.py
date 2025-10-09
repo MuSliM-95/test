@@ -31,9 +31,7 @@ def upgrade():
         "idx_loyality_cards_contragent_balance",
         "loyality_cards",
         ["contragent_id", "balance"],
-        postgresql_where=op.inline_literal(
-            "contragent_id IS NOT NULL AND is_deleted = FALSE"
-        ),
+        postgresql_where="contragent_id IS NOT NULL AND is_deleted = FALSE",
     )
 
     # 2. Транзакции лояльности
@@ -48,7 +46,7 @@ def upgrade():
         "idx_docs_sales_cashbox_contragent_sum",
         "docs_sales",
         ["cashbox", "contragent", "sum", "created_at"],
-        postgresql_where=op.inline_literal("contragent IS NOT NULL"),
+        postgresql_where="contragent IS NOT NULL",
     )
 
     # 4. Товары в документах
@@ -72,7 +70,7 @@ def upgrade():
         "idx_contragents_id_phone_cashbox",
         "contragents",
         ["id", "phone", "cashbox"],
-        postgresql_where=op.inline_literal("is_deleted = FALSE"),
+        postgresql_where="is_deleted = FALSE",
     )
 
     # 8. Дополнительный индекс для агрегатов
@@ -80,7 +78,7 @@ def upgrade():
         "idx_docs_sales_contragent_aggregate",
         "docs_sales",
         ["contragent", "id", "sum", "created_at"],
-        postgresql_where=op.inline_literal("contragent IS NOT NULL"),
+        postgresql_where="contragent IS NOT NULL",
     )
 
     # 9. Теги документов продаж
@@ -100,7 +98,7 @@ def upgrade():
         "idx_docs_sales_delivery_docs_address",
         "docs_sales_delivery_info",
         ["docs_sales_id", "delivery_date"],
-        postgresql_where=op.inline_literal("address IS NOT NULL AND address != ''"),
+        postgresql_where="address IS NOT NULL AND address != ''",
     )
 
     # Обновляем статистику
