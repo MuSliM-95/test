@@ -1,9 +1,11 @@
+from pprint import pprint
+
 from fastapi import APIRouter, HTTPException
-from database.db import database, users, users_cboxes_relation, employee_shifts
-from sqlalchemy import select, func, or_, and_
+from database.db import database, users, users_cboxes_relation, employee_shifts, employee_shifts_events
+from sqlalchemy import select, func, or_, and_, desc
 from datetime import datetime, timedelta
 from .schemas import (
-    ShiftStatus, ShiftResponse, ShiftStatusResponse, ShiftData
+    ShiftStatus, ShiftResponse, ShiftStatusResponse, ShiftData, ShiftEventsList, ShiftEvent, ShiftEventCreate
 )
 from api.users.schemas import UserWithShiftInfo, CBUsersListShortWithShifts, ShiftStatistics
 from ws_manager import manager
@@ -22,6 +24,17 @@ def serialize_shift_data(shift_data: dict) -> dict:
             serialized[key] = value
     return serialized
 
+
+async def log_shift_event(shift_response: ShiftResponse):
+    query = employee_shifts_events.insert(
+        ShiftEventCreate(
+            relation_id=shift_response.user_id,
+            cashbox_id=shift_response.cashbox_id,
+            shift_status=shift_response.status,
+            event_start=datetime.now(),
+        ).dict()
+    )
+    await database.execute(query)
 
 @router.post("/start", response_model=ShiftResponse)
 async def start_shift(token: str):
@@ -108,6 +121,8 @@ async def start_shift(token: str):
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)
 
+    await log_shift_event(shift_response)
+
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
         token,
@@ -186,6 +201,8 @@ async def end_shift(token: str):
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)
 
+    await log_shift_event(shift_response)
+
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
         token,
@@ -207,6 +224,7 @@ async def end_shift(token: str):
 
     # Обновляем статистику для админов
     await send_statistics_update(user.cashbox_id)
+
 
     return shift_response
 
@@ -263,6 +281,8 @@ async def create_break(token: str, duration_minutes: int):
     shift_response = ShiftResponse(**dict(updated_shift))
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)
+
+    await log_shift_event(shift_response)
 
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -589,6 +609,8 @@ async def end_break_early(token: str):
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)
 
+    await log_shift_event(shift_response)
+
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
         token,
@@ -612,3 +634,55 @@ async def end_break_early(token: str):
     await send_statistics_update(user.cashbox_id)
 
     return shift_response
+
+@router.get('/get_shifts_events', response_model=ShiftEventsList)
+async def get_shifts_events(token: str, limit: int = 30, offset: int = 0):
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+
+    shifts_events_query = (
+        select(
+            employee_shifts_events.c.id,
+            employee_shifts_events.c.relation_id,
+            employee_shifts_events.c.cashbox_id,
+            employee_shifts_events.c.shift_status,
+            employee_shifts_events.c.event_start,
+            employee_shifts_events.c.event_end,
+            users.c.id.label("user_id"),
+            users.c.first_name,
+            users.c.last_name,
+            users.c.username,
+            users.c.photo,
+            users.c.phone_number
+        )
+        .select_from(
+            employee_shifts_events
+            .join(
+                users_cboxes_relation,
+                employee_shifts_events.c.relation_id == users_cboxes_relation.c.id
+            )
+            .join(
+                users,
+                users_cboxes_relation.c.user == users.c.id
+            )
+        )
+        .where(employee_shifts_events.c.cashbox_id == user.cashbox_id)
+        .order_by(desc(employee_shifts_events.c.event_start))
+        .limit(limit)
+        .offset(offset)
+    )
+    total_count_query = (select(func.count(employee_shifts_events.c.id))
+                         .where(employee_shifts_events.c.cashbox_id == user.cashbox_id))
+
+    shifts_events = await database.fetch_all(shifts_events_query)
+    total_count = await database.execute(total_count_query)
+
+    return ShiftEventsList(
+        result=[ShiftEvent.from_orm(i) for i in shifts_events],
+        total_count=total_count
+    )

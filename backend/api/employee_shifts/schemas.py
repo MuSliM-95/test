@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -65,3 +65,30 @@ class ShiftData(BaseModel):
     break_duration: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+
+
+class ShiftEvent(BaseModel):
+    first_name: str
+    last_name: Optional[str]
+    username: Optional[str]
+    photo: str
+    relation_id: Optional[int] = None
+    phone_number: Optional[str]
+
+    shift_status: ShiftStatus
+    event_start: datetime
+
+    class Config:
+        orm_mode = True
+
+class ShiftEventsList(BaseModel):
+    result: List[ShiftEvent]
+    total_count: int
+
+
+class ShiftEventCreate(BaseModel):
+    relation_id: int
+    cashbox_id: int
+    shift_status: str
+    event_start: datetime
+    event_end: Optional[datetime] = None
