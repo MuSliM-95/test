@@ -33,6 +33,10 @@ class LoyalityCardFilters(BaseModel):
     # lifetime: Optional[int] # lifetime in seconds
 
     status_card: Optional[bool]
+    updated_at__gte: Optional[int] = None
+    updated_at__lte: Optional[int] = None
+    created_at__gte: Optional[int] = None
+    created_at__lte: Optional[int] = None
 
 
 class LoyalityCardCreate(BaseModel):
