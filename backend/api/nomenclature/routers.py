@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from typing import List, Optional
 
 from starlette import status
@@ -18,8 +19,9 @@ from functions.helpers import (
     get_entity_by_id,
     get_user_by_token,
     nomenclature_unit_id_to_name,
-    create_entity_hash, update_entity_hash
+    create_entity_hash, update_entity_hash, build_filters
 )
+from functions.filter_schemas import CUIntegerFilters
 from sqlalchemy import func, select, and_, desc, asc, case, cast, ARRAY, null, or_, Float, between
 from sqlalchemy.sql.functions import coalesce
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -175,7 +177,6 @@ async def get_nomenclature_by_ids(token: str, ids: List[int] = Body(..., example
             nomenclature.c.category.in_(ids)
         )
         .group_by(nomenclature.c.id, units.c.convent_national_view)
-        .order_by(asc(nomenclature.c.id))
     )
 
     nomenclature_db = await database.fetch_all(query)
@@ -247,7 +248,8 @@ async def get_nomenclature(
         only_main_from_group: bool = False,
         min_price: Optional[float] = Query(None, description="Минимальная цена для фильтрации"),
         max_price: Optional[float] = Query(None, description="Максимальная цена для фильтрации"),
-        filters_query: NomenclatureFilter = Depends(),
+        cu_filters: CUIntegerFilters = Depends(),
+        sort: Optional[str] = "created_at:desc",
 ):
     start_time = time.time()
     """Получение списка категорий"""
@@ -256,6 +258,15 @@ async def get_nomenclature(
     if name and barcode:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Фильтр может быть задан или по имени или по штрихкоду")
 
+    filters_data = cu_filters.dict(exclude_none=True)
+    cu_filter_data = {}
+
+    for f in filters_data.keys():
+        if f in ["created_at__gte", "created_at__lte", "updated_at__gte",
+                 "updated_at__lte"]:
+            cu_filter_data[f] = datetime.fromtimestamp(filters_data[f])
+
+    filters = build_filters(nomenclature, cu_filter_data)
     price_subquery = None
     if min_price is not None or max_price is not None:
         price_subquery = select(
@@ -318,26 +329,32 @@ async def get_nomenclature(
     if max_price is not None:
         conditions.append(price_subquery.c.min_price <= max_price)
 
-    query = query.where(and_(*conditions))
+    query = query.where(and_(*conditions)).filter(*filters)
 
-    if filters_query.order_created_at:
-        if filters_query.order_created_at == SortOrder.ASC:
-            query = query.order_by(asc(nomenclature.c.created_at))
-        else:
-            query = query.order_by(desc(nomenclature.c.created_at))
-    elif filters_query.order_name:
-        if filters_query.order_name == SortOrder.ASC:
-            query = query.order_by(asc(nomenclature.c.name))
-        else:
-            query = query.order_by(desc(nomenclature.c.name))
-    else:
-        query = query.order_by(desc(nomenclature.c.id))
+    if sort:
+        order_fields = {"created_at", "updated_at", "name"}
+        directions = {"asc", "desc"}
+
+        if (
+                len(sort.split(":")) != 2
+                or sort.split(":")[1].lower() not in directions
+                or sort.split(":")[0].lower() not in order_fields
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Вы ввели некорректный параметр сортировки!")
+        order_by, direction = sort.split(":")
+
+        column = nomenclature.c[order_by]
+        if direction.lower() == "desc":
+            column = column.desc()
+        query = query.order_by(column)
 
     query = query.group_by(nomenclature.c.id, units.c.convent_national_view)
 
     count_query = (
         select(func.count(func.distinct(nomenclature.c.id)))
-        .select_from(nomenclature)
+        .select_from(nomenclature).filter(*filters)
     )
 
     if barcode:

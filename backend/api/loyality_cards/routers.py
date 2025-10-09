@@ -9,7 +9,12 @@ from database.db import database, loyality_cards, contragents, organizations, lo
 import api.loyality_cards.schemas as schemas
 from sqlalchemy import desc, or_, asc
 
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, add_status, get_entity_by_id_cashbox, contr_org_ids_to_name, get_entity_by_id_and_created_by, get_filters_cards, clear_phone_number
+from functions.helpers import (
+    datetime_to_timestamp, get_entity_by_id, add_status,
+    get_entity_by_id_cashbox, contr_org_ids_to_name,
+    get_entity_by_id_and_created_by, get_filters_cards, clear_phone_number,
+    build_filters
+)
 
 from ws_manager import manager
 from functions.helpers import get_user_by_token
@@ -39,9 +44,8 @@ async def get_cards(
     token: str, limit:
     int = 100,
     offset: int = 0,
-    order_created_at: Optional[SortOrder] = Query(None, alias="order[created_at]"),
-    order_updated_at: Optional[SortOrder] = Query(None, alias="order[updated_at]"),
-    filters_q: schemas.LoyalityCardFilters = Depends()
+    filters_q: schemas.LoyalityCardFilters = Depends(),
+    sort: Optional[str] = "created_at:desc",
 ):
     """Получение списка карт"""
 
@@ -100,6 +104,15 @@ async def get_cards(
         else:
             raise HTTPException(404, "Такого пользователя не существует")
 
+    cu_filter_data = {}
+
+    for f in filters_dict.keys():
+        if f in ["created_at__gte", "created_at__lte", "updated_at__gte",
+                 "updated_at__lte"]:
+            cu_filter_data[f] = datetime.fromtimestamp(filters_dict[f])
+
+    filters += build_filters(loyality_cards, cu_filter_data)
+
     if filters:
         query = (
             loyality_cards.select()
@@ -118,19 +131,26 @@ async def get_cards(
             )
         )
 
-    order_by_condition = desc(loyality_cards.c.id)
-    if order_created_at:
-        if order_created_at == SortOrder.ASC:
-            order_by_condition = asc(loyality_cards.c.created_at)
-        elif order_created_at == SortOrder.DESC:
-            order_by_condition = desc(loyality_cards.c.created_at)
-    elif order_updated_at:
-        if order_updated_at == SortOrder.ASC:
-            order_by_condition = asc(loyality_cards.c.updated_at)
-        elif order_updated_at == SortOrder.DESC:
-            order_by_condition = desc(loyality_cards.c.updated_at)
+    if sort:
+        order_fields = {"created_at", "updated_at", "balance"}
+        directions = {"asc", "desc"}
 
-    query = query.order_by(order_by_condition).limit(limit).offset(offset)
+        if (
+                len(sort.split(":")) != 2
+                or sort.split(":")[1].lower() not in directions
+                or sort.split(":")[0].lower() not in order_fields
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Вы ввели некорректный параметр сортировки!")
+        order_by, direction = sort.split(":")
+
+        column = loyality_cards.c[order_by]
+        if direction.lower() == "desc":
+            column = column.desc()
+        query = query.order_by(column)
+
+    query = query.limit(limit).offset(offset)
 
     loyality_cards_db = await database.fetch_all(query)
     loyality_cards_db = [*map(datetime_to_timestamp, loyality_cards_db)]

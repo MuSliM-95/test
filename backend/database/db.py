@@ -1,10 +1,11 @@
+import datetime
+import enum
 import os
-import uuid
 from enum import Enum as ENUM
+
 import databases
 import sqlalchemy
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.pool import NullPool
+from dotenv import load_dotenv
 from sqlalchemy import (
     ARRAY,
     JSON,
@@ -22,13 +23,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 from sqlalchemy.sql import func
-import enum
-import datetime
-from dotenv import load_dotenv
 
 from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
-
 
 load_dotenv()
 
@@ -2171,12 +2169,6 @@ docs_sales_links = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
 )
 
-
-class ShiftStatus(str, Enum):
-    on_shift = "on_shift"
-    off_shift = "off_shift"
-    on_break = "on_break"
-
 employee_shifts = sqlalchemy.Table(
     "employee_shifts",
     metadata,
@@ -2190,6 +2182,17 @@ employee_shifts = sqlalchemy.Table(
     sqlalchemy.Column("break_duration", sqlalchemy.Integer, nullable=True),  # в минутах
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, server_default=func.now()),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, server_default=func.now(), onupdate=func.now()),
+)
+
+employee_shifts_events = sqlalchemy.Table(
+    "employee_shifts_events",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, index=True),
+    sqlalchemy.Column("relation_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("shift_status", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("event_start", sqlalchemy.DateTime, nullable=False),
+    sqlalchemy.Column("event_end", sqlalchemy.DateTime, nullable=True),
 )
 
 nomenclature_hash = sqlalchemy.Table(
