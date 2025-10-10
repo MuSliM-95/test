@@ -167,12 +167,18 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         or purchase_criteria.get("count")
         or purchase_criteria.get("total_amount")
     ):
-        # Базовый запрос для агрегации
+        # ВАЖНО: Создаем ОТДЕЛЬНЫЙ подзапрос для агрегации,
+        # полностью изолированный от основного запроса
+        # Это предотвращает CROSS JOIN между docs_sales и подзапросом
+
+        # Создаем алиас для docs_sales внутри агрегационного запроса
+        docs_sales_agg = docs_sales.alias("docs_sales_agg")
+
         agg_query = select(
-            docs_sales.c.contragent,
-            func.count(docs_sales.c.id).label("purchase_count"),
-            func.sum(docs_sales.c.sum).label("total_amount"),
-        ).select_from(docs_sales)
+            docs_sales_agg.c.contragent,
+            func.count(docs_sales_agg.c.id).label("purchase_count"),
+            func.sum(docs_sales_agg.c.sum).label("total_amount"),
+        ).select_from(docs_sales_agg)
 
         # КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: Если есть категории/номенклатуры,
         # фильтруем ДО агрегации через EXISTS в подзапросе агрегации
@@ -187,7 +193,9 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
                     nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
                 )
                 .join(categories, nomenclature.c.category == categories.c.id)
-                .where(docs_sales_goods.c.docs_sales_id == docs_sales.c.id)
+                .where(
+                    docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
+                )  # Используем алиас!
                 .where(or_(*category_conditions))
             )
             category_filter_clauses.append(category_exists)
@@ -202,7 +210,9 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
                 .join(
                     nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
                 )
-                .where(docs_sales_goods.c.docs_sales_id == docs_sales.c.id)
+                .where(
+                    docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
+                )  # Используем алиас!
                 .where(or_(*nomenclature_conditions))
             )
             category_filter_clauses.append(nomenclature_exists)
@@ -215,27 +225,37 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         if where_clauses:
             agg_query = agg_query.where(and_(*where_clauses))
 
-        # Группируем по контрагенту
-        agg_query = agg_query.group_by(docs_sales.c.contragent)
+        # Группируем по контрагенту (используем алиас!)
+        agg_query = agg_query.group_by(docs_sales_agg.c.contragent)
 
-        # Применяем HAVING фильтры
+        # Применяем HAVING фильтры (используем алиас!)
         having_clauses_built = []
 
         if rng := purchase_criteria.get("count"):
             if "gte" in rng:
-                having_clauses_built.append(func.count(docs_sales.c.id) >= rng["gte"])
+                having_clauses_built.append(
+                    func.count(docs_sales_agg.c.id) >= rng["gte"]
+                )
             if "lte" in rng:
-                having_clauses_built.append(func.count(docs_sales.c.id) <= rng["lte"])
+                having_clauses_built.append(
+                    func.count(docs_sales_agg.c.id) <= rng["lte"]
+                )
             if "eq" in rng:
-                having_clauses_built.append(func.count(docs_sales.c.id) == rng["eq"])
+                having_clauses_built.append(
+                    func.count(docs_sales_agg.c.id) == rng["eq"]
+                )
 
         if rng := purchase_criteria.get("total_amount"):
             if "gte" in rng:
-                having_clauses_built.append(func.sum(docs_sales.c.sum) >= rng["gte"])
+                having_clauses_built.append(
+                    func.sum(docs_sales_agg.c.sum) >= rng["gte"]
+                )
             if "lte" in rng:
-                having_clauses_built.append(func.sum(docs_sales.c.sum) <= rng["lte"])
+                having_clauses_built.append(
+                    func.sum(docs_sales_agg.c.sum) <= rng["lte"]
+                )
             if "eq" in rng:
-                having_clauses_built.append(func.sum(docs_sales.c.sum) == rng["eq"])
+                having_clauses_built.append(func.sum(docs_sales_agg.c.sum) == rng["eq"])
 
         if having_clauses_built:
             agg_query = agg_query.having(and_(*having_clauses_built))
