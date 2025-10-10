@@ -167,30 +167,84 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         or purchase_criteria.get("count")
         or purchase_criteria.get("total_amount")
     ):
-        # Базовый запрос для агрегации с учетом базовых фильтров
-        agg_base = select(docs_sales.c.contragent, docs_sales.c.id, docs_sales.c.sum)
+        # Базовый запрос для агрегации
+        agg_query = select(
+            docs_sales.c.contragent,
+            func.count(docs_sales.c.id).label("purchase_count"),
+            func.sum(docs_sales.c.sum).label("total_amount"),
+        ).select_from(docs_sales)
 
-        # Применяем where_clauses к базе агрегации если они есть
+        # КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: Если есть категории/номенклатуры,
+        # фильтруем ДО агрегации через EXISTS в подзапросе агрегации
+        category_filter_clauses = []
+
+        if cats := purchase_criteria.get("categories"):
+            category_conditions = [categories.c.name.ilike(f"%{cat}%") for cat in cats]
+            category_exists = exists(
+                select(1)
+                .select_from(docs_sales_goods)
+                .join(
+                    nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
+                )
+                .join(categories, nomenclature.c.category == categories.c.id)
+                .where(docs_sales_goods.c.docs_sales_id == docs_sales.c.id)
+                .where(or_(*category_conditions))
+            )
+            category_filter_clauses.append(category_exists)
+
+        if noms := purchase_criteria.get("nomenclatures"):
+            nomenclature_conditions = [
+                nomenclature.c.name.ilike(f"%{nom}%") for nom in noms
+            ]
+            nomenclature_exists = exists(
+                select(1)
+                .select_from(docs_sales_goods)
+                .join(
+                    nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
+                )
+                .where(docs_sales_goods.c.docs_sales_id == docs_sales.c.id)
+                .where(or_(*nomenclature_conditions))
+            )
+            category_filter_clauses.append(nomenclature_exists)
+
+        # Применяем фильтры категорий/номенклатур к агрегационному запросу
+        if category_filter_clauses:
+            agg_query = agg_query.where(and_(*category_filter_clauses))
+
+        # Применяем остальные where фильтры (дата, сумма чека)
         if where_clauses:
-            agg_base = agg_base.where(and_(*where_clauses))
+            agg_query = agg_query.where(and_(*where_clauses))
 
-        subq = (
-            select(docs_sales.c.contragent)
-            .select_from(agg_base.subquery())
-            .group_by(docs_sales.c.contragent)
-        )
+        # Группируем по контрагенту
+        agg_query = agg_query.group_by(docs_sales.c.contragent)
+
+        # Применяем HAVING фильтры
+        having_clauses_built = []
 
         if rng := purchase_criteria.get("count"):
-            apply_range(func.count(docs_sales.c.id), rng, having_clauses)
+            if "gte" in rng:
+                having_clauses_built.append(func.count(docs_sales.c.id) >= rng["gte"])
+            if "lte" in rng:
+                having_clauses_built.append(func.count(docs_sales.c.id) <= rng["lte"])
+            if "eq" in rng:
+                having_clauses_built.append(func.count(docs_sales.c.id) == rng["eq"])
 
         if rng := purchase_criteria.get("total_amount"):
-            apply_range(func.sum(docs_sales.c.sum), rng, having_clauses)
+            if "gte" in rng:
+                having_clauses_built.append(func.sum(docs_sales.c.sum) >= rng["gte"])
+            if "lte" in rng:
+                having_clauses_built.append(func.sum(docs_sales.c.sum) <= rng["lte"])
+            if "eq" in rng:
+                having_clauses_built.append(func.sum(docs_sales.c.sum) == rng["eq"])
 
-        if having_clauses:
-            subq = subq.having(and_(*having_clauses))
+        if having_clauses_built:
+            agg_query = agg_query.having(and_(*having_clauses_built))
 
-        subq = subq.subquery()
-        query = query.where(sub.c.contragent.in_(select(subq.c.contragent)))
+        # Создаем подзапрос с агрегатами
+        agg_subquery = agg_query.subquery("purchase_aggregates")
+
+        # Присоединяем к основному запросу через INNER JOIN
+        query = query.join(agg_subquery, sub.c.contragent == agg_subquery.c.contragent)
 
         # Очищаем where_clauses так как они уже применены
         where_clauses = []
