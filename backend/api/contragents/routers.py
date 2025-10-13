@@ -23,12 +23,15 @@ router = APIRouter(tags=["contragents"])
 @router.get("/contragents/")
 async def read_contragents_meta(token: str, limit: int = 100,
                                 offset: int = 0, sort: str = "created_at:desc", add_tags: bool = False,
-                                filters: ca_schemas.ContragentsFilterSchema = Depends()):
+                                filters: filter_schemas.CAFiltersQuery = Depends(),
+                                cu_filters: filter_schemas.CUIntegerFilters = Depends()
+                                ):
     """Получение меты контрагентов"""
     query = users_cboxes_relation.select(
         users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
-    filters = build_filters(contragents, filters)
+    filters = get_filters_ca(contragents, filters)
+    filters += build_filters(contragents, cu_filters)
     if user:
         if user.status:
             sort_list = sort.split(":")
