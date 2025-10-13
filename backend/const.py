@@ -5,6 +5,7 @@ PAY_LINK = "t.me/pay_bot"
 SUCCESS = "success"
 cheque_service_url = "https://proverkacheka.com/api/v1/check/get"
 report_queue_name = "report_queue"
+marketplace_orders_queue_name = "marketplace_orders_queue"
 
 class PaymentType:
     incoming = "incoming"

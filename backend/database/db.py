@@ -1,8 +1,9 @@
 import os
+import uuid
 from enum import Enum as ENUM
 import databases
 import sqlalchemy
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.pool import NullPool
 from sqlalchemy import (
     ARRAY,
@@ -17,11 +18,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
-    SmallInteger,
-    BIGINT,
-    text,
-    Index,
+    UniqueConstraint, SmallInteger, BIGINT, text, Index
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -30,16 +27,7 @@ import enum
 import datetime
 from dotenv import load_dotenv
 
-from database.enums import (
-    Repeatability,
-    DebitCreditType,
-    Gender,
-    ContragentType,
-    TriggerType,
-    TriggerTime,
-)
-from sqlalchemy import Column
-from sqlalchemy.orm import relationship
+from database.enums import Repeatability, DebitCreditType, Gender, ContragentType, TriggerType, TriggerTime
 
 
 load_dotenv()
@@ -146,9 +134,7 @@ class SegmentStatus(str, ENUM):
     calculated = "calculated"
 
 
-
 metadata = sqlalchemy.MetaData()
-Base = declarative_base(metadata=metadata)
 
 cashbox_settings = sqlalchemy.Table(
     "cashbox_settings",
@@ -514,6 +500,9 @@ cboxes = sqlalchemy.Table(
     sqlalchemy.Column("invite_token", String, unique=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("public", Boolean, server_default="false"),
+    sqlalchemy.Column("geo_point", String),
+    sqlalchemy.Column("city", String(100)),
 )
 
 organizations = sqlalchemy.Table(
@@ -582,13 +571,15 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
-    sqlalchemy.Column("chatting_percent", Integer, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("seo_title", String),
     sqlalchemy.Column("seo_description", String),
-    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String))
+    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String)),
+    sqlalchemy.Column("public", Boolean, server_default="false"),
+    sqlalchemy.Column("geo_point", String),
+    sqlalchemy.Column("city", String(100))
 )
 
 nomenclature_attributes = sqlalchemy.Table(
@@ -670,6 +661,20 @@ categories = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
+global_categories = sqlalchemy.Table(
+    "global_categories",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("name", String, nullable=False),
+    sqlalchemy.Column("description", String),
+    sqlalchemy.Column("code", Integer),
+    sqlalchemy.Column("parent_id", Integer, ForeignKey("global_categories.id")),
+    sqlalchemy.Column("external_id", String),  # ID из Авито
+    sqlalchemy.Column("is_active", Boolean, default=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
 units = sqlalchemy.Table(
     "units",
     metadata,
@@ -692,8 +697,6 @@ warehouses = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("address", String),
-    sqlalchemy.Column("latitude", Float),
-    sqlalchemy.Column("longitude", Float),
     sqlalchemy.Column("phone", String),
     sqlalchemy.Column("parent", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
@@ -742,7 +745,6 @@ price_types = sqlalchemy.Table(
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("is_system", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -889,8 +891,7 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
     sqlalchemy.Column("timezone", String),
-    sqlalchemy.Column("payment_past_edit_days", Integer),
-    sqlalchemy.Column("shift_work_enabled", Boolean, default=False),
+    sqlalchemy.Column("payment_past_edit_days", Integer)
 )
 
 contragents = sqlalchemy.Table(
@@ -1257,7 +1258,6 @@ docs_sales_delivery_info = sqlalchemy.Table(
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("address", String),
     sqlalchemy.Column("delivery_date", DateTime(timezone=True)),
-    sqlalchemy.Column("delivery_price", Float),
     sqlalchemy.Column("recipient", JSON),
     sqlalchemy.Column("note", String),
 )
@@ -1660,6 +1660,96 @@ areas = sqlalchemy.Table(
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+# Таблица заказов для селлеров (система распределения)
+mp_orders = sqlalchemy.Table(
+    "mp_orders",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("customer_order_id", Integer, ForeignKey("customer_orders.id"), nullable=False, index=True),
+    sqlalchemy.Column("customer_order_item_id", Integer, ForeignKey("customer_order_items.id"), nullable=False, index=True),
+    sqlalchemy.Column("seller_order_id", String, unique=True, nullable=False, index=True),  # уникальный ID заказа для селлера
+    sqlalchemy.Column("seller_cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False, index=True),
+    sqlalchemy.Column("product_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column("quantity", Integer, nullable=False, server_default="1"),
+    sqlalchemy.Column("price", Float, nullable=False),
+    sqlalchemy.Column("total_price", Float, nullable=False),
+    sqlalchemy.Column("delivery_type", String, nullable=False),
+    sqlalchemy.Column("delivery_address", String),
+    sqlalchemy.Column("delivery_comment", String),
+    sqlalchemy.Column("delivery_preferred_time", String),
+    sqlalchemy.Column("customer_phone", String, nullable=False),
+    sqlalchemy.Column("customer_lat", Float),
+    sqlalchemy.Column("customer_lon", Float),
+    sqlalchemy.Column("customer_name", String),
+    sqlalchemy.Column("status", String, nullable=False, server_default="pending"),  # pending, assigned, picked, delivered, completed
+    sqlalchemy.Column("assigned_picker_id", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("assigned_courier_id", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("routing_meta", JSON),  # метаданные для маршрутизации
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+qr_codes = sqlalchemy.Table(
+    "qr_codes",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("qr_hash", String, unique=True, nullable=False),
+    sqlalchemy.Column("entity_type", String, nullable=False),  # 'product' или 'location'
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("salt", String, nullable=False),  # Соль для генерации хэша
+    sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+reviews = sqlalchemy.Table(
+    "reviews",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("location_id", Integer, nullable=False),
+    sqlalchemy.Column("phone_hash", String, nullable=False),  # Хэш телефона для анонимности
+    sqlalchemy.Column("rating", Integer, nullable=False),  # 1-5
+    sqlalchemy.Column("text", Text, nullable=False),
+    sqlalchemy.Column("status", String, nullable=False, server_default="pending"),  # pending, visible, hidden
+    sqlalchemy.Column("utm", JSON),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+location_rating_aggregates = sqlalchemy.Table(
+    "location_rating_aggregates",
+    metadata,
+    sqlalchemy.Column("location_id", Integer, primary_key=True),
+    sqlalchemy.Column("avg_rating", Float, nullable=False),
+    sqlalchemy.Column("reviews_count", Integer, nullable=False),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+favorites = sqlalchemy.Table(
+    "favorites",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("entity_type", String, nullable=False),  # 'product' или 'location'
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("phone_hash", String, nullable=False),  # Хэш телефона для анонимности
+    sqlalchemy.Column("utm", JSON),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+view_events = sqlalchemy.Table(
+    "view_events",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("entity_type", String, nullable=False),  # 'product' или 'location'
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("listing_pos", Integer),  # Позиция в выдаче
+    sqlalchemy.Column("listing_page", Integer),  # Страница выдачи
+    sqlalchemy.Column("phone_hash", String),  # Хэш телефона для аналитики
+    sqlalchemy.Column("utm", JSON),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
 
 pages = sqlalchemy.Table(
@@ -2184,12 +2274,6 @@ docs_sales_links = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
 )
 
-
-class ShiftStatus(str, Enum):
-    on_shift = "on_shift"
-    off_shift = "off_shift"
-    on_break = "on_break"
-
 employee_shifts = sqlalchemy.Table(
     "employee_shifts",
     metadata,
@@ -2203,6 +2287,17 @@ employee_shifts = sqlalchemy.Table(
     sqlalchemy.Column("break_duration", sqlalchemy.Integer, nullable=True),  # в минутах
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, server_default=func.now()),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, server_default=func.now(), onupdate=func.now()),
+)
+
+employee_shifts_events = sqlalchemy.Table(
+    "employee_shifts_events",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, index=True),
+    sqlalchemy.Column("relation_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("shift_status", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("event_start", sqlalchemy.DateTime, nullable=False),
+    sqlalchemy.Column("event_end", sqlalchemy.DateTime, nullable=True),
 )
 
 nomenclature_hash = sqlalchemy.Table(
@@ -2223,4 +2318,47 @@ warehouse_hash = sqlalchemy.Table(
     sqlalchemy.Column("hash", String, nullable=False),
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+)
+
+# Таблица заказов клиентов (один заказ)
+customer_orders = sqlalchemy.Table(
+    "customer_orders",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("order_id", String, unique=True, nullable=False, index=True),
+    sqlalchemy.Column("customer_phone", String, nullable=False, index=True),
+    sqlalchemy.Column("customer_name", String),
+    sqlalchemy.Column("customer_lat", Float),
+    sqlalchemy.Column("customer_lon", Float),
+    sqlalchemy.Column("delivery_type", String, nullable=False),  # pickup, delivery
+    sqlalchemy.Column("delivery_address", String),
+    sqlalchemy.Column("delivery_comment", String),
+    sqlalchemy.Column("delivery_preferred_time", String),
+    sqlalchemy.Column("total_amount", Float, nullable=False, default=0),
+    sqlalchemy.Column("status", String, nullable=False, server_default="pending"),  # pending, processing, completed, cancelled
+    sqlalchemy.Column("utm_source", String),
+    sqlalchemy.Column("utm_medium", String),
+    sqlalchemy.Column("utm_campaign", String),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+# Таблица позиций заказа (много товаров в одном заказе)
+customer_order_items = sqlalchemy.Table(
+    "customer_order_items",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("customer_order_id", Integer, ForeignKey("customer_orders.id"), nullable=False, index=True),
+    sqlalchemy.Column("product_id", Integer, ForeignKey("nomenclature.id"), nullable=False, index=True),
+    sqlalchemy.Column("quantity", Integer, nullable=False, default=1),
+    sqlalchemy.Column("price", Float, nullable=False),
+    sqlalchemy.Column("total_price", Float, nullable=False),  # quantity * price
+    sqlalchemy.Column("listing_pos", Integer),  # позиция в выдаче
+    sqlalchemy.Column("listing_page", Integer),  # страница выдачи
+    sqlalchemy.Column("seller_cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False, index=True),
+    sqlalchemy.Column("status", String, nullable=False, server_default="pending"),  # pending, assigned, picked, delivered
+    sqlalchemy.Column("assigned_picker_id", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("assigned_courier_id", Integer, ForeignKey("relation_tg_cashboxes.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )

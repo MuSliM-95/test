@@ -3,6 +3,7 @@ import os
 
 from database.db import database, users
 import aio_pika
+from const import marketplace_orders_queue_name
 
 
 async def produce_message(body: dict) -> None:
@@ -100,3 +101,47 @@ async def send_order_assignment_notification(order_id: int, role: str, user_id: 
     # notification_data["recipients"] = ["chat_id1", "chat_id2", ...]
     
     return await queue_notification(notification_data)
+
+
+async def queue_marketplace_order(order_data: dict) -> bool:
+    """
+    Добавляет заказ маркетплейса в очередь RabbitMQ для распределения по кешбоксам.
+    
+    Args:
+        order_data: Данные заказа маркетплейса
+        
+    Returns:
+        bool: Успешно ли добавлен заказ в очередь
+    """
+    try:
+        connection = await aio_pika.connect_robust(
+            host=os.getenv("RABBITMQ_HOST"),
+            port=os.getenv("RABBITMQ_PORT"),
+            login=os.getenv("RABBITMQ_USER"),
+            password=os.getenv("RABBITMQ_PASS"),
+            virtualhost=os.getenv("RABBITMQ_VHOST"),
+            timeout=10,
+        )
+
+        async with connection:
+            channel = await connection.channel()
+            
+            # Создаем очередь если её нет
+            await channel.declare_queue(marketplace_orders_queue_name, durable=True)
+            
+            # Отправляем заказ в очередь
+            message = aio_pika.Message(
+                body=json.dumps(order_data).encode(),
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT
+            )
+            
+            await channel.default_exchange.publish(
+                message=message, 
+                routing_key=marketplace_orders_queue_name
+            )
+            
+            return True
+            
+    except Exception as e:
+        print(f"Ошибка при отправке заказа в очередь: {e}")
+        return False
