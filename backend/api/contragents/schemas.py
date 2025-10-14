@@ -56,14 +56,3 @@ class ContragentCreate(BaseModel):
 
 class ContragentResponse(Contragent):
     external_id: Optional[str]
-
-
-class ContragentsFilterSchema(BaseModel):
-    name: Optional[str]
-    inn: Optional[str]
-    phone: Optional[str]
-    external_id: Optional[str]
-    updated_at__gte: Optional[int] = None
-    updated_at__lte: Optional[int] = None
-    created_at__gte: Optional[int] = None
-    created_at__lte: Optional[int] = None
