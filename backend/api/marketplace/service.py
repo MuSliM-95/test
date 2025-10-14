@@ -222,6 +222,17 @@ async def create_order(order_request: schemas.MarketplaceOrderRequest) -> schema
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден или не доступен")
 
+    recipient_phone = None
+    recipient_name = None
+    recipient_lat = None
+    recipient_lon = None
+    
+    if order_request.recipient:
+        recipient_phone = order_request.recipient.phone
+        recipient_name = order_request.recipient.name
+        recipient_lat = order_request.recipient.lat
+        recipient_lon = order_request.recipient.lon
+
     order_data = {
         "order_id": order_id,
         "product_id": order_request.product_id,
@@ -233,16 +244,25 @@ async def create_order(order_request: schemas.MarketplaceOrderRequest) -> schema
         "delivery_address": order_request.delivery.address,
         "delivery_comment": order_request.delivery.comment,
         "delivery_preferred_time": order_request.delivery.preferred_time,
+        # Информация о заказчике
         "customer_phone": order_request.customer.phone,
         "customer_lat": order_request.customer.lat,
         "customer_lon": order_request.customer.lon,
         "customer_name": order_request.customer.name,
+        # Информация о получателе
+        "recipient_phone": recipient_phone,
+        "recipient_name": recipient_name,
+        "recipient_lat": recipient_lat,
+        "recipient_lon": recipient_lon,
+        "order_type": order_request.order_type,
         "quantity": order_request.quantity,
         "status": "pending",
         "routing_meta": {
             "product_cashbox": product.cashbox,
             "product_name": product.name,
             "distribution_strategy": "nearest_viable_with_stock",
+            "order_type": order_request.order_type,
+            "has_recipient": bool(order_request.recipient),
         },
     }
 

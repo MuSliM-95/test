@@ -81,11 +81,19 @@ class DeliveryInfo(BaseModel):
 
 
 class CustomerInfo(BaseModel):
-    """Информация о клиенте"""
+    """Информация о заказчике"""
     phone: str
     lat: Optional[float] = None
     lon: Optional[float] = None
     name: Optional[str] = None
+
+
+class RecipientInfo(BaseModel):
+    """Информация о получателе заказа"""
+    phone: Optional[str] = None  # Если отличается от заказчика
+    name: Optional[str] = None
+    lat: Optional[float] = None  # Место получения
+    lon: Optional[float] = None
 
 
 class MarketplaceOrderRequest(BaseModel):
@@ -97,6 +105,8 @@ class MarketplaceOrderRequest(BaseModel):
     utm: Optional[dict] = None  # UTM метки
     delivery: DeliveryInfo
     customer: CustomerInfo
+    recipient: Optional[RecipientInfo] = None  # Информация о получателе (если отличается от заказчика)
+    order_type: str = "self"  # Тип заказа: self, other, corporate, gift, proxy
     quantity: int = 1  # Количество товара
 
 
