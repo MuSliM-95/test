@@ -99,6 +99,18 @@ class DocsSalesTags(BaseModel):
         return v
 
 
+class TransformLoyalityCard(BaseModel):
+    cashback_percent: Optional[float]
+    max_withdraw_percentage: Optional[float]
+    lifetime: Optional[int]
+    tag: Optional[str]
+
+class AddRemoveTransaction(BaseModel):
+    amount: float
+    direction: Literal["plus", "minus"]
+    comment: Optional[str]
+
+
 class SegmentActions(BaseModel):
     add_existed_tags: Optional[AddRemoveTags]
     remove_tags: Optional[AddRemoveTags]
@@ -106,4 +118,6 @@ class SegmentActions(BaseModel):
     send_tg_notification: Optional[TgNotificationsAction]
     add_docs_sales_tags: Optional[DocsSalesTags]
     remove_docs_sales_tags: Optional[DocsSalesTags]
+    transform_loyality_card: Optional[TransformLoyalityCard]
+    add_loyality_transaction: Optional[AddRemoveTransaction]
 

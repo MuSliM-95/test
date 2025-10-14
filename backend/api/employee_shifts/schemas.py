@@ -23,7 +23,7 @@ class EndShiftRequest(BaseModel):
 class CreateBreakRequest(BaseModel):
     """Запрос на создание перерыва"""
     duration_minutes: int
-    
+
     class Config:
         schema_extra = {
             "example": {

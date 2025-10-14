@@ -77,6 +77,7 @@ async def read_cashbox_users(
             count += 1
             user_dict = {
                 "id": tg_acc.id,
+                "relation_id": u.id,
                 "external_id": tg_acc.external_id,
                 "photo": tg_acc.photo,
                 "first_name": tg_acc.first_name,

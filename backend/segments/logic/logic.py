@@ -68,18 +68,20 @@ class SegmentLogic:
                 if added_data:
                     await insert_in_batches(segment_objects, added_data, batch_size=3000)
 
-            if value_data.get(SegmentChangeType.removed.value):
-                query = (
-                    update(segment_objects)
-                    .where(and_(
-                        segment_objects.c.object_id.in_(value_data[SegmentChangeType.removed.value]),
-                        segment_objects.c.object_type == object_type,
-                        segment_objects.c.valid_to.is_(None)
-                    ))
-                    .values(valid_to=datetime.now())
-                )
-
-                await database.execute(query)
+            if ids := value_data.get(SegmentChangeType.removed.value):
+                batch_size = 30000  # чуть меньше лимита
+                for i in range(0, len(ids), batch_size):
+                    chunk = ids[i:i + batch_size]
+                    query = (
+                        update(segment_objects)
+                        .where(and_(
+                            segment_objects.c.object_id.in_(chunk),
+                            segment_objects.c.object_type == object_type,
+                            segment_objects.c.valid_to.is_(None)
+                        ))
+                        .values(valid_to=datetime.now())
+                    )
+                    await database.execute(query)
         return
 
     async def update_segment_data_in_db(self, new_ids: dict):

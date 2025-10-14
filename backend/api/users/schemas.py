@@ -4,6 +4,7 @@ from typing import List, Optional
 
 class CBUsers(BaseModel):
     id: int
+    relation_id: Optional[int] = None
     phone_number: Optional[str]
     external_id: Optional[str]
     first_name: str

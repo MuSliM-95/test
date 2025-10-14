@@ -12,6 +12,8 @@ class PurchaseCriteria(BaseModel):
     date_range: Optional[DateRange]
     categories: Optional[List[str]]
     nomenclatures: Optional[List[str]]
+    is_fully_paid: Optional[bool]
+    count_of_goods: Optional[Range]
 
     @validator("categories", "nomenclatures", each_item=True)
     def validate_category_item(cls, v):
