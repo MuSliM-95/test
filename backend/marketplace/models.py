@@ -158,7 +158,6 @@ item_rating_aggregates = Table(
     Index("idx_item_agg_rating", "avg_rating", "reviews_count"),
 )
 
-# Старая таблица для обратной совместимости (можно удалить после миграции)
 location_rating_aggregates = Table(
     "location_rating_aggregates",
     metadata,
