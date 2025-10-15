@@ -65,11 +65,11 @@ class SegmentActions:
                 "method": self.add_loyality_transaction
             },
             "send_wa_notification": {
-                "obj_type": SegmentObjectType.contragents.value,
+                "obj_type": SegmentObjectType.docs_sales.value,
                 "method": self.send_whatsapp_notification
             },
             "do_http_request": {
-                "obj_type": SegmentObjectType.contragents.value,
+                "obj_type": SegmentObjectType.docs_sales.value,
                 "method": self.do_http_request
             }
         }
@@ -332,35 +332,38 @@ class SegmentActions:
 
         await database.execute(query)
 
-    async def send_whatsapp_notification(self, contragent_ids: List[int], data: dict):
+    async def send_whatsapp_notification(self, docs_ids: List[int], data: dict):
         message = data.get("message")
         wappi_token = data.get("wappi_token")
         wappi_profile_id = data.get("wappi_profile_id")
-        q = contragents.select().where(contragents.c.id.in_(contragent_ids))
-        rows = await database.fetch_all(q)
-        if not rows or not all([message, wappi_token, wappi_profile_id]):
+        if not docs_ids or not all([message, wappi_token, wappi_profile_id]):
             return False
 
-        for contragent in rows:
-            if not contragent.phone:
+        for idx in docs_ids:
+            query = (
+                select(contragents)
+                .join(docs_sales, docs_sales.c.contragent == contragents.c.id)
+                .where(docs_sales.c.id == idx, contragents.c.phone.isnot(None))
+            )
+            contragent = await database.fetch_one(query)
+            if not contragent:
                 continue
-            await asyncio.sleep(1)
-            replacements = await create_replacements(contragent.id, obj_type="contragent")
+            replacements = await create_replacements(idx)
             message_text = replace_masks(message, replacements)
 
             url = f"https://wappi.pro/api/sync/message/send?profile_id={wappi_profile_id}"
             headers = {"Authorization": f"{wappi_token}"}
-            data = {
+            d = {
                 "body": message_text, "recipient": contragent.phone}
 
             async with HttpClient() as client:
-                status, response = await client.post(url, headers=headers, data=data)
+                status, response = await client.post(url, headers=headers, data=d)
                 print("Status:", status)
             await asyncio.sleep(data["sleep"])
 
-    async def do_http_request(self, contragent_ids: List[int], data: dict):
-        for idx in contragent_ids:
-            replacements = await create_replacements(idx, obj_type="contragent")
+    async def do_http_request(self, docs_ids: List[int], data: dict):
+        for idx in docs_ids:
+            replacements = await create_replacements(idx)
             data = replace_masks(data, replacements)
             if data.get("params"):
                 data["url"] = data["url"] + "?" + "&".join([f"{k}={v}" for k, v in data["params"].items()])
