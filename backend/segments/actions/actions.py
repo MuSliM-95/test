@@ -1,15 +1,15 @@
+import asyncio
 import json
 import logging
-from asyncio import sleep
 from datetime import datetime
 from typing import List
 
 from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
     users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts,
-    contragents
+    contragents, loyality_cards, loyality_transactions
 )
-from sqlalchemy import select, and_, func, literal, or_
+from sqlalchemy import select, and_, func, literal, or_, update
 from sqlalchemy.dialects.postgresql import insert
 
 from segments.actions.segment_tg_notification import send_segment_notification
@@ -21,9 +21,12 @@ from segments.constants import SegmentChangeType
 
 from segments.helpers.functions import create_replacements
 
+from api.loyality_transactions.routers import raschet_bonuses
+
 from segments.helpers.http_client import HttpClient
 
 logger = logging.getLogger(__name__)
+
 
 class SegmentActions:
     def __init__(self, segment_obj):
@@ -53,6 +56,14 @@ class SegmentActions:
                 "obj_type": SegmentObjectType.docs_sales.value,
                 "method": self.remove_docs_sales_tags
             },
+            "transform_loyality_card": {
+                "obj_type": SegmentObjectType.contragents.value,
+                "method": self.transform_loyality_card
+            },
+            "add_loyality_transaction": {
+                "obj_type": SegmentObjectType.contragents.value,
+                "method": self.add_loyality_transaction
+            },
             "send_wa_notification": {
                 "obj_type": SegmentObjectType.contragents.value,
                 "method": self.send_whatsapp_notification
@@ -68,7 +79,7 @@ class SegmentActions:
             segments.select().where(segments.c.id == self.segment_obj.id))
 
     async def run(self, action: str, ids: List[int],
-                         data: dict = None):
+                  data: dict = None):
         """Метод для выполения action"""
         await self.ACTIONS[action]["method"](ids, data)
 
@@ -85,9 +96,11 @@ class SegmentActions:
                 continue
             if v.get('trigger_on_new'):
                 del v['trigger_on_new']
-                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"], SegmentChangeType.new.value)
+                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"],
+                                            SegmentChangeType.new.value)
             elif v.get('trigger_on_removed'):
-                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"], SegmentChangeType.removed.value)
+                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"],
+                                            SegmentChangeType.removed.value)
                 del v['trigger_on_removed']
             else:
                 ids = await collect_objects(
@@ -100,13 +113,15 @@ class SegmentActions:
 
     async def add_existed_tags(self, contragents_ids: List[int], data: dict):
         tag_names = data.get("name", [])
-        query = select(tags.c.id).where(and_(tags.c.name.in_(tag_names), tags.c.cashbox_id == self.segment_obj.cashbox_id))
+        query = select(tags.c.id).where(
+            and_(tags.c.name.in_(tag_names), tags.c.cashbox_id == self.segment_obj.cashbox_id))
         rows = await database.fetch_all(query)
         tag_ids = [row.id for row in rows]
         new_values = []
         for tag_id in tag_ids:
             for contragent_id in contragents_ids:
-                new_values.append({"contragent_id": contragent_id, "tag_id": tag_id, "cashbox_id": self.segment_obj.cashbox_id})
+                new_values.append(
+                    {"contragent_id": contragent_id, "tag_id": tag_id, "cashbox_id": self.segment_obj.cashbox_id})
         if not new_values:
             return
         query = insert(contragents_tags).values(new_values)
@@ -149,7 +164,8 @@ class SegmentActions:
         count_rows = await database.execute(count_query)
 
         if count_rows != len(set(names)):
-            insert_query = insert(tags).values(prepared_data).on_conflict_do_nothing(index_elements=['name', "cashbox_id"])
+            insert_query = insert(tags).values(prepared_data).on_conflict_do_nothing(
+                index_elements=['name', "cashbox_id"])
             await database.execute(insert_query)
 
         await self.add_existed_tags(contragents_ids, {"name": names})
@@ -202,8 +218,7 @@ class SegmentActions:
 
         return True
 
-
-    async def send_tg_notification(self, order_ids:List[int], data: dict):
+    async def send_tg_notification(self, order_ids: List[int], data: dict):
         chat_ids = set()
         message = data.get("message")
         send_to = data.get("send_to")
@@ -254,17 +269,20 @@ class SegmentActions:
         if shift_status:
             if shift_status == 'off_shift':
                 where_clause = or_(
-                        employee_shifts.c.user_id.is_(None),
-                        employee_shifts.c.status == shift_status
-                    )
+                    employee_shifts.c.user_id.is_(None),
+                    employee_shifts.c.status == shift_status
+                )
             else:
                 where_clause = or_(
-                        employee_shifts.c.status == shift_status
-                    )
+                    employee_shifts.c.status == shift_status
+                )
             query = (
                 query
-                .outerjoin(employee_shifts, subquery.c.relation_id == employee_shifts.c.user_id)
-                .where(where_clause)
+                .outerjoin(employee_shifts, subquery.c.user_id == employee_shifts.c.user_id)
+                .where(or_(
+                    employee_shifts.c.user_id.is_(None),
+                    employee_shifts.c.status == shift_status
+                ))
             )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
@@ -279,7 +297,6 @@ class SegmentActions:
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
 
-
     async def get_courier_chat_id(self, order_id: int):
         query = (
             select(users.c.chat_id)
@@ -290,7 +307,7 @@ class SegmentActions:
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
 
-    async def add_docs_sales_tags(self, docs_ids:List[int], data: dict):
+    async def add_docs_sales_tags(self, docs_ids: List[int], data: dict):
 
         tags = data.get("tags")
         prepared_data = []
@@ -306,7 +323,7 @@ class SegmentActions:
             query = insert(docs_sales_tags).values(prepared_data)
             await database.execute(query)
 
-    async def remove_docs_sales_tags(self, docs_ids:List[int], data: dict):
+    async def remove_docs_sales_tags(self, docs_ids: List[int], data: dict):
         tags = data.get("tags")
         query = docs_sales_tags.delete().where(and_(
             docs_sales_tags.c.docs_sales_id.in_(docs_ids),
@@ -314,7 +331,6 @@ class SegmentActions:
         ))
 
         await database.execute(query)
-
 
     async def send_whatsapp_notification(self, contragent_ids: List[int], data: dict):
         message = data.get("message")
@@ -325,11 +341,10 @@ class SegmentActions:
         if not rows or not all([message, wappi_token, wappi_profile_id]):
             return False
 
-
         for contragent in rows:
             if not contragent.phone:
                 continue
-            sleep(1)
+            await asyncio.sleep(1)
             replacements = await create_replacements(contragent.id, obj_type="contragent")
             message_text = replace_masks(message, replacements)
 
@@ -341,14 +356,14 @@ class SegmentActions:
             async with HttpClient() as client:
                 status, response = await client.post(url, headers=headers, data=data)
                 print("Status:", status)
-            await sleep(data["sleep"])
+            await asyncio.sleep(data["sleep"])
 
     async def do_http_request(self, contragent_ids: List[int], data: dict):
         for idx in contragent_ids:
             replacements = await create_replacements(idx, obj_type="contragent")
             data = replace_masks(data, replacements)
             if data.get("params"):
-                data["url"] = data["url"] + "?" + "&".join([f"{k}={v}" for k,v in data["params"].items()])
+                data["url"] = data["url"] + "?" + "&".join([f"{k}={v}" for k, v in data["params"].items()])
             async with HttpClient() as client:
                 try:
                     status, response = await getattr(client, data["method"].lower())(
@@ -361,4 +376,46 @@ class SegmentActions:
                         logger.info(f"Response for contragent {idx}: {response}")
                 except Exception as e:
                     logger.error(e)
-            await sleep(data["sleep"])
+            await asyncio.sleep(data["sleep"])
+
+    async def transform_loyality_card(self, contragents_ids: List[int], data: dict):
+        fields_for_update = {}
+
+        if data.get("cashback_percent"):
+            fields_for_update["cashback_percent"] = data.get("cashback_percent")
+        if data.get("max_withdraw_percentage"):
+            fields_for_update["max_withdraw_percentage"] = data.get("max_withdraw_percentage")
+        if data.get("lifetime"):
+            fields_for_update["lifetime"] = data.get("lifetime")
+        if data.get("tag"):
+            fields_for_update["tags"] = data.get("tag")
+        query = update(loyality_cards).where(
+            loyality_cards.c.contragent_id.in_(contragents_ids),
+            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
+        ).values(**fields_for_update)
+
+        await database.execute(query)
+
+    async def add_loyality_transaction(self, contragents_ids: List[int], data: dict):
+        insert_data = {}
+        insert_data["amount"] = data.get("amount")
+        insert_data["type"] = "accrual" if data.get("direction") == "plus" else "withdraw"
+        if data.get("comment"):
+            insert_data["name"] = data.get("comment")
+        else:
+            insert_data["name"] = "Обновление условий карты лояльности"
+        insert_data["is_deleted"] = False
+        insert_data["status"] = True
+        insert_data["cashbox"] = self.segment_obj.cashbox_id
+
+        query = select(loyality_cards).where(
+            loyality_cards.c.contragent_id.in_(contragents_ids),
+            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
+        )
+        cards = await database.fetch_all(query)
+        for card in cards:
+            insert_data["loyality_card_id"] = card.id
+            await database.execute(
+                loyality_transactions.insert().values(insert_data)
+            )
+            await asyncio.gather(asyncio.create_task(raschet_bonuses(card.id)))

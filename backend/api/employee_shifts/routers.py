@@ -67,7 +67,7 @@ async def start_shift(token: str):
 
     now = datetime.utcnow()
     shift_data = ShiftData(
-        user_id=user.id,
+        user_id=user.user,
         cashbox_id=user.cashbox_id,
         shift_start=now,
         shift_end=None,
@@ -116,7 +116,7 @@ async def start_shift(token: str):
                 employee_shifts.c.updated_at
             )
         )
-
+    
     shift_response = ShiftResponse(**dict(new_shift))
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)

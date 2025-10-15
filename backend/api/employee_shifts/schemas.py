@@ -53,7 +53,6 @@ class ShiftStatusResponse(BaseModel):
     current_shift: Optional[ShiftResponse] = None
     message: str
 
-
 class ShiftData(BaseModel):
     """Схема отражающая модель в БД"""
     user_id: int

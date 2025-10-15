@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, or_, func, select, text, exists
 from sqlalchemy.sql import Select
@@ -15,6 +15,8 @@ from database.db import (
     tags,
     docs_sales_tags,
     pictures,
+    payments,
+    entity_to_entity,
 )
 from segments.ranges import apply_range, apply_date_range
 
@@ -27,7 +29,7 @@ def add_picker_filters(query: Select, picker_filters, sub):
     photos_not_added_minutes = picker_filters.get("photos_not_added_minutes")
 
     if photos_not_added_minutes is not None and isinstance(
-        photos_not_added_minutes, int
+            photos_not_added_minutes, int
     ):
         sales_entity = "docs_sales"
 
@@ -160,17 +162,76 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         )
         where_clauses.append(exists(exists_clause))
 
+    if cog := purchase_criteria.get("count_of_goods"):
+        query = (
+            query
+            .outerjoin(docs_sales_goods, docs_sales_goods.c.docs_sales_id == sub.c.id)
+        )
+
+        apply_range(func.coalesce(func.sum(docs_sales_goods.c.quantity), 0), cog,
+                    having_clauses)
+
+    if purchase_criteria.get("is_fully_paid"):
+        # --- сумма оплат в рублях ---
+        rub_cte = (
+            select(
+                entity_to_entity.c.from_id.label("docs_sales_id"),
+                func.coalesce(func.sum(payments.c.amount), 0).label(
+                    "paid_rub"),
+            )
+            .select_from(entity_to_entity)
+            .join(
+                payments,
+                and_(
+                    payments.c.id == entity_to_entity.c.to_id,
+                    entity_to_entity.c.to_entity == 5,  # 5 = оплата в рублях
+                ),
+            )
+            .where(entity_to_entity.c.from_entity == 7)  # 7 = документы продаж
+            .group_by(entity_to_entity.c.from_id)
+            .cte("rub_cte")
+        )
+
+        # --- сумма оплат в бонусах ---
+        bonus_cte = (
+            select(
+                entity_to_entity.c.from_id.label("docs_sales_id"),
+                func.coalesce(func.sum(loyality_transactions.c.amount), 0).label(
+                    "paid_bonus"),
+            )
+            .select_from(entity_to_entity)
+            .join(
+                loyality_transactions,
+                and_(
+                    loyality_transactions.c.id == entity_to_entity.c.to_id,
+                    entity_to_entity.c.to_entity == 6,  # 6 = бонусы
+                ),
+            )
+            .where(entity_to_entity.c.from_entity == 7)  # 7 = продажи
+            .group_by(entity_to_entity.c.from_id)
+            .cte("bonus_cte")
+        )
+        query = (
+            query
+            .outerjoin(rub_cte, rub_cte.c.docs_sales_id == sub.c.id)
+            .outerjoin(bonus_cte, bonus_cte.c.docs_sales_id == sub.c.id)
+        )
+
+        # фильтр на полностью оплаченные
+        having_clauses.append(
+            (
+                    func.coalesce(func.max(rub_cte.c.paid_rub), 0) +
+                    func.coalesce(func.max(bonus_cte.c.paid_bonus), 0)
+            ) >= sub.c.sum
+        )
+
     # ---- 4. Агрегаты по контрагенту (COUNT / SUM) -----------------
     # ОПТИМИЗАЦИЯ: применяем WHERE фильтры до агрегации
     if (
-        having_clauses
-        or purchase_criteria.get("count")
-        or purchase_criteria.get("total_amount")
+            having_clauses
+            or purchase_criteria.get("count")
+            or purchase_criteria.get("total_amount")
     ):
-        # ВАЖНО: Создаем ОТДЕЛЬНЫЙ подзапрос для агрегации,
-        # полностью изолированный от основного запроса
-        # Это предотвращает CROSS JOIN между docs_sales и подзапросом
-
         # Создаем алиас для docs_sales внутри агрегационного запроса
         docs_sales_agg = docs_sales.alias("docs_sales_agg")
 
@@ -180,8 +241,7 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
             func.sum(docs_sales_agg.c.sum).label("total_amount"),
         ).select_from(docs_sales_agg)
 
-        # КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: Если есть категории/номенклатуры,
-        # фильтруем ДО агрегации через EXISTS в подзапросе агрегации
+        # Фильтрация по категориям/номенклатурам ДО агрегации
         category_filter_clauses = []
 
         if cats := purchase_criteria.get("categories"):
@@ -195,7 +255,7 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
                 .join(categories, nomenclature.c.category == categories.c.id)
                 .where(
                     docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
-                )  # Используем алиас!
+                )
                 .where(or_(*category_conditions))
             )
             category_filter_clauses.append(category_exists)
@@ -212,25 +272,21 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
                 )
                 .where(
                     docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
-                )  # Используем алиас!
+                )
                 .where(or_(*nomenclature_conditions))
             )
             category_filter_clauses.append(nomenclature_exists)
 
-        # Применяем фильтры категорий/номенклатур к агрегационному запросу
         if category_filter_clauses:
             agg_query = agg_query.where(and_(*category_filter_clauses))
 
-        # Применяем остальные where фильтры (дата, сумма чека)
         if where_clauses:
             agg_query = agg_query.where(and_(*where_clauses))
 
-        # Группируем по контрагенту (используем алиас!)
         agg_query = agg_query.group_by(docs_sales_agg.c.contragent)
 
-        # Применяем HAVING фильтры (используем алиас!)
+        # HAVING фильтры
         having_clauses_built = []
-
         if rng := purchase_criteria.get("count"):
             if "gte" in rng:
                 having_clauses_built.append(
@@ -244,7 +300,6 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
                 having_clauses_built.append(
                     func.count(docs_sales_agg.c.id) == rng["eq"]
                 )
-
         if rng := purchase_criteria.get("total_amount"):
             if "gte" in rng:
                 having_clauses_built.append(
@@ -260,111 +315,92 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         if having_clauses_built:
             agg_query = agg_query.having(and_(*having_clauses_built))
 
-        # Создаем подзапрос с агрегатами
         agg_subquery = agg_query.subquery("purchase_aggregates")
-
-        # Присоединяем к основному запросу через INNER JOIN
         query = query.join(agg_subquery, sub.c.contragent == agg_subquery.c.contragent)
-
-        # Очищаем where_clauses так как они уже применены
-        where_clauses = []
+        where_clauses = []  # уже применены
 
     # ---- 5. Последняя покупка N дней назад -----------------------
     if rng := purchase_criteria.get("last_purchase_days_ago"):
         max_date = func.max(docs_sales.c.created_at)
-
         sub_last = (
             select(docs_sales.c.contragent, max_date.label("last_purchase"))
             .group_by(docs_sales.c.contragent)
             .subquery()
         )
-
         query = query.join(sub_last, sub_last.c.contragent == sub.c.contragent)
-
         if "gte" in rng:
-            cutoff = datetime.utcnow() - timedelta(days=rng["gte"])
+            cutoff = datetime.now(timezone.utc) - timedelta(days=rng["gte"])
             query = query.where(sub_last.c.last_purchase <= cutoff)
-
         if "lte" in rng:
-            cutoff = datetime.utcnow() - timedelta(days=rng["lte"])
+            cutoff = datetime.now(timezone.utc) - timedelta(days=rng["lte"])
             query = query.where(sub_last.c.last_purchase >= cutoff)
 
-    # ---- 6. Применяем оставшиеся фильтры -----------------------------------
+    # ---- 6. Применяем оставшиеся фильтры -------------------------
     if where_clauses:
         query = query.where(and_(*where_clauses))
+    if having_clauses:
+        query = query.having(and_(*having_clauses))
 
     # гарантируем уникальные чеки
-    query = query.distinct(sub.c.id)
-
+    query = query.group_by(sub.c.id, sub.c.contragent, sub.c.sum, sub.c.created_at)
     return query
 
 
 def add_loyality_filters(query: Select, loyality_criteria: dict, sub) -> Select:
-    """
-    Добавляет в запрос фильтры и агрегаты, описанные в loyality_criteria.
+    """Фильтры по лояльности.
 
-    :param query: исходный Select (contragents JOIN docs_sales … DISTINCT)
-    :param loyality_criteria: словарь из LoyalityCriteria
-    :return: модифицированный Select
+    Оптимизации:
+    - Предварительно фильтруем карты лояльности (balance) в подзапросе.
+    - Для expires_in_days используем только последнюю транзакцию (MAX(created_at)).
     """
-
     where_clauses = []
 
-    # Если есть критерии лояльности, применяем оптимизированную логику
-    if loyality_criteria:
-        # ОПТИМИЗАЦИЯ: создаем отдельный подзапрос для фильтрации карт лояльности
-        # вместо LEFT JOIN на всю таблицу
-        loyalty_subquery = select(
+    if not loyality_criteria:
+        return query
+
+    # Подзапрос по картам (возможно с фильтром баланса)
+    loyalty_subq = (
+        select(
             loyality_cards.c.id.label("card_id"),
             loyality_cards.c.contragent_id,
             loyality_cards.c.balance,
             loyality_cards.c.lifetime,
-        ).where(loyality_cards.c.contragent_id.isnot(None))
-
-        # Применяем фильтр по балансу на этапе подзапроса
-        if balance := loyality_criteria.get("balance"):
-            if "gte" in balance:
-                loyalty_subquery = loyalty_subquery.where(
-                    loyality_cards.c.balance >= balance["gte"]
-                )
-            if "lte" in balance:
-                loyalty_subquery = loyalty_subquery.where(
-                    loyality_cards.c.balance <= balance["lte"]
-                )
-            if "eq" in balance:
-                loyalty_subquery = loyalty_subquery.where(
-                    loyality_cards.c.balance == balance["eq"]
-                )
-
-        loyalty_subquery = loyalty_subquery.subquery("filtered_loyalty_cards")
-
-        # Присоединяем отфильтрованные карты к основному запросу
-        query = query.join(
-            loyalty_subquery,
-            loyalty_subquery.c.contragent_id == sub.c.contragent,
-            isouter=False,  # INNER JOIN - только контрагенты с картами лояльности
         )
+        .where(loyality_cards.c.contragent_id.isnot(None))
+    )
 
-        # Обработка фильтра по истечению срока
-        if expire := loyality_criteria.get("expires_in_days"):
-            # ОПТИМИЗАЦИЯ: присоединяем транзакции только для карт,
-            # прошедших фильтрацию по балансу
-            query = query.join(
-                loyality_transactions,
-                loyality_transactions.c.loyality_card_id == loyalty_subquery.c.card_id,
+    if balance := loyality_criteria.get("balance"):
+        if "gte" in balance:
+            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance >= balance["gte"])
+        if "lte" in balance:
+            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance <= balance["lte"])
+        if "eq" in balance:
+            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance == balance["eq"])
+
+    loyalty_subq = loyalty_subq.subquery("filtered_loyalty_cards")
+
+    # INNER JOIN: нам нужны только контрагенты с подходящими картами
+    query = query.join(
+        loyalty_subq, loyalty_subq.c.contragent_id == sub.c.contragent, isouter=False
+    )
+
+    # Фильтр по сроку действия (дни до истечения)
+    if expire := loyality_criteria.get("expires_in_days"):
+        # Последняя транзакция на карту
+        last_tx = (
+            select(
+                loyality_transactions.c.loyality_card_id,
+                func.max(loyality_transactions.c.created_at).label("last_tx"),
             )
-
-            # Рассчитываем дату истечения срока
-            # INTERVAL '1 second' * lifetime
-            expiry_datetime = (
-                loyality_transactions.c.created_at
-                + text("INTERVAL '1 second'") * loyalty_subquery.c.lifetime
-            )
-
-            # Остаток в днях
-            days_left = func.DATE_PART("day", expiry_datetime - func.now())
-
-            apply_range(days_left, expire, where_clauses)
+            .group_by(loyality_transactions.c.loyality_card_id)
+            .subquery()
+        )
+        query = query.join(
+            last_tx, last_tx.c.loyality_card_id == loyalty_subq.c.card_id
+        )
+        expiry_datetime = last_tx.c.last_tx + text("INTERVAL '1 second'") * loyalty_subq.c.lifetime
+        days_left = func.DATE_PART("day", expiry_datetime - func.now())
+        apply_range(days_left, expire, where_clauses)
 
     if where_clauses:
         query = query.where(and_(*where_clauses))
