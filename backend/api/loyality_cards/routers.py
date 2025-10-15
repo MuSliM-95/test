@@ -1,19 +1,31 @@
 from typing import Optional
 
 import phonenumbers
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException
 from phonenumbers import geocoder
 
-from api.nomenclature.web.pagination.NomenclatureFilter import SortOrder
-from database.db import database, loyality_cards, contragents, organizations, loyality_settings, users, users_cboxes_relation
+from database.db import (
+    database,
+    loyality_cards,
+    contragents,
+    organizations,
+    loyality_settings,
+    users,
+    users_cboxes_relation,
+)
 import api.loyality_cards.schemas as schemas
-from sqlalchemy import desc, or_, asc
+from sqlalchemy import or_
 
 from functions.helpers import (
-    datetime_to_timestamp, get_entity_by_id, add_status,
-    get_entity_by_id_cashbox, contr_org_ids_to_name,
-    get_entity_by_id_and_created_by, get_filters_cards, clear_phone_number,
-    build_filters
+    datetime_to_timestamp,
+    get_entity_by_id,
+    add_status,
+    get_entity_by_id_cashbox,
+    contr_org_ids_to_name,
+    get_entity_by_id_and_created_by,
+    get_filters_cards,
+    clear_phone_number,
+    build_filters,
 )
 
 from ws_manager import manager
@@ -31,7 +43,11 @@ router = APIRouter(tags=["loyality_cards"])
 async def get_loyality_card_by_id(token: str, idx: int):
     """Получение карты по ID"""
     user = await get_user_by_token(token)
-    loyality_cards_db_q = loyality_cards.select().where(loyality_cards.c.is_deleted == False, loyality_cards.c.cashbox_id == user.cashbox_id, loyality_cards.c.id == idx)
+    loyality_cards_db_q = loyality_cards.select().where(
+        loyality_cards.c.is_deleted == False,
+        loyality_cards.c.cashbox_id == user.cashbox_id,
+        loyality_cards.c.id == idx,
+    )
     loyality_cards_db = await database.fetch_one(loyality_cards_db_q)
     loyality_cards_db = datetime_to_timestamp(loyality_cards_db)
     loyality_cards_db = await contr_org_ids_to_name(loyality_cards_db)
@@ -41,8 +57,8 @@ async def get_loyality_card_by_id(token: str, idx: int):
 
 @router.get("/loyality_cards/", response_model=schemas.CountRes)
 async def get_cards(
-    token: str, limit:
-    int = 100,
+    token: str,
+    limit: int = 100,
     offset: int = 0,
     filters_q: schemas.LoyalityCardFilters = Depends(),
     sort: Optional[str] = "created_at:desc",
@@ -55,16 +71,21 @@ async def get_cards(
     filters_dict = filters_q.dict(exclude_none=True)
 
     if filters_dict.get("contragent_name"):
-        q = contragents.select().where(contragents.c.name.ilike(f'%{filters_dict.get("contragent_name")}%'), contragents.c.cashbox == user.cashbox_id)
+        q = contragents.select().where(
+            contragents.c.name.ilike(f"%{filters_dict.get('contragent_name')}%"),
+            contragents.c.cashbox == user.cashbox_id,
+        )
         finded_contrs = await database.fetch_all(q)
-        
+
         filters.append(
             loyality_cards.c.contragent_id.in_([contr.id for contr in finded_contrs])
         )
 
     if filters_dict.get("phone_number"):
         phone_number = filters_dict.get("phone_number")
-        phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+        phone_number_with_plus = (
+            f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+        )
         try:
             number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
             phone_number = number_phone_parsed.national_number
@@ -74,8 +95,10 @@ async def get_cards(
                 phone_number = number_phone_parsed.national_number
             except:
                 pass
-        q = contragents.select().where(contragents.c.phone.ilike(f'%{phone_number}%'),
-                                       contragents.c.cashbox == user.cashbox_id)
+        q = contragents.select().where(
+            contragents.c.phone.ilike(f"%{phone_number}%"),
+            contragents.c.cashbox == user.cashbox_id,
+        )
         finded_contrs = await database.fetch_all(q)
 
         filters.append(
@@ -83,9 +106,14 @@ async def get_cards(
         )
 
     if filters_dict.get("organization_name"):
-        q = organizations.select().where(organizations.c.short_name.ilike(f'%{filters_dict.get("organization_name")}%'), organizations.c.owner == user.id)
+        q = organizations.select().where(
+            organizations.c.short_name.ilike(
+                f"%{filters_dict.get('organization_name')}%"
+            ),
+            organizations.c.owner == user.id,
+        )
         finded_orgs = await database.fetch_all(q)
-        
+
         filters.append(
             loyality_cards.c.organization_id.in_([org.id for org in finded_orgs])
         )
@@ -94,21 +122,27 @@ async def get_cards(
         q = users.select().where(users.c.id == int(filters_dict.get("created_by_id")))
         user_by_filter = await database.fetch_one(q)
 
-        q = users_cboxes_relation.select().where(users_cboxes_relation.c.cashbox_id == user.cashbox_id, users_cboxes_relation.c.user == user_by_filter.id, users_cboxes_relation.c.status == True)
+        q = users_cboxes_relation.select().where(
+            users_cboxes_relation.c.cashbox_id == user.cashbox_id,
+            users_cboxes_relation.c.user == user_by_filter.id,
+            users_cboxes_relation.c.status == True,
+        )
         acc_by_phone = await database.fetch_one(q)
 
         if acc_by_phone:
-            filters.append(
-                loyality_cards.c.created_by_id == acc_by_phone.id
-            )
+            filters.append(loyality_cards.c.created_by_id == acc_by_phone.id)
         else:
             raise HTTPException(404, "Такого пользователя не существует")
 
     cu_filter_data = {}
 
     for f in filters_dict.keys():
-        if f in ["created_at__gte", "created_at__lte", "updated_at__gte",
-                 "updated_at__lte"]:
+        if f in [
+            "created_at__gte",
+            "created_at__lte",
+            "updated_at__gte",
+            "updated_at__lte",
+        ]:
             cu_filter_data[f] = datetime.fromtimestamp(filters_dict[f])
 
     filters += build_filters(loyality_cards, cu_filter_data)
@@ -118,17 +152,14 @@ async def get_cards(
             loyality_cards.select()
             .where(
                 loyality_cards.c.cashbox_id == user.cashbox_id,
-                loyality_cards.c.is_deleted.is_not(True)
+                loyality_cards.c.is_deleted.is_not(True),
             )
             .filter(*filters)
         )
     else:
-        query = (
-            loyality_cards.select()
-            .where(
-                loyality_cards.c.cashbox_id == user.cashbox_id,
-                loyality_cards.c.is_deleted.is_not(True)
-            )
+        query = loyality_cards.select().where(
+            loyality_cards.c.cashbox_id == user.cashbox_id,
+            loyality_cards.c.is_deleted.is_not(True),
         )
 
     if sort:
@@ -136,13 +167,13 @@ async def get_cards(
         directions = {"asc", "desc"}
 
         if (
-                len(sort.split(":")) != 2
-                or sort.split(":")[1].lower() not in directions
-                or sort.split(":")[0].lower() not in order_fields
+            len(sort.split(":")) != 2
+            or sort.split(":")[1].lower() not in directions
+            or sort.split(":")[0].lower() not in order_fields
         ):
             raise HTTPException(
-                status_code=400,
-                detail="Вы ввели некорректный параметр сортировки!")
+                status_code=400, detail="Вы ввели некорректный параметр сортировки!"
+            )
         order_by, direction = sort.split(":")
 
         column = loyality_cards.c[order_by]
@@ -158,27 +189,33 @@ async def get_cards(
 
     loyality_cards_db = [await instance for instance in loyality_cards_db]
 
-    c = select(func.count(loyality_cards.c.id)).where(loyality_cards.c.cashbox_id == user.cashbox_id, loyality_cards.c.is_deleted.is_not(True)).filter(*filters)
+    c = (
+        select(func.count(loyality_cards.c.id))
+        .where(
+            loyality_cards.c.cashbox_id == user.cashbox_id,
+            loyality_cards.c.is_deleted.is_not(True),
+        )
+        .filter(*filters)
+    )
     count = await database.fetch_one(c)
 
-    return {"result": loyality_cards_db, "count": count.count_1} # LOCAL
-
-
+    return {"result": loyality_cards_db, "count": count.count_1}  # LOCAL
 
 
 @router.post("/loyality_cards/", response_model=schemas.LoyalityCardsList)
-async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCardCreateMass):
+async def new_loyality_card(
+    token: str, loyality_card_data: schemas.LoyalityCardCreateMass
+):
     """Создание карт"""
     user = await get_user_by_token(token)
-    
+
     inserted_ids = set()
 
     for loyality_cards_values in loyality_card_data.dict()["__root__"]:
-        
         tag_phone = None
         user_by_phone = None
         if loyality_cards_values.get("tags"):
-            tags_arr = loyality_cards_values['tags'].split(",")
+            tags_arr = loyality_cards_values["tags"].split(",")
 
             for tag in tags_arr:
                 if tag.startswith("USERPHONE_"):
@@ -191,18 +228,32 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
             for phone_user in all_users:
                 similarity = fuzz.ratio(tag_phone, phone_user.phone_number)
                 if similarity >= 80:
-                    q = users_cboxes_relation.select().where(users_cboxes_relation.c.cashbox_id == user.cashbox_id, users_cboxes_relation.c.user == phone_user.id, users_cboxes_relation.c.status == True)
+                    q = users_cboxes_relation.select().where(
+                        users_cboxes_relation.c.cashbox_id == user.cashbox_id,
+                        users_cboxes_relation.c.user == phone_user.id,
+                        users_cboxes_relation.c.status == True,
+                    )
                     acc_by_phone = await database.fetch_one(q)
                     if acc_by_phone:
                         user_by_phone = acc_by_phone
 
         if loyality_cards_values.get("organization_id"):
-            loyality_card_org = await get_entity_by_id(organizations, loyality_cards_values["organization_id"], user.cashbox_id)
+            loyality_card_org = await get_entity_by_id(
+                organizations, loyality_cards_values["organization_id"], user.cashbox_id
+            )
             loyality_cards_values["organization_id"] = loyality_card_org.id
         else:
-            q = organizations.select().where(organizations.c.cashbox == user.cashbox_id, organizations.c.is_deleted == False)
+            q = organizations.select().where(
+                organizations.c.cashbox == user.cashbox_id,
+                organizations.c.is_deleted == False,
+            )
             loyality_card_org = await database.fetch_one(q)
-            print(loyality_cards_values)
+            # If no organization specified and none found for this cashbox, raise a clear error
+            if not loyality_card_org:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Не найдена ни одна организация для текущей кассы. Укажите organization_id явно или создайте организацию.",
+                )
             loyality_cards_values["organization_id"] = loyality_card_org.id
 
         contr_id = loyality_cards_values.get("contragent_id")
@@ -210,49 +261,65 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
         contr_name = loyality_cards_values.get("contragent_name")
 
         if contr_id:
-            loyality_card_contr = await get_entity_by_id_cashbox(contragents, loyality_cards_values["contragent_id"], user.cashbox_id)
-            print( loyality_card_contr )
+            loyality_card_contr = await get_entity_by_id_cashbox(
+                contragents, loyality_cards_values["contragent_id"], user.cashbox_id
+            )
+            print(loyality_card_contr)
             if loyality_cards_values["card_number"]:
                 loyality_cards_values["card_number"] = clear_phone_number(
                     phone_number=loyality_cards_values["card_number"]
                 )
             else:
                 if loyality_card_contr.phone:
-                    loyality_cards_values["card_number"] = clear_phone_number(phone_number=loyality_card_contr.phone)
+                    loyality_cards_values["card_number"] = clear_phone_number(
+                        phone_number=loyality_card_contr.phone
+                    )
                 else:
-                    loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
+                    loyality_cards_values["card_number"] = randint(
+                        0, 9_223_372_036_854_775
+                    )
         else:
             phone_code = None
             is_phone_formatted = False
             try:
-                phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
+                phone_number_with_plus = (
+                    f"+{phone_number}"
+                    if not phone_number.startswith("+")
+                    else phone_number
+                )
                 number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
-                phone_number = phonenumbers.format_number(number_phone_parsed,
-                                                          phonenumbers.PhoneNumberFormat.E164)
+                phone_number = phonenumbers.format_number(
+                    number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
+                )
                 phone_code = geocoder.description_for_number(number_phone_parsed, "en")
                 is_phone_formatted = True
                 if not phone_code:
                     phone_number = loyality_cards_values.get("phone_number")
                     is_phone_formatted = False
-            except:
+            except Exception:
                 try:
                     number_phone_parsed = phonenumbers.parse(phone_number, "RU")
-                    phone_number = phonenumbers.format_number(number_phone_parsed,
-                                                              phonenumbers.PhoneNumberFormat.E164)
-                    phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                    phone_number = phonenumbers.format_number(
+                        number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
+                    )
+                    phone_code = geocoder.description_for_number(
+                        number_phone_parsed, "en"
+                    )
                     is_phone_formatted = True
                     if not phone_code:
                         phone_number = loyality_cards_values.get("phone_number")
                         is_phone_formatted = False
-                except:
+                except Exception:
                     phone_number = loyality_cards_values.get("phone_number")
                     is_phone_formatted = False
 
-            q = contragents.select().where(contragents.c.phone == phone_number, contragents.c.cashbox == user.cashbox_id)
+            q = contragents.select().where(
+                contragents.c.phone == phone_number,
+                contragents.c.cashbox == user.cashbox_id,
+            )
             loyality_card_contr = await database.fetch_one(q)
 
             if not loyality_card_contr:
-
                 time = int(datetime.now().timestamp())
                 q = contragents.insert().values(
                     {
@@ -266,14 +333,16 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                         "cashbox": user.cashbox_id,
                         "is_deleted": False,
                         "created_at": time,
-                        "updated_at": time
+                        "updated_at": time,
                     }
                 )
                 new_contr_id = await database.execute(q)
                 q = contragents.select().where(contragents.c.id == new_contr_id)
                 loyality_card_contr = await database.fetch_one(q)
             if loyality_card_contr.phone:
-                loyality_cards_values["card_number"] = clear_phone_number(phone_number=loyality_card_contr.phone)
+                loyality_cards_values["card_number"] = clear_phone_number(
+                    phone_number=loyality_card_contr.phone
+                )
             else:
                 loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
 
@@ -299,7 +368,8 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
         if loyality_cards_values.get("organization_id"):
             q = loyality_settings.select().where(
                 loyality_settings.c.cashbox == user.cashbox_id,
-                loyality_settings.c.organization == loyality_cards_values.get("organization_id")
+                loyality_settings.c.organization
+                == loyality_cards_values.get("organization_id"),
             )
             setting_org = await database.fetch_one(q)
 
@@ -307,47 +377,85 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
                 setting = setting_org
 
         if setting:
-            loyality_cards_values['cashback_percent'] = setting.cashback_percent
-            loyality_cards_values['minimal_checque_amount'] = setting.minimal_checque_amount
-            loyality_cards_values['max_percentage'] = setting.max_percentage
-            loyality_cards_values['max_withdraw_percentage'] = setting.max_withdraw_percentage
-            loyality_cards_values['start_period'] = setting.start_period
-            loyality_cards_values['end_period'] = setting.end_period
+            loyality_cards_values["cashback_percent"] = setting.cashback_percent
+            loyality_cards_values["minimal_checque_amount"] = (
+                setting.minimal_checque_amount
+            )
+            loyality_cards_values["max_percentage"] = setting.max_percentage
+            loyality_cards_values["max_withdraw_percentage"] = (
+                setting.max_withdraw_percentage
+            )
+            loyality_cards_values["start_period"] = setting.start_period
+            loyality_cards_values["end_period"] = setting.end_period
 
-            if not loyality_cards_values['tags']:
+            if not loyality_cards_values["tags"]:
                 if setting.tags:
-                    loyality_cards_values['tags'] = setting.tags
+                    loyality_cards_values["tags"] = setting.tags
         else:
-            for field in ['cashback_percent', 'minimal_checque_amount', 'max_percentage', 'max_withdraw_percentage']:
+            for field in [
+                "cashback_percent",
+                "minimal_checque_amount",
+                "max_percentage",
+                "max_withdraw_percentage",
+            ]:
                 if not loyality_cards_values.get(field):
                     loyality_cards_values[field] = 0
 
-            if loyality_cards_values.get("start_period") and loyality_cards_values.get("end_period"):
-                loyality_cards_values["start_period"] = datetime.fromtimestamp(loyality_cards_values["start_period"])
-                loyality_cards_values["end_period"] = datetime.fromtimestamp(loyality_cards_values["end_period"])
+            if loyality_cards_values.get("start_period") and loyality_cards_values.get(
+                "end_period"
+            ):
+                loyality_cards_values["start_period"] = datetime.fromtimestamp(
+                    loyality_cards_values["start_period"]
+                )
+                loyality_cards_values["end_period"] = datetime.fromtimestamp(
+                    loyality_cards_values["end_period"]
+                )
 
-            if loyality_cards_values.get("start_period") and not loyality_cards_values.get("end_period"):
+            if loyality_cards_values.get(
+                "start_period"
+            ) and not loyality_cards_values.get("end_period"):
                 start_plus_ten = loyality_cards_values["start_period"] + 315576000
-                loyality_cards_values["start_period"] = datetime.fromtimestamp(loyality_cards_values["start_period"])
-                loyality_cards_values["end_period"] = datetime.fromtimestamp(start_plus_ten)
+                loyality_cards_values["start_period"] = datetime.fromtimestamp(
+                    loyality_cards_values["start_period"]
+                )
+                loyality_cards_values["end_period"] = datetime.fromtimestamp(
+                    start_plus_ten
+                )
 
-            if not loyality_cards_values.get("start_period") and not loyality_cards_values.get("end_period"):
-                loyality_cards_values["start_period"] = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                start_plus_ten = int(loyality_cards_values["start_period"].timestamp()) + 315576000
-                loyality_cards_values["end_period"] = datetime.fromtimestamp(start_plus_ten)
+            if not loyality_cards_values.get(
+                "start_period"
+            ) and not loyality_cards_values.get("end_period"):
+                loyality_cards_values["start_period"] = datetime.now().replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                start_plus_ten = (
+                    int(loyality_cards_values["start_period"].timestamp()) + 315576000
+                )
+                loyality_cards_values["end_period"] = datetime.fromtimestamp(
+                    start_plus_ten
+                )
 
-            if not loyality_cards_values.get("start_period") and loyality_cards_values.get("end_period"):
-                loyality_cards_values["start_period"] = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                start_plus_ten = int(loyality_cards_values["start_period"].timestamp()) + 315576000
-                loyality_cards_values["end_period"] = datetime.fromtimestamp(start_plus_ten)
+            if not loyality_cards_values.get(
+                "start_period"
+            ) and loyality_cards_values.get("end_period"):
+                loyality_cards_values["start_period"] = datetime.now().replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                start_plus_ten = (
+                    int(loyality_cards_values["start_period"].timestamp()) + 315576000
+                )
+                loyality_cards_values["end_period"] = datetime.fromtimestamp(
+                    start_plus_ten
+                )
 
         q = loyality_cards.select().where(
             or_(
                 loyality_cards.c.card_number == loyality_cards_values["card_number"],
-                loyality_cards.c.contragent_id == loyality_cards_values["contragent_id"]
+                loyality_cards.c.contragent_id
+                == loyality_cards_values["contragent_id"],
             ),
             loyality_cards.c.cashbox_id == user.cashbox_id,
-            loyality_cards.c.is_deleted == False
+            loyality_cards.c.is_deleted.is_not(True),
         )
         card = await database.fetch_one(q)
 
@@ -358,13 +466,9 @@ async def new_loyality_card(token: str, loyality_card_data: schemas.LoyalityCard
             loyality_card_id = await database.execute(query)
             inserted_ids.add(loyality_card_id)
     print(inserted_ids)
-    query = (
-        loyality_cards
-        .select()
-        .where(
-            loyality_cards.c.cashbox_id == user.cashbox_id,
-            loyality_cards.c.id.in_(list(inserted_ids))
-        )
+    query = loyality_cards.select().where(
+        loyality_cards.c.cashbox_id == user.cashbox_id,
+        loyality_cards.c.id.in_(list(inserted_ids)),
     )
 
     loyality_cards_db = await database.fetch_all(query)
@@ -395,28 +499,39 @@ async def edit_loyality_transaction(
 ):
     """Редактирование карт"""
     user = await get_user_by_token(token)
-    loyality_card_db = await get_entity_by_id_and_created_by(loyality_cards, idx, user.id)
+    loyality_card_db = await get_entity_by_id_and_created_by(
+        loyality_cards, idx, user.id
+    )
     loyality_card_values = loyality_card.dict(exclude_unset=True)
 
     if loyality_card_values:
-
         if loyality_card_values.get("max_percentage"):
-            if loyality_card_values["max_percentage"] > 100: loyality_card_values["max_percentage"] = 100
+            if loyality_card_values["max_percentage"] > 100:
+                loyality_card_values["max_percentage"] = 100
         if loyality_card_values.get("max_withdraw_percentage"):
-            if loyality_card_values["max_withdraw_percentage"] > 100: loyality_card_values["max_withdraw_percentage"] = 100
+            if loyality_card_values["max_withdraw_percentage"] > 100:
+                loyality_card_values["max_withdraw_percentage"] = 100
 
         if loyality_card_values.get("start_period"):
-            loyality_card_values["start_period"] = datetime.fromtimestamp(loyality_card_values["start_period"])
+            loyality_card_values["start_period"] = datetime.fromtimestamp(
+                loyality_card_values["start_period"]
+            )
         if loyality_card_values.get("end_period"):
-            loyality_card_values["end_period"] = datetime.fromtimestamp(loyality_card_values["end_period"])
+            loyality_card_values["end_period"] = datetime.fromtimestamp(
+                loyality_card_values["end_period"]
+            )
 
         query = (
             loyality_cards.update()
-            .where(loyality_cards.c.id == idx, loyality_cards.c.created_by_id == user.id)
+            .where(
+                loyality_cards.c.id == idx, loyality_cards.c.created_by_id == user.id
+            )
             .values(loyality_card_values)
         )
         await database.execute(query)
-        loyality_card_db = await get_entity_by_id_and_created_by(loyality_cards, idx, user.id)
+        loyality_card_db = await get_entity_by_id_and_created_by(
+            loyality_cards, idx, user.id
+        )
 
     loyality_card_db = datetime_to_timestamp(loyality_card_db)
 
@@ -425,7 +540,7 @@ async def edit_loyality_transaction(
         {"action": "edit", "target": "loyality_cards", "result": loyality_card_db},
     )
 
-    return {**loyality_card_db,  **{ "data": { "status": "success" } }}
+    return {**loyality_card_db, **{"data": {"status": "success"}}}
 
 
 @router.delete("/loyality_cards/{idx}/", response_model=schemas.LoyalityCard)
@@ -458,4 +573,4 @@ async def delete_loyality_transaction(token: str, idx: int):
     )
 
     # return loyality_card_db
-    return {**loyality_card_db,  **{ "data": { "status": "success" } }}
+    return {**loyality_card_db, **{"data": {"status": "success"}}}
