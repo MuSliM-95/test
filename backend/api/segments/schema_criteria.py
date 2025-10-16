@@ -47,6 +47,12 @@ class DeliverySchema(BaseModel):
     recipient: Optional[RecipientInfoSchema]
 
 
+class OrderCriteriaSchema(BaseModel):
+    order_status: Optional[str]
+    updated_at: Optional[DateRange]
+    created_at: Optional[DateRange]
+
+
 class SegmentCriteria(BaseModel):
     purchases: Optional[PurchaseCriteria]
     loyality: Optional[LoyalityCriteria]
@@ -57,3 +63,4 @@ class SegmentCriteria(BaseModel):
     picker: Optional[PickerCourierSchema]
     courier: Optional[PickerCourierSchema]
     delivery_info: Optional[DeliverySchema]
+    orders:  Optional[OrderCriteriaSchema]
