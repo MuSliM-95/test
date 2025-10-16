@@ -2224,3 +2224,35 @@ warehouse_hash = sqlalchemy.Table(
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 )
+
+feeds = sqlalchemy.Table(
+    "feeds",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("url_token", String, unique=True, nullable=False, index=True),
+    sqlalchemy.Column("name", String, nullable=False),
+    sqlalchemy.Column("description", String, nullable=True),
+    sqlalchemy.Column("root_tag", String, nullable=False),
+    sqlalchemy.Column("item_tag", String, nullable=False),
+    sqlalchemy.Column("field_tags", JSON, nullable=True),
+    sqlalchemy.Column("criteria", JSON, nullable=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), index=True),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+)
+
+
+
+feeds_tags = sqlalchemy.Table(
+    "feeds_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
+    sqlalchemy.Column("feed_id", Integer, ForeignKey("feeds.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
+    sqlalchemy.Column("created_at", DateTime(timezone=True),
+                      server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True),
+                      server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint("tag_id", "feed_id", name="unique_tag_id_feed_id"),
+)
