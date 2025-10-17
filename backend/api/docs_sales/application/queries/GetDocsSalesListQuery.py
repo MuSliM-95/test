@@ -7,17 +7,35 @@ from sqlalchemy import and_
 
 from api.docs_sales import schemas
 from api.docs_sales.sales.infrastructure.helpers.FilterService import FilterService
-from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import DocsSalesListRepository
+from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import (
+    DocsSalesListRepository,
+)
 
-from api.payments.infrastructure.repositories.PaymentsRepository import PaymentsRepository
-from api.docs_sales.goods.infrastructure.repositories.GoodsRepository import GoodsRepository
-from api.loyality_transactions.infrastructure.repositories.LoyalityRepository import LoyalityRepository
-from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import DeliveryRepository
-from api.contragents.infrastructure.repositories.ContragentRepository import ContragentRepository
-from api.settings.infrastructure.repositories.SettingsRepository import SettingsRepository
+from api.payments.infrastructure.repositories.PaymentsRepository import (
+    PaymentsRepository,
+)
+from api.docs_sales.goods.infrastructure.repositories.GoodsRepository import (
+    GoodsRepository,
+)
+from api.loyality_transactions.infrastructure.repositories.LoyalityRepository import (
+    LoyalityRepository,
+)
+from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import (
+    DeliveryRepository,
+)
+from api.contragents.infrastructure.repositories.ContragentRepository import (
+    ContragentRepository,
+)
+from api.settings.infrastructure.repositories.SettingsRepository import (
+    SettingsRepository,
+)
 
 
-from api.docs_sales.sales.infrastructure.helpers.id_extractors import extract_doc_id, extract_settings_id, extract_contragent_id
+from api.docs_sales.sales.infrastructure.helpers.id_extractors import (
+    extract_doc_id,
+    extract_settings_id,
+    extract_contragent_id,
+)
 
 
 class GetDocsSalesListQuery:
@@ -30,13 +48,17 @@ class GetDocsSalesListQuery:
         filters: Optional[schemas.FilterSchema] = None,
         kanban: bool = False,
     ) -> dict[str, Any]:
-        items_db, count = await self._get_items_and_count_in_db(cashbox_id, limit, offset, filters)
+        items_db, count = await self._get_items_and_count_in_db(
+            cashbox_id, limit, offset, filters
+        )
         results_map = await self._get_all_maps(items_db)
         items_db = self._enrich_docs_sales_items(items_db, results_map)
         return {"result": items_db, "count": count}
 
     @staticmethod
-    async def _get_items_and_count_in_db(cashbox_id, limit, offset, filters) -> Tuple[List[Dict[str, Any]], int]:
+    async def _get_items_and_count_in_db(
+        cashbox_id, limit, offset, filters
+    ) -> Tuple[List[Dict[str, Any]], int]:
         query = DocsSalesListRepository.base_list_query(cashbox_id)
         count_query = DocsSalesListRepository.base_count_list_query(cashbox_id)
 
@@ -73,7 +95,7 @@ class GetDocsSalesListQuery:
         return {
             "doc_ids": doc_ids,
             "contragents_ids": list(contragent_ids),
-            "settings_ids": settings_ids
+            "settings_ids": settings_ids,
         }
 
     async def _get_all_maps(self, items_db):
@@ -85,11 +107,13 @@ class GetDocsSalesListQuery:
 
         tasks = {
             "delivery_map": DeliveryRepository().fetch_delivery_info_by_ids(doc_ids),
-            "contagents_map": ContragentRepository().fetch_segments_by_contragent_ids(contragent_ids),
+            "contagents_map": ContragentRepository().fetch_segments_by_contragent_ids(
+                contragent_ids
+            ),
             "goods_map": GoodsRepository().fetch_goods_by_docs_ids(doc_ids),
             "settings_map": SettingsRepository().fetch_settings_by_ids(settings_ids),
             "payment_map": PaymentsRepository().fetch_payments_map_by_ids(doc_ids),
-            "loyality_map": LoyalityRepository().fetch_loyality_map_by_ids(doc_ids)
+            "loyality_map": LoyalityRepository().fetch_loyality_map_by_ids(doc_ids),
         }
 
         results = await asyncio.gather(*tasks.values())
@@ -102,13 +126,17 @@ class GetDocsSalesListQuery:
             doc_id = item.get("id")
 
             goods = results_map["goods_map"].get(doc_id, [])
-            item['goods'] = goods
+            item["goods"] = goods
             item["nomenclature_count"] = len(goods)
-            item["doc_discount"] = round(sum(g.get("sum_discounted", 0) for g in goods), 2)
+            item["doc_discount"] = round(
+                sum((g.get("sum_discounted") or 0) for g in goods), 2
+            )
 
             contragent_id = item.get("contragent")
             item["has_contragent"] = bool(contragent_id)
-            item["contragent_segments"] = results_map["contagents_map"].get(contragent_id, [])
+            item["contragent_segments"] = results_map["contagents_map"].get(
+                contragent_id, []
+            )
 
             delivery_info = results_map["delivery_map"].get(doc_id, {})
             item.update(delivery_info)

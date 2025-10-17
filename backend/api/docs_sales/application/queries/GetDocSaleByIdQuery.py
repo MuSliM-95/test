@@ -89,7 +89,9 @@ class GetDocSaleByIdQuery:
         goods = results_map["goods_map"]
         item["goods"] = goods
         item["nomenclature_count"] = len(goods)
-        item["doc_discount"] = round(sum(g.get("sum_discounted", 0) for g in goods), 2)
+        item["doc_discount"] = round(
+            sum((g.get("sum_discounted") or 0) for g in goods), 2
+        )
 
         key_transaction = (item.get("id"), item.get("cashbox"))
         payment_value = results_map["payment_map"].get(key_transaction, {})

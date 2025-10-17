@@ -9,18 +9,36 @@ from sqlalchemy import and_
 
 from api.docs_sales import schemas
 from api.docs_sales.sales.infrastructure.helpers.FilterService import FilterService
-from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import DocsSalesListRepository
+from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import (
+    DocsSalesListRepository,
+)
 
 from api.users.infrastructure.repositories.UsersRepository import UsersRepository
-from api.payments.infrastructure.repositories.PaymentsRepository import PaymentsRepository
-from api.docs_sales.goods.infrastructure.repositories.GoodsRepository import GoodsRepository
-from api.loyality_transactions.infrastructure.repositories.LoyalityRepository import LoyalityRepository
-from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import DeliveryRepository
-from api.contragents.infrastructure.repositories.ContragentRepository import ContragentRepository
-from api.settings.infrastructure.repositories.SettingsRepository import SettingsRepository
+from api.payments.infrastructure.repositories.PaymentsRepository import (
+    PaymentsRepository,
+)
+from api.docs_sales.goods.infrastructure.repositories.GoodsRepository import (
+    GoodsRepository,
+)
+from api.loyality_transactions.infrastructure.repositories.LoyalityRepository import (
+    LoyalityRepository,
+)
+from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import (
+    DeliveryRepository,
+)
+from api.contragents.infrastructure.repositories.ContragentRepository import (
+    ContragentRepository,
+)
+from api.settings.infrastructure.repositories.SettingsRepository import (
+    SettingsRepository,
+)
 
-from api.docs_sales.sales.infrastructure.helpers.id_extractors import (extract_doc_id, extract_settings_id,
-    extract_contragent_id, extract_user_ids)
+from api.docs_sales.sales.infrastructure.helpers.id_extractors import (
+    extract_doc_id,
+    extract_settings_id,
+    extract_contragent_id,
+    extract_user_ids,
+)
 
 
 class GetDocsSalesListByCreatedDateQuery:
@@ -33,7 +51,9 @@ class GetDocsSalesListByCreatedDateQuery:
         kanban: bool = False,
     ) -> dict[str, Any]:
         start_datetime, end_datetime = self._get_validate_date(date)
-        items_db, count = await self._get_items_and_count_in_db(cashbox_id, start_datetime, end_datetime, filters)
+        items_db, count = await self._get_items_and_count_in_db(
+            cashbox_id, start_datetime, end_datetime, filters
+        )
         results_map = await self._get_all_maps(items_db)
         items_db = self._enrich_docs_sales_items(items_db, results_map)
         return {"result": items_db, "count": count}
@@ -52,12 +72,20 @@ class GetDocsSalesListByCreatedDateQuery:
             return start_timestamp, end_timestamp
 
         except ValueError:
-            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+            raise HTTPException(
+                status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD"
+            )
 
     @staticmethod
-    async def _get_items_and_count_in_db(cashbox_id, start_date: int, end_date: int, filters) -> Tuple[List[Dict[str, Any]], int]:
-        query = DocsSalesListRepository().query_by_created_date(cashbox_id, start_date, end_date)
-        count_query = DocsSalesListRepository().get_count_list_by_created_date_query(cashbox_id, start_date, end_date)
+    async def _get_items_and_count_in_db(
+        cashbox_id, start_date: int, end_date: int, filters
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        query = DocsSalesListRepository().query_by_created_date(
+            cashbox_id, start_date, end_date
+        )
+        count_query = DocsSalesListRepository().get_count_list_by_created_date_query(
+            cashbox_id, start_date, end_date
+        )
 
         filter_list, query_with_joins = FilterService().apply_filters(filters, query)
 
@@ -93,7 +121,7 @@ class GetDocsSalesListByCreatedDateQuery:
             "doc_ids": doc_ids,
             "contragents_ids": list(contragent_ids),
             "settings_ids": settings_ids,
-            "users_ids": list(user_ids)
+            "users_ids": list(user_ids),
         }
 
     async def _get_all_maps(self, items_db):
@@ -106,12 +134,14 @@ class GetDocsSalesListByCreatedDateQuery:
 
         tasks = {
             "delivery_map": DeliveryRepository().fetch_delivery_info_by_ids(doc_ids),
-            "contagents_map": ContragentRepository().fetch_segments_by_contragent_ids(contragent_ids),
+            "contagents_map": ContragentRepository().fetch_segments_by_contragent_ids(
+                contragent_ids
+            ),
             "goods_map": GoodsRepository().fetch_goods_by_docs_ids(doc_ids),
             "settings_map": SettingsRepository().fetch_settings_by_ids(settings_ids),
             "payment_map": PaymentsRepository().fetch_payments_map_by_ids(doc_ids),
             "loyality_map": LoyalityRepository().fetch_loyality_map_by_ids(doc_ids),
-            "users_map": UsersRepository().fetch_users_by_ids(users_ids)
+            "users_map": UsersRepository().fetch_users_by_ids(users_ids),
         }
 
         results = await asyncio.gather(*tasks.values())
@@ -124,13 +154,17 @@ class GetDocsSalesListByCreatedDateQuery:
             doc_id = item.get("id")
 
             goods = results_map["goods_map"].get(doc_id, [])
-            item['goods'] = goods
+            item["goods"] = goods
             item["nomenclature_count"] = len(goods)
-            item["doc_discount"] = round(sum(g.get("sum_discounted", 0) for g in goods), 2)
+            item["doc_discount"] = round(
+                sum((g.get("sum_discounted") or 0) for g in goods), 2
+            )
 
             contragent_id = item.get("contragent")
             item["has_contragent"] = bool(contragent_id)
-            item["contragent_segments"] = results_map["contagents_map"].get(contragent_id, [])
+            item["contragent_segments"] = results_map["contagents_map"].get(
+                contragent_id, []
+            )
 
             delivery_info = results_map["delivery_map"].get(doc_id, {})
             item.update(delivery_info)
