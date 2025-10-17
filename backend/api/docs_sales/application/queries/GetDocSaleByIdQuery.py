@@ -4,16 +4,29 @@ from typing import Any, Dict
 
 from database.db import database
 from functions.helpers import datetime_to_timestamp
-from sqlalchemy import and_
 
-from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import DocsSalesListRepository
+from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import (
+    DocsSalesListRepository,
+)
 from api.users.infrastructure.repositories.UsersRepository import UsersRepository
-from api.payments.infrastructure.repositories.PaymentsRepository import PaymentsRepository
-from api.docs_sales.goods.infrastructure.repositories.GoodsRepository import GoodsRepository
-from api.loyality_transactions.infrastructure.repositories.LoyalityRepository import LoyalityRepository
-from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import DeliveryRepository
-from api.contragents.infrastructure.repositories.ContragentRepository import ContragentRepository
-from api.settings.infrastructure.repositories.SettingsRepository import SettingsRepository
+from api.payments.infrastructure.repositories.PaymentsRepository import (
+    PaymentsRepository,
+)
+from api.docs_sales.goods.infrastructure.repositories.GoodsRepository import (
+    GoodsRepository,
+)
+from api.loyality_transactions.infrastructure.repositories.LoyalityRepository import (
+    LoyalityRepository,
+)
+from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import (
+    DeliveryRepository,
+)
+from api.contragents.infrastructure.repositories.ContragentRepository import (
+    ContragentRepository,
+)
+from api.settings.infrastructure.repositories.SettingsRepository import (
+    SettingsRepository,
+)
 
 from api.docs_sales.sales.infrastructure.helpers.id_extractors import extract_user_ids
 
@@ -21,6 +34,7 @@ from api.docs_sales.sales.infrastructure.helpers.id_extractors import extract_us
 class GetDocSaleByIdQuery:
     async def execute(self, idx: int, user_cashbox_id: int) -> dict[str, Any]:
         item_db = await self._get_item_in_db(idx, user_cashbox_id)
+        item_db = datetime_to_timestamp(item_db)
         results_map = await self._get_all_maps(item_db)
         item_db = self._enrich_doc_sale(item_db, results_map)
         return item_db
@@ -41,7 +55,7 @@ class GetDocSaleByIdQuery:
         setting_id = item.get("settings")
         users_ids: set[int] = set()
 
-        datetime_to_timestamp(item)
+        item = datetime_to_timestamp(item)
         extract_user_ids(item, users_ids)
 
         tasks = {
@@ -49,13 +63,16 @@ class GetDocSaleByIdQuery:
             "goods_map": GoodsRepository().fetch_goods_by_doc_id(doc_id),
             "payment_map": PaymentsRepository().fetch_payments_map_by_id(doc_id),
             "loyality_map": LoyalityRepository().fetch_loyality_map_by_id(doc_id),
-
         }
         if contragent_id is not None:
-            tasks["contagents_map"] = ContragentRepository().fetch_segments_by_contragent_id(contragent_id)
+            tasks["contagents_map"] = (
+                ContragentRepository().fetch_segments_by_contragent_id(contragent_id)
+            )
 
         if setting_id is not None:
-            tasks["settings_map"] = SettingsRepository().fetch_settings_by_id(setting_id)
+            tasks["settings_map"] = SettingsRepository().fetch_settings_by_id(
+                setting_id
+            )
 
         if users_ids:
             tasks["users_map"] = UsersRepository().fetch_users_by_ids(list(users_ids))
@@ -70,7 +87,7 @@ class GetDocSaleByIdQuery:
         item.update(delivery_info)
 
         goods = results_map["goods_map"]
-        item['goods'] = goods
+        item["goods"] = goods
         item["nomenclature_count"] = len(goods)
         item["doc_discount"] = round(sum(g.get("sum_discounted", 0) for g in goods), 2)
 
