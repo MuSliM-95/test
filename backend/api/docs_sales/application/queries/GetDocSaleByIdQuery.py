@@ -3,7 +3,6 @@ from fastapi import HTTPException
 from typing import Any, Dict
 
 from database.db import database
-from functions.helpers import datetime_to_timestamp
 
 from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import (
     DocsSalesListRepository,
@@ -34,7 +33,6 @@ from api.docs_sales.sales.infrastructure.helpers.id_extractors import extract_us
 class GetDocSaleByIdQuery:
     async def execute(self, idx: int, user_cashbox_id: int) -> dict[str, Any]:
         item_db = await self._get_item_in_db(idx, user_cashbox_id)
-        item_db = datetime_to_timestamp(item_db)
         results_map = await self._get_all_maps(item_db)
         item_db = self._enrich_doc_sale(item_db, results_map)
         return item_db
@@ -55,7 +53,6 @@ class GetDocSaleByIdQuery:
         setting_id = item.get("settings")
         users_ids: set[int] = set()
 
-        item = datetime_to_timestamp(item)
         extract_user_ids(item, users_ids)
 
         tasks = {
