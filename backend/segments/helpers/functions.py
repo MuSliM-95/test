@@ -31,6 +31,7 @@ async def create_replacements(obj_id:int, obj_type: str = "docs_sales") -> dict:
             add_docs_sales_goods_info_to_replacements(replacements, order_id),
             link_replacements(replacements, order_id),
             create_delivery_info_text(replacements, order_id),
+            order_info_to_replacements(replacements, order_id),
         ]
         query = docs_sales.select().where(docs_sales.c.id == order_id)
         order = await database.fetch_one(query)
@@ -49,6 +50,59 @@ async def create_replacements(obj_id:int, obj_type: str = "docs_sales") -> dict:
     return replacements
 
 
+async def order_info_to_replacements(replacements: dict, order_id: int):
+    data = {}
+    order_query = docs_sales.select().where(docs_sales.c.id == order_id)
+    order = await database.fetch_one(order_query)
+    if not order:
+        return
+
+    order_statuses = {
+        "received": "Получен",
+        "processed": "Обработан",
+        "collecting": "Собирается",
+        "collected": "Собран",
+        "picked": "Назначен доставщик",
+        "delivered": "Доставлен",
+        "closed": "Закрыт",
+        "success": "Успешно"
+    }
+    if order.order_status:
+        data["order_status"] = order_statuses[order.order_status] if order.order_status in order_statuses else order.status
+
+    if order.assigned_picker:
+        query = (
+            users.select()
+            .join(users_cboxes_relation,
+                                    users_cboxes_relation.c.user == users.c.id)
+            .where(users_cboxes_relation.c.id == order.assigned_picker)
+        )
+        user = await database.fetch_one(query)
+        if user:
+            data["picker_name"] = ""
+            if user.first_name:
+                data["picker_name"] += f"{user.first_name} "
+            if user.last_name:
+                data["picker_name"] += f"{user.last_name}"
+
+    if order.assigned_courier:
+        query = (
+            users.select()
+            .join(users_cboxes_relation,
+                                    users_cboxes_relation.c.user == users.c.id)
+            .where(users_cboxes_relation.c.id == order.assigned_courier)
+        )
+        user = await database.fetch_one(query)
+        if user:
+            data["courier_name"] = ""
+            if user.first_name:
+                data["courier_name"] += f"{user.first_name} "
+            if user.last_name:
+                data["courier_name"] += f"{user.last_name}"
+
+    replacements.update(data)
+
+
 async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
     data = {}
     query = warehouses.select().join(docs_sales, docs_sales.c.warehouse == warehouses.c.id).where(docs_sales.c.id == order_id)
@@ -61,6 +115,7 @@ async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
         if row.phone:
             data["warehouse_phone"] = row.phone
     replacements.update(data)
+
 
 async def add_manager_info_to_replacements(replacements:dict, order_id:int):
     data = {}
@@ -80,6 +135,7 @@ async def add_manager_info_to_replacements(replacements:dict, order_id:int):
             data["manager_phone"] = user.phone_number
 
     replacements.update(data)
+
 
 async def link_replacements(replacements, order_id):
     data = {}

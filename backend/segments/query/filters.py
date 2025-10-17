@@ -21,6 +21,22 @@ from database.db import (
 from segments.ranges import apply_range, apply_date_range
 
 
+def orders_filters(query: Select, order_filters: dict, sub) -> Select:
+    where_clauses = []
+    if u_at := order_filters.get("updated_at"):
+        apply_date_range(sub.c.updated_at, u_at, where_clauses)
+    if c_at := order_filters.get("created_at"):
+        apply_date_range(sub.c.created_at, c_at, where_clauses)
+
+    if status := order_filters.get("order_status"):
+        where_clauses.append(sub.c.order_status == status)
+
+    if where_clauses:
+        query = query.where(and_(*where_clauses))
+
+    return query
+
+
 def add_picker_filters(query: Select, picker_filters, sub):
     where_clauses = []
 
