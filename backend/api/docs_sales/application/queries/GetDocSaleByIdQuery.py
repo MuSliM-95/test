@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from typing import Any, Dict
 
 from database.db import database
+from functions.helpers import datetime_to_timestamp
 
 from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import (
     DocsSalesListRepository,
@@ -44,7 +45,9 @@ class GetDocSaleByIdQuery:
 
         if not item_db_raw:
             raise HTTPException(status_code=404, detail="Не найдено.")
-        return dict(item_db_raw)
+
+        item_db = datetime_to_timestamp(item_db_raw)
+        return item_db
 
     @staticmethod
     async def _get_all_maps(item):
