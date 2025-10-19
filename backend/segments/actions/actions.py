@@ -365,15 +365,26 @@ class SegmentActions:
         for idx in docs_ids:
             replacements = await create_replacements(idx)
             data = replace_masks(data, replacements)
+            url = data["url"]
             if data.get("params"):
-                data["url"] = data["url"] + "?" + "&".join([f"{k}={v}" for k, v in data["params"].items()])
+                url = data["url"] + "?" + "&".join([f"{k}={v}" for k, v in data["params"].items()])
             async with HttpClient() as client:
                 try:
-                    status, response = await getattr(client, data["method"].lower())(
-                        url=data["url"],
-                        headers=data.get("headers"),
-                        data=data.get("body"),
-                    )
+
+                    method = data["method"].lower()
+
+                    if method == "get":
+                        status, response = await client.get(
+                            url=url,
+                            headers=data.get("headers"),
+                        )
+                    else:
+                        status, response = await getattr(client, method)(
+                            url=url,
+                            headers=data.get("headers"),
+                            data=data.get("body"),
+                        )
+
                     logger.info(f"Status for contragent {idx}: {status}")
                     if status not in [200, 201]:
                         logger.info(f"Response for contragent {idx}: {response}")
