@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import enum
 import os
@@ -1551,6 +1552,7 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("created_by_id", ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("status_card", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column('apple_wallet_advertisement', String, nullable=False, default='TableCRM', server_default='TableCRM'),
     sqlalchemy.Column("lifetime", BigInteger, index=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -2013,6 +2015,7 @@ segments = sqlalchemy.Table(
 class SegmentObjectType(enum.Enum):
     docs_sales = "docs_sales"
     contragents = "contragents"
+    loyality_cards = "loyality_cards"
 
 
 segment_objects = sqlalchemy.Table(
@@ -2227,3 +2230,35 @@ warehouse_hash = sqlalchemy.Table(
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 )
+
+apple_push_tokens = sqlalchemy.Table(
+    "apple_push_tokens",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("card_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("loyality_cards.id"), nullable=False),
+    sqlalchemy.Column("device_library_identifier", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("pass_type_id", String, nullable=False),
+    sqlalchemy.Column("serial_number", String, nullable=False),
+    sqlalchemy.Column("push_token", String, nullable=False),
+    # sqlalchemy.Column("have_updates", Boolean, nullable=False, default=False, server_default=sqlalchemy.sql.expression.false()),
+)
+
+apple_wallet_card_settings = sqlalchemy.Table(
+    "apple_wallet_card_settings",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey('cashboxes.id'), nullable=False),
+    sqlalchemy.Column("data", sqlalchemy.JSON, nullable=True),
+)
+
+
+# async def main():
+#     await database.connect()
+#
+#     q = apple_wallet_card_settings.select().where(apple_wallet_card_settings.c.cashbox_id == 1)
+#
+#     res = await database.fetch_one(q)
+#     print(json.loads(res.data))
+#
+# if __name__ == '__main__':
+#     asyncio.run(main())

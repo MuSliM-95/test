@@ -122,6 +122,7 @@ class TransformLoyalityCard(BaseModel):
     max_withdraw_percentage: Optional[float]
     lifetime: Optional[int]
     tag: Optional[str]
+    apple_wallet_advertisement: Optional[str]
 
 class AddRemoveTransaction(BaseModel):
     amount: float

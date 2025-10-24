@@ -1,9 +1,17 @@
+from datetime import datetime
+from random import randint
 from typing import Optional
 
 import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException
+from fuzzywuzzy import fuzz
 from phonenumbers import geocoder
+from sqlalchemy import func, select
+from sqlalchemy import or_
 
+import api.loyality_cards.schemas as schemas
+from api.apple_wallet.utils import update_apple_wallet_pass
+from common.apple_wallet_service.impl.WalletPassService import WalletPassGeneratorService
 from database.db import (
     database,
     loyality_cards,
@@ -13,9 +21,6 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
-import api.loyality_cards.schemas as schemas
-from sqlalchemy import or_
-
 from functions.helpers import (
     datetime_to_timestamp,
     get_entity_by_id,
@@ -27,14 +32,8 @@ from functions.helpers import (
     clear_phone_number,
     build_filters,
 )
-
-from ws_manager import manager
 from functions.helpers import get_user_by_token
-from datetime import datetime
-
-from random import randint
-from sqlalchemy import func, select
-from fuzzywuzzy import fuzz
+from ws_manager import manager
 
 router = APIRouter(tags=["loyality_cards"])
 
@@ -488,6 +487,11 @@ async def new_loyality_card(
         },
     )
 
+    apple_wallet_service = WalletPassGeneratorService()
+
+    for card in loyality_cards_db:
+        await apple_wallet_service.update_pass(card['id'])
+
     return loyality_cards_db
 
 
@@ -539,6 +543,8 @@ async def edit_loyality_transaction(
         token,
         {"action": "edit", "target": "loyality_cards", "result": loyality_card_db},
     )
+
+    await update_apple_wallet_pass(loyality_card_db['id'])
 
     return {**loyality_card_db, **{"data": {"status": "success"}}}
 

@@ -4,6 +4,8 @@ import logging
 from datetime import datetime
 from typing import List
 
+from common.apple_wallet_service.impl.WalletNotificationService import WalletNotificationService
+from common.apple_wallet_service.impl.WalletPassService import WalletPassGeneratorService
 from database.db import (
     database, segments, tags, contragents_tags, SegmentObjectType, users,
     users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts,
@@ -394,7 +396,6 @@ class SegmentActions:
 
     async def transform_loyality_card(self, contragents_ids: List[int], data: dict):
         fields_for_update = {}
-
         if data.get("cashback_percent"):
             fields_for_update["cashback_percent"] = data.get("cashback_percent")
         if data.get("max_withdraw_percentage"):
@@ -403,12 +404,28 @@ class SegmentActions:
             fields_for_update["lifetime"] = data.get("lifetime")
         if data.get("tag"):
             fields_for_update["tags"] = data.get("tag")
+        if data.get('apple_wallet_advertisement'):
+            fields_for_update["apple_wallet_advertisement"] = data.get("apple_wallet_advertisement")
+
         query = update(loyality_cards).where(
             loyality_cards.c.contragent_id.in_(contragents_ids),
             loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
         ).values(**fields_for_update)
 
         await database.execute(query)
+
+        apple_notification_service = WalletNotificationService()
+        apple_wallet_service = WalletPassGeneratorService()
+
+        loyality_ids_query = select(loyality_cards.c.id).where(
+            loyality_cards.c.contragent_id.in_(contragents_ids),
+            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
+        )
+        loyality_ids = [i.id for i in (await database.fetch_all(loyality_ids_query))]
+        for card_id in loyality_ids:
+            await apple_wallet_service.update_pass(card_id)
+            await apple_notification_service.ask_update_pass(card_id)
+
 
     async def add_loyality_transaction(self, contragents_ids: List[int], data: dict):
         insert_data = {}

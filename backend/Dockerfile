@@ -11,11 +11,12 @@ RUN apt-get update && \
     libxrender1 \
     tesseract-ocr \
     tesseract-ocr-rus\
-    poppler-utils
+    poppler-utils build-essential libssl-dev libffi-dev
 
 RUN mkdir "tmp"
 
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
