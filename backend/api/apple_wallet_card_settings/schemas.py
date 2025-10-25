@@ -17,8 +17,8 @@ class WalletCardSettings(BaseModel):
     )
 
     icon_path: Optional[str] = '/backend/static_files/AppleWalletIconDefault.png'
-    logo_path: Optional[str] = 'backend/static_files/AppleWalletLogoDefault.png'
-    strip_path: Optional[str] = 'backend/static_files/AppleWalletStripDefault.png'
+    logo_path: Optional[str] = '/backend/static_files/AppleWalletLogoDefault.png'
+    strip_path: Optional[str] = '/backend/static_files/AppleWalletStripDefault.png'
 
     locations: list[Location] = []
 

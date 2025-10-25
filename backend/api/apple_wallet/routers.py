@@ -25,7 +25,7 @@ async def create_apple_wallet_card(token: str, card_id: int):
         raise HTTPException(status_code=401, detail="Неверный токен")
 
     pass_generator = WalletPassGeneratorService()
-    path, filename = pass_generator.update_pass(card_id)
+    path, filename = await pass_generator.update_pass(card_id)
 
     return FileResponse(
         path=path,

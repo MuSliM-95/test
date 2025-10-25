@@ -5,9 +5,10 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
+from api.apple_wallet.utils import update_apple_wallet_pass
 from api.apple_wallet_card_settings.schemas import WalletCardSettings, WalletCardSettingsCreate, \
     WalletCardSettingsUpdate
-from database.db import users_cboxes_relation, database, apple_wallet_card_settings
+from database.db import users_cboxes_relation, database, apple_wallet_card_settings, loyality_cards
 
 router = APIRouter(prefix='/apple_wallet_card_settings', tags=['apple_wallet_card_settings'])
 
@@ -101,5 +102,13 @@ async def update_apple_wallet_card_settings(token: str, settings: WalletCardSett
         ).dict()
     ).returning(apple_wallet_card_settings.c.data)
     settings = await database.execute(settings_stmt)
+
+    cards_query = select(
+        loyality_cards.c.id
+    ).where(loyality_cards.c.cashbox_id == user.cashbox_id)
+    cards = [i.id for i in await database.fetch_all(cards_query)]
+
+    for card_id in cards:
+        await update_apple_wallet_pass(card_id)
 
     return WalletCardSettings(**json.loads(settings))
