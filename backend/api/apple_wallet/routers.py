@@ -1,0 +1,210 @@
+import os
+from datetime import datetime
+
+from fastapi import APIRouter, Request, Response, HTTPException
+from fastapi.responses import FileResponse
+from sqlalchemy import select, cast, String
+
+from api.apple_wallet.schemas import DeviceRegistration, SerialNumbersList
+from api.apple_wallet.utils import update_apple_wallet_pass
+from common.apple_wallet_service.impl.WalletNotificationService import WalletNotificationService
+from common.apple_wallet_service.impl.WalletPassService import WalletPassGeneratorService
+from database.db import apple_push_tokens, database, loyality_cards, users_cboxes_relation
+
+router = APIRouter(tags=["apple-wallet"])
+
+
+@router.post('/create_apple_wallet_card')
+async def create_apple_wallet_card(token: str, card_id: int):
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+
+    pass_generator = WalletPassGeneratorService()
+    path, filename = pass_generator.update_pass(card_id)
+
+    return FileResponse(
+        path=path,
+        media_type="application/vnd.apple.pkpass",
+        filename=filename
+    )
+
+
+@router.get("/version")
+async def get_version():
+    """Эндпоинт для проверки версии веб-сервиса (обязательный)."""
+    return {"version": 1}
+
+
+@router.post("/v1/devices/{device_library_identifier}/registrations/{pass_type_identifier}/{serial_number}")
+async def register_device(
+        device_library_identifier: str,
+        pass_type_identifier: str,
+        serial_number: str,
+        registration: DeviceRegistration
+):
+    """
+    Регистрирует устройство для получения обновлений пасса.
+    Apple вызывает этот эндпоинт, когда пользователь добавляет пасс в Wallet.
+    """
+    # Нормализуем токен (удаляем пробелы и приводим к нижнему регистру, если нужно)
+    clean_token = registration.pushToken.replace(" ", "").replace("<", "").replace(">", "")
+
+    is_token_exist_query = apple_push_tokens.select().where(
+        apple_push_tokens.c.device_library_identifier == device_library_identifier,
+        apple_push_tokens.c.pass_type_id == pass_type_identifier,
+        apple_push_tokens.c.serial_number == serial_number,
+        apple_push_tokens.c.push_token == clean_token
+    )
+    is_token_exist = await database.fetch_one(is_token_exist_query)
+
+    if not is_token_exist:
+        loyalty_card_query = select(
+            loyality_cards.c.id
+        ).where(
+            loyality_cards.c.card_number == int(serial_number),
+        )
+        card_id = (await database.fetch_one(loyalty_card_query)).id
+
+        token_query = apple_push_tokens.insert().values(
+            {
+                "device_library_identifier": device_library_identifier,
+                "pass_type_id": pass_type_identifier,
+                "serial_number": serial_number,
+                "push_token": clean_token,
+                "card_id": card_id,
+            }
+        )
+
+        await database.execute(token_query)
+        return {"status": "success"}, 201
+
+    return {"status": "already_registered"}, 200
+
+
+@router.delete("/v1/devices/{device_library_identifier}/registrations/{pass_type_identifier}/{serial_number}")
+async def unregister_device(
+        device_library_identifier: str,
+        pass_type_identifier: str,
+        serial_number: str
+):
+    """
+    Отменяет регистрацию устройства для пасса.
+    Apple вызывает этот эндпоинт, когда пользователь удаляет пасс из Wallet.
+    """
+    is_pass_exist = apple_push_tokens.select().where(
+        apple_push_tokens.c.device_library_identifier == device_library_identifier,
+        apple_push_tokens.c.pass_type_id == pass_type_identifier,
+        apple_push_tokens.c.serial_number == serial_number,
+    )
+    is_pass_exist = await database.fetch_one(is_pass_exist)
+    if is_pass_exist:
+        token_query = apple_push_tokens.delete().where(
+            apple_push_tokens.c.device_library_identifier == device_library_identifier,
+            apple_push_tokens.c.pass_type_id == pass_type_identifier,
+            apple_push_tokens.c.serial_number == serial_number,
+        )
+        await database.execute(token_query)
+        return {"status": "success"}, 200
+    return Response(status_code=401)
+
+
+@router.get("/v1/passes/{pass_type_identifier}/{serial_number}")
+async def get_pass(
+        pass_type_identifier: str,
+        serial_number: str,
+        request: Request
+):
+    """
+    Возвращает последнюю версию пасса.
+    Устройство вызывает этот эндпоинт после получения push-уведомления.
+    """
+    pass_service = WalletPassGeneratorService()
+    path, filename = pass_service.get_card_path_and_name(serial_number)
+
+    if not os.path.exists(path):
+        query = select(
+            loyality_cards.c.id
+        ).where(loyality_cards.c.card_number == int(serial_number))
+        await update_apple_wallet_pass(query)
+
+    return FileResponse(
+        path=path,
+        media_type="application/vnd.apple.pkpass",
+        filename=filename
+    )
+
+
+@router.get("/v1/devices/{device_library_identifier}/registrations/{pass_type_identifier}", response_model=SerialNumbersList)
+async def get_passes_for_device(
+    device_library_identifier: str,
+    pass_type_identifier: str,
+    passesUpdatedSince: str = None
+):
+    """
+    Возвращает список серийных номеров пассов, которые были обновлены.
+    Устройство может вызывать этот эндпоинт для проверки обновлений.
+    """
+    query = select(loyality_cards.c.card_number).select_from(
+        loyality_cards.join(
+            apple_push_tokens,
+            apple_push_tokens.c.serial_number == cast(loyality_cards.c.card_number, String)
+        )
+    ).where(
+        apple_push_tokens.c.device_library_identifier == device_library_identifier,
+        apple_push_tokens.c.pass_type_id == pass_type_identifier
+    )
+
+    if passesUpdatedSince is not None:
+        query = query.where(loyality_cards.c.updated_at >= datetime.fromisoformat(passesUpdatedSince))
+
+    res = [i.card_number for i in await database.fetch_all(query)]
+    # query = select(
+    #     apple_push_tokens.c.serial_number,
+    # ).where(
+    #     apple_push_tokens.c.device_library_identifier == device_library_identifier,
+    #     apple_push_tokens.c.pass_type_id == pass_type_identifier,
+    #     apple_push_tokens.c.have_updates == True
+    # )
+    # res = [i.serial_number for i in await database.fetch_all(query)]
+    #
+    # set_false_query = apple_push_tokens.update().where(
+    #     apple_push_tokens.c.device_library_identifier == device_library_identifier,
+    #     apple_push_tokens.c.pass_type_id == pass_type_identifier,
+    #     apple_push_tokens.c.have_updates == True,
+    #     apple_push_tokens.c.serial_number.in_(res)
+    # ).values({'have_updates': False})
+    # await database.execute(set_false_query)
+
+    return SerialNumbersList(serialNumbers=list(map(str, res)), lastUpdated=datetime.now().isoformat())
+
+@router.post('/ask_update_pass')
+async def renew_pass(token: str, card_id: int):
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+
+    service = WalletNotificationService()
+    await service.ask_update_pass(card_id)
+
+    return Response(status_code=200)
+
+@router.get('/link_to_card')
+async def link_to_card(token: str, card_number: int):
+    user_query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.token == token
+    )
+    user = await database.fetch_one(user_query)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+
+    return f'https://{os.getenv("APP_URL")}/get_apple_wallet_card/?card_number={card_number}'

@@ -1,26 +1,52 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, or_, func, select, text, exists, case
+from sqlalchemy import and_, or_, func, select, text, exists
 from sqlalchemy.sql import Select
 
 from database.db import (
-    docs_sales, OrderStatus, docs_sales_delivery_info, docs_sales_goods,
-    nomenclature, categories, contragents, loyality_cards,
-    loyality_transactions, contragents_tags, tags, docs_sales_tags, pictures,
-    payments, entity_to_entity
+    docs_sales,
+    OrderStatus,
+    docs_sales_delivery_info,
+    docs_sales_goods,
+    nomenclature,
+    categories,
+    loyality_cards,
+    loyality_transactions,
+    tags,
+    docs_sales_tags,
+    pictures,
+    payments,
+    entity_to_entity,
 )
 from segments.ranges import apply_range, apply_date_range
 
 
-def add_picker_filters(query: Select, picker_filters, sub):
+def orders_filters(query: Select, order_filters: dict, sub) -> Select:
+    where_clauses = []
+    if u_at := order_filters.get("updated_at"):
+        apply_date_range(sub.c.updated_at, u_at, where_clauses)
+    if c_at := order_filters.get("created_at"):
+        apply_date_range(sub.c.created_at, c_at, where_clauses)
 
+    if status := order_filters.get("order_status"):
+        where_clauses.append(sub.c.order_status == status)
+
+    if where_clauses:
+        query = query.where(and_(*where_clauses))
+
+    return query
+
+
+def add_picker_filters(query: Select, picker_filters, sub):
     where_clauses = []
 
     assigned = picker_filters.get("assigned")
 
     photos_not_added_minutes = picker_filters.get("photos_not_added_minutes")
 
-    if photos_not_added_minutes is not None and isinstance(photos_not_added_minutes, int):
+    if photos_not_added_minutes is not None and isinstance(
+            photos_not_added_minutes, int
+    ):
         sales_entity = "docs_sales"
 
         pictures_of_sales = pictures.c.entity == sales_entity
@@ -32,10 +58,8 @@ def add_picker_filters(query: Select, picker_filters, sub):
         picker_finished = sub.c.picker_finished_at.isnot(None)
 
         not_any_photo = ~exists(
-            select(1).where(and_(
-                pictures_of_sales,
-                pictures_of_order
-            )))
+            select(1).where(and_(pictures_of_sales, pictures_of_order))
+        )
 
         picker_late_photos = func.now() >= sub.c.picker_finished_at + interval
 
@@ -44,41 +68,36 @@ def add_picker_filters(query: Select, picker_filters, sub):
         where_clauses.append(photo_filter)
 
     if assigned is not None:
-        apply_range(sub.c.assigned_picker,
-                    {"is_none": not assigned}, where_clauses)
+        apply_range(sub.c.assigned_picker, {"is_none": not assigned}, where_clauses)
 
     if sdr := picker_filters.get("start"):
-        apply_date_range(sub.c.picker_started_at, sdr,
-                         where_clauses)
+        apply_date_range(sub.c.picker_started_at, sdr, where_clauses)
     if fdr := picker_filters.get("finish"):
-        apply_date_range(sub.c.picker_finished_at, fdr,
-                         where_clauses)
+        apply_date_range(sub.c.picker_finished_at, fdr, where_clauses)
 
     if where_clauses:
         query = query.where(and_(*where_clauses))
 
     return query
 
-def add_courier_filters(query: Select, courier_filters, sub):
 
+def add_courier_filters(query: Select, courier_filters, sub):
     where_clauses = []
 
     assigned = courier_filters.get("assigned")
 
     if assigned is not None:
-        apply_range(sub.c.assigned_courier,
-                    {"is_none": not assigned}, where_clauses)
+        apply_range(sub.c.assigned_courier, {"is_none": not assigned}, where_clauses)
 
         if assigned is False:
-            apply_range(sub.c.order_status,
-                        {"eq": OrderStatus.collected.value}, where_clauses)
+            apply_range(
+                sub.c.order_status, {"eq": OrderStatus.collected.value}, where_clauses
+            )
 
     if sdr := courier_filters.get("start"):
-        apply_date_range(sub.c.courier_picked_at, sdr,
-                         where_clauses)
+        apply_date_range(sub.c.courier_picked_at, sdr, where_clauses)
     if fdr := courier_filters.get("finish"):
-        apply_date_range(sub.c.courier_delivered_at, fdr,
-                         where_clauses)
+        apply_date_range(sub.c.courier_delivered_at, fdr, where_clauses)
 
     if where_clauses:
         query = query.where(and_(*where_clauses))
@@ -87,33 +106,39 @@ def add_courier_filters(query: Select, courier_filters, sub):
 
 
 def add_delivery_required_filters(query: Select, delivery_required: bool, sub):
-
     if delivery_required is True:
-        query = query.where(and_(
-            docs_sales_delivery_info.c.docs_sales_id.isnot(None),
-            docs_sales_delivery_info.c.address.isnot(None),
-            docs_sales_delivery_info.c.address != ""
-        ))
+        query = query.where(
+            and_(
+                docs_sales_delivery_info.c.docs_sales_id.isnot(None),
+                docs_sales_delivery_info.c.address.isnot(None),
+                docs_sales_delivery_info.c.address != "",
+            )
+        )
     elif delivery_required is False:
-        query = query.where(or_(
-            docs_sales_delivery_info.c.docs_sales_id.is_(None),
-            docs_sales_delivery_info.c.address.is_(None),
-            docs_sales_delivery_info.c.address == ""
-        ))
+        query = query.where(
+            or_(
+                docs_sales_delivery_info.c.docs_sales_id.is_(None),
+                docs_sales_delivery_info.c.address.is_(None),
+                docs_sales_delivery_info.c.address == "",
+            )
+        )
 
     return query
 
 
 def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
     """
-        Добавляет в запрос фильтры и агрегаты, описанные в purchase_criteria.
+    Добавляет в запрос фильтры и агрегаты, описанные в purchase_criteria.
 
-        :param query: исходный Select (на sub)
-        :param purchase_criteria: словарь из PurchaseCriteria
-        :param sub: подзапрос с docs_sales.id, docs_sales.contragent
-        :return: модифицированный Select
+    ОПТИМИЗАЦИЯ: используются подзапросы с предварительной фильтрацией
+    документов продаж перед применением агрегатов.
+
+    :param query: исходный Select (на sub)
+    :param purchase_criteria: словарь из PurchaseCriteria
+    :param sub: подзапрос с docs_sales.id, docs_sales.contragent
+    :return: модифицированный Select
     """
-    where_clauses = []   # фильтры по чекам
+    where_clauses = []  # фильтры по чекам
     having_clauses = []  # агрегаты по чекам
 
     # ---- 1. Диапазон дат по чеку ---------------------------------
@@ -125,28 +150,33 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         apply_range(sub.c.sum, per_check, where_clauses)
 
     # ---- 3. Фильтр по категориям / номенклатурам через EXISTS ----
+    # ОПТИМИЗАЦИЯ: объединяем условия для категорий в один OR вместо множества EXISTS
     if cats := purchase_criteria.get("categories"):
-        for cat in cats:
-            exists_clause = (
-                select(1)
-                .select_from(docs_sales_goods)
-                .join(nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id)
-                .join(categories, nomenclature.c.category == categories.c.id)
-                .where(docs_sales_goods.c.docs_sales_id == sub.c.id)
-                .where(categories.c.name.ilike(f"%{cat}%"))
-            )
-            where_clauses.append(exists(exists_clause))
+        # Создаем единственный EXISTS с OR условиями для всех категорий
+        category_conditions = [categories.c.name.ilike(f"%{cat}%") for cat in cats]
+        exists_clause = (
+            select(1)
+            .select_from(docs_sales_goods)
+            .join(nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id)
+            .join(categories, nomenclature.c.category == categories.c.id)
+            .where(docs_sales_goods.c.docs_sales_id == sub.c.id)
+            .where(or_(*category_conditions))
+        )
+        where_clauses.append(exists(exists_clause))
 
+    # ОПТИМИЗАЦИЯ: аналогично для номенклатур
     if noms := purchase_criteria.get("nomenclatures"):
-        for nom in noms:
-            exists_clause = (
-                select(1)
-                .select_from(docs_sales_goods)
-                .join(nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id)
-                .where(docs_sales_goods.c.docs_sales_id == sub.c.id)
-                .where(nomenclature.c.name.ilike(f"%{nom}%"))
-            )
-            where_clauses.append(exists(exists_clause))
+        nomenclature_conditions = [
+            nomenclature.c.name.ilike(f"%{nom}%") for nom in noms
+        ]
+        exists_clause = (
+            select(1)
+            .select_from(docs_sales_goods)
+            .join(nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id)
+            .where(docs_sales_goods.c.docs_sales_id == sub.c.id)
+            .where(or_(*nomenclature_conditions))
+        )
+        where_clauses.append(exists(exists_clause))
 
     if cog := purchase_criteria.get("count_of_goods"):
         query = (
@@ -155,7 +185,7 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         )
 
         apply_range(func.coalesce(func.sum(docs_sales_goods.c.quantity), 0), cog,
-                         having_clauses)
+                    having_clauses)
 
     if purchase_criteria.get("is_fully_paid"):
         # --- сумма оплат в рублях ---
@@ -212,85 +242,167 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         )
 
     # ---- 4. Агрегаты по контрагенту (COUNT / SUM) -----------------
-    subq = (
-        select(docs_sales.c.contragent)
-        .group_by(docs_sales.c.contragent)
-    )
-    sub_having_clauses = []
-    if rng := purchase_criteria.get("count"):
-        apply_range(func.count(docs_sales.c.id), rng, sub_having_clauses)
+    # ОПТИМИЗАЦИЯ: применяем WHERE фильтры до агрегации
+    if (
+            having_clauses
+            or purchase_criteria.get("count")
+            or purchase_criteria.get("total_amount")
+    ):
+        # Создаем алиас для docs_sales внутри агрегационного запроса
+        docs_sales_agg = docs_sales.alias("docs_sales_agg")
 
-    if rng := purchase_criteria.get("total_amount"):
-        apply_range(func.sum(docs_sales.c.sum), rng, sub_having_clauses)
+        agg_query = select(
+            docs_sales_agg.c.contragent,
+            func.count(docs_sales_agg.c.id).label("purchase_count"),
+            func.sum(docs_sales_agg.c.sum).label("total_amount"),
+        ).select_from(docs_sales_agg)
 
-    if sub_having_clauses:
-        subq = subq.having(and_(*sub_having_clauses))
+        # Фильтрация по категориям/номенклатурам ДО агрегации
+        category_filter_clauses = []
 
-    subq = subq.subquery()
+        if cats := purchase_criteria.get("categories"):
+            category_conditions = [categories.c.name.ilike(f"%{cat}%") for cat in cats]
+            category_exists = exists(
+                select(1)
+                .select_from(docs_sales_goods)
+                .join(
+                    nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
+                )
+                .join(categories, nomenclature.c.category == categories.c.id)
+                .where(
+                    docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
+                )
+                .where(or_(*category_conditions))
+            )
+            category_filter_clauses.append(category_exists)
 
-    query = query.where(sub.c.contragent.in_(select(subq.c.contragent)))
+        if noms := purchase_criteria.get("nomenclatures"):
+            nomenclature_conditions = [
+                nomenclature.c.name.ilike(f"%{nom}%") for nom in noms
+            ]
+            nomenclature_exists = exists(
+                select(1)
+                .select_from(docs_sales_goods)
+                .join(
+                    nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
+                )
+                .where(
+                    docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
+                )
+                .where(or_(*nomenclature_conditions))
+            )
+            category_filter_clauses.append(nomenclature_exists)
+
+        if category_filter_clauses:
+            agg_query = agg_query.where(and_(*category_filter_clauses))
+
+        if where_clauses:
+            agg_query = agg_query.where(and_(*where_clauses))
+
+        agg_query = agg_query.group_by(docs_sales_agg.c.contragent)
+
+        # HAVING фильтры
+        having_clauses_built = []
+        if rng := purchase_criteria.get("count"):
+            if "gte" in rng:
+                having_clauses_built.append(
+                    func.count(docs_sales_agg.c.id) >= rng["gte"]
+                )
+            if "lte" in rng:
+                having_clauses_built.append(
+                    func.count(docs_sales_agg.c.id) <= rng["lte"]
+                )
+            if "eq" in rng:
+                having_clauses_built.append(
+                    func.count(docs_sales_agg.c.id) == rng["eq"]
+                )
+        if rng := purchase_criteria.get("total_amount"):
+            if "gte" in rng:
+                having_clauses_built.append(
+                    func.sum(docs_sales_agg.c.sum) >= rng["gte"]
+                )
+            if "lte" in rng:
+                having_clauses_built.append(
+                    func.sum(docs_sales_agg.c.sum) <= rng["lte"]
+                )
+            if "eq" in rng:
+                having_clauses_built.append(func.sum(docs_sales_agg.c.sum) == rng["eq"])
+
+        if having_clauses_built:
+            agg_query = agg_query.having(and_(*having_clauses_built))
+
+        agg_subquery = agg_query.subquery("purchase_aggregates")
+        query = query.join(agg_subquery, sub.c.contragent == agg_subquery.c.contragent)
+        where_clauses = []  # уже применены
 
     # ---- 5. Последняя покупка N дней назад -----------------------
     if rng := purchase_criteria.get("last_purchase_days_ago"):
         max_date = func.max(docs_sales.c.created_at)
-
         sub_last = (
             select(docs_sales.c.contragent, max_date.label("last_purchase"))
             .group_by(docs_sales.c.contragent)
             .subquery()
         )
-
-        query = query.join(
-            sub_last, sub_last.c.contragent == sub.c.contragent
-        )
-
+        query = query.join(sub_last, sub_last.c.contragent == sub.c.contragent)
         if "gte" in rng:
-            cutoff = datetime.utcnow() - timedelta(days=rng["gte"])
+            cutoff = datetime.now(timezone.utc) - timedelta(days=rng["gte"])
             query = query.where(sub_last.c.last_purchase <= cutoff)
-
         if "lte" in rng:
-            cutoff = datetime.utcnow() - timedelta(days=rng["lte"])
+            cutoff = datetime.now(timezone.utc) - timedelta(days=rng["lte"])
             query = query.where(sub_last.c.last_purchase >= cutoff)
 
-    # ---- 6. Применяем фильтры -----------------------------------
+    # ---- 6. Применяем оставшиеся фильтры -------------------------
     if where_clauses:
         query = query.where(and_(*where_clauses))
-
     if having_clauses:
         query = query.having(and_(*having_clauses))
 
     # гарантируем уникальные чеки
     query = query.group_by(sub.c.id, sub.c.contragent, sub.c.sum, sub.c.created_at)
-
     return query
 
 
 def add_loyality_filters(query: Select, loyality_criteria: dict, sub) -> Select:
-    """
-        Добавляет в запрос фильтры и агрегаты, описанные в loyality_criteria.
+    """Фильтры по лояльности.
 
-        :param query: исходный Select (contragents JOIN docs_sales … DISTINCT)
-        :param loyality_criteria: словарь из LoyalityCriteria
-        :return: модифицированный Select
+    Оптимизации:
+    - Предварительно фильтруем карты лояльности (balance) в подзапросе.
+    - Для expires_in_days используем только последнюю транзакцию (MAX(created_at)).
     """
-
     where_clauses = []
 
-    # --- 1. Фильтр по балансу карты ---
-    if balance := loyality_criteria.get("balance"):
-        sub_where_clauses = []
-        apply_range(loyality_cards.c.balance, balance, sub_where_clauses)
-        exists_balance = exists(
-            select(1)
-            .select_from(loyality_cards)
-            .where(loyality_cards.c.contragent_id == sub.c.contragent)
-            .where(*sub_where_clauses)
-        )
-        where_clauses.append(exists_balance)
+    if not loyality_criteria:
+        return query
 
-    # --- 2. Фильтр по сроку жизни карты (expires_in_days) ---
+    # Подзапрос по картам (возможно с фильтром баланса)
+    loyalty_subq = (
+        select(
+            loyality_cards.c.id.label("card_id"),
+            loyality_cards.c.contragent_id,
+            loyality_cards.c.balance,
+            loyality_cards.c.lifetime,
+        )
+        .where(loyality_cards.c.contragent_id.isnot(None))
+    )
+
+    if balance := loyality_criteria.get("balance"):
+        if "gte" in balance:
+            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance >= balance["gte"])
+        if "lte" in balance:
+            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance <= balance["lte"])
+        if "eq" in balance:
+            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance == balance["eq"])
+
+    loyalty_subq = loyalty_subq.subquery("filtered_loyalty_cards")
+
+    # INNER JOIN: нам нужны только контрагенты с подходящими картами
+    query = query.join(
+        loyalty_subq, loyalty_subq.c.contragent_id == sub.c.contragent, isouter=False
+    )
+
+    # Фильтр по сроку действия (дни до истечения)
     if expire := loyality_criteria.get("expires_in_days"):
-        # Подзапрос: последняя транзакция на карту
+        # Последняя транзакция на карту
         last_tx = (
             select(
                 loyality_transactions.c.loyality_card_id,
@@ -299,24 +411,13 @@ def add_loyality_filters(query: Select, loyality_criteria: dict, sub) -> Select:
             .group_by(loyality_transactions.c.loyality_card_id)
             .subquery()
         )
-        sub_where_clauses = []
-        expiry_datetime = last_tx.c.last_tx + text(
-            "INTERVAL '1 second'") * loyality_cards.c.lifetime
-        days_left = func.DATE_PART("day", expiry_datetime - func.now())
-
-        apply_range(days_left, expire, sub_where_clauses)
-
-        exists_expiry = exists(
-            select(1)
-            .select_from(loyality_cards)
-            .join(last_tx, last_tx.c.loyality_card_id == loyality_cards.c.id)
-            .where(loyality_cards.c.contragent_id == sub.c.contragent)
-            .where(*sub_where_clauses)
+        query = query.join(
+            last_tx, last_tx.c.loyality_card_id == loyalty_subq.c.card_id
         )
+        expiry_datetime = last_tx.c.last_tx + text("INTERVAL '1 second'") * loyalty_subq.c.lifetime
+        days_left = func.DATE_PART("day", expiry_datetime - func.now())
+        apply_range(days_left, expire, where_clauses)
 
-        where_clauses.append(exists_expiry)
-
-    # --- 3. Применяем все условия ---
     if where_clauses:
         query = query.where(and_(*where_clauses))
 
@@ -332,23 +433,13 @@ def created_at_filters(query: Select, data: dict, sub) -> Select:
 
 
 def tags_filters(query: Select, data: list, sub) -> Select:
-    like_conditions = [
-        tags.c.name.ilike(f"%{tag}%") for tag in data
-    ]
-    return (
-        query
-        .where(or_(*like_conditions))
-    )
+    like_conditions = [tags.c.name.ilike(f"%{tag}%") for tag in data]
+    return query.where(or_(*like_conditions))
 
 
 def docs_sales_tags_filters(query: Select, data: list, sub) -> Select:
-    like_conditions = [
-        docs_sales_tags.c.name.ilike(f"%{tag}%") for tag in data
-    ]
-    return (
-        query
-        .where(or_(*like_conditions))
-    )
+    like_conditions = [docs_sales_tags.c.name.ilike(f"%{tag}%") for tag in data]
+    return query.where(or_(*like_conditions))
 
 
 def delivery_info_filters(query: Select, data: dict, sub) -> Select:
@@ -361,15 +452,16 @@ def delivery_info_filters(query: Select, data: dict, sub) -> Select:
         where_clauses.append(docs_sales_delivery_info.c.address.ilike(f"%{address}%"))
 
     if note := data.get("note"):
-        where_clauses.append(
-            docs_sales_delivery_info.c.note.ilike(f"%{note}%"))
+        where_clauses.append(docs_sales_delivery_info.c.note.ilike(f"%{note}%"))
 
     if recipient := data.get("recipient"):
         if not isinstance(recipient, dict):
             recipient = {}
         for k, v in recipient.items():
             where_clauses.append(
-                docs_sales_delivery_info.c.recipient.op('->>')(text(f"'{k}'")).ilike(f'%{v}%')
+                docs_sales_delivery_info.c.recipient.op("->>")(text(f"'{k}'")).ilike(
+                    f"%{v}%"
+                )
             )
 
     if where_clauses:

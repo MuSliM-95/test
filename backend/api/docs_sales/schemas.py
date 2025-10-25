@@ -5,7 +5,9 @@ import datetime
 
 from database.db import OrderStatus
 from database.enums import Repeatability
-from pydantic import BaseModel, conint
+from pydantic import BaseModel, conint, validator
+
+from functions.helpers import sanitize_float
 
 
 class Item(BaseModel):
@@ -162,6 +164,17 @@ class ViewInList(BaseModel):
     courier_picked_at: Optional[datetime.datetime] = None
     courier_delivered_at: Optional[datetime.datetime] = None
 
+    @validator("paid_doc")
+    def check_paid_doc(cls, v):
+        return sanitize_float(v)
+
+    @validator("paid_rubles")
+    def check_paid_rubles(cls, v):
+        return sanitize_float(v)
+
+    @validator('sum')
+    def check_sum(cls, v):
+        return sanitize_float(v)
 
 class ViewInListResult(BaseModel):
     result: List[ViewInList]
@@ -219,6 +232,10 @@ class FilterSchema(BaseModel):
 
     picker_id: Optional[int] = None
     courier_id: Optional[int] = None
+    updated_at__gte: Optional[int] = None
+    updated_at__lte: Optional[int] = None
+    created_at__gte: Optional[int] = None
+    created_at__lte: Optional[int] = None
 
 
 class NotifyType(str, Enum):

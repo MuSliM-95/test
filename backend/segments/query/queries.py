@@ -69,7 +69,11 @@ class SegmentCriteriaQuery:
             "delivery_info": {
                 "handler": self.filters.delivery_info_filters,
                 "filter_tag": "delivery_info",
-            }
+            },
+            "orders": {
+                "handler": self.filters.orders_filters,
+                "filter_tag": "self",
+            },
         }
 
         self.filter_tag_dependencies = {

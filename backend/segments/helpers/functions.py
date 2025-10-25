@@ -6,6 +6,7 @@ from api.docs_sales.api.routers import generate_and_save_order_links
 from database.db import (
     docs_sales_delivery_info, database, docs_sales, warehouses, users,
     users_cboxes_relation, docs_sales_goods, nomenclature, units, contragents,
+    loyality_cards
 )
 from sqlalchemy import select, func
 
@@ -18,17 +19,88 @@ def format_contragent_text_notifications(action: str, segment_name: str, name: s
     return f"{header}\nСегмент: {segment_name}.\nКлиент:\n{name}\nТелефон: {phone}"
 
 
-async def create_replacements(order_id:int) -> dict:
+async def create_replacements(obj_id:int, obj_type: str = "docs_sales") -> dict:
     replacements = {}
-    await asyncio.gather(
-        add_warehouse_info_to_replacements(replacements, order_id),
-        add_manager_info_to_replacements(replacements, order_id),
-        add_docs_sales_goods_info_to_replacements(replacements, order_id),
-        link_replacements(replacements, order_id),
-        create_delivery_info_text(replacements, order_id),
-        add_contragent_info_to_replacements(replacements, order_id)
-    )
+    tasks = []
+    contragent_id = None
+    if obj_type == "docs_sales":
+        order_id = obj_id
+        tasks += [
+            add_warehouse_info_to_replacements(replacements, order_id),
+            add_manager_info_to_replacements(replacements, order_id),
+            add_docs_sales_goods_info_to_replacements(replacements, order_id),
+            link_replacements(replacements, order_id),
+            create_delivery_info_text(replacements, order_id),
+            order_info_to_replacements(replacements, order_id),
+        ]
+        query = docs_sales.select().where(docs_sales.c.id == order_id)
+        order = await database.fetch_one(query)
+
+        contragent_id = order.contragent
+
+    if obj_type == "contragent":
+        contragent_id = obj_id
+    if contragent_id:
+        tasks += [
+            add_contragent_info_to_replacements(replacements, contragent_id),
+            add_loyality_card_info_to_replacements(replacements, contragent_id)
+        ]
+
+    await asyncio.gather(*tasks)
     return replacements
+
+
+async def order_info_to_replacements(replacements: dict, order_id: int):
+    data = {}
+    order_query = docs_sales.select().where(docs_sales.c.id == order_id)
+    order = await database.fetch_one(order_query)
+    if not order:
+        return
+
+    order_statuses = {
+        "received": "Получен",
+        "processed": "Обработан",
+        "collecting": "Собирается",
+        "collected": "Собран",
+        "picked": "Назначен доставщик",
+        "delivered": "Доставлен",
+        "closed": "Закрыт",
+        "success": "Успешно"
+    }
+    if order.order_status:
+        data["order_status"] = order_statuses[order.order_status] if order.order_status in order_statuses else order.status
+
+    if order.assigned_picker:
+        query = (
+            users.select()
+            .join(users_cboxes_relation,
+                                    users_cboxes_relation.c.user == users.c.id)
+            .where(users_cboxes_relation.c.id == order.assigned_picker)
+        )
+        user = await database.fetch_one(query)
+        if user:
+            data["picker_name"] = ""
+            if user.first_name:
+                data["picker_name"] += f"{user.first_name} "
+            if user.last_name:
+                data["picker_name"] += f"{user.last_name}"
+
+    if order.assigned_courier:
+        query = (
+            users.select()
+            .join(users_cboxes_relation,
+                                    users_cboxes_relation.c.user == users.c.id)
+            .where(users_cboxes_relation.c.id == order.assigned_courier)
+        )
+        user = await database.fetch_one(query)
+        if user:
+            data["courier_name"] = ""
+            if user.first_name:
+                data["courier_name"] += f"{user.first_name} "
+            if user.last_name:
+                data["courier_name"] += f"{user.last_name}"
+
+    replacements.update(data)
 
 
 async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
@@ -43,6 +115,7 @@ async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
         if row.phone:
             data["warehouse_phone"] = row.phone
     replacements.update(data)
+
 
 async def add_manager_info_to_replacements(replacements:dict, order_id:int):
     data = {}
@@ -62,6 +135,7 @@ async def add_manager_info_to_replacements(replacements:dict, order_id:int):
             data["manager_phone"] = user.phone_number
 
     replacements.update(data)
+
 
 async def link_replacements(replacements, order_id):
     data = {}
@@ -117,18 +191,37 @@ async def add_docs_sales_goods_info_to_replacements(replacements:dict, docs_sale
     replacements.update(data)
 
 
-async def add_contragent_info_to_replacements(replacements: dict, docs_sales_id: int):
+async def add_contragent_info_to_replacements(replacements: dict, contragent_id: int):
     data = {}
 
     query = (
-        select(contragents.c.name, contragents.c.phone)
-        .join(contragents, docs_sales.c.contragent == contragents.c.id)
-        .where(docs_sales.c.id == docs_sales_id)
+        select(contragents)
+        .where(contragents.c.id == contragent_id)
     )
     contragent = await database.fetch_one(query)
     if contragent:
         data["contragent_name"] = contragent.name
-        if contragent.phone:
-            data["contragent_phone"] = contragent.phone
+        data["contragent_phone"] = contragent.phone
+        data["contragent_inn"] = contragent.inn
 
+    replacements.update(data)
+
+
+async def add_loyality_card_info_to_replacements(replacements: dict, contragent_id: int):
+    data = {}
+    query = (
+        select(loyality_cards)
+        .join(contragents, contragents.c.id == contragent_id)
+        .limit(1)
+    )
+    card = await database.fetch_one(query)
+    if card:
+        data["card_number"] = card.card_number
+        data["card_balance"] = card.balance
+        data["card_income"] = card.income
+        data["card_outcome"] = card.outcome
+        data["card_cashback_percent"] = card.cashback_percent
+        data["card_minimal_checque_amount"] = card.minimal_checque_amount
+        data["card_max_percentage"] = card.max_percentage
+        data["card_max_withdraw_percentage"] = card.max_withdraw_percentage
     replacements.update(data)
