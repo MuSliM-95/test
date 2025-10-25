@@ -16,10 +16,9 @@ class WalletCardSettings(BaseModel):
         labelColor="#ffffff"
     )
 
-    # TODO; set default images. First of all create dir for that images
-    icon_path: Optional[str] = ''
-    logo_path: Optional[str] = ''
-    strip_path: Optional[str] = ''
+    icon_path: Optional[str] = '/backend/static_files/AppleWalletIconDefault.png'
+    logo_path: Optional[str] = 'backend/static_files/AppleWalletLogoDefault.png'
+    strip_path: Optional[str] = 'backend/static_files/AppleWalletStripDefault.png'
 
     locations: list[Location] = []
 
