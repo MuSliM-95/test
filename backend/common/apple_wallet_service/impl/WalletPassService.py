@@ -5,6 +5,7 @@ from py_pkpass.models import StoreCard, Pass, BarcodeFormat, Barcode, Field
 from sqlalchemy import select
 
 from api.apple_wallet_card_settings.schemas import WalletCardSettings
+from api.apple_wallet_card_settings.utils import create_default_apple_wallet_setting
 from common.apple_wallet_service.IWalletPassGeneratorService import IWalletPassGeneratorService
 from common.apple_wallet_service.impl.models import PassParamsModel
 from database.db import loyality_cards, contragents, organizations, database, apple_wallet_card_settings
@@ -118,7 +119,12 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
 
         card_settings_query = select(apple_wallet_card_settings.c.data).where(
             apple_wallet_card_settings.c.cashbox_id == loyality_card_db.cashbox_id)
-        card_settings = WalletCardSettings(**json.loads((await database.fetch_one(card_settings_query)).data))
+        card_settings_db = await database.fetch_one(card_settings_query)
+
+        if card_settings_db is None:
+            card_settings = await create_default_apple_wallet_setting(card_id)
+        else:
+            card_settings = WalletCardSettings(**json.loads(card_settings_db.data))
 
         path, filename = self._generate_pkpass(PassParamsModel(
             card_number=loyality_card_db.card_number,

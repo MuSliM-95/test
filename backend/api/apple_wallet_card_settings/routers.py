@@ -8,6 +8,7 @@ from sqlalchemy import select
 from api.apple_wallet.utils import update_apple_wallet_pass
 from api.apple_wallet_card_settings.schemas import WalletCardSettings, WalletCardSettingsCreate, \
     WalletCardSettingsUpdate
+from api.apple_wallet_card_settings.utils import create_default_apple_wallet_setting
 from database.db import users_cboxes_relation, database, apple_wallet_card_settings, loyality_cards
 
 router = APIRouter(prefix='/apple_wallet_card_settings', tags=['apple_wallet_card_settings'])
@@ -54,14 +55,7 @@ async def get_apple_wallet_card_settings(token: str):
     settings = await database.fetch_one(settings_query)
 
     if not settings:
-        setting_stmt = apple_wallet_card_settings.insert().values(
-            WalletCardSettingsCreate(
-                cashbox_id=user.cashbox_id,
-                data=WalletCardSettings()
-            ).dict()
-        ).returning(apple_wallet_card_settings.c.data)
-        settings = await database.execute(setting_stmt)
-        return WalletCardSettings(**json.loads(settings))
+        await create_default_apple_wallet_setting(user.cashbox_id)
 
     return WalletCardSettings(**json.loads(settings.data))
 

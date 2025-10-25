@@ -28,6 +28,3 @@ class WalletCardSettingsCreate(BaseModel):
 
 class WalletCardSettingsUpdate(WalletCardSettingsCreate):
     data: dict
-
-
-# print(WalletCardSettingsUpdate(cashbox_id=1, data=WalletCardSettings().dict(exclude_unset=True)))
