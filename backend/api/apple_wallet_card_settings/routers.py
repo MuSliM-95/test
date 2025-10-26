@@ -1,19 +1,32 @@
 import json
 import uuid
+from os import environ
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
+from starlette.staticfiles import StaticFiles
 
 from api.apple_wallet.utils import update_apple_wallet_pass
 from api.apple_wallet_card_settings.schemas import WalletCardSettings, WalletCardSettingsCreate, \
     WalletCardSettingsUpdate
 from api.apple_wallet_card_settings.utils import create_default_apple_wallet_setting
 from database.db import users_cboxes_relation, database, apple_wallet_card_settings, loyality_cards
+from common.s3_service.impl.S3Client import S3Client
+from common.s3_service.models.S3SettingsModel import S3SettingsModel
 
 router = APIRouter(prefix='/apple_wallet_card_settings', tags=['apple_wallet_card_settings'])
+router.mount('/backend/static_files', StaticFiles(directory='/backend/static_files'), name='static_files')
 
-UPLOAD_DIR = '/backend/photos'
+BUCKET_NAME = "5075293c-docs_generated"
+S3_FOLDER = "photos"
+
+def get_s3_client() -> S3Client:
+    return S3Client(S3SettingsModel(
+        aws_access_key_id=environ.get("S3_ACCESS"),
+        aws_secret_access_key=environ.get("S3_SECRET"),
+        endpoint_url=environ.get("S3_URL")
+    ))
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -23,21 +36,23 @@ async def upload_file(file: UploadFile = File(...)):
         # при желании вернуть 415 Unsupported Media Type
         return Response(status_code=415)
 
+    print(1)
     # Генерируем уникальное имя файла с сохранением расширения
     unique_name = f"{uuid.uuid4().hex}-{file.filename.split('.')[0]}.{file.filename.split('.')[-1]}"
-    dest_path = f'{UPLOAD_DIR}/{unique_name}'
+    s3_key = f'{S3_FOLDER}/{unique_name}'
 
     try:
-        with open(dest_path, "wb") as f:
-            while True:
-                chunk = await file.read(1024 * 1024)  # читать по 1 MiB
-                if not chunk:
-                    break
-                f.write(chunk)
+        # Читаем файл в байты
+        file_bytes = await file.read()
+        print(2)
+        # Загружаем в S3
+        s3_client = get_s3_client()
+        await s3_client.upload_file_object(BUCKET_NAME, s3_key, file_bytes)
+        print(3)
+        # Возвращаем путь в S3
+        return JSONResponse(content={"path": s3_key})
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to save file")
-
-    return JSONResponse(content={"path": dest_path})
+        raise HTTPException(status_code=500, detail=f"Failed to upload file to S3: {str(e)}")
 
 @router.get('', response_model=WalletCardSettings)
 async def get_apple_wallet_card_settings(token: str):

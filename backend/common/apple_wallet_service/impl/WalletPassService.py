@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 
 from py_pkpass.models import StoreCard, Pass, BarcodeFormat, Barcode, Field
 from sqlalchemy import select
@@ -9,15 +10,37 @@ from api.apple_wallet_card_settings.utils import create_default_apple_wallet_set
 from common.apple_wallet_service.IWalletPassGeneratorService import IWalletPassGeneratorService
 from common.apple_wallet_service.impl.models import PassParamsModel
 from database.db import loyality_cards, contragents, organizations, database, apple_wallet_card_settings
+from common.s3_service.impl.S3Client import S3Client
+from common.s3_service.models.S3SettingsModel import S3SettingsModel
 
 
 # load_dotenv()
 
 class WalletPassGeneratorService(IWalletPassGeneratorService):
     def __init__(self):
-        self.__wallet_pass = '/backend/photos'
+        self.__wallet_pass_folder = 'apple_wallet_passes'
+        self.__bucket_name = "5075293c-docs_generated"
+        self.__s3_client = S3Client(S3SettingsModel(
+            aws_access_key_id=os.getenv("S3_ACCESS"),
+            aws_secret_access_key=os.getenv("S3_SECRET"),
+            endpoint_url=os.getenv("S3_URL")
+        ))
 
-    def _generate_pkpass(self, pass_params: PassParamsModel) -> tuple[str, str]:
+    async def _get_image_from_s3_or_local(self, path: str) -> bytes:
+        """
+        Получает изображение из S3 или из локальной файловой системы.
+        Если путь начинается с '/', то это локальный файл.
+        Иначе это ключ в S3.
+        """
+        if path.startswith('/'):
+            # Локальный файл
+            with open(path, 'rb') as f:
+                return f.read()
+        else:
+            # Файл в S3
+            return await self.__s3_client.get_object(self.__bucket_name, path)
+
+    async def _generate_pkpass(self, pass_params: PassParamsModel) -> tuple[str, str]:
         # Create a store card pass type
         card_info = StoreCard()
 
@@ -66,30 +89,88 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
 
         passfile.locations = [i.dict() for i in pass_params.locations]
 
-        # Including the icon and logo is necessary for the passbook to be valid
-        passfile.addFile('icon.png', open(pass_params.icon_path, 'rb'))
-        passfile.addFile('icon@2x.png', open(pass_params.icon_path, 'rb'))
-        passfile.addFile('icon@3x.png', open(pass_params.icon_path, 'rb'))
-        passfile.addFile('logo.png', open(pass_params.logo_path, 'rb'))
-        passfile.addFile('strip@2x.png', open(pass_params.strip_path, 'rb'))
+        # Получаем изображения из S3 и создаем временные файлы
+        icon_data = await self._get_image_from_s3_or_local(pass_params.icon_path)
+        logo_data = await self._get_image_from_s3_or_local(pass_params.logo_path)
+        strip_data = await self._get_image_from_s3_or_local(pass_params.strip_path)
 
-        # passfile.expirationDate = pass_params.exp_date.isoformat() if pass_params.exp_date else None
+        # Создаем временные файлы для изображений
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as icon_tmp, \
+             tempfile.NamedTemporaryFile(delete=False, suffix='.png') as logo_tmp, \
+             tempfile.NamedTemporaryFile(delete=False, suffix='.png') as strip_tmp:
 
-        # Create and output the Passbook file (.pkpass)
-        pkpass_path = f'{self.__wallet_pass}/{pass_params.card_number}.pkpass'
-        password = os.getenv('PKPASS_PASSWORD')
-        passfile.create(
-            os.getenv('APPLE_CERTIFICATE_PATH'),
-            os.getenv('APPLE_KEY_PATH'),
-            os.getenv('APPLE_WWDR_PATH'),
-            password,
-            pkpass_path
-        )
+            icon_tmp.write(icon_data)
+            logo_tmp.write(logo_data)
+            strip_tmp.write(strip_data)
+
+            icon_tmp_path = icon_tmp.name
+            logo_tmp_path = logo_tmp.name
+            strip_tmp_path = strip_tmp.name
+
+        # Создаем временный файл для pkpass
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pkpass') as pkpass_tmp:
+            pkpass_tmp_path = pkpass_tmp.name
+
+        try:
+            # Including the icon and logo is necessary for the passbook to be valid
+            passfile.addFile('icon.png', open(icon_tmp_path, 'rb'))
+            passfile.addFile('icon@2x.png', open(icon_tmp_path, 'rb'))
+            passfile.addFile('icon@3x.png', open(icon_tmp_path, 'rb'))
+            passfile.addFile('logo.png', open(logo_tmp_path, 'rb'))
+            passfile.addFile('strip@2x.png', open(strip_tmp_path, 'rb'))
+
+            # passfile.expirationDate = pass_params.exp_date.isoformat() if pass_params.exp_date else None
+
+            # Create and output the Passbook file (.pkpass) во временный файл
+            password = os.getenv('PKPASS_PASSWORD')
+            passfile.create(
+                os.getenv('APPLE_CERTIFICATE_PATH'),
+                os.getenv('APPLE_KEY_PATH'),
+                os.getenv('APPLE_WWDR_PATH'),
+                password,
+                pkpass_tmp_path
+            )
+
+            # Загружаем pkpass файл в S3
+            with open(pkpass_tmp_path, 'rb') as f:
+                pkpass_bytes = f.read()
+
+            s3_key = f'{self.__wallet_pass_folder}/{pass_params.card_number}.pkpass'
+            await self.__s3_client.upload_file_object(self.__bucket_name, s3_key, pkpass_bytes)
+
+        finally:
+            # Удаляем временные файлы
+            os.unlink(icon_tmp_path)
+            os.unlink(logo_tmp_path)
+            os.unlink(strip_tmp_path)
+            os.unlink(pkpass_tmp_path)
 
         return self.get_card_path_and_name(pass_params.card_number)
 
+    def get_card_s3_key(self, card_number: str) -> str:
+        """Возвращает S3 ключ для pkpass файла"""
+        return f'{self.__wallet_pass_folder}/{card_number}.pkpass'
+
     def get_card_path_and_name(self, card_number: str) -> tuple[str, str]:
-        return f'{self.__wallet_pass}/{card_number}.pkpass', f'{card_number}.pkpass'
+        """
+        Deprecated: Использовать get_card_s3_key() для S3
+        Возвращает S3 ключ и имя файла
+        """
+        return self.get_card_s3_key(card_number), f'{card_number}.pkpass'
+
+    async def get_pkpass_from_s3(self, card_number: str) -> bytes:
+        """Получает pkpass файл из S3"""
+        s3_key = self.get_card_s3_key(card_number)
+        return await self.__s3_client.get_object(self.__bucket_name, s3_key)
+
+    async def pkpass_exists_in_s3(self, card_number: str) -> bool:
+        """Проверяет существование pkpass файла в S3"""
+        try:
+            s3_key = self.get_card_s3_key(card_number)
+            await self.__s3_client.get_object(self.__bucket_name, s3_key)
+            return True
+        except Exception:
+            return False
 
     async def update_pass(self, card_id: int) -> tuple[str, str]:
         query = (
@@ -126,7 +207,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
         else:
             card_settings = WalletCardSettings(**json.loads(card_settings_db.data))
 
-        path, filename = self._generate_pkpass(PassParamsModel(
+        path, filename = await self._generate_pkpass(PassParamsModel(
             card_number=loyality_card_db.card_number,
             contragent_name=loyality_card_db.contragent_name,
             organization_name=loyality_card_db.organization_name,

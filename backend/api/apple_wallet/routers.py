@@ -2,7 +2,6 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, Request, Response, HTTPException
-from fastapi.responses import FileResponse
 from sqlalchemy import select, cast, String
 
 from api.apple_wallet.schemas import DeviceRegistration, SerialNumbersList
@@ -25,12 +24,19 @@ async def create_apple_wallet_card(token: str, card_id: int):
         raise HTTPException(status_code=401, detail="Неверный токен")
 
     pass_generator = WalletPassGeneratorService()
-    path, filename = await pass_generator.update_pass(card_id)
+    s3_key, filename = await pass_generator.update_pass(card_id)
 
-    return FileResponse(
-        path=path,
+    # Получаем файл из S3
+    pkpass_bytes = await pass_generator.get_pkpass_from_s3(
+        s3_key.split('/')[-1].replace('.pkpass', '')
+    )
+
+    return Response(
+        content=pkpass_bytes,
         media_type="application/vnd.apple.pkpass",
-        filename=filename
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
     )
 
 
@@ -124,18 +130,29 @@ async def get_pass(
     Устройство вызывает этот эндпоинт после получения push-уведомления.
     """
     pass_service = WalletPassGeneratorService()
-    path, filename = pass_service.get_card_path_and_name(serial_number)
 
-    if not os.path.exists(path):
+    # Проверяем существование файла в S3
+    exists = await pass_service.pkpass_exists_in_s3(serial_number)
+
+    if not exists:
+        # Генерируем новый pass
         query = select(
             loyality_cards.c.id
         ).where(loyality_cards.c.card_number == int(serial_number))
-        await update_apple_wallet_pass(query)
+        card = await database.fetch_one(query)
+        if card:
+            await pass_service.update_pass(card.id)
 
-    return FileResponse(
-        path=path,
+    # Получаем файл из S3
+    pkpass_bytes = await pass_service.get_pkpass_from_s3(serial_number)
+    filename = f'{serial_number}.pkpass'
+
+    return Response(
+        content=pkpass_bytes,
         media_type="application/vnd.apple.pkpass",
-        filename=filename
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
     )
 
 
