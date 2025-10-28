@@ -175,7 +175,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
     async def update_pass(self, card_id: int) -> tuple[str, str]:
         query = (
             select(
-                loyality_cards.c.card_number,
+                loyality_cards.c.id,
                 contragents.c.name.label("contragent_name"),
                 organizations.c.short_name.label("organization_name"),
                 loyality_cards.c.cashback_percent,
@@ -194,7 +194,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
                     organizations,
                     organizations.c.id == loyality_cards.c.organization_id
                 )
-            ).where(loyality_cards.c.id == card_id)
+            ).where(loyality_cards.c.id == int(card_id))
         )
         loyality_card_db = await database.fetch_one(query)
 
@@ -208,7 +208,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
             card_settings = WalletCardSettings(**json.loads(card_settings_db.data))
 
         path, filename = await self._generate_pkpass(PassParamsModel(
-            card_number=loyality_card_db.card_number,
+            card_number=loyality_card_db.id,
             contragent_name=loyality_card_db.contragent_name,
             organization_name=loyality_card_db.organization_name,
             description=card_settings.description,
@@ -226,24 +226,3 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
         ))
 
         return path, filename
-# WalletPassGeneratorService().generate_pkpass(
-#     PassParamsModel(
-#         card_number='327492',
-#         contragent_name='gool',
-#         organization_name='Table',
-#         description='first card',
-#         barcode_message='first barcode',
-#         colors=PassColorConfig(
-#             backgroundColor='#000000',
-#             foregroundColor='#888888',
-#             labelColor='#FFFFFF'
-#         ),
-#         icon_path='/Users/reveek/PycharmProjects/tablecrm/photos/file_2.jpg',
-#         logo_path='/Users/reveek/PycharmProjects/tablecrm/photos/file_2.jpg',
-#         cashback_persent=5,
-#         locations=[],
-#         logo_text='logo text',
-#         balance=1000,
-#         strip_path='/Users/reveek/PycharmProjects/tablecrm/photos/file_2.jpg',
-#     )
-# )

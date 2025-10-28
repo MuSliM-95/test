@@ -5,13 +5,13 @@ from fastapi import APIRouter, Request, Response, HTTPException
 from sqlalchemy import select, cast, String
 
 from api.apple_wallet.schemas import DeviceRegistration, SerialNumbersList
-from api.apple_wallet.utils import update_apple_wallet_pass
 from common.apple_wallet_service.impl.WalletNotificationService import WalletNotificationService
 from common.apple_wallet_service.impl.WalletPassService import WalletPassGeneratorService
 from database.db import apple_push_tokens, database, loyality_cards, users_cboxes_relation
 
 router = APIRouter(tags=["apple-wallet"])
 
+# serial_number = card_id. Помни это
 
 @router.post('/create_apple_wallet_card')
 async def create_apple_wallet_card(token: str, card_id: int):
@@ -69,20 +69,13 @@ async def register_device(
     is_token_exist = await database.fetch_one(is_token_exist_query)
 
     if not is_token_exist:
-        loyalty_card_query = select(
-            loyality_cards.c.id
-        ).where(
-            loyality_cards.c.card_number == int(serial_number),
-        )
-        card_id = (await database.fetch_one(loyalty_card_query)).id
-
         token_query = apple_push_tokens.insert().values(
             {
                 "device_library_identifier": device_library_identifier,
                 "pass_type_id": pass_type_identifier,
                 "serial_number": serial_number,
                 "push_token": clean_token,
-                "card_id": card_id,
+                "card_id": serial_number,
             }
         )
 
@@ -135,13 +128,7 @@ async def get_pass(
     exists = await pass_service.pkpass_exists_in_s3(serial_number)
 
     if not exists:
-        # Генерируем новый pass
-        query = select(
-            loyality_cards.c.id
-        ).where(loyality_cards.c.card_number == int(serial_number))
-        card = await database.fetch_one(query)
-        if card:
-            await pass_service.update_pass(card.id)
+        await pass_service.update_pass(serial_number)
 
     # Получаем файл из S3
     pkpass_bytes = await pass_service.get_pkpass_from_s3(serial_number)
@@ -169,7 +156,7 @@ async def get_passes_for_device(
     query = select(loyality_cards.c.card_number).select_from(
         loyality_cards.join(
             apple_push_tokens,
-            apple_push_tokens.c.serial_number == cast(loyality_cards.c.card_number, String)
+            apple_push_tokens.c.serial_number == cast(loyality_cards.c.id, String)
         )
     ).where(
         apple_push_tokens.c.device_library_identifier == device_library_identifier,
@@ -180,22 +167,6 @@ async def get_passes_for_device(
         query = query.where(loyality_cards.c.updated_at >= datetime.fromisoformat(passesUpdatedSince))
 
     res = [i.card_number for i in await database.fetch_all(query)]
-    # query = select(
-    #     apple_push_tokens.c.serial_number,
-    # ).where(
-    #     apple_push_tokens.c.device_library_identifier == device_library_identifier,
-    #     apple_push_tokens.c.pass_type_id == pass_type_identifier,
-    #     apple_push_tokens.c.have_updates == True
-    # )
-    # res = [i.serial_number for i in await database.fetch_all(query)]
-    #
-    # set_false_query = apple_push_tokens.update().where(
-    #     apple_push_tokens.c.device_library_identifier == device_library_identifier,
-    #     apple_push_tokens.c.pass_type_id == pass_type_identifier,
-    #     apple_push_tokens.c.have_updates == True,
-    #     apple_push_tokens.c.serial_number.in_(res)
-    # ).values({'have_updates': False})
-    # await database.execute(set_false_query)
 
     return SerialNumbersList(serialNumbers=list(map(str, res)), lastUpdated=datetime.now().isoformat())
 
@@ -215,7 +186,7 @@ async def renew_pass(token: str, card_id: int):
     return Response(status_code=200)
 
 @router.get('/link_to_card')
-async def link_to_card(token: str, card_number: int):
+async def link_to_card(token: str, card_id: int):
     user_query = users_cboxes_relation.select().where(
         users_cboxes_relation.c.token == token
     )
@@ -224,4 +195,4 @@ async def link_to_card(token: str, card_number: int):
     if not user:
         raise HTTPException(status_code=401, detail="Неверный токен")
 
-    return f'https://{os.getenv("APP_URL")}/get_apple_wallet_card/?card_number={card_number}'
+    return f'https://{os.getenv("APP_URL")}/get_apple_wallet_card/?card_number={card_id}'
