@@ -70,7 +70,7 @@ async def get_apple_wallet_card_settings(token: str):
     settings = await database.fetch_one(settings_query)
 
     if not settings:
-        await create_default_apple_wallet_setting(user.cashbox_id)
+        return await create_default_apple_wallet_setting(user.cashbox_id)
 
     return WalletCardSettings(**json.loads(settings.data))
 
