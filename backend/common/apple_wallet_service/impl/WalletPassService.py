@@ -203,7 +203,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
         card_settings_db = await database.fetch_one(card_settings_query)
 
         if card_settings_db is None:
-            card_settings = await create_default_apple_wallet_setting(card_id)
+            card_settings = await create_default_apple_wallet_setting(loyality_card_db.cashbox_id)
         else:
             card_settings = WalletCardSettings(**json.loads(card_settings_db.data))
 
