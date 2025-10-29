@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import enum
 import os
@@ -77,7 +78,6 @@ class TypeCustomField(str, ENUM):
     Contact = "Контакт"
     Lead = "Сделка"
 
-
 class BookingStatus(str, ENUM):
     new = "Новый"
     confirmed = "Подтвержден"
@@ -116,20 +116,17 @@ class TgBillStatus(str, ENUM):
     PAID = "PAID"
     ERROR = "ERROR"
 
-
 class TgBillApproveStatus(str, ENUM):
     NEW = "NEW"
     APPROVED = "APPROVED"
     CANCELED = "CANCELED"
-
 
 class NomenclatureCashbackType(str, ENUM):
     percent = "percent"
     const = "const"
     no_cashback = "no_cashback"
     lcard_cashback = "lcard_cashback"
-
-
+    
 class OrderStatus(str, ENUM):
     received = "received"
     processed = "processed"
@@ -191,6 +188,7 @@ yookassa_payments = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
+
 
 booking_tags = sqlalchemy.Table(
     "booking_tags",
@@ -1551,6 +1549,7 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("created_by_id", ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("status_card", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column('apple_wallet_advertisement', String, nullable=False, default='TableCRM', server_default='TableCRM'),
     sqlalchemy.Column("lifetime", BigInteger, index=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
@@ -2013,6 +2012,7 @@ segments = sqlalchemy.Table(
 class SegmentObjectType(enum.Enum):
     docs_sales = "docs_sales"
     contragents = "contragents"
+    loyality_cards = "loyality_cards"
 
 
 segment_objects = sqlalchemy.Table(
@@ -2226,4 +2226,56 @@ warehouse_hash = sqlalchemy.Table(
     sqlalchemy.Column("hash", String, nullable=False),
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+)
+
+apple_push_tokens = sqlalchemy.Table(
+    "apple_push_tokens",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("card_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("loyality_cards.id"), nullable=False),
+    sqlalchemy.Column("device_library_identifier", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("pass_type_id", String, nullable=False),
+    sqlalchemy.Column("serial_number", String, nullable=False),
+    sqlalchemy.Column("push_token", String, nullable=False),
+    # sqlalchemy.Column("have_updates", Boolean, nullable=False, default=False, server_default=sqlalchemy.sql.expression.false()),
+)
+
+apple_wallet_card_settings = sqlalchemy.Table(
+    "apple_wallet_card_settings",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey('cashboxes.id'), nullable=False),
+    sqlalchemy.Column("data", sqlalchemy.JSON, nullable=True),
+)
+
+feeds = sqlalchemy.Table(
+    "feeds",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("url_token", String, unique=True, nullable=False, index=True),
+    sqlalchemy.Column("name", String, nullable=False),
+    sqlalchemy.Column("description", String, nullable=True),
+    sqlalchemy.Column("root_tag", String, nullable=False),
+    sqlalchemy.Column("item_tag", String, nullable=False),
+    sqlalchemy.Column("field_tags", JSON, nullable=True),
+    sqlalchemy.Column("criteria", JSON, nullable=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), index=True),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+)
+
+
+
+feeds_tags = sqlalchemy.Table(
+    "feeds_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
+    sqlalchemy.Column("feed_id", Integer, ForeignKey("feeds.id"), nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
+    sqlalchemy.Column("created_at", DateTime(timezone=True),
+                      server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True),
+                      server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint("tag_id", "feed_id", name="unique_tag_id_feed_id"),
 )

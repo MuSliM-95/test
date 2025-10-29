@@ -131,7 +131,8 @@ from api.fifo_settings.routers import router as fifo_settings_router
 from api.warehouse_balances.routers import router as warehouse_balances_router
 from api.gross_profit_docs.routers import router as gross_profit_docs_router
 from api.autosuggestion.routers import router as autosuggestion_router
-
+from api.apple_wallet.routers import router as apple_wallet_router
+from api.apple_wallet_card_settings.routers import router as apple_wallet_card_settings_router
 from api.loyality_cards.routers import router as loyality_cards
 from api.loyality_transactions.routers import router as loyality_transactions
 from api.loyality_settings.routers import router as loyality_settings
@@ -160,6 +161,7 @@ from api.tech_operations.router import router as tech_operations_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
 from api.employee_shifts.routers import router as employee_shifts_router
+from api.feeds.routers import router as feeds_router
 # from jobs.jobs import scheduler
 
 # sentry_sdk.init(
@@ -249,6 +251,10 @@ app.include_router(tech_operations_router)
 app.include_router(autosuggestion_router)
 
 app.include_router(employee_shifts_router)
+app.include_router(apple_wallet_router)
+app.include_router(apple_wallet_card_settings_router)
+
+app.include_router(feeds_router)
 
 
 @app.get("/health")

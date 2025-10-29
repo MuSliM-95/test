@@ -62,6 +62,8 @@ class LoyalityCardCreate(BaseModel):
     status_card: bool = True
     is_deleted: bool = False
 
+    apple_wallet_advertisement: str = 'TableCRM'
+
     class Config:
         orm_mode = True
 
@@ -88,6 +90,8 @@ class LoyalityCardEdit(BaseModel):
     status_card: Optional[bool]
     is_deleted: Optional[bool]
 
+    apple_wallet_advertisement: Optional[str]
+
 
 class LoyalityCardGet(BaseModel):
     id: int
@@ -108,6 +112,8 @@ class LoyalityCardGet(BaseModel):
     max_percentage: int
 
     lifetime: Optional[int] # lifetime in seconds
+
+    apple_wallet_advertisement: str
 
     status_card: bool
     is_deleted: bool
