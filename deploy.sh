@@ -42,6 +42,7 @@ deploy_new_version() {
     --network infrastructure \
     -v "/certs:/certs" \
     -p $NEW_PORT:8000 \
+    -e PKPASS_PASSWORD=$PKPASS_PASSWORD \
     -e APPLE_PASS_TYPE_ID=$APPLE_PASS_TYPE_ID \
     -e APPLE_TEAM_ID=$APPLE_TEAM_ID \
     -e APPLE_CERTIFICATE_PATH=$APPLE_CERTIFICATE_PATH \
@@ -172,6 +173,7 @@ deploy_another_services() {
     --name "worker" \
     --restart always \
     --network infrastructure \
+    -e PKPASS_PASSWORD=$PKPASS_PASSWORD \
     -e APPLE_PASS_TYPE_ID=$APPLE_PASS_TYPE_ID \
     -e APPLE_TEAM_ID=$APPLE_TEAM_ID \
     -e APPLE_CERTIFICATE_PATH=$APPLE_CERTIFICATE_PATH \
@@ -208,6 +210,7 @@ deploy_another_services() {
     --name "backend_jobs" \
     --restart always \
     --network infrastructure \
+    -e PKPASS_PASSWORD=$PKPASS_PASSWORD \
     -e APPLE_PASS_TYPE_ID=$APPLE_PASS_TYPE_ID \
     -e APPLE_TEAM_ID=$APPLE_TEAM_ID \
     -e APPLE_CERTIFICATE_PATH=$APPLE_CERTIFICATE_PATH \
@@ -244,6 +247,7 @@ deploy_another_services() {
     --name "message_consumer_task" \
     --restart always \
     --network infrastructure \
+    -e PKPASS_PASSWORD=$PKPASS_PASSWORD \
     -e APPLE_PASS_TYPE_ID=$APPLE_PASS_TYPE_ID \
     -e APPLE_TEAM_ID=$APPLE_TEAM_ID \
     -e APPLE_CERTIFICATE_PATH=$APPLE_CERTIFICATE_PATH \
@@ -280,6 +284,7 @@ deploy_another_services() {
     --name "notification_consumer_task" \
     --restart always \
     --network infrastructure \
+    -e PKPASS_PASSWORD=$PKPASS_PASSWORD \
     -e APPLE_PASS_TYPE_ID=$APPLE_PASS_TYPE_ID \
     -e APPLE_TEAM_ID=$APPLE_TEAM_ID \
     -e APPLE_CERTIFICATE_PATH=$APPLE_CERTIFICATE_PATH \
