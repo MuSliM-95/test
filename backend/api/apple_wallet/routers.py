@@ -64,7 +64,7 @@ async def register_device(
     is_token_exist_query = apple_push_tokens.select().where(
         apple_push_tokens.c.device_library_identifier == device_library_identifier,
         apple_push_tokens.c.pass_type_id == pass_type_identifier,
-        apple_push_tokens.c.serial_number == serial_number,
+        apple_push_tokens.c.serial_number == str(serial_number),
         apple_push_tokens.c.push_token == clean_token
     )
     is_token_exist = await database.fetch_one(is_token_exist_query)
@@ -74,7 +74,7 @@ async def register_device(
             {
                 "device_library_identifier": device_library_identifier,
                 "pass_type_id": pass_type_identifier,
-                "serial_number": serial_number,
+                "serial_number": str(serial_number),
                 "push_token": clean_token,
                 "card_id": serial_number,
             }
@@ -96,8 +96,6 @@ async def unregister_device(
     Отменяет регистрацию устройства для пасса.
     Apple вызывает этот эндпоинт, когда пользователь удаляет пасс из Wallet.
     """
-    serial_number = int(serial_number)
-
     is_pass_exist = apple_push_tokens.select().where(
         apple_push_tokens.c.device_library_identifier == device_library_identifier,
         apple_push_tokens.c.pass_type_id == pass_type_identifier,
