@@ -57,6 +57,7 @@ async def register_device(
     Регистрирует устройство для получения обновлений пасса.
     Apple вызывает этот эндпоинт, когда пользователь добавляет пасс в Wallet.
     """
+    serial_number = int(serial_number)
     # Нормализуем токен (удаляем пробелы и приводим к нижнему регистру, если нужно)
     clean_token = registration.pushToken.replace(" ", "").replace("<", "").replace(">", "")
 
@@ -73,7 +74,7 @@ async def register_device(
             {
                 "device_library_identifier": device_library_identifier,
                 "pass_type_id": pass_type_identifier,
-                "serial_number": int(serial_number),
+                "serial_number": serial_number,
                 "push_token": clean_token,
                 "card_id": serial_number,
             }
@@ -95,6 +96,8 @@ async def unregister_device(
     Отменяет регистрацию устройства для пасса.
     Apple вызывает этот эндпоинт, когда пользователь удаляет пасс из Wallet.
     """
+    serial_number = int(serial_number)
+
     is_pass_exist = apple_push_tokens.select().where(
         apple_push_tokens.c.device_library_identifier == device_library_identifier,
         apple_push_tokens.c.pass_type_id == pass_type_identifier,
@@ -128,7 +131,7 @@ async def get_pass(
     exists = await pass_service.pkpass_exists_in_s3(serial_number)
 
     if not exists:
-        await pass_service.update_pass(serial_number)
+        await pass_service.update_pass(int(serial_number))
 
     # Получаем файл из S3
     pkpass_bytes = await pass_service.get_pkpass_from_s3(serial_number)
