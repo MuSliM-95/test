@@ -73,7 +73,7 @@ async def register_device(
             {
                 "device_library_identifier": device_library_identifier,
                 "pass_type_id": pass_type_identifier,
-                "serial_number": serial_number,
+                "serial_number": int(serial_number),
                 "push_token": clean_token,
                 "card_id": serial_number,
             }
