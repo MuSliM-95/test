@@ -154,7 +154,7 @@ async def get_passes_for_device(
     Возвращает список серийных номеров пассов, которые были обновлены.
     Устройство может вызывать этот эндпоинт для проверки обновлений.
     """
-    query = select(loyality_cards.c.card_number).select_from(
+    query = select(loyality_cards.c.id).select_from(
         loyality_cards.join(
             apple_push_tokens,
             apple_push_tokens.c.serial_number == cast(loyality_cards.c.id, String)
@@ -167,7 +167,7 @@ async def get_passes_for_device(
     if passesUpdatedSince is not None:
         query = query.where(loyality_cards.c.updated_at >= datetime.fromisoformat(passesUpdatedSince))
 
-    res = [i.card_number for i in await database.fetch_all(query)]
+    res = [i.id for i in await database.fetch_all(query)]
 
     return SerialNumbersList(serialNumbers=list(map(str, res)), lastUpdated=datetime.now().isoformat())
 
