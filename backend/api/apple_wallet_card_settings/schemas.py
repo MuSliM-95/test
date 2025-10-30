@@ -16,9 +16,9 @@ class WalletCardSettings(BaseModel):
         labelColor="#ffffff"
     )
     # Пути могут быть как локальными (начинаются с /), так и S3 ключами
-    icon_path: Optional[str] = '/backend/static_files/AppleWalletIconDefault.png'
-    logo_path: Optional[str] = '/backend/static_files/AppleWalletLogoDefault.png'
-    strip_path: Optional[str] = '/backend/static_files/AppleWalletStripDefault.png'
+    icon_path: Optional[str] = 'photos/AppleWalletIconDefault.png'
+    logo_path: Optional[str] = 'photos/AppleWalletLogoDefault.png'
+    strip_path: Optional[str] = 'photos/AppleWalletStripDefault.png'
 
     locations: list[Location] = []
 
