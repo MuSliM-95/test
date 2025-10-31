@@ -7,6 +7,7 @@ services:
     network_mode: host
     volumes:
       - ./backend:/backend
+      - ./certs:/certs
     environment:
       APP_URL: ${APP_URL}
       S3_ACCESS: ${S3_ACCESS}
@@ -32,6 +33,7 @@ services:
       APPLE_WWDR_PATH: ${APPLE_WWDR_PATH}
       APPLE_NOTIFICATION_PATH: ${APPLE_NOTIFICATION_PATH}
       APPLE_NOTIFICATION_KEY: ${APPLE_NOTIFICATION_KEY}
+      PKPASS_PASSWORD: ${PKPASS_PASSWORD}
 
   backend:
     build: ./backend
@@ -80,7 +82,7 @@ services:
     network_mode: host
     volumes:
       - ./backend:/backend
-      - /photos:/backend/photos
+      - ./photos:/backend/photos
     environment:
       APP_URL: ${APP_URL}
       TG_TOKEN: ${TG_TOKEN}

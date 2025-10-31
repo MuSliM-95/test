@@ -43,7 +43,6 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
     async def _generate_pkpass(self, pass_params: PassParamsModel) -> tuple[str, str]:
         # Create a store card pass type
         card_info = StoreCard()
-
         balance_field = Field('H1', str(pass_params.balance), 'Баланс')
         balance_field.changeMessage = 'Ваш баланс %@'
         cashback_field = Field('H2', str(pass_params.cashback_persent) + '%', 'Бонусы')
@@ -68,12 +67,13 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
         )
 
         # Set required pass information
-        passfile.serialNumber = str(pass_params.card_number)
+        passfile.serialNumber = str(pass_params.serial_number)
         passfile.description = pass_params.description
 
         # Add a barcode - all supported formats: PDF417, QR, AZTEC, CODE128
         passfile.barcode = Barcode(
-            message=pass_params.barcode_message,
+            message=pass_params.card_number,
+            altText=pass_params.barcode_message,
             format=BarcodeFormat.QR,
         )
 
@@ -135,7 +135,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
             with open(pkpass_tmp_path, 'rb') as f:
                 pkpass_bytes = f.read()
 
-            s3_key = f'{self.__wallet_pass_folder}/{pass_params.card_number}.pkpass'
+            s3_key = f'{self.__wallet_pass_folder}/{pass_params.serial_number}.pkpass'
             await self.__s3_client.upload_file_object(self.__bucket_name, s3_key, pkpass_bytes)
 
         finally:
@@ -145,7 +145,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
             os.unlink(strip_tmp_path)
             os.unlink(pkpass_tmp_path)
 
-        return self.get_card_path_and_name(pass_params.card_number)
+        return self.get_card_path_and_name(pass_params.serial_number)
 
     def get_card_s3_key(self, card_number: str) -> str:
         """Возвращает S3 ключ для pkpass файла"""
@@ -176,6 +176,7 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
         query = (
             select(
                 loyality_cards.c.id,
+                loyality_cards.c.card_number,
                 contragents.c.name.label("contragent_name"),
                 organizations.c.short_name.label("organization_name"),
                 loyality_cards.c.cashback_percent,
@@ -208,7 +209,8 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
             card_settings = WalletCardSettings(**json.loads(card_settings_db.data))
 
         path, filename = await self._generate_pkpass(PassParamsModel(
-            card_number=loyality_card_db.id,
+            serial_number=loyality_card_db.id,
+            card_number=loyality_card_db.card_number,
             contragent_name=loyality_card_db.contragent_name,
             organization_name=loyality_card_db.organization_name,
             description=card_settings.description,

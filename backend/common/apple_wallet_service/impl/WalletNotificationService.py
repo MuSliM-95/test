@@ -29,9 +29,10 @@ class WalletNotificationService(IWalletNotificationService):
     async def ask_update_pass(self, card_id: int) -> bool:
         try:
             query = select(apple_push_tokens.c.push_token).where(apple_push_tokens.c.card_id == card_id)
-            push_token = (await database.fetch_one(query)).push_token
+            push_tokens = (await database.fetch_all(query))
 
-            await self.renew_pass(push_token)
+            for token in push_tokens:
+                await self.renew_pass(token.push_token)
             return True
         except AttributeError: # карта не зарегистрирована
             return False

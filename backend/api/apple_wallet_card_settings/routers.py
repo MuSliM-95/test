@@ -14,6 +14,7 @@ from api.apple_wallet_card_settings.utils import create_default_apple_wallet_set
 from database.db import users_cboxes_relation, database, apple_wallet_card_settings, loyality_cards
 from common.s3_service.impl.S3Client import S3Client
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
+from producer import publish_apple_wallet_pass_update
 
 router = APIRouter(prefix='/apple_wallet_card_settings', tags=['apple_wallet_card_settings'])
 router.mount('/backend/static_files', StaticFiles(directory='/backend/static_files'), name='static_files')
@@ -117,7 +118,6 @@ async def update_apple_wallet_card_settings(token: str, settings: WalletCardSett
     ).where(loyality_cards.c.cashbox_id == user.cashbox_id)
     cards = [i.id for i in await database.fetch_all(cards_query)]
 
-    for card_id in cards:
-        await update_apple_wallet_pass(card_id)
+    await publish_apple_wallet_pass_update(cards)
 
     return WalletCardSettings(**json.loads(settings))

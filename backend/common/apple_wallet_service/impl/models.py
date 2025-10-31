@@ -16,6 +16,7 @@ class Location(BaseModel):
     relevantText: str
 
 class PassParamsModel(BaseModel):
+    serial_number: str
     card_number: str  # из loyalty cards
     contragent_name: str
     cashback_persent: str

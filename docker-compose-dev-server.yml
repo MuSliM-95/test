@@ -129,6 +129,7 @@ services:
     command: bash -c "python3 worker.py"
     volumes:
       - ./backend:/backend
+      - /certs:/certs
     environment:
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
       APPLE_TEAM_ID: ${APPLE_TEAM_ID}

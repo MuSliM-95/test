@@ -1,6 +1,7 @@
+import re
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from common.apple_wallet_service.impl.models import PassColorConfig, Location
 
@@ -21,6 +22,13 @@ class WalletCardSettings(BaseModel):
     strip_path: Optional[str] = 'photos/AppleWalletStripDefault.png'
 
     locations: list[Location] = []
+
+    @validator('barcode_message')
+    def validate_message(cls, value):
+        pattern = re.compile(r'^[A-Za-z0-9]+$')
+        if pattern.match(value):
+            return value
+        return 'TableCRM'
 
 class WalletCardSettingsCreate(BaseModel):
     cashbox_id: int
