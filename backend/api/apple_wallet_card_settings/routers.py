@@ -95,8 +95,9 @@ async def create_apple_wallet_card_settings(token: str, settings: WalletCardSett
 
     return WalletCardSettings(**json.loads(settings))
 
-@router.patch('', response_model=WalletCardSettings)
+@router.patch("", response_model=WalletCardSettings)
 async def update_apple_wallet_card_settings(token: str, settings: WalletCardSettings):
+    # Найти пользователя по токену
     user_query = users_cboxes_relation.select().where(
         users_cboxes_relation.c.token == token
     )
@@ -105,19 +106,30 @@ async def update_apple_wallet_card_settings(token: str, settings: WalletCardSett
     if not user:
         raise HTTPException(status_code=401, detail="Неверный токен")
 
-    settings_stmt = apple_wallet_card_settings.update().values(
-        WalletCardSettingsUpdate(
-            cashbox_id=user.cashbox_id,
-            data=settings.dict(exclude_unset=True)
-        ).dict()
-    ).returning(apple_wallet_card_settings.c.data)
-    settings = await database.execute(settings_stmt)
+    # Подготовить обновлённые данные
+    update_data = WalletCardSettingsUpdate(
+        cashbox_id=user.cashbox_id,
+        data=settings.dict(exclude_unset=True)
+    ).dict()
 
-    cards_query = select(
-        loyality_cards.c.id
-    ).where(loyality_cards.c.cashbox_id == user.cashbox_id)
-    cards = [i.id for i in await database.fetch_all(cards_query)]
+    # Обновить настройки в БД
+    settings_stmt = (
+        apple_wallet_card_settings
+        .update()
+        .values(**update_data)
+        .where(apple_wallet_card_settings.c.cashbox_id == user.cashbox_id)
+        .returning(apple_wallet_card_settings.c.data)
+    )
+    updated_data = await database.fetch_one(settings_stmt)
 
+    # Получить все карты пользователя
+    cards_query = select(loyality_cards.c.id).where(
+        loyality_cards.c.cashbox_id == user.cashbox_id
+    )
+    cards = [row.id for row in await database.fetch_all(cards_query)]
+
+    # Опубликовать обновление пассов
     await publish_apple_wallet_pass_update(cards)
 
-    return WalletCardSettings(**json.loads(settings))
+    # Вернуть обновлённые настройки
+    return WalletCardSettings(**json.loads(updated_data.data))
