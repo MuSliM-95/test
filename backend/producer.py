@@ -1,6 +1,11 @@
 import json
 import os
+import uuid
 
+from api.apple_wallet.messages.AppleWalletCardUpdateMessage import AppleWalletCardUpdateMessage
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
+from common.utils.ioc.ioc import ioc
 from database.db import database, users
 import aio_pika
 
@@ -100,3 +105,16 @@ async def send_order_assignment_notification(order_id: int, role: str, user_id: 
     # notification_data["recipients"] = ["chat_id1", "chat_id2", ...]
     
     return await queue_notification(notification_data)
+
+
+async def publish_apple_wallet_pass_update(card_ids: list[int]):
+    rabbitmq_messaging: IRabbitMessaging = await ioc.get(IRabbitFactory)()
+
+    for card_id in card_ids:
+        await rabbitmq_messaging.publish(
+            AppleWalletCardUpdateMessage(
+                message_id=uuid.uuid4(),
+                loyality_card_id=card_id,
+            ),
+            routing_key="teach_card_operation"
+        )

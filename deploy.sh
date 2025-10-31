@@ -173,6 +173,7 @@ deploy_another_services() {
     --name "worker" \
     --restart always \
     --network infrastructure \
+    -v "/certs:/certs" \
     -e PKPASS_PASSWORD=$PKPASS_PASSWORD \
     -e APPLE_PASS_TYPE_ID=$APPLE_PASS_TYPE_ID \
     -e APPLE_TEAM_ID=$APPLE_TEAM_ID \

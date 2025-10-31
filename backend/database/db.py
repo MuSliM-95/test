@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import enum
 import os
@@ -2244,7 +2243,7 @@ apple_wallet_card_settings = sqlalchemy.Table(
     "apple_wallet_card_settings",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey('cashboxes.id'), nullable=False),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey('cashboxes.id'), nullable=False, primary_key=True),
     sqlalchemy.Column("data", sqlalchemy.JSON, nullable=True),
 )
 
@@ -2263,8 +2262,6 @@ feeds = sqlalchemy.Table(
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
     sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 )
-
-
 
 feeds_tags = sqlalchemy.Table(
     "feeds_tags",
