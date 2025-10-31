@@ -2243,7 +2243,7 @@ apple_wallet_card_settings = sqlalchemy.Table(
     "apple_wallet_card_settings",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey('cashboxes.id'), nullable=False, primary_key=True),
+    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey('cashboxes.id'), nullable=False, unique=True),
     sqlalchemy.Column("data", sqlalchemy.JSON, nullable=True),
 )
 
