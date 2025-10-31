@@ -125,11 +125,11 @@ async def get_pass(
     """
     pass_service = WalletPassGeneratorService()
 
-    # Проверяем существование файла в S3
-    exists = await pass_service.pkpass_exists_in_s3(serial_number)
-
-    if not exists:
-        await pass_service.update_pass(int(serial_number))
+    # # Проверяем существование файла в S3
+    # exists = await pass_service.pkpass_exists_in_s3(serial_number)
+    #
+    # if not exists:
+    await pass_service.update_pass(int(serial_number))
 
     # Получаем файл из S3
     pkpass_bytes = await pass_service.get_pkpass_from_s3(serial_number)
