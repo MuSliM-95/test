@@ -137,7 +137,7 @@ class SegmentCriteriaQuery:
 
     async def calculate(self):
         """Собираем Id документов продаж"""
-        docs_sales_rows = await database.fetch_all(select(docs_sales.c.id).where(docs_sales.c.cashbox == self.cashbox_id))
+        docs_sales_rows = await database.fetch_all(select(docs_sales.c.id).where(docs_sales.c.cashbox == self.cashbox_id, docs_sales.c.is_deleted == False))
         self.docs_sales_ids = [row.id for row in docs_sales_rows]
         groups = self.group_criteria_by_priority()
         for group in groups:
