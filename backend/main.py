@@ -132,7 +132,9 @@ from api.distribution_docs.routers import router as distribution_docs_router
 from api.fifo_settings.routers import router as fifo_settings_router
 from api.warehouse_balances.routers import router as warehouse_balances_router
 from api.gross_profit_docs.routers import router as gross_profit_docs_router
-
+from api.autosuggestion.routers import router as autosuggestion_router
+from api.apple_wallet.routers import router as apple_wallet_router
+from api.apple_wallet_card_settings.routers import router as apple_wallet_card_settings_router
 from api.loyality_cards.routers import router as loyality_cards
 from api.loyality_transactions.routers import router as loyality_transactions
 from api.loyality_settings.routers import router as loyality_settings
@@ -158,6 +160,10 @@ from api.segments.routers import router as segments_router
 from api.tags.routers import router as tags_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
+from api.employee_shifts.routers import router as employee_shifts_router
+from api.feeds.routers import router as feeds_router
+from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
+
 from api.marketplace.routers import router as marketplace_router
 # from jobs.jobs import scheduler
 
@@ -172,7 +178,7 @@ from api.marketplace.routers import router as marketplace_router
 
 
 app = FastAPI(
-    # root_path='/api/v1',  # Временно отключаем для Swagger
+    root_path='/api/v1',
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0"
@@ -246,6 +252,11 @@ app.include_router(utm_router)
 app.include_router(segments_router)
 app.include_router(marketplace_router)
 
+app.include_router(employee_shifts_router)
+app.include_router(apple_wallet_router)
+app.include_router(apple_wallet_card_settings_router)
+
+app.include_router(feeds_router)
 
 @app.get("/")
 async def root():
@@ -380,6 +391,8 @@ async def startup():
 
     init_db()
     await database.connect()
+
+    await DefaultImagesUploader().upload_all()
     # scheduler.start()
 
 

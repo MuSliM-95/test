@@ -3,6 +3,8 @@ import os
 
 import databases
 
+from api.apple_wallet.handlers.AppleWalletCardUpdateHandler import AppleWalletCardUpdateHandler
+from api.apple_wallet.messages.AppleWalletCardUpdateMessage import AppleWalletCardUpdateMessage
 from api.docs_sales.handlers.RecalculateFinancialsHandler import RecalculateFinancialsHandler
 from api.docs_sales.handlers.RecalculateLoyaltyPointsHandler import RecalculateLoyaltyPointsHandler
 from api.docs_sales.messages.RecalculateFinancialsMessageModel import RecalculateFinancialsMessageModel
@@ -44,7 +46,8 @@ async def startup():
         leads_repository=LeadsRepository()
     ))
     await rabbitmq_messaging.subscribe(TechCardWarehouseOperationMessage, TechCardWarehouseOperationHandler())
-    
+    await rabbitmq_messaging.subscribe(AppleWalletCardUpdateMessage, AppleWalletCardUpdateHandler())
+
     await rabbitmq_messaging.install([
         QueueSettingsModel(
             queue_name="recalculate.financials",
@@ -64,6 +67,10 @@ async def startup():
         ),
         QueueSettingsModel(
             queue_name='teach_card_operation',
+            prefetch_count=1
+        ),
+        QueueSettingsModel(
+            queue_name='apple_wallet_card_update',
             prefetch_count=1
         )
     ])

@@ -69,7 +69,11 @@ class SegmentCriteriaQuery:
             "delivery_info": {
                 "handler": self.filters.delivery_info_filters,
                 "filter_tag": "delivery_info",
-            }
+            },
+            "orders": {
+                "handler": self.filters.orders_filters,
+                "filter_tag": "self",
+            },
         }
 
         self.filter_tag_dependencies = {
@@ -93,12 +97,7 @@ class SegmentCriteriaQuery:
                 "condition": lambda
                     base: contragents_tags.c.contragent_id == base.c.contragent,
             },
-            "loyality": {
-                "join_type": "join",
-                "table": loyality_cards,
-                "condition": lambda
-                    base: loyality_cards.c.contragent_id == base.c.contragent,
-            },
+            "loyality": None,
         }
 
     def group_criteria_by_priority(self):
@@ -138,7 +137,7 @@ class SegmentCriteriaQuery:
 
     async def calculate(self):
         """Собираем Id документов продаж"""
-        docs_sales_rows = await database.fetch_all(select(docs_sales.c.id).where(docs_sales.c.cashbox == self.cashbox_id))
+        docs_sales_rows = await database.fetch_all(select(docs_sales.c.id).where(docs_sales.c.cashbox == self.cashbox_id, docs_sales.c.is_deleted == False))
         self.docs_sales_ids = [row.id for row in docs_sales_rows]
         groups = self.group_criteria_by_priority()
         for group in groups:
@@ -170,7 +169,6 @@ class SegmentCriteriaQuery:
                         "handler")
                     if handler:
                         query = handler(query, data, subq)
-
                 # Выполняем запрос для части
                 try:
                     chunk_rows = await database.fetch_all(query)

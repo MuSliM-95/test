@@ -1,6 +1,11 @@
 import json
 import os
+import uuid
 
+from api.apple_wallet.messages.AppleWalletCardUpdateMessage import AppleWalletCardUpdateMessage
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
+from common.utils.ioc.ioc import ioc
 from database.db import database, users
 import aio_pika
 from const import marketplace_orders_queue_name
@@ -103,13 +108,26 @@ async def send_order_assignment_notification(order_id: int, role: str, user_id: 
     return await queue_notification(notification_data)
 
 
+async def publish_apple_wallet_pass_update(card_ids: list[int]):
+    rabbitmq_messaging: IRabbitMessaging = await ioc.get(IRabbitFactory)()
+
+    for card_id in card_ids:
+        await rabbitmq_messaging.publish(
+            AppleWalletCardUpdateMessage(
+                message_id=uuid.uuid4(),
+                loyality_card_id=card_id,
+            ),
+            routing_key="teach_card_operation"
+        )
+
+
 async def queue_marketplace_order(order_data: dict) -> bool:
     """
     Добавляет заказ маркетплейса в очередь RabbitMQ для распределения по кешбоксам.
-    
+
     Args:
         order_data: Данные заказа маркетплейса
-        
+
     Returns:
         bool: Успешно ли добавлен заказ в очередь
     """
@@ -125,23 +143,23 @@ async def queue_marketplace_order(order_data: dict) -> bool:
 
         async with connection:
             channel = await connection.channel()
-            
+
             # Создаем очередь если её нет
             await channel.declare_queue(marketplace_orders_queue_name, durable=True)
-            
+
             # Отправляем заказ в очередь
             message = aio_pika.Message(
                 body=json.dumps(order_data).encode(),
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT
             )
-            
+
             await channel.default_exchange.publish(
-                message=message, 
+                message=message,
                 routing_key=marketplace_orders_queue_name
             )
-            
+
             return True
-            
+
     except Exception as e:
         print(f"Ошибка при отправке заказа в очередь: {e}")
         return False

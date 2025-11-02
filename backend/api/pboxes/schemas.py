@@ -1,5 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import Optional, List
+
+from common.utils.validators import sanitize_float
+
 
 class Payboxes(BaseModel):
     id: int
@@ -15,6 +18,9 @@ class Payboxes(BaseModel):
     created_at: int
     updated_at: int
 
+    @validator("start_balance", "balance", pre=True)
+    def validate_float(cls, v):
+        return sanitize_float(v) or 0.0
 
     class Config:
         orm_mode = True
@@ -28,6 +34,10 @@ class PayboxesEdit(BaseModel):
     name: Optional[str]
     organization_id: Optional[int]
 
+    @validator("start_balance", pre=True)
+    def validate_float(cls, v):
+        return sanitize_float(v)
+
     class Config:
         orm_mode = True
 
@@ -37,6 +47,10 @@ class PayboxesCreate(BaseModel):
     start_balance: float
     external_id: Optional[str]
     organization_id: Optional[int]
+
+    @validator("start_balance", pre=True)
+    def validate_float(cls, v):
+        return sanitize_float(v) or 0.0
 
     class Config:
         orm_mode = True
@@ -56,6 +70,7 @@ class PayboxesShort(BaseModel):
     name: str
     created_at: int
     updated_at: int
+
 
 class GetPaymentsShort(GetPayments):
     result: Optional[List[PayboxesShort]]

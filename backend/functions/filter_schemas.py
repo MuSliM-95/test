@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 from typing import Optional, List
 
@@ -68,3 +70,10 @@ class PricesFiltersQuery(BaseModel):
     price_type_id: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+
+
+class CUIntegerFilters(BaseModel):
+    updated_at__gte: Optional[int] = None
+    updated_at__lte: Optional[int] = None
+    created_at__gte: Optional[int] = None
+    created_at__lte: Optional[int] = None

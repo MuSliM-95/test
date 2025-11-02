@@ -12,6 +12,8 @@ class PurchaseCriteria(BaseModel):
     date_range: Optional[DateRange]
     categories: Optional[List[str]]
     nomenclatures: Optional[List[str]]
+    is_fully_paid: Optional[bool]
+    count_of_goods: Optional[Range]
 
     @validator("categories", "nomenclatures", each_item=True)
     def validate_category_item(cls, v):
@@ -45,6 +47,12 @@ class DeliverySchema(BaseModel):
     recipient: Optional[RecipientInfoSchema]
 
 
+class OrderCriteriaSchema(BaseModel):
+    order_status: Optional[str]
+    updated_at: Optional[DateRange]
+    created_at: Optional[DateRange]
+
+
 class SegmentCriteria(BaseModel):
     purchases: Optional[PurchaseCriteria]
     loyality: Optional[LoyalityCriteria]
@@ -55,3 +63,4 @@ class SegmentCriteria(BaseModel):
     picker: Optional[PickerCourierSchema]
     courier: Optional[PickerCourierSchema]
     delivery_info: Optional[DeliverySchema]
+    orders:  Optional[OrderCriteriaSchema]

@@ -99,6 +99,37 @@ class DocsSalesTags(BaseModel):
         return v
 
 
+class WaNotification(BaseModel):
+    trigger_on_new: bool = True
+    message: str
+    wappi_token: str
+    wappi_profile_id: str
+    sleep: int = 5
+
+
+class HttpRequest(BaseModel):
+    trigger_on_new: bool = True
+    method: Literal["GET", "POST", "PATCH"]
+    url: str
+    headers: Optional[dict]
+    params: Optional[dict]
+    body: Optional[dict]
+    sleep: int = 5
+
+
+class TransformLoyalityCard(BaseModel):
+    cashback_percent: Optional[float]
+    max_withdraw_percentage: Optional[float]
+    lifetime: Optional[int]
+    tag: Optional[str]
+    apple_wallet_advertisement: Optional[str]
+
+class AddRemoveTransaction(BaseModel):
+    amount: float
+    direction: Literal["plus", "minus"]
+    comment: Optional[str]
+
+
 class SegmentActions(BaseModel):
     add_existed_tags: Optional[AddRemoveTags]
     remove_tags: Optional[AddRemoveTags]
@@ -106,4 +137,8 @@ class SegmentActions(BaseModel):
     send_tg_notification: Optional[TgNotificationsAction]
     add_docs_sales_tags: Optional[DocsSalesTags]
     remove_docs_sales_tags: Optional[DocsSalesTags]
+    transform_loyality_card: Optional[TransformLoyalityCard]
+    add_loyality_transaction: Optional[AddRemoveTransaction]
+    send_wa_notification: Optional[WaNotification]
+    do_http_request: Optional[HttpRequest]
 
