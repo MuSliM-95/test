@@ -8,7 +8,7 @@ import api.nomenclature.schemas as schemas
 from api.nomenclature.web.pagination.NomenclatureFilter import NomenclatureFilter, SortOrder
 from database.db import categories, database, manufacturers, nomenclature, nomenclature_barcodes, prices, price_types, \
     warehouse_register_movement, warehouses, units, warehouse_balances, nomenclature_groups_value, nomenclature_groups, \
-    nomenclature_attributes, nomenclature_attributes_value, warehouse_hash, nomenclature_hash
+    nomenclature_attributes, nomenclature_attributes_value, warehouse_hash, nomenclature_hash, pictures
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.params import Body, Query
 
@@ -245,6 +245,7 @@ async def get_nomenclature(
         with_prices: bool = False,
         with_balance: bool = False,
         with_attributes: bool = Query(False, description="Включить атрибуты номенклатуры в ответ"),
+        with_photos: bool = Query(False, description="Включить фото номенклатуры в ответ"),
         only_main_from_group: bool = False,
         min_price: Optional[float] = Query(None, description="Минимальная цена для фильтрации"),
         max_price: Optional[float] = Query(None, description="Максимальная цена для фильтрации"),
@@ -452,6 +453,27 @@ async def get_nomenclature(
             )
             attributes_list = await database.fetch_all(attributes_query)
             nomenclature_info["attributes"] = attributes_list
+
+        if with_photos:
+            photos_query = (
+                select(
+                    pictures.c.id,
+                    pictures.c.url,
+                    pictures.c.is_main,
+                    pictures.c.created_at,
+                    pictures.c.updated_at
+                )
+                .select_from(pictures)
+                .where(
+                    pictures.c.entity == 'nomenclature',
+                    pictures.c.entity_id == nomenclature_info['id'],
+                    pictures.c.is_deleted.is_not(True)
+                )
+                .order_by(pictures.c.is_main.desc(), pictures.c.id.asc())
+            )
+            photos_list = await database.fetch_all(photos_query)
+            photos_list = [*map(datetime_to_timestamp, photos_list)]
+            nomenclature_info["photos"] = photos_list
 
     return {"result": nomenclature_db, "count": nomenclature_db_count}
 
