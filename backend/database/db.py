@@ -976,6 +976,7 @@ payments = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", Integer),
 )
 
+
 projects = sqlalchemy.Table(
     "projects",
     metadata,
