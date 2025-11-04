@@ -972,7 +972,6 @@ payments = sqlalchemy.Table(
     sqlalchemy.Column("is_deleted", Boolean, default=False),
     sqlalchemy.Column("cheque", Integer, ForeignKey("cheques.id"), nullable=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
-    sqlalchemy.Column("docs_purchases_id", Integer, ForeignKey("docs_purchases.id"), nullable=True),
     sqlalchemy.Column("contract_id", Integer, ForeignKey("contracts.id")),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
