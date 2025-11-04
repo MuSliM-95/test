@@ -1151,13 +1151,12 @@ async def attach_payment(
     sale_id: int = 0,
     purchase_id: int = 0
 ):
-    """Прикрепление платежа к документам продажи и покупок"""
+    """Прикрепление платежа к документам продажи и закупки"""
 
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
     if not user or not user.status:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
-
 
     if bool(sale_id) == bool(purchase_id):
         raise HTTPException(
@@ -1188,24 +1187,23 @@ async def attach_payment(
         )
         doc = await database.fetch_one(doc_query)
         if not doc:
-            raise HTTPException(status_code=404, detail="Документ покупки не найден")
+            raise HTTPException(status_code=404, detail="Документ закупки не найден")
 
     entity_values = {
         "cashbox_id": user.cashbox_id,
-        "type": "docs_sales_payments" if sale_id else "docs_purchases_payments",
-        "from_entity": 7 if sale_id else 1,
-        "to_entity": 5,
-        "from_id": sale_id or purchase_id,
-        "to_id": id,
+        "type": "payments_docs_sales" if sale_id else "payments_docs_purchases",
+        "from_entity": 5,                        
+        "to_entity": 7 if sale_id else 1,        
+        "from_id": id,                         
+        "to_id": sale_id or purchase_id,      
         "status": True,
         "delinked": False,
     }
 
-
     existing = await database.fetch_one(
         entity_to_entity.select().where(
-            entity_to_entity.c.from_id == entity_values["from_id"],
-            entity_to_entity.c.to_id == id,
+            entity_to_entity.c.from_id == id,
+            entity_to_entity.c.to_id == entity_values["to_id"],
             entity_to_entity.c.type == entity_values["type"],
             entity_to_entity.c.cashbox_id == user.cashbox_id,
         )
@@ -1215,6 +1213,7 @@ async def attach_payment(
         raise HTTPException(status_code=400, detail="Эта связь уже существует")
 
     await database.execute(entity_to_entity.insert().values(entity_values))
+
 
     await database.execute(
         payments.update()
@@ -1226,19 +1225,20 @@ async def attach_payment(
 
     entity_links = await database.fetch_all(
         entity_to_entity.select().where(
-            entity_to_entity.c.to_id == id,
+            entity_to_entity.c.from_id == id,
             entity_to_entity.c.cashbox_id == user.cashbox_id,
-            entity_to_entity.c.type.in_(["docs_sales_payments", "docs_purchases_payments"])
+            entity_to_entity.c.type.in_(["payments_docs_sales", "payments_docs_purchases"])
         )
     )
 
     docs_sales_id = None
     docs_purchases_id = None
     for e in entity_links:
-        if e["type"] == "docs_sales_payments":
-            docs_sales_id = e["from_id"]
-        elif e["type"] == "docs_purchases_payments":
-            docs_purchases_id = e["from_id"]
+        if e["type"] == "payments_docs_sales":
+            docs_sales_id = e["to_id"]
+        elif e["type"] == "payments_docs_purchases":
+            docs_purchases_id = e["to_id"]
+
 
     notification_data = {
         "type": "payment_attachment",
@@ -1251,12 +1251,11 @@ async def attach_payment(
     }
     await queue_notification(notification_data)
 
- 
+
     payment_dict = dict(payment_db)
     payment_dict["docs_sales_id"] = docs_sales_id
     payment_dict["docs_purchases_id"] = docs_purchases_id
 
- 
     await manager.send_message(
         token,
         {"action": "edit", "target": "payments", "result": payment_dict},
