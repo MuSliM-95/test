@@ -105,6 +105,7 @@ class NomenclatureGet(NomenclatureCreate):
     prices: Optional[List[PriceGetWithNomenclature]]
     balances: Optional[List[WarehouseWithNomenclature]]
     attributes: Optional[List[NomenclatureAttributeValue]] = None
+    photos: Optional[List[dict]] = None
     group_id: Optional[int]
     group_name: Optional[str]
     is_main: Optional[bool]
