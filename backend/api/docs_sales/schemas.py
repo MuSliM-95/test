@@ -290,3 +290,97 @@ class OrderLinksResponse(BaseModel):
     general_link: Optional[OrderLinkResponse] = None
     picker_link: Optional[OrderLinkResponse] = None
     courier_link: Optional[OrderLinkResponse] = None
+
+# ============================================
+# ANALYTICS SCHEMAS
+# ============================================
+
+class DayStatusBreakdown(BaseModel):
+    """Разбор заказов по статусам за день"""
+    received: int = 0
+    processed: int = 0
+    collecting: int = 0
+    collected: int = 0
+    picked: int = 0
+    delivered: int = 0
+    closed: int = 0
+    success: int = 0
+
+    class Config:
+        orm_mode = True
+
+
+class DayAnalytics(BaseModel):
+    """Аналитика за один день"""
+    date: int
+    day_number: int
+    orders_created: int
+    orders_paid: int
+    revenue: float = 0.0
+    by_status: DayStatusBreakdown
+
+    class Config:
+        orm_mode = True
+
+
+class AnalyticsPeriod(BaseModel):
+    """Информация о периоде"""
+    date_from: int
+    date_to: int
+
+    class Config:
+        orm_mode = True
+
+
+class AnalyticsFilter(BaseModel):
+    """Применённые фильтры"""
+    role: Optional[str] = None
+    user_id: int
+
+    class Config:
+        orm_mode = True
+
+
+class AnalyticsSummary(BaseModel):
+    """Общая сводка по периоду"""
+    total_orders: int
+    total_revenue: float
+    total_paid: int
+    average_daily_load: float
+    peak_day_date: int
+    peak_day_orders: int
+    orders_completed: int
+    orders_planned: int
+    orders_cancelled: int
+    today_total_orders: int
+    today_revenue: float
+    today_completed: int
+    today_planned: int
+    today_cancelled: int
+
+    class Config:
+        orm_mode = True
+
+
+class AnalyticsResponse(BaseModel):
+    """Ответ с детальной аналитикой по дням"""
+    period: AnalyticsPeriod
+    filter: AnalyticsFilter
+    summary: AnalyticsSummary
+    days: List[DayAnalytics]
+
+    class Config:
+        orm_mode = True
+
+
+class CashierStats(BaseModel):
+    """Статистика кассира за период"""
+    orders_completed: int
+    errors: int
+    rating: float
+    average_check: float
+    hours_processed: float
+    successful_orders_percent: float
+
+    class Config:
+        orm_mode = True
