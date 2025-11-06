@@ -255,7 +255,7 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
             docs_sales_agg.c.contragent,
             func.count(docs_sales_agg.c.id).label("purchase_count"),
             func.sum(docs_sales_agg.c.sum).label("total_amount"),
-        ).select_from(docs_sales_agg)
+        ).select_from(docs_sales_agg).where(docs_sales_agg.c.is_deleted == False)
 
         # Фильтрация по категориям/номенклатурам ДО агрегации
         category_filter_clauses = []
