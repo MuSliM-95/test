@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+from api.marketplace.service import MarketplaceService
+
 
 def safe_parse_json(value: Any) -> Optional[Dict[str, Any]]:
     try:
@@ -12,4 +14,7 @@ def safe_parse_json(value: Any) -> Optional[Dict[str, Any]]:
     except Exception:
         return None
 
-
+async def get_marketplace_service() -> MarketplaceService:
+    marketplace_service = MarketplaceService()
+    await marketplace_service.connect()
+    return marketplace_service

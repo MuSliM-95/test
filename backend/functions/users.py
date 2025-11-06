@@ -44,7 +44,7 @@ async def get_user_by_token(token: str):
 
 
 async def raschet(user, token):
-    update = await database.fetch_all("SELECT * FROM rachet(:token, :today)",
+    update = await database.fetch_all("SELECT * FROM raschet(:token, :today)",
                                       {"token": token, "today": int(datetime.utcnow().timestamp())})
 
     payboxes_list_q = select([pboxes.c.id, pboxes.c.start_balance]).where(

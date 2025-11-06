@@ -2,6 +2,18 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+from api.docs_sales.schemas import DeliveryInfoSchema
+
+
+class AvailableWarehouse(BaseModel):
+    warehouse_id: int
+    organization_id: int
+    warehouse_name: str
+    warehouse_address: str
+
+    class Config:
+        orm_mode = True
+
 
 class MarketplaceProduct(BaseModel):
     """Модель товара для маркетплейса"""
@@ -11,6 +23,7 @@ class MarketplaceProduct(BaseModel):
     description_long: Optional[str] = None
     code: Optional[str] = None
     unit_name: Optional[str] = None
+    cashbox_id: int
     category_name: Optional[str] = None
     manufacturer_name: Optional[str] = None
     price: float
@@ -21,18 +34,22 @@ class MarketplaceProduct(BaseModel):
     updated_at: datetime
     images: Optional[List[str]] = None
     barcodes: Optional[List[str]] = None
-    
+
     # Новые поля для расширенной функциональности
     listing_pos: Optional[int] = None  # Позиция в выдаче для аналитики
     is_ad_pos: Optional[bool] = False  # Рекламное размещение
     tags: Optional[List[str]] = None  # Теги товара
     variations: Optional[List[dict]] = None  # Вариации товара
     stock_quantity: Optional[float] = None  # Остатки
+
     seller_name: Optional[str] = None  # Имя селлера
     seller_photo: Optional[str] = None  # Фото селлера
+
     rating: Optional[float] = None  # Рейтинг 1-5
     reviews_count: Optional[int] = None  # Количество отзывов
     distance: Optional[float] = None  # Расстояние до клиента (если передана геолокация)
+
+    available_warehouses: Optional[List[AvailableWarehouse]] = None
 
     class Config:
         orm_mode = True
@@ -50,15 +67,13 @@ class MarketplaceLocation(BaseModel):
     """Модель локации для маркетплейса"""
     id: int
     name: str
-    geo_point: Optional[str] = None  # POINT as string
-    city: Optional[str] = None
+    address: Optional[str] = None
     cashbox_id: Optional[int] = None
     admin_id: Optional[int] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
     avg_rating: Optional[float] = None
     reviews_count: Optional[int] = None
-    cashboxes: Optional[List[dict]] = None  # Связанные кешбоксы
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
@@ -70,14 +85,6 @@ class MarketplaceLocationList(BaseModel):
     count: int
     page: int
     size: int
-
-
-class DeliveryInfo(BaseModel):
-    """Информация о доставке"""
-    type: str  # pickup, delivery, courier
-    address: Optional[str] = None
-    comment: Optional[str] = None
-    preferred_time: Optional[str] = None
 
 
 class CustomerInfo(BaseModel):
@@ -96,27 +103,31 @@ class RecipientInfo(BaseModel):
     lon: Optional[float] = None
 
 
+class MarketplaceOrderGood(BaseModel):
+    cashbox_id: int
+    nomenclature_id: int
+    organization_id: int
+    warehouse_id: int # ID помещения
+    quantity: int = 1  # Количество товара
+
+
 class MarketplaceOrderRequest(BaseModel):
     """Запрос на создание заказа маркетплейса"""
-    product_id: int
-    listing_pos: Optional[int] = None  # Позиция товара в выдаче
-    listing_page: Optional[int] = None  # Страница выдачи
-    location_id: Optional[int] = None  # ID помещения
+    goods: List[MarketplaceOrderGood]
     utm: Optional[dict] = None  # UTM метки
-    delivery: DeliveryInfo
-    customer: CustomerInfo
+    delivery: DeliveryInfoSchema
+    contragent_id: int
     recipient: Optional[RecipientInfo] = None  # Информация о получателе (если отличается от заказчика)
     order_type: str = "self"  # Тип заказа: self, other, corporate, gift, proxy
-    quantity: int = 1  # Количество товара
 
 
 class MarketplaceOrderResponse(BaseModel):
     """Ответ на создание заказа маркетплейса"""
-    order_id: str
-    status: str
+    # order_id: str
+    # status: str
     message: str
-    estimated_delivery: Optional[str] = None
-    cashbox_assignments: Optional[List[dict]] = None
+    # estimated_delivery: Optional[str] = None
+    # cashbox_assignments: Optional[List[dict]] = None
 
 
 class QRResolveResponse(BaseModel):

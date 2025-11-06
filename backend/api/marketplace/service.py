@@ -1,307 +1,298 @@
+import hashlib
+import json
+import uuid
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 from fastapi import HTTPException
-from sqlalchemy import select, func, and_, or_, desc, asc, text
-from datetime import datetime
-import uuid
-import json
-import hashlib
+from sqlalchemy import select, func, and_, desc, asc, text, JSON, cast, literal_column
 
+from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
+from common.utils.ioc.ioc import ioc
+from database.db import nomenclature, units, categories, manufacturers, prices, price_types, cboxes, pictures, \
+    nomenclature_barcodes, database, qr_codes, view_events, warehouses_rating_aggregates, warehouses, warehouse_balances
 from . import schemas
-from .models import (
-    database, nomenclature, prices, price_types, units, categories,
-    manufacturers, pictures, nomenclature_barcodes, cboxes, mp_orders, qr_codes,
-    reviews, location_rating_aggregates, favorites, view_events, warehouse_balances, tags
-)
-from producer import queue_marketplace_order
+from .rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
+from .schemas import MarketplaceOrderGood
 
 
-async def get_products(
-    phone: Optional[str],
-    lat: Optional[float],
-    lon: Optional[float],
-    city: Optional[str],
-    page: int,
-    size: int,
-    sort: Optional[str],
-    category_filter: Optional[str],
-    manufacturer_filter: Optional[str],
-    min_price: Optional[float],
-    max_price: Optional[float],
-    tags_filter: Optional[str],
-    in_stock: Optional[bool],
-) -> schemas.MarketplaceProductList:
-    query = (
-        select(
+class MarketplaceService:
+    def __init__(self):
+        self.__rabbitmq: Optional[IRabbitMessaging] = None
+
+    async def connect(self):
+        self.__rabbitmq = await ioc.get(IRabbitFactory)()
+
+    @staticmethod
+    async def get_products(
+            phone: Optional[str],
+            lat: Optional[float],
+            lon: Optional[float],
+            city: Optional[str],
+            page: int,
+            size: int,
+            sort: Optional[str],
+            category_filter: Optional[str],
+            manufacturer_filter: Optional[str],
+            min_price: Optional[float],
+            max_price: Optional[float],
+            tags_filter: Optional[str],
+            in_stock: Optional[bool],
+    ) -> schemas.MarketplaceProductList:
+        # Алиас для складов, связанных с балансами (чтобы не конфликтовать с основным warehouses)
+        wh_bal = warehouses.alias("wh_bal")
+
+        json_obj = func.json_build_object(
+            literal_column("'warehouse_id'"), wh_bal.c.id,
+            literal_column("'organization_id'"), warehouse_balances.c.organization_id,
+            literal_column("'warehouse_name'"), wh_bal.c.name,
+            literal_column("'warehouse_address'"), wh_bal.c.address
+        )
+
+        available_warehouses_agg = (
+            func.array_agg(cast(json_obj, JSON))
+            .filter(wh_bal.c.id.is_not(None))
+            .label("available_warehouses")
+        )
+
+        query = (
+            select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.description_short,
+                nomenclature.c.description_long,
+                nomenclature.c.code,
+                nomenclature.c.cashbox,
+                nomenclature.c.created_at,
+                nomenclature.c.updated_at,
+                units.c.convent_national_view.label("unit_name"),
+                categories.c.name.label("category_name"),
+                manufacturers.c.name.label("manufacturer_name"),
+                prices.c.price,
+                price_types.c.name.label("price_type"),
+                cboxes.c.name.label("seller_name"),
+                warehouses_rating_aggregates.c.avg_rating.label("rating"),
+                warehouses_rating_aggregates.c.reviews_count.label("reviews_count"),
+                func.array_agg(
+                    func.distinct(pictures.c.url)
+                ).filter(pictures.c.url.is_not(None)).label("images"),
+                func.array_agg(
+                    func.distinct(nomenclature_barcodes.c.code)
+                ).filter(nomenclature_barcodes.c.code.is_not(None)).label("barcodes"),
+                available_warehouses_agg
+            )
+            .select_from(nomenclature)
+            .join(units, units.c.id == nomenclature.c.unit, isouter=True)
+            .join(categories, categories.c.id == nomenclature.c.category, isouter=True)
+            .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, isouter=True)
+            .join(prices, prices.c.nomenclature == nomenclature.c.id)
+            .join(price_types, price_types.c.id == prices.c.price_type)
+            .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
+            .join(pictures, and_(
+                pictures.c.entity == "nomenclature",
+                pictures.c.entity_id == nomenclature.c.id,
+                pictures.c.is_deleted.is_not(True)
+            ), isouter=True)
+            .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, isouter=True)
+            .join(warehouses, warehouses.c.cashbox == nomenclature.c.cashbox)
+            .join(warehouses_rating_aggregates, warehouses_rating_aggregates.c.warehouse_id == warehouses.c.id,
+                  isouter=True)
+            # Warehouses for balances (public only)
+            .join(warehouse_balances, and_(
+                warehouse_balances.c.nomenclature_id == nomenclature.c.id,
+                warehouse_balances.c.current_amount > 0
+            ), isouter=True)
+            .join(wh_bal, and_(
+                wh_bal.c.id == warehouse_balances.c.warehouse_id,
+                wh_bal.c.is_public.is_(True),
+                wh_bal.c.status.is_(True),
+                wh_bal.c.is_deleted.is_not(True)
+            ), isouter=True)
+        )
+
+        conditions = [
+            nomenclature.c.is_deleted.is_not(True),
+            prices.c.is_deleted.is_not(True),
+            price_types.c.name == "chatting",
+        ]
+
+        if category_filter:
+            conditions.append(categories.c.name.ilike(f"%{category_filter}%"))
+        if manufacturer_filter:
+            conditions.append(manufacturers.c.name.ilike(f"%{manufacturer_filter}%"))
+        if min_price is not None:
+            conditions.append(prices.c.price >= min_price)
+        if max_price is not None:
+            conditions.append(prices.c.price <= max_price)
+
+        query = query.where(and_(*conditions))
+
+        group_by_fields = [
             nomenclature.c.id,
-            nomenclature.c.name,
-            nomenclature.c.description_short,
-            nomenclature.c.description_long,
-            nomenclature.c.code,
-            nomenclature.c.geo_point,
-            nomenclature.c.city,
-            nomenclature.c.created_at,
-            nomenclature.c.updated_at,
-            units.c.convent_national_view.label("unit_name"),
-            categories.c.name.label("category_name"),
-            manufacturers.c.name.label("manufacturer_name"),
+            units.c.convent_national_view,
+            categories.c.name,
+            manufacturers.c.name,
             prices.c.price,
-            price_types.c.name.label("price_type"),
-            cboxes.c.name.label("seller_name"),
-            location_rating_aggregates.c.avg_rating.label("rating"),
-            location_rating_aggregates.c.reviews_count.label("reviews_count"),
-            func.array_agg(func.distinct(pictures.c.url)).filter(pictures.c.url.is_not(None)).label("images"),
-            func.array_agg(func.distinct(nomenclature_barcodes.c.code)).filter(nomenclature_barcodes.c.code.is_not(None)).label("barcodes"),
+            price_types.c.name,
+            cboxes.c.name,
+            warehouses_rating_aggregates.c.avg_rating,
+            warehouses_rating_aggregates.c.reviews_count,
+        ]
+        query = query.group_by(*group_by_fields)
+
+        if sort == "price":
+            query = query.order_by(asc(prices.c.price))
+        elif sort == "name":
+            query = query.order_by(asc(nomenclature.c.name))
+        elif sort == "created_at":
+            query = query.order_by(desc(nomenclature.c.created_at))
+        else:
+            query = query.order_by(desc(nomenclature.c.id))
+
+        offset = (page - 1) * size
+        query = query.limit(size).offset(offset)
+
+        products_db = await database.fetch_all(query)
+
+        # Подсчёт общего количества (без пагинации)
+        count_query = (
+            select(func.count(nomenclature.c.id))
+            .select_from(nomenclature)
+            .join(prices, prices.c.nomenclature == nomenclature.c.id)
+            .join(price_types, price_types.c.id == prices.c.price_type)
+            .where(and_(*conditions))
         )
-        .select_from(nomenclature)
-        .join(units, units.c.id == nomenclature.c.unit, full=True)
-        .join(categories, categories.c.id == nomenclature.c.category, full=True)
-        .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, full=True)
-        .join(prices, prices.c.nomenclature == nomenclature.c.id, full=True)
-        .join(price_types, price_types.c.id == prices.c.price_type, full=True)
-        .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, full=True)
-        .join(pictures, and_(
-            pictures.c.entity == "nomenclature",
-            pictures.c.entity_id == nomenclature.c.id,
-            pictures.c.is_deleted.is_not(True)
-        ), full=True)
-        .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, full=True)
-        .join(location_rating_aggregates, location_rating_aggregates.c.location_id == cboxes.c.id, full=True)
-    )
+        count_result = await database.fetch_one(count_query)
+        total_count = count_result[0] if count_result else 0
 
-    conditions = [
-        nomenclature.c.public == True,
-        nomenclature.c.is_deleted.is_not(True),
-        prices.c.is_deleted.is_not(True),
-        price_types.c.name == "chatting",
-    ]
+        products: List[schemas.MarketplaceProduct] = []
+        for index, product in enumerate(products_db):
+            product_dict = dict(product)
+            product_dict["listing_pos"] = (page - 1) * size + index + 1
+            if product_dict.get("geo_point"):
+                product_dict["geo_point"] = str(product_dict["geo_point"])
 
-    if city:
-        conditions.append(or_(nomenclature.c.city.ilike(f"%{city}%"), cboxes.c.city.ilike(f"%{city}%")))
-    if category_filter:
-        conditions.append(categories.c.name.ilike(f"%{category_filter}%"))
-    if manufacturer_filter:
-        conditions.append(manufacturers.c.name.ilike(f"%{manufacturer_filter}%"))
-    if min_price is not None:
-        conditions.append(prices.c.price >= min_price)
-    if max_price is not None:
-        conditions.append(prices.c.price <= max_price)
+            # Images
+            images = product_dict.get("images")
+            product_dict["images"] = [url for url in images if url] if images and any(images) else None
 
-    query = query.where(and_(*conditions))
+            # Barcodes
+            barcodes = product_dict.get("barcodes")
+            product_dict["barcodes"] = [code for code in barcodes if code] if barcodes and any(barcodes) else None
 
-    group_by_fields = [
-        nomenclature.c.id,
-        units.c.convent_national_view,
-        categories.c.name,
-        manufacturers.c.name,
-        prices.c.price,
-        price_types.c.name,
-        cboxes.c.name,
-        location_rating_aggregates.c.avg_rating,
-        location_rating_aggregates.c.reviews_count,
-    ]
-    query = query.group_by(*group_by_fields)
+            wh_raw = product_dict.get("available_warehouses")
+            if wh_raw and isinstance(wh_raw, list):
+                wh_valid = [w for w in wh_raw if w is not None and w.get("warehouse_id") is not None]
+                if wh_valid:
+                    product_dict["available_warehouses"] = [
+                        schemas.AvailableWarehouse(
+                            warehouse_id=w["warehouse_id"],
+                            organization_id=w["organization_id"],
+                            warehouse_name=w["warehouse_name"],
+                            warehouse_address=w["warehouse_address"]
+                        )
+                        for w in wh_valid
+                    ]
+                else:
+                    product_dict["available_warehouses"] = None
+            else:
+                product_dict["available_warehouses"] = None
 
-    if sort == "price":
-        query = query.order_by(asc(prices.c.price))
-    elif sort == "name":
-        query = query.order_by(asc(nomenclature.c.name))
-    elif sort == "created_at":
-        query = query.order_by(desc(nomenclature.c.created_at))
-    elif sort == "rating":
-        query = query.order_by(desc(location_rating_aggregates.c.avg_rating))
-    else:
-        query = query.order_by(desc(nomenclature.c.id))
+            # Остальные поля
+            product_dict["tags"] = product_dict.get("tags") or []
+            product_dict["is_ad_pos"] = False
+            product_dict["variations"] = []
+            product_dict["stock_quantity"] = 0.0
+            product_dict["distance"] = float(product_dict.get("distance")) if product_dict.get("distance") else None
+            product_dict["seller_photo"] = None
+            product_dict["cashbox_id"] = product_dict["cashbox"]
 
-    offset = (page - 1) * size
-    query = query.limit(size).offset(offset)
+            products.append(schemas.MarketplaceProduct(**product_dict))
 
-    products_db = await database.fetch_all(query)
-
-    count_query = (
-        select(func.count(nomenclature.c.id))
-        .select_from(nomenclature)
-        .join(prices, prices.c.nomenclature == nomenclature.c.id)
-        .join(price_types, price_types.c.id == prices.c.price_type)
-        .where(and_(*conditions))
-    )
-    if city:
-        count_query = count_query.join(cboxes, cboxes.c.id == nomenclature.c.cashbox)
-
-    count_result = await database.fetch_one(count_query)
-    total_count = count_result[0] if count_result else 0
-
-    products: List[schemas.MarketplaceProduct] = []
-    for index, product in enumerate(products_db):
-        product_dict = dict(product)
-        product_dict["listing_pos"] = (page - 1) * size + index + 1
-        if product_dict.get("geo_point"):
-            product_dict["geo_point"] = str(product_dict["geo_point"])
-        product_dict["images"] = product_dict.get("images") or []
-        product_dict["barcodes"] = product_dict.get("barcodes") or []
-        product_dict["tags"] = product_dict.get("tags") or []
-        product_dict["is_ad_pos"] = False
-        product_dict["variations"] = []
-        product_dict["stock_quantity"] = 0.0
-        product_dict["rating"] = float(product_dict.get("rating")) if product_dict.get("rating") else None
-        product_dict["reviews_count"] = product_dict.get("reviews_count", 0)
-        product_dict["distance"] = float(product_dict.get("distance")) if product_dict.get("distance") else None
-        product_dict["seller_photo"] = None
-        products.append(schemas.MarketplaceProduct(**product_dict))
-
-    return schemas.MarketplaceProductList(result=products, count=total_count, page=page, size=size)
-
-
-async def get_locations(
-    city: Optional[str],
-    lat: Optional[float],
-    lon: Optional[float],
-    radius: Optional[float],
-    page: int,
-    size: int,
-    sort: Optional[str],
-):
-    offset = (page - 1) * size
-    query = select(
-        cboxes.c.id,
-        cboxes.c.name,
-        cboxes.c.geo_point,
-        cboxes.c.city,
-        cboxes.c.admin,
-        cboxes.c.created_at,
-        cboxes.c.updated_at,
-    ).select_from(cboxes)
-
-    conditions = [cboxes.c.public == True]
-    if city:
-        conditions.append(cboxes.c.city.ilike(f"%{city}%"))
-    query = query.where(and_(*conditions))
-
-    if sort == "name":
-        query = query.order_by(cboxes.c.name)
-    else:
-        query = query.order_by(cboxes.c.name)
-
-    count_query = select(func.count()).select_from(cboxes).where(and_(*conditions))
-    total_count = await database.fetch_val(count_query)
-
-    query = query.offset(offset).limit(size)
-    locations = await database.fetch_all(query)
-
-    result: List[Dict[str, Any]] = []
-    for location in locations:
-        ld = dict(location)
-        if ld.get("geo_point"):
-            ld["geo_point"] = str(ld["geo_point"])
-        ld["cashbox_id"] = ld.get("id")
-        ld["admin_id"] = ld.get("admin")
-        ld["avg_rating"] = None
-        ld["reviews_count"] = 0
-        ld["cashboxes"] = []
-        result.append(ld)
-
-    return {"result": result, "count": total_count, "page": page, "size": size}
-
-
-async def create_order(order_request: schemas.MarketplaceOrderRequest) -> schemas.MarketplaceOrderResponse:
-    order_id = f"mp_{uuid.uuid4().hex[:12]}"
-
-    product_query = select(
-        nomenclature.c.id,
-        nomenclature.c.name,
-        nomenclature.c.cashbox,
-        nomenclature.c.public,
-    ).where(
-        and_(
-            nomenclature.c.id == order_request.product_id,
-            nomenclature.c.public == True,
-            nomenclature.c.is_deleted == False,
+        return schemas.MarketplaceProductList(
+            result=products,
+            count=total_count,
+            page=page,
+            size=size
         )
-    )
-    product = await database.fetch_one(product_query)
-    if not product:
-        raise HTTPException(status_code=404, detail="Товар не найден или не доступен")
 
-    recipient_phone = None
-    recipient_name = None
-    recipient_lat = None
-    recipient_lon = None
-    
-    if order_request.recipient:
-        recipient_phone = order_request.recipient.phone
-        recipient_name = order_request.recipient.name
-        recipient_lat = order_request.recipient.lat
-        recipient_lon = order_request.recipient.lon
+    @staticmethod
+    async def get_locations( # TODO: rewrite locations на warehouses balaneces
+        city: Optional[str],
+        lat: Optional[float],
+        lon: Optional[float],
+        radius: Optional[float],
+        page: int,
+        size: int,
+        sort: Optional[str],
+    ):
+        offset = (page - 1) * size
+        query = select(
+            warehouses.c.id,
+            warehouses.c.name,
+            warehouses.c.address,
+            warehouses.c.cashbox,
+            warehouses.c.owner,
+            warehouses.c.created_at,
+            warehouses.c.updated_at,
+        ).select_from(warehouses)
 
-    order_data = {
-        "order_id": order_id,
-        "product_id": order_request.product_id,
-        "listing_pos": order_request.listing_pos,
-        "listing_page": order_request.listing_page,
-        "location_id": order_request.location_id,
-        "utm": order_request.utm,
-        "delivery_type": order_request.delivery.type,
-        "delivery_address": order_request.delivery.address,
-        "delivery_comment": order_request.delivery.comment,
-        "delivery_preferred_time": order_request.delivery.preferred_time,
-        # Информация о заказчике
-        "customer_phone": order_request.customer.phone,
-        "customer_lat": order_request.customer.lat,
-        "customer_lon": order_request.customer.lon,
-        "customer_name": order_request.customer.name,
-        # Информация о получателе
-        "recipient_phone": recipient_phone,
-        "recipient_name": recipient_name,
-        "recipient_lat": recipient_lat,
-        "recipient_lon": recipient_lon,
-        "order_type": order_request.order_type,
-        "quantity": order_request.quantity,
-        "status": "pending",
-        "routing_meta": {
-            "product_cashbox": product.cashbox,
-            "product_name": product.name,
-            "distribution_strategy": "nearest_viable_with_stock",
-            "order_type": order_request.order_type,
-            "has_recipient": bool(order_request.recipient),
-        },
-    }
+        conditions = [warehouses.c.is_public == True]
+        # if city:
+        #     conditions.append(cboxes.c.city.ilike(f"%{city}%"))
+        query = query.where(and_(*conditions))
 
-    await database.execute(mp_orders.insert().values(order_data))
+        if sort == "name":
+            query = query.order_by(warehouses.c.name)
+        else:
+            query = query.order_by(warehouses.c.name)
 
-    rabbitmq_data = {
-        "order_id": order_id,
-        "product_id": order_request.product_id,
-        "product_cashbox": product.cashbox,
-        "quantity": order_request.quantity,
-        "customer_phone": order_request.customer.phone,
-        "delivery_type": order_request.delivery.type,
-        "delivery_address": order_request.delivery.address,
-        "customer_lat": order_request.customer.lat,
-        "customer_lon": order_request.customer.lon,
-    }
-    queue_success = await queue_marketplace_order(rabbitmq_data)
-    if not queue_success:
-        await database.execute(
-            mp_orders.update()
-            .where(mp_orders.c.order_id == order_id)
-            .values(status="failed", routing_meta={"error": "Failed to queue order"})
+        count_query = select(func.count()).select_from(warehouses).where(and_(*conditions))
+        total_count = await database.fetch_val(count_query)
+
+        query = query.limit(size).offset(offset)
+        locations = await database.fetch_all(query)
+
+        result: List[Dict[str, Any]] = []
+        for location in locations:
+            ld = dict(location)
+            if ld.get("address"):
+                ld["address"] = str(ld["address"])
+            ld["cashbox_id"] = ld.get("cashbox")
+            ld["admin_id"] = ld.get("owner")
+            ld["avg_rating"] = None # TODO: add rating
+            ld["reviews_count"] = 0
+            result.append(ld)
+
+        return {"result": result, "count": total_count, "page": page, "size": size}
+
+
+    async def create_order(self, order_request: schemas.MarketplaceOrderRequest) -> schemas.MarketplaceOrderResponse:
+        # группируем товары по cashbox
+        goods_dict: dict[int, list[MarketplaceOrderGood]] = {}
+
+        for good in order_request.goods:
+            if goods_dict.get(good.cashbox_id):
+                goods_dict[good.cashbox_id].append(good)
+            else:
+                goods_dict[good.cashbox_id] = [good]
+
+        for cashbox, goods in goods_dict.items():
+            await self.__rabbitmq.publish(
+                CreateMarketplaceOrderMessage(
+                    message_id=uuid.uuid4(),
+                    cashbox_id=cashbox,
+                    contragent_id=order_request.contragent_id,
+                    goods=goods,
+                    delivery_info=order_request.delivery,
+                ),
+                routing_key='create_marketplace_order',
+            )
+
+        return schemas.MarketplaceOrderResponse(
+            message="Заказ создан и отправлен на обработку"
         )
-        raise HTTPException(status_code=500, detail="Ошибка при обработке заказа")
-
-    return schemas.MarketplaceOrderResponse(
-        order_id=order_id,
-        status="pending",
-        message="Заказ создан и отправлен на обработку",
-        estimated_delivery="30-60 минут",
-        cashbox_assignments=[
-            {
-                "cashbox_id": product.cashbox,
-                "product_name": product.name,
-                "quantity": order_request.quantity,
-                "status": "assigned",
-            }
-        ],
-    )
 
 
 async def resolve_qr(qr_hash: str) -> schemas.QRResolveResponse:

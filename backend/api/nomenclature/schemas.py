@@ -41,6 +41,8 @@ class NomenclatureCreate(BaseModel):
     seo_description: Optional[str]
     seo_keywords: Optional[List[str]] = []
 
+    public: Optional[bool] = False
+
     class Config:
         orm_mode = True
 

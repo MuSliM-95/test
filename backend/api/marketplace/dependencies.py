@@ -1,4 +1,4 @@
-from api.marketplace.models import database
+from database.db import database
 
 
 def get_db():

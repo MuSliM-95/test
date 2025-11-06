@@ -14,7 +14,7 @@ from sqlalchemy import func
 router = APIRouter(tags=["segments"])
 
 
-@router.post("/segments", response_model=schemas.Segment)
+@router.post("/segments/", response_model=schemas.Segment)
 async def create_segments(token: str, segment_data: schemas.SegmentCreate):
     user = await get_user_by_token(token)
 
@@ -194,7 +194,7 @@ async def get_segment_data(idx: int, token: str):
     )
 
 
-@router.get("/segments", response_model=List[schemas.SegmentWithContragents])
+@router.get("/segments/", response_model=List[schemas.SegmentWithContragents])
 async def get_user_segments(token: str, is_archived: Optional[bool] = None):
     user = await get_user_by_token(token)
 

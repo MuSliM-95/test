@@ -11,6 +11,8 @@ from api.docs_sales.messages.RecalculateFinancialsMessageModel import Recalculat
 from api.docs_sales.messages.RecalculateLoyaltyPointsMessageModel import RecalculateLoyaltyPointsMessageModel
 from api.docs_sales.messages.TechCardWarehouseOperationMessage import TechCardWarehouseOperationMessage
 from api.docs_sales.handlers.TechCardWarehouseOperationHandler import TechCardWarehouseOperationHandler
+from api.marketplace.rabbitmq.handlers.CreateMarketplaceOrderHandler import CreateMarketplaceOrderHandler
+from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
 from apps.amocrm.leads.handlers.impl.PostLeadEvent import PostLeadEvent
 from apps.amocrm.leads.models.NewLeadBaseModelMessage import NewLeadBaseModelMessage
 from apps.amocrm.leads.repositories.impl.LeadsRepository import LeadsRepository
@@ -47,6 +49,7 @@ async def startup():
     ))
     await rabbitmq_messaging.subscribe(TechCardWarehouseOperationMessage, TechCardWarehouseOperationHandler())
     await rabbitmq_messaging.subscribe(AppleWalletCardUpdateMessage, AppleWalletCardUpdateHandler())
+    await rabbitmq_messaging.subscribe(CreateMarketplaceOrderMessage, CreateMarketplaceOrderHandler())
 
     await rabbitmq_messaging.install([
         QueueSettingsModel(
@@ -71,6 +74,10 @@ async def startup():
         ),
         QueueSettingsModel(
             queue_name='apple_wallet_card_update',
+            prefetch_count=1
+        ),
+        QueueSettingsModel(
+            queue_name='create_marketplace_order',
             prefetch_count=1
         )
     ])
