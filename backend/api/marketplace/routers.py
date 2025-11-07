@@ -56,21 +56,21 @@ async def get_marketplace_products(
     )
 
 
-@router.get("/locations", response_model=schemas.MarketplaceLocationList)
-async def get_marketplace_locations(
-    city: Optional[str] = Query(None, description="Город"),
-    lat: Optional[float] = Query(None, description="Широта"),
-    lon: Optional[float] = Query(None, description="Долгота"),
-    radius: Optional[float] = Query(None, description="Радиус поиска в км"),
-    page: int = Query(1, ge=1, description="Номер страницы"),
-    size: int = Query(20, ge=1, le=100, description="Размер страницы"),
-    sort: Optional[str] = Query("name", description="Сортировка: name, distance, rating"),
-    service: MarketplaceService = Depends(get_marketplace_service)
-):
-    """
-    Получить список публичных локаций для чекина
-    """
-    return await service.get_locations(city=city, lat=lat, lon=lon, radius=radius, page=page, size=size, sort=sort)
+# @router.get("/locations", response_model=schemas.MarketplaceLocationList)
+# async def get_marketplace_locations(
+#     city: Optional[str] = Query(None, description="Город"),
+#     lat: Optional[float] = Query(None, description="Широта"),
+#     lon: Optional[float] = Query(None, description="Долгота"),
+#     radius: Optional[float] = Query(None, description="Радиус поиска в км"),
+#     page: int = Query(1, ge=1, description="Номер страницы"),
+#     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
+#     sort: Optional[str] = Query("name", description="Сортировка: name, distance, rating"),
+#     service: MarketplaceService = Depends(get_marketplace_service)
+# ):
+#     """
+#     Получить список публичных локаций для чекина
+#     """
+#     return await service.get_locations(city=city, lat=lat, lon=lon, radius=radius, page=page, size=size, sort=sort)
 
 
 @router.post("/orders", response_model=schemas.MarketplaceOrderResponse)
@@ -132,13 +132,12 @@ async def get_favorites(
     phone: str = Query(..., description="Номер телефона"),
     page: int = Query(1, ge=1, description="Номер страницы"),
     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
-    entity_type: Optional[str] = Query(None, description="Фильтр по типу: product или location"),
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
     """
     Получить список избранного пользователя
     """
-    return await service.get_favorites(phone=phone, page=page, size=size, entity_type=entity_type)
+    return await service.get_favorites(contragent_phone=phone, page=page, size=size)
 
 
 # @router.get("/events/view")

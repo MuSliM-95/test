@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from api.docs_sales.schemas import DeliveryInfoSchema
+from api.marketplace.constants import QrEntityTypes
 
 
 class AvailableWarehouse(BaseModel):
@@ -104,7 +105,6 @@ class RecipientInfo(BaseModel):
 
 
 class MarketplaceOrderGood(BaseModel):
-    cashbox_id: int
     nomenclature_id: int
     organization_id: int
     warehouse_id: int # ID помещения
@@ -132,7 +132,7 @@ class MarketplaceOrderResponse(BaseModel):
 
 class QRResolveResponse(BaseModel):
     """Ответ QR-резолвера"""
-    type: str  # "product" или "location"
+    type: QrEntityTypes  # "product" или "location"
     entity: dict  # Данные товара или локации
     qr_hash: str
     resolved_at: datetime
@@ -170,22 +170,28 @@ class ReviewListResponse(BaseModel):
     avg_rating: Optional[float] = None
 
 
+class FavoriteNomenclatureCreate(BaseModel):
+    nomenclature_id: int
+    contagent_id: int
+
+
+# TODO: переписать на contragent_phone все
 class FavoriteRequest(BaseModel):
     """Запрос на добавление в избранное"""
-    entity_type: str  # Только "product"
-    entity_id: int
-    phone: str
-    utm: Optional[dict] = None
+    nomenclature_id: int
+    contragent_phone: str
 
 
 class FavoriteResponse(BaseModel):
     """Ответ с избранным"""
     id: int
-    entity_type: str
-    entity_id: int
-    phone_hash: str
+    nomenclature_id: int
+    contagent_id: int
     created_at: datetime
-    utm: Optional[dict] = None
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
 
 
 class FavoriteListResponse(BaseModel):

@@ -1,30 +1,10 @@
-# """
-# Константы для модуля маркетплейса.
-# Содержит все константы, используемые в функциональности маркетплейса.
-# """
-#
-#
-# # Типы доставки
-# class DeliveryType:
-#     PICKUP = "pickup"            # Самовывоз
-#     DELIVERY = "delivery"        # Доставка
-#     EXPRESS = "express"          # Экспресс доставка
-#
-#
-# # Типы заказов (кто получает заказ)
-# class OrderType:
-#     SELF = "self"                # Заказчик получает сам
-#     OTHER = "other"              # Заказ для другого человека
-#     CORPORATE = "corporate"      # Корпоративный заказ
-#     GIFT = "gift"                # Подарок
-#     PROXY = "proxy"              # Заказ по доверенности
-#
-#
-# # Типы сущностей для QR-кодов и избранного
-# class EntityType:
-#     PRODUCT = "product"          # Товар
-#     LOCATION = "location"        # Локация/магазин
-#     ORDER = "order"              # Заказ
+from enum import Enum
+
+
+class QrEntityTypes(Enum):
+    NOMENCLATURE = "nomenclature"          # Товар
+    WAREHOUSE = "warehouse"        # Локация/магазин
+    # ORDER = "order"              # Заказ
 #
 #
 # # Статусы отзывов

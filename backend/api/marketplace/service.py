@@ -5,16 +5,19 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 from fastapi import HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select, func, and_, desc, asc, text, JSON, cast, literal_column
 
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from common.utils.ioc.ioc import ioc
 from database.db import nomenclature, units, categories, manufacturers, prices, price_types, cboxes, pictures, \
-    nomenclature_barcodes, database, qr_codes, view_events, warehouses_rating_aggregates, warehouses, warehouse_balances
+    nomenclature_barcodes, database, qr_codes, view_events, warehouses_rating_aggregates, warehouses, \
+    warehouse_balances, nomenclature_hash, warehouse_hash, favorites_nomenclatures, contragents
 from . import schemas
+from .constants import QrEntityTypes
 from .rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
-from .schemas import MarketplaceOrderGood
+from .schemas import MarketplaceOrderGood, FavoriteNomenclatureCreate
 
 
 class MarketplaceService:
@@ -23,6 +26,11 @@ class MarketplaceService:
 
     async def connect(self):
         self.__rabbitmq = await ioc.get(IRabbitFactory)()
+
+    @staticmethod
+    async def __get_contragent_id_by_phone(phone: str):  # TODO: Отрефакторить
+        contragent_query = select(contragents.c.id).where(contragents.c.phone == phone)
+        return (await database.fetch_one(contragent_query)).id
 
     @staticmethod
     async def get_products(
@@ -271,12 +279,14 @@ class MarketplaceService:
     async def create_order(self, order_request: schemas.MarketplaceOrderRequest) -> schemas.MarketplaceOrderResponse:
         # группируем товары по cashbox
         goods_dict: dict[int, list[MarketplaceOrderGood]] = {}
-
         for good in order_request.goods:
-            if goods_dict.get(good.cashbox_id):
-                goods_dict[good.cashbox_id].append(good)
+            cashbox_query = select(nomenclature.c.cashbox).where(nomenclature.c.id == good.nomenclature_id)
+            cashbox_id = (await database.fetch_one(cashbox_query)).id
+
+            if goods_dict.get(cashbox_id):
+                goods_dict[cashbox_id].append(good)
             else:
-                goods_dict[good.cashbox_id] = [good]
+                goods_dict[cashbox_id] = [good]
 
         for cashbox, goods in goods_dict.items():
             await self.__rabbitmq.publish(
@@ -294,90 +304,203 @@ class MarketplaceService:
             message="Заказ создан и отправлен на обработку"
         )
 
+    @staticmethod
+    async def resolve_qr(qr_hash: str) -> schemas.QRResolveResponse:
+        nomenclature_query = select(nomenclature_hash.c.nomenclature_id).where(nomenclature_hash.c.hash == qr_hash)
+        warehouse_query = select(warehouse_hash.c.warehouses_id).where(warehouse_hash.c.hash == qr_hash)
+        nomenclature_db = await database.fetch_one(nomenclature_query)
+        warehouse_db = await database.fetch_one(warehouse_query)
 
-async def resolve_qr(qr_hash: str) -> schemas.QRResolveResponse:
-    qr_query = select(qr_codes.c.entity_type, qr_codes.c.entity_id, qr_codes.c.is_active).where(
-        and_(qr_codes.c.qr_hash == qr_hash, qr_codes.c.is_active == True)
-    )
-    qr_record = await database.fetch_one(qr_query)
-    if not qr_record:
-        raise HTTPException(status_code=404, detail="QR-код не найден или неактивен")
+        if nomenclature_db:
+            product_query = select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.description_short,
+                nomenclature.c.description_long,
+                nomenclature.c.code,
+                nomenclature.c.geo_point,
+                nomenclature.c.city,
+                nomenclature.c.cashbox,
+                nomenclature.c.public,
+            ).where(
+                and_(nomenclature.c.id == nomenclature_db.nomenclature_id, nomenclature.c.public == True, nomenclature.c.is_deleted == False))
+            product = await database.fetch_one(product_query)
+            if not product:
+                raise HTTPException(status_code=404, detail="Товар не найден или не доступен")
 
-    entity_type = qr_record.entity_type
-    entity_id = qr_record.entity_id
+            price_query = (
+                select(prices.c.price, price_types.c.name.label("price_type"))
+                .select_from(prices.join(price_types, price_types.c.id == prices.c.price_type))
+                .where(and_(prices.c.nomenclature == nomenclature_db.id, price_types.c.name == "chatting"))
+            )
+            price_data = await database.fetch_one(price_query)
+            entity_data = {
+                "id": product.id,
+                "name": product.name,
+                "description_short": product.description_short,
+                "description_long": product.description_long,
+                "code": product.code,
+                "unit_name": None, # TODO: add data
+                "category_name": None,
+                "manufacturer_name": None,
+                "price": float(price_data.price) if price_data and price_data.price else 0.0,
+                "price_type": price_data.price_type if price_data else "chatting",
+                "images": [],
+                "barcodes": [],
+            }
+            return schemas.QRResolveResponse(type=QrEntityTypes.NOMENCLATURE, entity=entity_data, qr_hash=qr_hash, resolved_at=datetime.now())
+# TODO: удалить таблицу qr_codes
+        elif warehouse_db:
+            warehouse_query = select(
+                warehouses.c.id,
+                warehouses.c.name,
+                warehouses.c.address,
+                warehouses.c.cashbox,
+                warehouses.c.owner,
+                warehouses.c.created_at,
+                warehouses.c.updated_at,
+            ).where(and_(warehouses.c.id == warehouse_db.warehouses_id, warehouses.c.is_public == True))
 
-    if entity_type == "product":
-        product_query = select(
-            nomenclature.c.id,
-            nomenclature.c.name,
-            nomenclature.c.description_short,
-            nomenclature.c.description_long,
-            nomenclature.c.code,
-            nomenclature.c.geo_point,
-            nomenclature.c.city,
-            nomenclature.c.cashbox,
-            nomenclature.c.public,
-        ).where(and_(nomenclature.c.id == entity_id, nomenclature.c.public == True, nomenclature.c.is_deleted == False))
-        product = await database.fetch_one(product_query)
-        if not product:
+
+            warehouse = await database.fetch_one(warehouse_query)
+            if not warehouse:
+                raise HTTPException(status_code=404, detail="Локация не найдена или не доступна")
+
+            entity_data = {
+                "id": warehouse.id,
+                "name": warehouse.name,
+                "admin_id": warehouse.owner,
+                "created_at": warehouse.created_at,
+                "updated_at": warehouse.updated_at,
+                "avg_rating": None, # TODO: add reviews
+                "reviews_count": 0,
+            }
+            return schemas.QRResolveResponse(type=QrEntityTypes.WAREHOUSE, entity=entity_data, qr_hash=qr_hash, resolved_at=datetime.now())
+        else:
+            raise HTTPException(status_code=404, detail="QR-код не найден или неактивен")
+
+    async def get_favorites(
+        self,
+        contragent_phone: str,
+        page: int,
+        size: int
+    ) -> schemas.FavoriteListResponse:
+        contragent_id = await self.__get_contragent_id_by_phone(contragent_phone)
+
+        offset = (page - 1) * size
+
+        # Fetch favorites with pagination
+        favorites_query = (
+            select(
+                favorites_nomenclatures.c.id,
+                favorites_nomenclatures.c.nomenclature_id,
+                favorites_nomenclatures.c.contagent_id,
+                favorites_nomenclatures.c.created_at,
+                favorites_nomenclatures.c.updated_at,
+            )
+            .where(favorites_nomenclatures.c.contagent_id == contragent_id)
+            .order_by(desc(favorites_nomenclatures.c.created_at))
+            .limit(size)
+            .offset(offset)
+        )
+        favorites_rows = await database.fetch_all(favorites_query)
+
+        # Count total favorites
+        count_query = (
+            select(func.count())
+            .select_from(favorites_nomenclatures)
+            .where(favorites_nomenclatures.c.contagent_id == contragent_id)
+        )
+        total_count = await database.fetch_val(count_query)
+
+        # Convert to FavoriteResponse models
+        result = [
+            schemas.FavoriteResponse(
+                id=row.id,
+                nomenclature_id=row.nomenclature_id,
+                contagent_id=row.contagent_id,
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in favorites_rows
+        ]
+
+        return schemas.FavoriteListResponse(
+            result=result,
+            count=total_count,
+            page=page,
+            size=size
+        )
+
+    async def add_to_favorites(self, favorite_request: schemas.FavoriteRequest) -> schemas.FavoriteResponse:
+        product_query = select(nomenclature.c.id).where(
+            and_(
+                nomenclature.c.id == favorite_request.nomenclature_id,
+                nomenclature.c.is_deleted == False, # TODO: добавить проверку на публичность price_type
+            )
+        )
+        entity = await database.fetch_one(product_query)
+        if not entity:
             raise HTTPException(status_code=404, detail="Товар не найден или не доступен")
 
-        price_query = (
-            select(prices.c.price, price_types.c.name.label("price_type"))
-            .select_from(prices.join(price_types, price_types.c.id == prices.c.price_type))
-            .where(and_(prices.c.nomenclature == entity_id, price_types.c.name == "chatting"))
+        contragent_id = await self.__get_contragent_id_by_phone(favorite_request.contragent_phone)
+
+        existing_query = select(favorites_nomenclatures.c.id).where(
+            and_(
+                favorites_nomenclatures.c.nomenclature_id == favorite_request.nomenclature_id,
+                favorites_nomenclatures.c.contagent_id == contragent_id,
+            )
         )
-        price_data = await database.fetch_one(price_query)
-        entity_data = {
-            "id": product.id,
-            "name": product.name,
-            "description_short": product.description_short,
-            "description_long": product.description_long,
-            "code": product.code,
-            "unit_name": "шт",
-            "category_name": "Категория",
-            "manufacturer_name": "Производитель",
-            "price": float(price_data.price) if price_data and price_data.price else 0.0,
-            "price_type": price_data.price_type if price_data else "chatting",
-            "geo_point": str(product.geo_point) if product.geo_point else None,
-            "city": product.city,
-            "cashbox_id": product.cashbox,
-            "images": [],
-            "barcodes": [],
-        }
-    elif entity_type == "location":
-        location_query = select(
-            cboxes.c.id,
-            cboxes.c.name,
-            cboxes.c.geo_point,
-            cboxes.c.city,
-            cboxes.c.admin,
-            cboxes.c.public,
-            cboxes.c.created_at,
-            cboxes.c.updated_at,
-        ).where(and_(cboxes.c.id == entity_id, cboxes.c.public == True))
-        location = await database.fetch_one(location_query)
-        if not location:
-            raise HTTPException(status_code=404, detail="Локация не найдена или не доступна")
+        existing_favorite = await database.fetch_one(existing_query)
+        if existing_favorite:
+            raise HTTPException(status_code=409, detail="Элемент уже добавлен в избранное")
 
-        entity_data = {
-            "id": location.id,
-            "name": location.name,
-            "geo_point": str(location.geo_point) if location.geo_point else None,
-            "city": location.city,
-            "cashbox_id": location.id,
-            "admin_id": location.admin,
-            "created_at": location.created_at,
-            "updated_at": location.updated_at,
-            "avg_rating": None,
-            "reviews_count": 0,
-            "cashboxes": [],
-        }
-    else:
-        raise HTTPException(status_code=400, detail="Неизвестный тип сущности")
+        insert_data = FavoriteNomenclatureCreate(nomenclature_id=favorite_request.nomenclature_id,
+                                                 contagent_id=contragent_id).dict()
+        favorite_id = await database.execute(favorites_nomenclatures.insert().values(**insert_data))
 
-    return schemas.QRResolveResponse(type=entity_type, entity=entity_data, qr_hash=qr_hash, resolved_at=datetime.now())
+        created_favorite_query = select(
+            favorites_nomenclatures.c.id,
+            favorites_nomenclatures.c.nomenclature_id,
+            favorites_nomenclatures.c.contagent_id,
+            favorites_nomenclatures.c.created_at,
+            favorites_nomenclatures.c.updated_at,
+        ).where(favorites_nomenclatures.c.id == favorite_id)
+        created_favorite = await database.fetch_one(created_favorite_query)
 
+        return schemas.FavoriteResponse.from_orm(created_favorite)
+
+    async def remove_from_favorites(self, favorite_id: int, contragent_phone: str) -> dict:
+        """
+        Удаляет запись из избранного, если она принадлежит указанному контрагенту.
+        """
+        contragent_id = await self.__get_contragent_id_by_phone(contragent_phone)
+
+        # Проверяем, существует ли такая запись и принадлежит ли она контрагенту
+        check_query = (
+            select(favorites_nomenclatures.c.id)
+            .where(
+                and_(
+                    favorites_nomenclatures.c.id == favorite_id,
+                    favorites_nomenclatures.c.contagent_id == contragent_id
+                )
+            )
+        )
+        existing = await database.fetch_one(check_query)
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail="Запись в избранном не найдена или не принадлежит указанному пользователю"
+            )
+
+        # Удаляем запись
+        delete_query = (
+            favorites_nomenclatures.delete()
+            .where(favorites_nomenclatures.c.id == favorite_id)
+        )
+        await database.execute(delete_query)
+
+        return {"message": "Элемент успешно удалён из избранного"}
 
 async def create_review(location_id: int, review_request: schemas.ReviewRequest) -> schemas.ReviewResponse:
     location_query = select(cboxes.c.id, cboxes.c.public).where(and_(cboxes.c.id == location_id, cboxes.c.public == True))
@@ -515,69 +638,6 @@ async def get_reviews(location_id: int, page: int, size: int, sort: Optional[str
     )
 
 
-async def add_to_favorites(favorite_request: schemas.FavoriteRequest) -> schemas.FavoriteResponse:
-    if favorite_request.entity_type != "product":
-        raise HTTPException(status_code=400, detail="Тип сущности должен быть 'product'")
-
-    product_query = select(nomenclature.c.id).where(
-        and_(
-            nomenclature.c.id == favorite_request.entity_id,
-            nomenclature.c.public == True,
-            nomenclature.c.is_deleted == False,
-        )
-    )
-    entity = await database.fetch_one(product_query)
-    if not entity:
-        raise HTTPException(status_code=404, detail="Товар не найден или не доступен")
-
-    phone_hash = hashlib.sha256(favorite_request.phone.encode()).hexdigest()
-    existing_query = select(favorites.c.id).where(
-        and_(
-            favorites.c.phone_hash == phone_hash,
-            favorites.c.entity_type == favorite_request.entity_type,
-            favorites.c.entity_id == favorite_request.entity_id,
-        )
-    )
-    existing_favorite = await database.fetch_one(existing_query)
-    if existing_favorite:
-        raise HTTPException(status_code=409, detail="Элемент уже добавлен в избранное")
-
-    favorite_data = {
-        "entity_type": favorite_request.entity_type,
-        "entity_id": favorite_request.entity_id,
-        "phone_hash": phone_hash,
-        "utm": favorite_request.utm,
-    }
-    favorite_id = await database.execute(favorites.insert().values(favorite_data))
-
-    created_favorite_query = select(
-        favorites.c.id,
-        favorites.c.entity_type,
-        favorites.c.entity_id,
-        favorites.c.phone_hash,
-        favorites.c.created_at,
-        favorites.c.utm,
-    ).where(favorites.c.id == favorite_id)
-    created_favorite = await database.fetch_one(created_favorite_query)
-
-    utm_data = None
-    if created_favorite.utm:
-        try:
-            if isinstance(created_favorite.utm, str):
-                utm_data = json.loads(created_favorite.utm)
-            else:
-                utm_data = created_favorite.utm
-        except Exception:
-            utm_data = None
-
-    return schemas.FavoriteResponse(
-        id=created_favorite.id,
-        entity_type=created_favorite.entity_type,
-        entity_id=created_favorite.entity_id,
-        phone_hash=created_favorite.phone_hash,
-        created_at=created_favorite.created_at,
-        utm=utm_data,
-    )
 
 
 async def remove_from_favorites(favorite_id: int, phone: str) -> Dict[str, Any]:
