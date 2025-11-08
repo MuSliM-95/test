@@ -162,6 +162,7 @@ from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
 from api.employee_shifts.routers import router as employee_shifts_router
 from api.feeds.routers import router as feeds_router
+from api.autosuggestion.routers import router as autosuggestion_router
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 
 from api.marketplace.routers import router as marketplace_router
@@ -255,7 +256,7 @@ app.include_router(marketplace_router)
 app.include_router(employee_shifts_router)
 app.include_router(apple_wallet_router)
 app.include_router(apple_wallet_card_settings_router)
-
+app.include_router(autosuggestion_router)
 app.include_router(feeds_router)
 
 @app.get("/")

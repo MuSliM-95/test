@@ -5,6 +5,11 @@ class QrEntityTypes(Enum):
     NOMENCLATURE = "nomenclature"          # Товар
     WAREHOUSE = "warehouse"        # Локация/магазин
     # ORDER = "order"              # Заказ
+
+class ReviewEntityTypes(Enum):
+    NOMENCLATURE = "nomenclature"
+    WAREHOUSE = "warehouse"
+
 #
 #
 # # Статусы отзывов

@@ -12,12 +12,12 @@ from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from common.utils.ioc.ioc import ioc
 from database.db import nomenclature, units, categories, manufacturers, prices, price_types, cboxes, pictures, \
-    nomenclature_barcodes, database, qr_codes, view_events, warehouses_rating_aggregates, warehouses, \
+    nomenclature_barcodes, database, qr_codes, marketplace_view_events, warehouses_rating_aggregates, warehouses, \
     warehouse_balances, nomenclature_hash, warehouse_hash, favorites_nomenclatures, contragents
 from . import schemas
 from .constants import QrEntityTypes
 from .rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
-from .schemas import MarketplaceOrderGood, FavoriteNomenclatureCreate
+from .schemas import MarketplaceOrderGood, FavoriteNomenclatureCreate, ViewEvent
 
 
 class MarketplaceService:
@@ -29,8 +29,11 @@ class MarketplaceService:
 
     @staticmethod
     async def __get_contragent_id_by_phone(phone: str):  # TODO: Отрефакторить
-        contragent_query = select(contragents.c.id).where(contragents.c.phone == phone)
-        return (await database.fetch_one(contragent_query)).id
+        try:
+            contragent_query = select(contragents.c.id).where(contragents.c.phone == phone)
+            return (await database.fetch_one(contragent_query)).id
+        except AttributeError:
+            raise HTTPException(status_code=404, detail="Контрагент с таким номером телефона не найден")
 
     @staticmethod
     async def get_products(
@@ -178,6 +181,7 @@ class MarketplaceService:
         for index, product in enumerate(products_db):
             product_dict = dict(product)
             product_dict["listing_pos"] = (page - 1) * size + index + 1
+            product_dict["listing_page"] = page
             if product_dict.get("geo_point"):
                 product_dict["geo_point"] = str(product_dict["geo_point"])
 
@@ -278,6 +282,7 @@ class MarketplaceService:
 
     async def create_order(self, order_request: schemas.MarketplaceOrderRequest) -> schemas.MarketplaceOrderResponse:
         # группируем товары по cashbox
+        # TODO: add autosetuping warehouse_id and org_id
         goods_dict: dict[int, list[MarketplaceOrderGood]] = {}
         for good in order_request.goods:
             cashbox_query = select(nomenclature.c.cashbox).where(nomenclature.c.id == good.nomenclature_id)
@@ -502,20 +507,57 @@ class MarketplaceService:
 
         return {"message": "Элемент успешно удалён из избранного"}
 
-async def create_review(location_id: int, review_request: schemas.ReviewRequest) -> schemas.ReviewResponse:
+    async def create_view_event(self, request: schemas.CreateViewEventRequest) -> schemas.CreateViewEventResponse:
+        contragent_id = await self.__get_contragent_id_by_phone(request.contragent_phone)
+
+        if request.entity_type == 'warehouse':
+            cashbox_id = select(warehouses.c.cashbox).where(warehouses.c.id == request.entity_id)
+        elif request.entity_type == 'nomenclature':
+            cashbox_id = select(nomenclature.c.cashbox).where(nomenclature.c.id == request.entity_id)
+        else:
+            raise HTTPException(status_code=422, detail='Неизвестный entity_type')
+
+        query = marketplace_view_events.insert().values(
+            cashbox_id=cashbox_id,
+            entity_type=request.entity_type,
+            entity_id=request.entity_id,
+            listing_pos=request.listing_pos,
+            listing_page=request.listing_page,
+            contragent_id=contragent_id,
+        )
+        await database.execute(query)
+        return schemas.CreateViewEventResponse(success=True, message="Событие просмотра успешно сохранено")
+
+    async def get_view_events(self, request: schemas.GetViewEventsRequest) -> schemas.GetViewEventsList:
+        query = select(marketplace_view_events).where()
+        conditions = [marketplace_view_events.c.cashbox_id == request.cashbox_id]
+
+        if request.entity_type:
+            conditions.append(marketplace_view_events.c.entity_type == request.entity_type)
+        if request.contragent_phone:
+            contragent_id = await self.__get_contragent_id_by_phone(request.contragent_phone)
+            conditions.append(marketplace_view_events.c.contragent_id == contragent_id)
+        if request.from_time:
+            conditions.append(marketplace_view_events.c.created_at >= request.from_time)
+        if request.to_time:
+            conditions.append(marketplace_view_events.c.created_at <= request.to_time)
+
+        query = query.where(and_(*conditions))
+        count_query = select(func.count(marketplace_view_events.c.id)).where(and_(*conditions))
+
+        result = await database.fetch_all(query)
+        count_result = await database.fetch_val(count_query)
+        return schemas.GetViewEventsList(
+            events=[ViewEvent.from_orm(i) for i in result],
+            count=count_result,
+        )
+
+async def create_review(review_request: schemas.ReviewRequest) -> schemas.ReviewResponse:
     location_query = select(cboxes.c.id, cboxes.c.public).where(and_(cboxes.c.id == location_id, cboxes.c.public == True))
     location = await database.fetch_one(location_query)
     if not location:
         raise HTTPException(status_code=404, detail="Локация не найдена или не доступна")
 
-    if not (1 <= review_request.rating <= 5):
-        raise HTTPException(status_code=400, detail="Рейтинг должен быть от 1 до 5")
-    if len(review_request.text.strip()) < 10:
-        raise HTTPException(status_code=400, detail="Текст отзыва должен содержать минимум 10 символов")
-    if len(review_request.text) > 1000:
-        raise HTTPException(status_code=400, detail="Текст отзыва не должен превышать 1000 символов")
-
-    phone_hash = hashlib.sha256(review_request.phone.encode()).hexdigest()
     recent_review_query = select(reviews.c.id).where(
         and_(reviews.c.location_id == location_id, reviews.c.phone_hash == phone_hash, reviews.c.created_at >= func.now() - text("INTERVAL '24 hours'"))
     )
@@ -650,75 +692,3 @@ async def remove_from_favorites(favorite_id: int, phone: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Элемент не найден в избранном")
     await database.execute(favorites.delete().where(favorites.c.id == favorite_id))
     return {"message": "Элемент удален из избранного"}
-
-
-async def get_favorites(
-    phone: str, page: int, size: int, entity_type: Optional[str]
-) -> schemas.FavoriteListResponse:
-    phone_hash = hashlib.sha256(phone.encode()).hexdigest()
-    offset = (page - 1) * size
-
-    query = select(
-        favorites.c.id,
-        favorites.c.entity_type,
-        favorites.c.entity_id,
-        favorites.c.phone_hash,
-        favorites.c.created_at,
-        favorites.c.utm,
-    ).where(favorites.c.phone_hash == phone_hash)
-
-    if entity_type:
-        if entity_type not in ["product", "location"]:
-            raise HTTPException(status_code=400, detail="Тип сущности должен быть 'product' или 'location'")
-        query = query.where(favorites.c.entity_type == entity_type)
-
-    query = query.order_by(desc(favorites.c.created_at))
-    count_query = select(func.count()).where(favorites.c.phone_hash == phone_hash)
-    if entity_type:
-        count_query = count_query.where(favorites.c.entity_type == entity_type)
-    total_count = await database.fetch_val(count_query)
-
-    query = query.offset(offset).limit(size)
-    favorites_data = await database.fetch_all(query)
-
-    result: List[schemas.FavoriteResponse] = []
-    for favorite in favorites_data:
-        utm_data = None
-        if favorite.utm:
-            try:
-                if isinstance(favorite.utm, str):
-                    utm_data = json.loads(favorite.utm)
-                else:
-                    utm_data = favorite.utm
-            except Exception:
-                utm_data = None
-        result.append(
-            schemas.FavoriteResponse(
-                id=favorite.id,
-                entity_type=favorite.entity_type,
-                entity_id=favorite.entity_id,
-                phone_hash=favorite.phone_hash,
-                created_at=favorite.created_at,
-                utm=utm_data,
-            )
-        )
-
-    return schemas.FavoriteListResponse(result=result, count=total_count, page=page, size=size)
-
-
-async def create_view_event(request: schemas.ViewEventRequest) -> schemas.ViewEventResponse:
-    phone_hash = None
-    if request.phone:
-        phone_hash = hashlib.sha256(request.phone.encode()).hexdigest()
-    query = view_events.insert().values(
-        entity_type=request.entity_type,
-        entity_id=request.entity_id,
-        listing_pos=request.listing_pos,
-        listing_page=request.listing_page,
-        phone_hash=phone_hash,
-        utm=request.utm,
-    )
-    await database.execute(query)
-    return schemas.ViewEventResponse(success=True, message="Событие просмотра успешно сохранено")
-
-

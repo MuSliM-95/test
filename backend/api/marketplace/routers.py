@@ -1,16 +1,13 @@
 from typing import Optional
 
 from fastapi import APIRouter, Query, Depends
+from watchgod import awatch
 
 import api.marketplace.schemas as schemas
 from api.marketplace.service import MarketplaceService
 from api.marketplace.utils import get_marketplace_service
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
-
-@router.get("/events/view")
-async def get_view_events_info(): pass
-
 
 
 @router.get("/products", response_model=schemas.MarketplaceProductList)
@@ -140,44 +137,13 @@ async def get_favorites(
     return await service.get_favorites(contragent_phone=phone, page=page, size=size)
 
 
-# @router.get("/events/view")
-# async def get_view_events_info():
-#     """Информация о эндпоинте событий просмотра"""
-#     return {
-#         "message": "Используйте POST запрос для создания событий просмотра",
-#         "endpoint": "POST /mp/events/view",
-#         "example": {
-#             "entity_type": "product",
-#             "entity_id": 5,
-#             "listing_pos": 1,
-#             "listing_page": 1,
-#             "utm": {"source": "mobile_app", "campaign": "product_view"},
-#             "phone": "+79001111111"
-#         }
-#     }
-#
-#
-# @router.post("/events/view", response_model=schemas.ViewEventResponse)
-# async def create_view_event(request: schemas.ViewEventRequest):
-#     """Создание события просмотра товара или локации"""
-#     return await service.create_view_event(request)
-#
-#     """Информация о эндпоинте событий просмотра"""
-#     return {
-#         "message": "Используйте POST запрос для создания событий просмотра",
-#         "endpoint": "POST /mp/events/view",
-#         "example": {
-#             "entity_type": "product",
-#             "entity_id": 5,
-#             "listing_pos": 1,
-#             "listing_page": 1,
-#             "utm": {"source": "mobile_app", "campaign": "product_view"},
-#             "phone": "+79001111111"
-#         }
-#     }
-#
-#
-# @router.post("/events/view", response_model=schemas.ViewEventResponse)
-# async def create_view_event(request: schemas.ViewEventRequest):
-#     """Создание события просмотра товара или локации"""
-#     return await service.create_view_event(request)
+@router.get("/events/view")
+async def get_view_events_info(request: schemas.GetViewEventsRequest = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
+    """Информация о эндпоинте событий просмотра"""
+    return await service.get_view_events(request)
+
+
+@router.post("/events/view", response_model=schemas.CreateViewEventResponse)
+async def create_view_event(request: schemas.CreateViewEventRequest, service: MarketplaceService = Depends(get_marketplace_service)):
+    """Создание события просмотра товара или локации"""
+    return await service.create_view_event(request)

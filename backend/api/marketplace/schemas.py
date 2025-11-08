@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from api.docs_sales.schemas import DeliveryInfoSchema
-from api.marketplace.constants import QrEntityTypes
+from api.marketplace.constants import QrEntityTypes, ReviewEntityTypes
 
 
 class AvailableWarehouse(BaseModel):
@@ -38,7 +38,9 @@ class MarketplaceProduct(BaseModel):
 
     # Новые поля для расширенной функциональности
     listing_pos: Optional[int] = None  # Позиция в выдаче для аналитики
+    listing_page: Optional[int] = None
     is_ad_pos: Optional[bool] = False  # Рекламное размещение
+
     tags: Optional[List[str]] = None  # Теги товара
     variations: Optional[List[dict]] = None  # Вариации товара
     stock_quantity: Optional[float] = None  # Остатки
@@ -140,22 +142,23 @@ class QRResolveResponse(BaseModel):
 
 class ReviewRequest(BaseModel):
     """Запрос на создание отзыва"""
-    rating: int  # 1-5
+    entity_type: ReviewEntityTypes
+    entity_id: int
+    rating: int = Field(ge=1, le=5) # 1-5
     text: str
-    phone: str
-    utm: Optional[dict] = None
+    contragent_phone: str
 
 
 class ReviewResponse(BaseModel):
     """Ответ с отзывом"""
     id: int
-    location_id: int
-    rating: int
+    entity_type: ReviewEntityTypes
+    entity_id: int
+    rating: int = Field(ge=1, le=5) # 1-5
     text: str
-    phone_hash: str
+    contgragent_phone: str
     status: str  # pending, visible, hidden
     created_at: datetime
-    utm: Optional[dict] = None
 
     class Config:
         orm_mode = True
@@ -202,17 +205,44 @@ class FavoriteListResponse(BaseModel):
     size: int
 
 
-class ViewEventRequest(BaseModel):
+class ViewEventEntityType(str):
+    pass
+
+
+class GetViewEventsRequest(BaseModel):
+    cashbox_id: int
+    from_time: Optional[datetime] = None
+    to_time: Optional[datetime] = None
+    contragent_phone: Optional[str] = None
+    entity_type: Optional[ViewEventEntityType] = None
+
+class ViewEvent(BaseModel):
+    id: int
+    entity_type: ViewEventEntityType
+    entity_id: int
+    listing_pos: int
+    listing_page: int
+    contragent_id: int
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class GetViewEventsList(BaseModel):
+    events: List[ViewEvent]
+    count: int
+
+class CreateViewEventRequest(BaseModel):
     """Запрос на создание события просмотра"""
-    entity_type: str  # "product" или "location"
+    entity_type: ViewEventEntityType  # "product" или "location"
     entity_id: int
     listing_pos: Optional[int] = None  # Позиция в выдаче
     listing_page: Optional[int] = None  # Страница выдачи
-    utm: Optional[Dict[str, Any]] = None
-    phone: Optional[str] = None  # Для аналитики
+    # utm: Optional[Dict[str, Any]] = None
+    contragent_phone: Optional[str] = None  # Для аналитики
 
 
-class ViewEventResponse(BaseModel):
+class CreateViewEventResponse(BaseModel):
     """Ответ на создание события просмотра"""
     success: bool
     message: str

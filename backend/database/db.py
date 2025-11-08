@@ -1710,16 +1710,16 @@ favorites_nomenclatures = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-view_events = sqlalchemy.Table(
-    "view_events",
+marketplace_view_events = sqlalchemy.Table(
+    "marketplace_view_events",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id'), nullable=False),
     sqlalchemy.Column("entity_type", String, nullable=False),  # 'product' или 'location'
     sqlalchemy.Column("entity_id", Integer, nullable=False),
     sqlalchemy.Column("listing_pos", Integer),  # Позиция в выдаче
     sqlalchemy.Column("listing_page", Integer),  # Страница выдачи
-    sqlalchemy.Column("phone_hash", String),  # Хэш телефона для аналитики
-    sqlalchemy.Column("utm", JSON),
+    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id")),  # Хэш телефона для аналитики
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
 
