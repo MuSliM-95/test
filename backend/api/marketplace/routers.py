@@ -1,16 +1,22 @@
 from typing import Optional
 
 from fastapi import APIRouter, Query, Depends
-from watchgod import awatch
 
-import api.marketplace.schemas as schemas
-from api.marketplace.service import MarketplaceService
+from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse
+from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderRequest
+from api.marketplace.service.products_list_service.schemas import MarketplaceProductList
+from api.marketplace.service.qr_service.schemas import QRResolveResponse
+from api.marketplace.service.review_service.schemas import UpdateReviewRequest, MarketplaceReview, CreateReviewRequest, \
+    ReviewListResponse, ReviewListRequest
+from api.marketplace.service.service import MarketplaceService
+from api.marketplace.service.view_event_service.schemas import GetViewEventsRequest, CreateViewEventResponse, \
+    CreateViewEventRequest
 from api.marketplace.utils import get_marketplace_service
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
 
 
-@router.get("/products", response_model=schemas.MarketplaceProductList)
+@router.get("/products", response_model=MarketplaceProductList)
 async def get_marketplace_products(
     phone: Optional[str] = Query(None, description="Телефон клиента"),
     lat: Optional[float] = Query(None, description="Широта"),
@@ -53,7 +59,7 @@ async def get_marketplace_products(
     )
 
 
-# @router.get("/locations", response_model=schemas.MarketplaceLocationList)
+# @router.get("/locations", response_model=MarketplaceLocationList)
 # async def get_marketplace_locations(
 #     city: Optional[str] = Query(None, description="Город"),
 #     lat: Optional[float] = Query(None, description="Широта"),
@@ -70,15 +76,15 @@ async def get_marketplace_products(
 #     return await service.get_locations(city=city, lat=lat, lon=lon, radius=radius, page=page, size=size, sort=sort)
 
 
-@router.post("/orders", response_model=schemas.MarketplaceOrderResponse)
-async def create_marketplace_order(order_request: schemas.MarketplaceOrderRequest, service: MarketplaceService = Depends(get_marketplace_service)): # TODO: add UTM
+@router.post("/orders", response_model=MarketplaceOrderResponse)
+async def create_marketplace_order(order_request: MarketplaceOrderRequest, service: MarketplaceService = Depends(get_marketplace_service)): # TODO: add UTM
     """
     Создать заказ маркетплейса с автоматическим распределением по кешбоксам
     """
     return await service.create_order(order_request)
 
 
-@router.get("/qr/{qr_hash}", response_model=schemas.QRResolveResponse)
+@router.get("/qr/{qr_hash}", response_model=QRResolveResponse)
 async def resolve_qr_code(qr_hash: str, service: MarketplaceService = Depends(get_marketplace_service)):
     """
     Получить товар или локацию по QR-коду (MD5 хэш)
@@ -86,30 +92,30 @@ async def resolve_qr_code(qr_hash: str, service: MarketplaceService = Depends(ge
     return await service.resolve_qr(qr_hash)
 
 
-@router.post("/locations/{location_id}/reviews", response_model=schemas.ReviewResponse)
-async def create_review(location_id: int, review_request: schemas.ReviewRequest, service: MarketplaceService = Depends(get_marketplace_service)):
-    """
-    Создать отзыв о локации
-    """
-    return await service.create_review(location_id, review_request)
+@router.post("/reviews", response_model=MarketplaceReview)
+async def create_review(review_request: CreateReviewRequest, service: MarketplaceService = Depends(get_marketplace_service)):
+    return await service.create_review(review_request)
 
 
-@router.get("/locations/{location_id}/reviews", response_model=schemas.ReviewListResponse)
+@router.get("/reviews", response_model=ReviewListResponse)
 async def get_reviews(
-    location_id: int,
-    page: int = Query(1, ge=1, description="Номер страницы"),
-    size: int = Query(20, ge=1, le=100, description="Размер страницы"),
-    sort: Optional[str] = Query("newest", description="Сортировка: newest, oldest, highest, lowest"),
+    request: ReviewListRequest = Depends(),
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
-    """
-    Получить отзывы о локации
-    """
-    return await service.get_reviews(location_id=location_id, page=page, size=size, sort=sort)
+    return await service.get_reviews(request)
 
 
-@router.post("/favorites", response_model=schemas.FavoriteResponse)
-async def add_to_favorites(favorite_request: schemas.FavoriteRequest, service: MarketplaceService = Depends(get_marketplace_service)):
+@router.patch("/reviews/{review_id}", response_model=MarketplaceReview)
+async def update_review(
+    review_id: int,
+    request: UpdateReviewRequest,
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.update_review(review_id, request)
+
+
+@router.post("/favorites", response_model=FavoriteResponse)
+async def add_to_favorites(favorite_request: FavoriteRequest, service: MarketplaceService = Depends(get_marketplace_service)):
     """
     Добавить товар или локацию в избранное
     """
@@ -124,7 +130,7 @@ async def remove_from_favorites(favorite_id: int, phone: str = Query(..., descri
     return await service.remove_from_favorites(favorite_id, phone)
 
 
-@router.get("/favorites", response_model=schemas.FavoriteListResponse)
+@router.get("/favorites", response_model=FavoriteListResponse)
 async def get_favorites(
     phone: str = Query(..., description="Номер телефона"),
     page: int = Query(1, ge=1, description="Номер страницы"),
@@ -138,12 +144,12 @@ async def get_favorites(
 
 
 @router.get("/events/view")
-async def get_view_events_info(request: schemas.GetViewEventsRequest = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
+async def get_view_events_info(request: GetViewEventsRequest = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
     """Информация о эндпоинте событий просмотра"""
     return await service.get_view_events(request)
 
 
-@router.post("/events/view", response_model=schemas.CreateViewEventResponse)
-async def create_view_event(request: schemas.CreateViewEventRequest, service: MarketplaceService = Depends(get_marketplace_service)):
+@router.post("/events/view", response_model=CreateViewEventResponse)
+async def create_view_event(request: CreateViewEventRequest, service: MarketplaceService = Depends(get_marketplace_service)):
     """Создание события просмотра товара или локации"""
     return await service.create_view_event(request)

@@ -1,22 +1,19 @@
 import datetime
-from typing import Mapping, Any, Optional, List
+from typing import Mapping, Any, Optional
 
 from aio_pika import IncomingMessage
 from sqlalchemy import select
 
+from api.docs_sales.schemas import Create as CreateDocsSales
 # from api.docs_sales.api.routers import create as create_docs_sales
-from api.docs_sales.api.routers import delivery_info as create_delivery_info
 from api.docs_sales.schemas import CreateMass as CreateMassDocsSales
 from api.docs_sales.schemas import Item as DocsSalesItem
-from api.docs_sales.schemas import Create as CreateDocsSales
 from api.docs_sales.web.views.CreateDocsSalesView import CreateDocsSalesView
 from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
 from api.marketplace.rabbitmq.utils import get_rabbitmq_factory
-from api.marketplace.schemas import MarketplaceOrderGood
+from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
-from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
-from common.utils.ioc.ioc import ioc
-from database.db import cboxes, users_cboxes_relation, database, nomenclature, prices, organizations, contragents
+from database.db import users_cboxes_relation, database, prices
 
 
 class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]):

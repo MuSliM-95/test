@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional
 
-from api.marketplace.service import MarketplaceService
+from api.marketplace.service.service import MarketplaceService
 
 
 def safe_parse_json(value: Any) -> Optional[Dict[str, Any]]:

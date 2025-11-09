@@ -1,10 +1,7 @@
 from typing import List
 
-from pydantic import validator
-
 from api.docs_sales.schemas import DeliveryInfoSchema
-from api.marketplace.schemas import MarketplaceOrderGood
-from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
+from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
 
 

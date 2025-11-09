@@ -1662,38 +1662,26 @@ areas = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-qr_codes = sqlalchemy.Table(
-    "qr_codes",
+marketplace_reviews = sqlalchemy.Table(
+    "marketplace_reviews",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("qr_hash", String, unique=True, nullable=False),
-    sqlalchemy.Column("entity_type", String, nullable=False),  # 'product' или 'location'
     sqlalchemy.Column("entity_id", Integer, nullable=False),
-    sqlalchemy.Column("salt", String, nullable=False),  # Соль для генерации хэша
-    sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-)
-
-warehouse_reviews = sqlalchemy.Table(
-    "warehouse_reviews",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("warehouse_id", Integer, ForeignKey('warehouses.id'), nullable=False),
+    sqlalchemy.Column("entity_type", String, nullable=False),
     sqlalchemy.Column("contagent_id", Integer, ForeignKey('contragents.id'), nullable=False),  # Хэш телефона для анонимности
     sqlalchemy.Column("rating", Integer, nullable=False),  # 1-5
     sqlalchemy.Column("text", Text, nullable=False),
-    sqlalchemy.Column("status", String, nullable=False, server_default="pending"),  # pending, visible, hidden
-    sqlalchemy.Column("utm", JSON),
+    sqlalchemy.Column("status", String, nullable=False, server_default="visible"),  # pending, visible, hidden
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-warehouses_rating_aggregates = sqlalchemy.Table(
-    "warehouses_rating_aggregates",
+marketplace_rating_aggregates = sqlalchemy.Table(
+    "marketplace_rating_aggregates",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("warehouse_id", Integer, ForeignKey('warehouses.id'), nullable=False),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("entity_type", String, nullable=False),
     sqlalchemy.Column("avg_rating", Float, nullable=False),
     sqlalchemy.Column("reviews_count", Integer, nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
