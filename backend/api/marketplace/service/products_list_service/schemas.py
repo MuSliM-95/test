@@ -8,7 +8,10 @@ class AvailableWarehouse(BaseModel):
     warehouse_id: int
     organization_id: int
     warehouse_name: str
-    warehouse_address: str
+    warehouse_address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    distance_to_client: Optional[float] = None
 
     class Config:
         orm_mode = True

@@ -5,26 +5,10 @@ from pydantic import BaseModel
 from api.docs_sales.schemas import DeliveryInfoSchema
 
 
-class CustomerInfo(BaseModel):
-    """Информация о заказчике"""
-    phone: str
-    lat: Optional[float] = None
-    lon: Optional[float] = None
-    name: Optional[str] = None
-
-
-class RecipientInfo(BaseModel):
-    """Информация о получателе заказа"""
-    phone: Optional[str] = None  # Если отличается от заказчика
-    name: Optional[str] = None
-    lat: Optional[float] = None  # Место получения
-    lon: Optional[float] = None
-
-
 class MarketplaceOrderGood(BaseModel):
     nomenclature_id: int
-    organization_id: int
-    warehouse_id: int # ID помещения
+    organization_id: Optional[int] = None
+    warehouse_id: Optional[int] = None # ID помещения
     quantity: int = 1  # Количество товара
 
 
@@ -34,8 +18,9 @@ class MarketplaceOrderRequest(BaseModel):
     utm: Optional[dict] = None  # UTM метки
     delivery: DeliveryInfoSchema
     contragent_id: int
-    recipient: Optional[RecipientInfo] = None  # Информация о получателе (если отличается от заказчика)
-    order_type: str = "self"  # Тип заказа: self, other, corporate, gift, proxy
+    # order_type: str = "self"  # Тип заказа: self, other, corporate, gift, proxy
+    client_lat: Optional[float] = None
+    client_lon: Optional[float] = None
 
 
 class MarketplaceOrderResponse(BaseModel):

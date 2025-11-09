@@ -1,6 +1,9 @@
+import json
+import math
 from typing import Optional, List
 
 from sqlalchemy import and_, select, func, asc, desc, literal_column, JSON, cast
+from sqlalchemy.dialects.postgresql import JSONB
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.products_list_service.schemas import MarketplaceProduct, MarketplaceProductList, \
@@ -11,7 +14,28 @@ from database.db import nomenclature, prices, price_types, database, warehouses,
 
 class MarketplaceProductsListService(BaseMarketplaceService):
     @staticmethod
+    def __count_distance_to_client(client_lat: Optional[float], client_long: Optional[float], warehouse_lat: Optional[float], warehouse_long: Optional[float]) -> Optional[float]:
+        if not all([client_lat, client_long, warehouse_lat, warehouse_long]):
+            return None
+
+        R = 6371.0  # радиус Земли в километрах
+
+        lat1_rad = math.radians(client_lat)
+        lon1_rad = math.radians(client_long)
+        lat2_rad = math.radians(warehouse_lat)
+        lon2_rad = math.radians(warehouse_long)
+
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+
+        a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        distance = R * c
+        return distance  # в километрах
+
     async def get_products(
+            self,
             phone: Optional[str],
             lat: Optional[float],
             lon: Optional[float],
@@ -29,15 +53,17 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # Алиас для складов, связанных с балансами (чтобы не конфликтовать с основным warehouses)
         wh_bal = warehouses.alias("wh_bal")
 
-        json_obj = func.json_build_object(
+        json_obj = func.jsonb_build_object(
             literal_column("'warehouse_id'"), wh_bal.c.id,
             literal_column("'organization_id'"), warehouse_balances.c.organization_id,
             literal_column("'warehouse_name'"), wh_bal.c.name,
-            literal_column("'warehouse_address'"), wh_bal.c.address
+            literal_column("'warehouse_address'"), wh_bal.c.address,
+            literal_column("'latitude'"), wh_bal.c.latitude,
+            literal_column("'longitude'"), wh_bal.c.longitude
         )
 
         available_warehouses_agg = (
-            func.array_agg(cast(json_obj, JSON))
+            func.array_agg(cast(json_obj, JSONB).distinct())
             .filter(wh_bal.c.id.is_not(None))
             .label("available_warehouses")
         )
@@ -93,7 +119,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             # Warehouses for balances (public only)
             .join(warehouse_balances, and_(
                 warehouse_balances.c.nomenclature_id == nomenclature.c.id,
-                warehouse_balances.c.current_amount > 0
+                # warehouse_balances.c.current_amount >= 0
             ), isouter=True)
             .join(wh_bal, and_(
                 wh_bal.c.id == warehouse_balances.c.warehouse_id,
@@ -178,15 +204,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             if wh_raw and isinstance(wh_raw, list):
                 wh_valid = [w for w in wh_raw if w is not None and w.get("warehouse_id") is not None]
                 if wh_valid:
-                    product_dict["available_warehouses"] = [
-                        AvailableWarehouse(
-                            warehouse_id=w["warehouse_id"],
-                            organization_id=w["organization_id"],
-                            warehouse_name=w["warehouse_name"],
-                            warehouse_address=w["warehouse_address"]
-                        )
+                    product_dict["available_warehouses"] = sorted([
+                        AvailableWarehouse(**w, distance_to_client=self.__count_distance_to_client(lat, lon, w['latitude'], w['longitude']))
                         for w in wh_valid
-                    ]
+                    ], key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0))
                 else:
                     product_dict["available_warehouses"] = None
             else:
@@ -209,3 +230,70 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             page=page,
             size=size
         )
+
+
+    async def _fetch_available_warehouses(
+            self,
+            nomenclature_id: int,
+            client_lat: Optional[float] = None,
+            client_lon: Optional[float] = None
+    ) -> List[AvailableWarehouse]:
+        """
+        Получает список публичных, активных и неудалённых складов,
+        на которых есть остатки указанной номенклатуры,
+        и возвращает их как AvailableWarehouse с расстоянием до клиента.
+        """
+
+        # Формируем JSON-объект для каждого склада
+        json_obj = func.jsonb_build_object(
+            literal_column("'warehouse_id'"), warehouses.c.id,
+            literal_column("'organization_id'"), warehouse_balances.c.organization_id,
+            literal_column("'warehouse_name'"), warehouses.c.name,
+            literal_column("'warehouse_address'"), warehouses.c.address,
+            literal_column("'latitude'"), warehouses.c.latitude,
+            literal_column("'longitude'"), warehouses.c.longitude
+        )
+
+        # Запрос: склады с остатками по указанной номенклатуре
+        query = (
+            select(json_obj)
+            .select_from(warehouse_balances)
+            .join(
+                warehouses,
+                and_(
+                    warehouses.c.id == warehouse_balances.c.warehouse_id,
+                    warehouses.c.is_public.is_(True),
+                    warehouses.c.status.is_(True),
+                    warehouses.c.is_deleted.is_not(True)
+                )
+            )
+            .where(
+                and_(
+                    warehouse_balances.c.nomenclature_id == nomenclature_id,
+                    # Можно добавить условие на наличие остатка, если нужно:
+                    # warehouse_balances.c.current_amount > 0
+                )
+            )
+        )
+
+        rows = await database.fetch_all(query)
+        raw_warehouses = []
+        for row in rows:
+            if row and row[0]:
+                # row[0] — это JSON-строка (str), нужно распарсить
+                try:
+                    wh_dict = json.loads(row[0])
+                    raw_warehouses.append(wh_dict)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue  # пропустить некорректные записи
+
+        if not raw_warehouses:
+            return []
+
+        result = []
+        for w in raw_warehouses:
+            result.append(AvailableWarehouse(**w, distance_to_client=self.__count_distance_to_client(client_lat, client_lon, w['latitude'], w['longitude'])))
+
+        # Сортируем: сначала склады с известным расстоянием (по возрастанию), потом — без координат
+        result.sort(key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0))
+        return result

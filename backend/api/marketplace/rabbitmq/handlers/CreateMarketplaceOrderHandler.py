@@ -4,8 +4,8 @@ from typing import Mapping, Any, Optional
 from aio_pika import IncomingMessage
 from sqlalchemy import select
 
+from api.docs_sales.api.routers import delivery_info as create_delivery_info
 from api.docs_sales.schemas import Create as CreateDocsSales
-# from api.docs_sales.api.routers import create as create_docs_sales
 from api.docs_sales.schemas import CreateMass as CreateMassDocsSales
 from api.docs_sales.schemas import Item as DocsSalesItem
 from api.docs_sales.web.views.CreateDocsSalesView import CreateDocsSalesView
@@ -30,12 +30,13 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
                 warehouses_dict[(good.warehouse_id, good.organization_id)].append(good)
             else:
                 warehouses_dict[(good.warehouse_id, good.organization_id)] = [good]
+
         for warehouse_and_organization, goods in warehouses_dict.items():
             # отправить запросы в create
             create_docs_sales_view = CreateDocsSalesView(
                 rabbitmq_messaging_factory=get_rabbitmq_factory()
             )
-            await create_docs_sales_view.__call__(
+            create_result = await create_docs_sales_view.__call__(
                 token=token,
                 docs_sales_data=CreateMassDocsSales(
                     __root__=[
@@ -58,8 +59,9 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
                     ]
                 )
             )
-            # TODO: выставляем delivery_info
-            # await create_delivery_info(
-            #     token=token,
-            #     idx=
-            # )
+            # выставляем delivery_info
+            await create_delivery_info(
+                token=token,
+                idx=create_result[0]['id'],
+                data=data.delivery_info
+            )

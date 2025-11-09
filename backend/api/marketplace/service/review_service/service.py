@@ -76,7 +76,7 @@ class MarketplaceReviewService(BaseMarketplaceService):
             status: Optional[str] = "visible"
 
         # проверяем существование сущности
-        if not (await self.__is_entity_exist_by_id(self.__entity_types_to_tables[review_request.entity_type.value],
+        if not (await self.__is_entity_exist_by_id(self._entity_types_to_tables[review_request.entity_type.value],
                                                    review_request.entity_id)):
             raise HTTPException(status_code=404, detail='Entity type not found')
 
