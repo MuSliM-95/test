@@ -5,6 +5,7 @@ from enum import Enum as ENUM
 
 import databases
 import sqlalchemy
+from dotenv import load_dotenv
 from sqlalchemy import (
     ARRAY,
     JSON,
@@ -18,7 +19,11 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint, SmallInteger, BIGINT, text, Index
+    UniqueConstraint,
+    SmallInteger,
+    BIGINT,
+    text,
+    Index,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -33,6 +38,9 @@ from database.enums import (
     TriggerType,
     TriggerTime,
 )
+
+
+load_dotenv()
 
 
 class OperationType(str, ENUM):
@@ -503,9 +511,6 @@ cboxes = sqlalchemy.Table(
     sqlalchemy.Column("invite_token", String, unique=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
-    # sqlalchemy.Column("public", Boolean, server_default="false"),
-    # sqlalchemy.Column("geo_point", String),
-    # sqlalchemy.Column("city", String(100)),
 )
 
 organizations = sqlalchemy.Table(
@@ -574,12 +579,13 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
+    sqlalchemy.Column("chatting_percent", Integer, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     sqlalchemy.Column("seo_title", String),
     sqlalchemy.Column("seo_description", String),
-    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String)),
+    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String))
 )
 
 nomenclature_attributes = sqlalchemy.Table(
@@ -697,6 +703,8 @@ warehouses = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("address", String),
+    sqlalchemy.Column("latitude", Float),
+    sqlalchemy.Column("longitude", Float),
     sqlalchemy.Column("phone", String),
     sqlalchemy.Column("parent", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
@@ -746,6 +754,7 @@ price_types = sqlalchemy.Table(
     sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
+    sqlalchemy.Column("is_system", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -892,7 +901,8 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
     sqlalchemy.Column("timezone", String),
-    sqlalchemy.Column("payment_past_edit_days", Integer)
+    sqlalchemy.Column("payment_past_edit_days", Integer),
+    sqlalchemy.Column("shift_work_enabled", Boolean, default=False),
 )
 
 contragents = sqlalchemy.Table(
@@ -978,6 +988,7 @@ payments = sqlalchemy.Table(
     sqlalchemy.Column("cheque", Integer, ForeignKey("cheques.id"), nullable=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("contract_id", Integer, ForeignKey("contracts.id")),
+    sqlalchemy.Column("docs_purchases_id", Integer, ForeignKey("docs_purchases.id")),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
@@ -1257,6 +1268,7 @@ docs_sales_delivery_info = sqlalchemy.Table(
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("address", String),
     sqlalchemy.Column("delivery_date", DateTime(timezone=True)),
+    sqlalchemy.Column("delivery_price", Float),
     sqlalchemy.Column("recipient", JSON),
     sqlalchemy.Column("note", String),
 )
@@ -2209,10 +2221,10 @@ database = databases.Database(
     # max_size=10,
     # statement_cache_size=0
 )
-engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL, echo=True)
+engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
 engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)
 
-async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL_ASYNC, pool_pre_ping=True, poolclass=NullPool, echo=True)
+async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL_ASYNC, pool_pre_ping=True, poolclass=NullPool)
 async_session_maker = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
