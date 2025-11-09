@@ -8,7 +8,7 @@ from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.utils.ioc.ioc import ioc
 
 
-class MarketplaceService(MarketplaceOrdersService, MarketplaceProductsListService, MarketplaceReviewService, MarketplaceFavoritesService, MarketplaceQrService, MarketplaceViewEventService):
+class MarketplaceService(MarketplaceProductsListService, MarketplaceOrdersService, MarketplaceReviewService, MarketplaceFavoritesService, MarketplaceQrService, MarketplaceViewEventService):
     def __init__(self):
         super().__init__()
 
