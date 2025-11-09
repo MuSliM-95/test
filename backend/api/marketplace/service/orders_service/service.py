@@ -16,7 +16,7 @@ class MarketplaceOrdersService(BaseMarketplaceService):
         goods_dict: dict[int, list[MarketplaceOrderGood]] = {}
         for good in order_request.goods:
             cashbox_query = select(nomenclature.c.cashbox).where(nomenclature.c.id == good.nomenclature_id)
-            cashbox_id = (await database.fetch_one(cashbox_query)).id
+            cashbox_id = (await database.fetch_one(cashbox_query)).cashbox
 
             if goods_dict.get(cashbox_id):
                 goods_dict[cashbox_id].append(good)
@@ -24,7 +24,7 @@ class MarketplaceOrdersService(BaseMarketplaceService):
                 goods_dict[cashbox_id] = [good]
 
         for cashbox, goods in goods_dict.items():
-            await self.__rabbitmq.publish(
+            await self._rabbitmq.publish(
                 CreateMarketplaceOrderMessage(
                     message_id=uuid.uuid4(),
                     cashbox_id=cashbox,

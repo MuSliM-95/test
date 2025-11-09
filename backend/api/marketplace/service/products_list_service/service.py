@@ -1,6 +1,7 @@
 from typing import Optional, List
 
 from sqlalchemy import and_, select, func, asc, desc, literal_column, JSON, cast
+from sqlalchemy.dialects.postgresql import JSONB
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.products_list_service.schemas import MarketplaceProduct, MarketplaceProductList, \
@@ -29,7 +30,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # Алиас для складов, связанных с балансами (чтобы не конфликтовать с основным warehouses)
         wh_bal = warehouses.alias("wh_bal")
 
-        json_obj = func.json_build_object(
+        json_obj = func.jsonb_build_object(
             literal_column("'warehouse_id'"), wh_bal.c.id,
             literal_column("'organization_id'"), warehouse_balances.c.organization_id,
             literal_column("'warehouse_name'"), wh_bal.c.name,
@@ -37,7 +38,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         )
 
         available_warehouses_agg = (
-            func.array_agg(cast(json_obj, JSON))
+            func.array_agg(cast(json_obj, JSONB).distinct())
             .filter(wh_bal.c.id.is_not(None))
             .label("available_warehouses")
         )

@@ -9,8 +9,11 @@ from common.utils.ioc.ioc import ioc
 
 
 class MarketplaceService(MarketplaceOrdersService, MarketplaceProductsListService, MarketplaceReviewService, MarketplaceFavoritesService, MarketplaceQrService, MarketplaceViewEventService):
+    def __init__(self):
+        super().__init__()
+
     async def connect(self):
-        self.__rabbitmq = await ioc.get(IRabbitFactory)()
+        self._rabbitmq = await ioc.get(IRabbitFactory)()
 
     # @staticmethod
     # async def get_locations( # TODO: rewrite locations на warehouses balaneces

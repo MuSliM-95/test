@@ -1267,6 +1267,9 @@ async def delete(token: str, idx: int):
 )
 async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
     """Добавление информации о доставке в заказу"""
+    print(token)
+    print(idx)
+    print(data)
 
     user = await get_user_by_token(token)
 

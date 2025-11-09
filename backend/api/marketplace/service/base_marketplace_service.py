@@ -9,8 +9,8 @@ from database.db import nomenclature, warehouses, contragents, database
 
 class BaseMarketplaceService:
     def __init__(self):
-        self.__rabbitmq: Optional[IRabbitMessaging] = None
-        self.__entity_types_to_tables = {
+        self._rabbitmq: Optional[IRabbitMessaging] = None
+        self._entity_types_to_tables = {
             'nomenclature': nomenclature,
             'warehouses': warehouses,
         }
