@@ -5,12 +5,13 @@ from typing import List, Optional
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
+from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage, \
+    OrderGoodMessage
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderGood, \
     MarketplaceOrderRequest, CreateOrderUtm
 from api.marketplace.service.products_list_service.schemas import AvailableWarehouse
-from database.db import nomenclature, database
+from database.db import nomenclature, database, warehouse_balances
 
 
 class MarketplaceOrdersService(BaseMarketplaceService, ABC):
@@ -23,17 +24,30 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
     ) -> List[AvailableWarehouse]:
         ...
 
+    @staticmethod
+    async def __transform_good(good: OrderGoodMessage) -> OrderGoodMessage:
+        if good.organization_id == -1:
+            org_id_query = select(warehouse_balances.c.organization_id).where(
+                warehouse_balances.c.warehouse_id == good.warehouse_id,
+                warehouse_balances.c.nomenclature_id == good.nomenclature_id,
+            )
+            org_id = (await database.fetch_one(org_id_query)).organization_id
+            good.organization_id = org_id
+
+        return good
+
+
     async def create_order(self, order_request: MarketplaceOrderRequest, utm: CreateOrderUtm) -> MarketplaceOrderResponse:
         # группируем товары по cashbox
-        goods_dict: dict[int, list[MarketplaceOrderGood]] = {}
+        goods_dict: dict[int, list[OrderGoodMessage]] = {}
         for good in order_request.goods:
             cashbox_query = select(nomenclature.c.cashbox).where(nomenclature.c.id == good.nomenclature_id)
             cashbox_id = (await database.fetch_one(cashbox_query)).cashbox
 
-            if goods_dict.get(cashbox_id):
-                goods_dict[cashbox_id].append(good)
-            else:
-                goods_dict[cashbox_id] = [good]
+            good = OrderGoodMessage(
+                organization_id=-1, # дефолтное значение, которое нужно изменить
+                **good.dict()
+            )
 
             if good.warehouse_id is None:
                 if all([order_request.client_lat, order_request.client_lon]):
@@ -46,13 +60,21 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
                     good.organization_id = warehouse.organization_id
                 else:
                     raise HTTPException(status_code=422, detail='Нужно указать либо склад, либо координаты клиента')
+            else:
+                good = await self.__transform_good(good)
 
+            if goods_dict.get(cashbox_id):
+                goods_dict[cashbox_id].append(good)
+            else:
+                goods_dict[cashbox_id] = [good]
+
+        contragent_id = await self._get_contragent_id_by_phone(order_request.contragent_phone)
         for cashbox, goods in goods_dict.items():
             await self._rabbitmq.publish(
                 CreateMarketplaceOrderMessage(
                     message_id=uuid.uuid4(),
                     cashbox_id=cashbox,
-                    contragent_id=order_request.contragent_id,
+                    contragent_id=contragent_id,
                     goods=goods,
                     delivery_info=order_request.delivery,
                     utm=utm,

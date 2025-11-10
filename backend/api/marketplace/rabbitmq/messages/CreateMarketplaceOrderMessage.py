@@ -5,9 +5,12 @@ from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood,
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
 
 
+class OrderGoodMessage(MarketplaceOrderGood):
+    organization_id: int
+
 class CreateMarketplaceOrderMessage(BaseModelMessage):
     cashbox_id: int
     contragent_id: int
-    goods: List[MarketplaceOrderGood]
+    goods: List[OrderGoodMessage]
     delivery_info: DeliveryInfoSchema
     utm: Optional[CreateOrderUtm] = None
