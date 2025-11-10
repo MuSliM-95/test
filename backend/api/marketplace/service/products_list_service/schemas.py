@@ -63,13 +63,3 @@ class MarketplaceProductList(BaseModel):
     count: int
     page: int
     size: int
-
-class MarketplaceProductFilters(BaseModel): # TODO: использовать это
-    """Фильтры для товаров маркетплейса"""
-    contragent_phone: Optional[str] = None
-    lat: Optional[float] = None
-    lon: Optional[float] = None
-    city: Optional[str] = None
-    page: int = 1
-    size: int = 20
-    sort: Optional[str] = None  # 'distance', 'price', 'name', 'created_at'

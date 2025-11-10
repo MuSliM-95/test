@@ -3,7 +3,9 @@ from typing import List
 
 from pydantic import BaseModel
 
-# TODO: переписать на contragent_phone все
+from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
+
+
 class FavoriteRequest(BaseModel):
     """Запрос на добавление в избранное"""
     nomenclature_id: int
@@ -28,3 +30,6 @@ class FavoriteListResponse(BaseModel):
     count: int
     page: int
     size: int
+
+class CreateFavoritesUtm(BaseMarketplaceUtm):
+    entity_type: UtmEntityType = UtmEntityType.favorites

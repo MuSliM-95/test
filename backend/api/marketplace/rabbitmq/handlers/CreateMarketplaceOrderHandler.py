@@ -2,6 +2,7 @@ import datetime
 from typing import Mapping, Any, Optional
 
 from aio_pika import IncomingMessage
+from fastapi import HTTPException
 from sqlalchemy import select
 
 from api.docs_sales.api.routers import delivery_info as create_delivery_info
@@ -9,14 +10,24 @@ from api.docs_sales.schemas import Create as CreateDocsSales
 from api.docs_sales.schemas import CreateMass as CreateMassDocsSales
 from api.docs_sales.schemas import Item as DocsSalesItem
 from api.docs_sales.web.views.CreateDocsSalesView import CreateDocsSalesView
+from api.docs_sales_utm_tags.schemas import CreateUTMTag
+from api.docs_sales_utm_tags.service import get_docs_sales_utm_service
 from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
 from api.marketplace.rabbitmq.utils import get_rabbitmq_factory
-from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
+from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood, CreateOrderUtm
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
 from database.db import users_cboxes_relation, database, prices
 
 
 class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]):
+    @staticmethod
+    async def __add_utm(token, entity_id: int, utm: CreateOrderUtm):
+        service = await get_docs_sales_utm_service()
+        try:
+            await service.create_utm_tag(token, entity_id, CreateUTMTag(**utm.dict()))
+        except HTTPException:
+            pass
+
     async def __call__(self, event: Mapping[str, Any], message: Optional[IncomingMessage] = None):
         data = CreateMarketplaceOrderMessage(**event)
         token_query = select(users_cboxes_relation.c.token).where(users_cboxes_relation.c.cashbox_id == data.cashbox_id)
@@ -59,9 +70,13 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
                     ]
                 )
             )
+            docs_sales_id = create_result[0]['id']
             # выставляем delivery_info
             await create_delivery_info(
                 token=token,
-                idx=create_result[0]['id'],
+                idx=docs_sales_id,
                 data=data.delivery_info
             )
+            # добавляем utm
+            if data.utm:
+                await self.__add_utm(token, docs_sales_id, data.utm)

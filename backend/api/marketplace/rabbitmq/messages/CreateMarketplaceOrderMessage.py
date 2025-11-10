@@ -1,7 +1,7 @@
-from typing import List
+from typing import List, Optional
 
 from api.docs_sales.schemas import DeliveryInfoSchema
-from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
+from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood, CreateOrderUtm
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
 
 
@@ -10,3 +10,4 @@ class CreateMarketplaceOrderMessage(BaseModelMessage):
     contragent_id: int
     goods: List[MarketplaceOrderGood]
     delivery_info: DeliveryInfoSchema
+    utm: Optional[CreateOrderUtm] = None

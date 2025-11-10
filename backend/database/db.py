@@ -2057,6 +2057,25 @@ docs_sales_utm_tags = sqlalchemy.Table(
     sqlalchemy.Column("utm_gaclientid", String),
 )
 
+marketplace_utm_tags = sqlalchemy.Table(
+    'marketplace_utm_tags',
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("entity_type", String),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("utm_source", String),
+    sqlalchemy.Column("utm_medium", String),
+    sqlalchemy.Column("utm_campaign", String),
+    sqlalchemy.Column("utm_term", ARRAY(item_type=String)),
+    sqlalchemy.Column("utm_content", String),
+    sqlalchemy.Column("utm_name", String),
+    sqlalchemy.Column("utm_phone", String),
+    sqlalchemy.Column("utm_email", String),
+    sqlalchemy.Column("utm_leadid", String),
+    sqlalchemy.Column("utm_yclientid", String),
+    sqlalchemy.Column("utm_gaclientid", String),
+)
+
 segments = sqlalchemy.Table(
     "segments",
     metadata,

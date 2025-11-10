@@ -3,6 +3,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from api.docs_sales.schemas import DeliveryInfoSchema
+from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
 
 
 class MarketplaceOrderGood(BaseModel):
@@ -15,7 +16,6 @@ class MarketplaceOrderGood(BaseModel):
 class MarketplaceOrderRequest(BaseModel):
     """Запрос на создание заказа маркетплейса"""
     goods: List[MarketplaceOrderGood]
-    utm: Optional[dict] = None  # UTM метки
     delivery: DeliveryInfoSchema
     contragent_id: int
     # order_type: str = "self"  # Тип заказа: self, other, corporate, gift, proxy
@@ -30,3 +30,6 @@ class MarketplaceOrderResponse(BaseModel):
     message: str
     # estimated_delivery: Optional[str] = None
     # cashbox_assignments: Optional[List[dict]] = None
+
+class CreateOrderUtm(BaseMarketplaceUtm):
+    entity_type: UtmEntityType = UtmEntityType.docs_sales

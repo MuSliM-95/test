@@ -2,15 +2,17 @@ from typing import Optional
 
 from fastapi import APIRouter, Query, Depends
 
-from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse
-from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderRequest
+from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse, \
+    CreateFavoritesUtm
+from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderRequest, \
+    CreateOrderUtm
 from api.marketplace.service.products_list_service.schemas import MarketplaceProductList
 from api.marketplace.service.qr_service.schemas import QRResolveResponse
 from api.marketplace.service.review_service.schemas import UpdateReviewRequest, MarketplaceReview, CreateReviewRequest, \
     ReviewListResponse, ReviewListRequest
 from api.marketplace.service.service import MarketplaceService
 from api.marketplace.service.view_event_service.schemas import GetViewEventsRequest, CreateViewEventResponse, \
-    CreateViewEventRequest
+    CreateViewEventRequest, ViewEventsUtm
 from api.marketplace.utils import get_marketplace_service
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
@@ -77,11 +79,11 @@ async def get_marketplace_products(
 
 
 @router.post("/orders", response_model=MarketplaceOrderResponse)
-async def create_marketplace_order(order_request: MarketplaceOrderRequest, service: MarketplaceService = Depends(get_marketplace_service)): # TODO: add UTM
+async def create_marketplace_order(order_request: MarketplaceOrderRequest, utm: CreateOrderUtm = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
     """
     Создать заказ маркетплейса с автоматическим распределением по кешбоксам
     """
-    return await service.create_order(order_request)
+    return await service.create_order(order_request, utm)
 
 
 @router.get("/qr/{qr_hash}", response_model=QRResolveResponse)
@@ -115,11 +117,11 @@ async def update_review(
 
 
 @router.post("/favorites", response_model=FavoriteResponse)
-async def add_to_favorites(favorite_request: FavoriteRequest, service: MarketplaceService = Depends(get_marketplace_service)):
+async def add_to_favorites(favorite_request: FavoriteRequest, utm: CreateFavoritesUtm = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
     """
     Добавить товар или локацию в избранное
     """
-    return await service.add_to_favorites(favorite_request)
+    return await service.add_to_favorites(favorite_request, utm)
 
 
 @router.delete("/favorites/{favorite_id}")
@@ -150,6 +152,6 @@ async def get_view_events_info(request: GetViewEventsRequest = Depends(), servic
 
 
 @router.post("/events/view", response_model=CreateViewEventResponse)
-async def create_view_event(request: CreateViewEventRequest, service: MarketplaceService = Depends(get_marketplace_service)):
+async def create_view_event(request: CreateViewEventRequest, utm: ViewEventsUtm = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
     """Создание события просмотра товара или локации"""
-    return await service.create_view_event(request)
+    return await service.create_view_event(request, utm)

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderGood, \
-    MarketplaceOrderRequest
+    MarketplaceOrderRequest, CreateOrderUtm
 from api.marketplace.service.products_list_service.schemas import AvailableWarehouse
 from database.db import nomenclature, database
 
@@ -23,7 +23,7 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
     ) -> List[AvailableWarehouse]:
         ...
 
-    async def create_order(self, order_request: MarketplaceOrderRequest) -> MarketplaceOrderResponse:
+    async def create_order(self, order_request: MarketplaceOrderRequest, utm: CreateOrderUtm) -> MarketplaceOrderResponse:
         # группируем товары по cashbox
         goods_dict: dict[int, list[MarketplaceOrderGood]] = {}
         for good in order_request.goods:
@@ -55,6 +55,7 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
                     contragent_id=order_request.contragent_id,
                     goods=goods,
                     delivery_info=order_request.delivery,
+                    utm=utm,
                 ),
                 routing_key='create_marketplace_order',
             )

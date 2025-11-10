@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from sqlalchemy import select, and_, func, desc
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
-from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse
+from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse, \
+    CreateFavoritesUtm
 from database.db import nomenclature, database, favorites_nomenclatures
 
 
@@ -14,7 +15,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
             page: int,
             size: int
     ) -> FavoriteListResponse:
-        contragent_id = await self.__get_contragent_id_by_phone(contragent_phone)
+        contragent_id = await self._get_contragent_id_by_phone(contragent_phone)
 
         offset = (page - 1) * size
 
@@ -62,7 +63,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         )
 
 
-    async def add_to_favorites(self, favorite_request: FavoriteRequest) -> FavoriteResponse:
+    async def add_to_favorites(self, favorite_request: FavoriteRequest, utm: CreateFavoritesUtm) -> FavoriteResponse:
         class FavoriteNomenclatureCreate(BaseModel):
             nomenclature_id: int
             contagent_id: int
@@ -77,7 +78,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         if not entity:
             raise HTTPException(status_code=404, detail="Товар не найден или не доступен")
 
-        contragent_id = await self.__get_contragent_id_by_phone(favorite_request.contragent_phone)
+        contragent_id = await self._get_contragent_id_by_phone(favorite_request.contragent_phone)
 
         existing_query = select(favorites_nomenclatures.c.id).where(
             and_(
@@ -102,21 +103,25 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         ).where(favorites_nomenclatures.c.id == favorite_id)
         created_favorite = await database.fetch_one(created_favorite_query)
 
+        # добавляем utm
+        await self._add_utm(created_favorite.id, utm)
+
         return FavoriteResponse.from_orm(created_favorite)
 
 
-    async def remove_from_favorites(self, favorite_id: int, contragent_phone: str) -> dict:
+    async def remove_from_favorites(self, nomeclature_id: int, contragent_phone: str) -> dict:
         """
         Удаляет запись из избранного, если она принадлежит указанному контрагенту.
         """
-        contragent_id = await self.__get_contragent_id_by_phone(contragent_phone)
+        contragent_id = await self._get_contragent_id_by_phone(contragent_phone)
 
         # Проверяем, существует ли такая запись и принадлежит ли она контрагенту
         check_query = (
             select(favorites_nomenclatures.c.id)
+            .join(nomenclature, nomenclature.c.id == favorites_nomenclatures.c.nomenclature_id)
             .where(
                 and_(
-                    favorites_nomenclatures.c.id == favorite_id,
+                    nomenclature.c.id == nomeclature_id,
                     favorites_nomenclatures.c.contagent_id == contragent_id
                 )
             )
@@ -131,7 +136,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         # Удаляем запись
         delete_query = (
             favorites_nomenclatures.delete()
-            .where(favorites_nomenclatures.c.id == favorite_id)
+            .where(favorites_nomenclatures.c.id == existing.id)
         )
         await database.execute(delete_query)
 
