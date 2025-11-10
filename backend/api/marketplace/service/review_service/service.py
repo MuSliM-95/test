@@ -80,7 +80,7 @@ class MarketplaceReviewService(BaseMarketplaceService):
                                                    review_request.entity_id)):
             raise HTTPException(status_code=404, detail='Entity type not found')
 
-        contragent_id = await self.__get_contragent_id_by_phone(review_request.contragent_phone)
+        contragent_id = await self._get_contragent_id_by_phone(review_request.contragent_phone)
         review_id = await database.execute(marketplace_reviews.insert().values(CreateReviewDb(
             entity_id=review_request.entity_id,
             entity_type=review_request.entity_type.value,
@@ -156,7 +156,7 @@ class MarketplaceReviewService(BaseMarketplaceService):
 
     async def update_review(self, review_id: int, request: UpdateReviewRequest) -> MarketplaceReview:
         # 1. Получаем ID контрагента по телефону
-        contragent_id = await self.__get_contragent_id_by_phone(request.contragent_phone)
+        contragent_id = await self._get_contragent_id_by_phone(request.contragent_phone)
 
         # 2. Проверяем, существует ли отзыв и принадлежит ли он контрагенту
         existing_query = select(

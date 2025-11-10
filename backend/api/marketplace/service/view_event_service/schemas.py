@@ -3,6 +3,8 @@ from typing import Optional, List
 
 from pydantic import BaseModel
 
+from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
+
 
 class ViewEventEntityType(str):
     pass
@@ -45,3 +47,7 @@ class CreateViewEventResponse(BaseModel):
     """Ответ на создание события просмотра"""
     success: bool
     message: str
+
+
+class ViewEventsUtm(BaseMarketplaceUtm):
+    entity_type: UtmEntityType = UtmEntityType.view_events
