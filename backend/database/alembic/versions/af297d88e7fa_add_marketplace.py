@@ -87,10 +87,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_favorites_nomenclatures_id'), 'favorites_nomenclatures', ['id'], unique=False)
 
-    op.create_foreign_key(None, 'categories', 'pictures', ['photo_id'], ['id'])
     op.add_column('docs_sales', sa.Column('is_marketplace_order', sa.Boolean(), server_default='false', nullable=True))
-
-    op.create_foreign_key(None, 'tech_operation_components', 'nomenclature', ['nomeclature_id'], ['id'])
 
     op.add_column('warehouses', sa.Column('is_public', sa.Boolean(), server_default='false', nullable=True))
 
