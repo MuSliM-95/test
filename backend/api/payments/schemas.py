@@ -57,6 +57,7 @@ class PaymentCreate(BaseModel):
     deb_cred: Optional[bool]
     cheque: Optional[int]
     docs_sales_id: Optional[int]
+    docs_purchases_id: Optional[int]
     contract_id: Optional[int]
 
     preamount: Optional[float]
@@ -107,6 +108,7 @@ class PaymentGet(BaseModel):
     deb_cred: Optional[bool]
     cheque: Optional[int]
     docs_sales_id: Optional[int]
+    docs_purchases_id: Optional[int]
 
     @validator("amount")
     def validate_amount(cls, value):
@@ -161,9 +163,10 @@ class PaymentInList(BaseModel):
     contragent_name: Optional[str]
     cheque: Optional[int]
     docs_sales_id: Optional[int]
+    docs_purchases_id: Optional[int]
     created_at: int
     updated_at: int
-    can_be_deleted_or_edited: bool = True
+    can_be_deleted_or_edited: Optional[bool] = True
 
     @validator("amount")
     def validate_amount(cls, value):
@@ -203,6 +206,7 @@ class PaymentEdit(BaseModel):
     deb_cred: Optional[bool]
     cheque: Optional[int]
     docs_sales_id: Optional[int]
+    docs_purchases_id: Optional[int]
 
     @validator("amount")
     def validate_amount(cls, value):
