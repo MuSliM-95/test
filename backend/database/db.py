@@ -667,20 +667,6 @@ categories = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-global_categories = sqlalchemy.Table(
-    "global_categories",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("name", String, nullable=False),
-    sqlalchemy.Column("description", String),
-    sqlalchemy.Column("code", Integer),
-    sqlalchemy.Column("parent_id", Integer, ForeignKey("global_categories.id")),
-    sqlalchemy.Column("external_id", String),  # ID из Авито
-    sqlalchemy.Column("is_active", Boolean, default=True),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-)
-
 units = sqlalchemy.Table(
     "units",
     metadata,
