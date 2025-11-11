@@ -29,8 +29,6 @@ class MarketplaceProduct(BaseModel):
     manufacturer_name: Optional[str] = None
     price: float
     price_type: str
-    geo_point: Optional[str] = None  # POINT as string
-    city: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     images: Optional[List[str]] = None
@@ -50,7 +48,6 @@ class MarketplaceProduct(BaseModel):
 
     rating: Optional[float] = None  # Рейтинг 1-5
     reviews_count: Optional[int] = None  # Количество отзывов
-    distance: Optional[float] = None  # Расстояние до клиента (если передана геолокация)
 
     available_warehouses: Optional[List[AvailableWarehouse]] = None
 

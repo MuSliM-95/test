@@ -189,8 +189,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             product_dict = dict(product)
             product_dict["listing_pos"] = (page - 1) * size + index + 1
             product_dict["listing_page"] = page
-            if product_dict.get("geo_point"):
-                product_dict["geo_point"] = str(product_dict["geo_point"])
 
             # Images
             images = product_dict.get("images")

@@ -92,19 +92,23 @@ class MarketplaceReviewService(BaseMarketplaceService):
         created_review_query = select(marketplace_reviews).where(marketplace_reviews.c.id == review_id)
         created_review = await database.fetch_one(created_review_query)
 
+        # Пересчитываем агрегат после создания
+        await self.__recalculate_rating_aggregate(review_request.entity_type.value, review_request.entity_id)
+
         return MarketplaceReview.from_orm(created_review)
 
     @staticmethod
     async def get_reviews(request: ReviewListRequest) -> ReviewListResponse:
         offset = (request.page - 1) * request.size
 
-        # Базовый запрос
-        query = select(marketplace_reviews).where()
+        # Базовый запрос отзывов
         conditions = [
             marketplace_reviews.c.entity_type == request.entity_type.value,
             marketplace_reviews.c.entity_id == request.entity_id,
-            marketplace_reviews.c.status == "visible"  # Только видимые отзывы
+            marketplace_reviews.c.status == "visible"
         ]
+
+        query = select(marketplace_reviews).where(and_(*conditions))
 
         # Применяем сортировку
         if request.sort == ReviewListRequest.SortBy.newest:
@@ -116,29 +120,24 @@ class MarketplaceReviewService(BaseMarketplaceService):
         elif request.sort == ReviewListRequest.SortBy.lowest:
             query = query.order_by(asc(marketplace_reviews.c.rating), desc(marketplace_reviews.c.created_at))
 
-        query = query.where(and_(*conditions))
         # Пагинация
         query = query.limit(request.size).offset(offset)
-
-        # Выполняем запрос на отзывы
         reviews_rows = await database.fetch_all(query)
 
-        # Считаем общее количество
-        count_query = select(func.count(marketplace_reviews.c.id)).where(
-            and_(*conditions)
-        )
-        total_count = await database.fetch_val(count_query)
-
-        # Считаем средний рейтинг, если есть отзывы
-        avg_rating = None
-        if total_count > 0:
-            avg_query = select(func.avg(marketplace_reviews.c.rating)).where(
-                and_(
-                    *conditions
-                )
+        # Получаем агрегатные данные из marketplace_rating_aggregates
+        agg_query = select(
+            marketplace_rating_aggregates.c.avg_rating,
+            marketplace_rating_aggregates.c.reviews_count
+        ).where(
+            and_(
+                marketplace_rating_aggregates.c.entity_type == request.entity_type.value,
+                marketplace_rating_aggregates.c.entity_id == request.entity_id
             )
-            avg_result = await database.fetch_val(avg_query)
-            avg_rating = float(avg_result) if avg_result is not None else None
+        )
+        agg = await database.fetch_one(agg_query)
+
+        total_count = agg.reviews_count if agg else 0
+        avg_rating = float(agg.avg_rating) if agg and agg.avg_rating is not None else None
 
         # Преобразуем в схемы
         result = [
@@ -162,7 +161,8 @@ class MarketplaceReviewService(BaseMarketplaceService):
         existing_query = select(
             marketplace_reviews.c.id,
             marketplace_reviews.c.contagent_id,
-            marketplace_reviews.c.status
+            marketplace_reviews.c.entity_type,
+            marketplace_reviews.c.entity_id
         ).where(
             and_(
                 marketplace_reviews.c.id == review_id,
@@ -190,7 +190,10 @@ class MarketplaceReviewService(BaseMarketplaceService):
         )
         await database.execute(update_query)
 
-        # 4. Возвращаем обновлённый отзыв
+        # 4. Пересчитываем агрегат
+        await self.__recalculate_rating_aggregate(existing_review.entity_type, existing_review.entity_id)
+
+        # 5. Возвращаем обновлённый отзыв
         updated_review_query = select(marketplace_reviews).where(marketplace_reviews.c.id == review_id)
         updated_review = await database.fetch_one(updated_review_query)
 
