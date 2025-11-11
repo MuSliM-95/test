@@ -68,6 +68,7 @@ class Create(BaseModel):
     tech_card_operation_uuid: Optional[UUID] = None
     goods: Optional[List[Item]]
     priority: Optional[conint(ge=0, le=10)] = None
+    is_marketplace_order: Optional[bool] = False
 
     class Config:
         orm_mode = True

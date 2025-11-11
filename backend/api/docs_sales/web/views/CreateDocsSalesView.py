@@ -230,6 +230,7 @@ class CreateDocsSalesView:
                 "cashbox": user.cashbox_id,
                 "is_deleted": False,
                 "priority": doc.priority,
+                "is_marketplace_order": doc.is_marketplace_order
             }
             docs_rows.append(doc_dict)
 

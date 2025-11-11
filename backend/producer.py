@@ -8,6 +8,7 @@ from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from common.utils.ioc.ioc import ioc
 from database.db import database, users
 import aio_pika
+from const import marketplace_orders_queue_name
 
 
 async def produce_message(body: dict) -> None:

@@ -1,5 +1,6 @@
 /backend/photos/**
 /backend/.venv/**
+/backend/.idea
 /backend/**/__pycache__
 /nginx/nginx.conf
 docker-compose.yml

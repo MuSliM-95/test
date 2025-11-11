@@ -9,6 +9,7 @@ class WarehouseCreate(BaseModel):
     address: Optional[str]
     phone: Optional[str]
     parent: Optional[int]
+    is_public: Optional[bool]
     status: bool = True
 
     class Config:
