@@ -39,9 +39,7 @@ async def get_marketplace_products(
     Получение всех публичных товаров маркетплейса
     
     Фильтрует только товары с:
-    - public = true
     - price_type = 'chatting'
-    - Поддерживает геолокацию, персонализацию и расширенные фильтры
     """
     
     return await service.get_products(
@@ -147,11 +145,11 @@ async def get_favorites(
 
 @router.get("/events/view")
 async def get_view_events_info(request: GetViewEventsRequest = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
-    """Информация о эндпоинте событий просмотра"""
+    """Информация о событиях просмотра"""
     return await service.get_view_events(request)
 
 
 @router.post("/events/view", response_model=CreateViewEventResponse)
 async def create_view_event(request: CreateViewEventRequest, utm: ViewEventsUtm = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
-    """Создание события просмотра товара или локации"""
+    """Создание события просмотра товара"""
     return await service.create_view_event(request, utm)
