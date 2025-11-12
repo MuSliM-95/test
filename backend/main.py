@@ -165,6 +165,8 @@ from api.feeds.routers import router as feeds_router
 from api.chats.routers import router as chats_router
 from api.chats.websocket import router as chats_ws_router
 from api.chats.rabbitmq_consumer import chat_consumer
+from api.chats.avito.avito_routes import router as avito_router
+from api.chats.avito.avito_consumer import avito_consumer
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 
 # from jobs.jobs import scheduler
@@ -265,6 +267,7 @@ app.include_router(apple_wallet_card_settings_router)
 app.include_router(feeds_router)
 app.include_router(chats_router)
 app.include_router(chats_ws_router)
+app.include_router(avito_router)
 
 # @app.get("/api/v1/openapi.json", include_in_schema=False)
 # async def get_openapi():
@@ -397,9 +400,22 @@ async def startup():
     await database.connect()
 
     try:
+        from api.chats.avito.avito_init import init_avito_credentials
+        await init_avito_credentials()
+    except Exception as e:
+        print(f"Warning: failed to initialize Avito credentials from env: {e}")
+
+    try:
         await chat_consumer.start()
     except Exception as e:
         print(f"Warning: Failed to start chat consumer: {e}")
+        import traceback
+        traceback.print_exc()
+
+    try:
+        await avito_consumer.start()
+    except Exception as e:
+        print(f"Warning: Failed to start Avito consumer: {e}")
         import traceback
         traceback.print_exc()
 
@@ -413,3 +429,4 @@ async def startup():
 async def shutdown():
     await database.disconnect()
     await chat_consumer.stop()
+    await avito_consumer.stop()

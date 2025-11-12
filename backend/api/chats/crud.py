@@ -27,6 +27,12 @@ async def get_channel(channel_id: int):
     return await database.fetch_one(query)
 
 
+async def get_channel_by_type(channel_type: str):
+    """Get channel by type (optimized single lookup)"""
+    query = channels.select().where(channels.c.type == channel_type)
+    return await database.fetch_one(query)
+
+
 async def get_channels(skip: int = 0, limit: int = 100):
     """Get all channels with pagination"""
     query = channels.select().offset(skip).limit(limit)
@@ -75,6 +81,16 @@ async def create_chat(channel_id: int, cashbox_id: int, contragent_id: Optional[
 async def get_chat(chat_id: int):
     """Get chat by ID"""
     query = chats.select().where(chats.c.id == chat_id)
+    return await database.fetch_one(query)
+
+
+async def get_chat_by_external_id(channel_id: int, external_chat_id: str, cashbox_id: int):
+    """Find chat by external_chat_id, channel_id and cashbox_id (optimized single query)"""
+    query = chats.select().where(and_(
+        chats.c.channel_id == channel_id,
+        chats.c.external_chat_id == external_chat_id,
+        chats.c.cashbox_id == cashbox_id
+    ))
     return await database.fetch_one(query)
 
 
