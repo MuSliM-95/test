@@ -258,7 +258,13 @@ async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Op
         name = chat.get('name')
     
     cashbox_id = chat['cashbox_id']
+    channel_id = chat['channel_id']
     
+    channel = await get_channel(channel_id)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    channel_type = channel.get('type', 'UNKNOWN') 
     query = contragents.select().where(
         and_(
             contragents.c.phone == phone,
@@ -276,18 +282,42 @@ async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Op
         contragent_id = existing_contragent['id']
         contragent_name = existing_contragent['name']
         message_result = "Chat linked with existing contragent"
+        
+        existing_data = existing_contragent.get('data') or {}
+        if not isinstance(existing_data, dict):
+            existing_data = {}
+        
+        if 'chat_ids' not in existing_data:
+            existing_data['chat_ids'] = []
+        
+        if chat_id not in existing_data['chat_ids']:
+            existing_data['chat_ids'].append(chat_id)
+        
+        if 'primary_channel' not in existing_data:
+            existing_data['primary_channel'] = channel_type
+        
+        update_contragent_query = contragents.update().where(
+            contragents.c.id == contragent_id
+        ).values(data=existing_data)
+        await database.execute(update_contragent_query)
     else:
         is_new_contragent = True
         contragent_name = name or "Unknown"
+        
+        contragent_data = {
+            "chat_ids": [chat_id],
+            "primary_channel": channel_type
+        }
         
         insert_query = contragents.insert().values(
             name=contragent_name,
             phone=phone,
             cashbox=cashbox_id,
             is_deleted=False,
-            description="",
+            description=f"Канал: {channel_type}",
             external_id=None,
-            contragent_type="Покупатель"
+            contragent_type="Покупатель",
+            data=contragent_data
         )
         contragent_id = await database.execute(insert_query)
         message_result = "New contragent created and linked to chat"
@@ -310,6 +340,7 @@ async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Op
         "contragent_name": contragent_name,
         "is_new_contragent": is_new_contragent,
         "message": message_result,
-        "phone": phone
+        "phone": phone,
+        "channel_type": channel_type
     }
 
