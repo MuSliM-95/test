@@ -39,7 +39,6 @@ from database.enums import (
     TriggerTime,
 )
 
-
 load_dotenv()
 
 
@@ -142,6 +141,45 @@ class SegmentStatus(str, ENUM):
     created = "created"
     in_process = "in_process"
     calculated = "calculated"
+
+
+class ChannelType(str, ENUM):
+    AVITO = "AVITO"
+    WHATSAPP = "WHATSAPP"
+    TELEGRAM = "TELEGRAM"
+
+
+class CustomerSource(str, ENUM):
+    AVITO = "AVITO"
+    WHATSAPP = "WHATSAPP"
+    TELEGRAM = "TELEGRAM"
+
+
+class ChatStatus(str, ENUM):
+    ACTIVE = "ACTIVE"
+    CLOSED = "CLOSED"
+    ARCHIVED = "ARCHIVED"
+
+
+class MessageType(str, ENUM):
+    TEXT = "TEXT"
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+    DOCUMENT = "DOCUMENT"
+    VOICE = "VOICE"
+    SYSTEM = "SYSTEM"
+
+
+class MessageStatus(str, ENUM):
+    SENT = "SENT"
+    DELIVERED = "DELIVERED"
+    READ = "READ"
+    FAILED = "FAILED"
+
+
+class MessageSenderType(str, ENUM):
+    CLIENT = "CLIENT"
+    OPERATOR = "OPERATOR"
 
 
 metadata = sqlalchemy.MetaData()
@@ -697,7 +735,6 @@ warehouses = sqlalchemy.Table(
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("status", Boolean, nullable=False),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("is_public", Boolean, server_default="false"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -889,6 +926,7 @@ users_cboxes_relation = sqlalchemy.Table(
     sqlalchemy.Column("timezone", String),
     sqlalchemy.Column("payment_past_edit_days", Integer),
     sqlalchemy.Column("shift_work_enabled", Boolean, default=False),
+    sqlalchemy.Column("rating", Float, nullable=True, server_default="0.0"),
 )
 
 contragents = sqlalchemy.Table(
@@ -974,11 +1012,9 @@ payments = sqlalchemy.Table(
     sqlalchemy.Column("cheque", Integer, ForeignKey("cheques.id"), nullable=True),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("contract_id", Integer, ForeignKey("contracts.id")),
-    sqlalchemy.Column("docs_purchases_id", Integer, ForeignKey("docs_purchases.id")),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
-
 
 projects = sqlalchemy.Table(
     "projects",
@@ -1235,9 +1271,7 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 
-    sqlalchemy.Column("priority", Integer, nullable=True),
-
-    sqlalchemy.Column("is_marketplace_order", Boolean, server_default="false")
+    sqlalchemy.Column("priority", Integer, nullable=True)
 )
 
 docs_sales_tags = sqlalchemy.Table(
@@ -1661,55 +1695,6 @@ areas = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-marketplace_reviews = sqlalchemy.Table(
-    "marketplace_reviews",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("entity_id", Integer, nullable=False),
-    sqlalchemy.Column("entity_type", String, nullable=False),
-    sqlalchemy.Column("contagent_id", Integer, ForeignKey('contragents.id'), nullable=False),  # Хэш телефона для анонимности
-    sqlalchemy.Column("rating", Integer, nullable=False),  # 1-5
-    sqlalchemy.Column("text", Text, nullable=False),
-    sqlalchemy.Column("status", String, nullable=False, server_default="visible"),  # pending, visible, hidden
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-)
-
-marketplace_rating_aggregates = sqlalchemy.Table(
-    "marketplace_rating_aggregates",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("entity_id", Integer, nullable=False),
-    sqlalchemy.Column("entity_type", String, nullable=False),
-    sqlalchemy.Column("avg_rating", Float, nullable=False),
-    sqlalchemy.Column("reviews_count", Integer, nullable=False),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now()),
-)
-
-favorites_nomenclatures = sqlalchemy.Table(
-    "favorites_nomenclatures",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey('nomenclature.id'), nullable=False),
-    sqlalchemy.Column("contagent_id", Integer, ForeignKey('contragents.id'), nullable=False),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-)
-
-marketplace_view_events = sqlalchemy.Table(
-    "marketplace_view_events",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id'), nullable=False),
-    sqlalchemy.Column("entity_type", String, nullable=False),  # 'product' или 'location'
-    sqlalchemy.Column("entity_id", Integer, nullable=False),
-    sqlalchemy.Column("listing_pos", Integer),  # Позиция в выдаче
-    sqlalchemy.Column("listing_page", Integer),  # Страница выдачи
-    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id")),  # Хэш телефона для аналитики
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-)
-
 pages = sqlalchemy.Table(
     "pages",
     metadata,
@@ -2044,25 +2029,6 @@ docs_sales_utm_tags = sqlalchemy.Table(
     sqlalchemy.Column("utm_gaclientid", String),
 )
 
-marketplace_utm_tags = sqlalchemy.Table(
-    'marketplace_utm_tags',
-    metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("entity_type", String),
-    sqlalchemy.Column("entity_id", Integer, nullable=False),
-    sqlalchemy.Column("utm_source", String),
-    sqlalchemy.Column("utm_medium", String),
-    sqlalchemy.Column("utm_campaign", String),
-    sqlalchemy.Column("utm_term", ARRAY(item_type=String)),
-    sqlalchemy.Column("utm_content", String),
-    sqlalchemy.Column("utm_name", String),
-    sqlalchemy.Column("utm_phone", String),
-    sqlalchemy.Column("utm_email", String),
-    sqlalchemy.Column("utm_leadid", String),
-    sqlalchemy.Column("utm_yclientid", String),
-    sqlalchemy.Column("utm_gaclientid", String),
-)
-
 segments = sqlalchemy.Table(
     "segments",
     metadata,
@@ -2349,4 +2315,55 @@ feeds_tags = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime(timezone=True),
                       server_default=func.now(), onupdate=func.now()),
     sqlalchemy.UniqueConstraint("tag_id", "feed_id", name="unique_tag_id_feed_id"),
+)
+
+
+channels = sqlalchemy.Table(
+    "channels",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("name", String(50), nullable=False, unique=True),
+    sqlalchemy.Column("type", Enum(ChannelType), nullable=False),
+    sqlalchemy.Column("description", String(255), nullable=True),
+    sqlalchemy.Column("svg_icon", String(255), nullable=True),
+    sqlalchemy.Column("tags", JSON, nullable=True),
+    sqlalchemy.Column("api_config_name", String(100), nullable=True),
+    sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
+    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
+)
+
+chats = sqlalchemy.Table(
+    "chats",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id", ondelete="SET NULL"), nullable=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("external_chat_id", String(255), nullable=False),
+    sqlalchemy.Column("phone", String(20), nullable=True),
+    sqlalchemy.Column("name", String(100), nullable=True),
+    sqlalchemy.Column("status", Enum(ChatStatus), nullable=False, server_default="ACTIVE"),
+    sqlalchemy.Column("assigned_operator_id", Integer, ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"), nullable=True),
+    sqlalchemy.Column("first_message_time", DateTime, nullable=True),
+    sqlalchemy.Column("first_response_time_seconds", Integer, nullable=True),
+    sqlalchemy.Column("last_message_time", DateTime, nullable=True),
+    sqlalchemy.Column("last_response_time_seconds", Integer, nullable=True),
+    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
+    UniqueConstraint("channel_id", "external_chat_id", "cashbox_id", name="uq_chats_channel_external_cashbox"),
+)
+
+chat_messages = sqlalchemy.Table(
+    "chat_messages",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("chat_id", Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("sender_type", Enum(MessageSenderType), nullable=False),
+    sqlalchemy.Column("message_type", Enum(MessageType), nullable=False, server_default="TEXT"),
+    sqlalchemy.Column("content", Text, nullable=False),
+    sqlalchemy.Column("external_message_id", String(255), nullable=True),
+    sqlalchemy.Column("status", Enum(MessageStatus), nullable=False, server_default="SENT"),
+    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
 )

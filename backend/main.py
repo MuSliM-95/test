@@ -5,47 +5,14 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from starlette.types import Message
 
-from api.analytics.routers import router as analytics_router
-from api.apple_wallet.routers import router as apple_wallet_router
-from api.apple_wallet_card_settings.routers import router as apple_wallet_card_settings_router
-from api.articles.routers import router as articles_router
-from api.autosuggestion.routers import router as autosuggestion_router
-from api.balances.routers import router as balances_router
-from api.cashboxes.routers import router as cboxes_router
-from api.categories.routers import router as categories_router
 from api.categories.web.InstallCategoriesWeb import InstallCategoriesWeb
-from api.cheques.routers import router as cheques_router
-from api.contracts.routers import router as contracts_router
-from api.contragents.routers import router as contragents_router
-# from api.global_categories.web.InstallGlobalCategoriesWeb import InstallGlobalCategoriesWeb
 from api.contragents.web.InstallContragentsWeb import InstallContragentsWeb
-from api.distribution_docs.routers import router as distribution_docs_router
-from api.docs_generate.routers import router as doc_generate_router
-from api.docs_purchases.routers import router as docs_purchases_router
-from api.docs_reconciliation.routers import router as docs_reconciliation_router
-from api.docs_sales.api.routers import router as docs_sales_router
 from api.docs_sales.web.InstallDocsSalesWeb import InstallDocsSalesWeb
-from api.docs_sales_utm_tags.routers import router as utm_router
-from api.docs_warehouses.routers import router as docs_warehouses_router
-from api.employee_shifts.routers import router as employee_shifts_router
-from api.events.routers import router as events_router
-from api.feeds.routers import router as feeds_router
-from api.fifo_settings.routers import router as fifo_settings_router
-from api.functions.routers import router as entity_functions_router
-from api.gross_profit_docs.routers import router as gross_profit_docs_router
-from api.installs.routers import router as installs_router
-from api.integrations.routers import router as int_router
-from api.loyality_cards.routers import router as loyality_cards
-from api.loyality_settings.routers import router as loyality_settings
-from api.loyality_transactions.routers import router as loyality_transactions
 from api.loyality_transactions.web.InstallLoyalityTransactionsWeb import InstallLoyalityTransactionsWeb
 from api.manufacturers.web.InstallManufacturersWeb import InstallManufacturersWeb
-from api.marketplace.routers import router as marketplace_router
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
 from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import NomenclatureReader
-from api.nomenclature.routers import router as nomenclature_router
 from api.nomenclature.web.InstallNomenclatureWeb import InstallNomenclatureWeb
 from api.nomenclature_attributes.infrastructure.functions.core.IDeleteNomenclatureAttributesFunction import \
     IDeleteNomenclatureAttributesFunction
@@ -87,32 +54,6 @@ from api.nomenclature_groups.infrastructure.functions.impl.PatchNomenclatureGrou
 from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
 from api.nomenclature_groups.infrastructure.readers.impl.NomenclatureGroupsReader import NomenclatureGroupsReader
 from api.nomenclature_groups.web.InstallNomenclatureGroupsWeb import InstallNomenclatureGroupsWeb
-from api.oauth.routes import router as oauth_router
-from api.organizations.routers import router as organizations_router
-from api.payments.routers import create_payment, router as payments_router
-from api.pboxes.routers import router as pboxes_router
-from api.pictures.routers import router as pictures_router
-from api.price_types.routers import router as price_types_router
-from api.prices.routers import router as prices_router
-from api.projects.routers import router as projects_router
-from api.reports.routers import router as reports_router
-from api.segments.routers import router as segments_router
-from api.segments_tags.routers import router as segments_tags_router
-from api.settings.amo_triggers.routers import router as triggers_router
-from api.settings.cashbox.routers import router as cashbox_settings_router
-from api.tags.routers import router as tags_router
-from api.tech_cards.router import router as tech_cards_router
-from api.tech_operations.router import router as tech_operations_router
-from api.templates.routers import router as templates_router
-from api.trigger_notification.routers import router as triggers_notification
-from api.units.routers import router as units_router
-from api.users.routers import router as users_router
-from api.warehouse_balances.routers import router as warehouse_balances_router
-from api.warehouses.routers import router as warehouses_router
-from api.webapp.routers import router as webapp_router
-from api.websockets.routers import router as websockets_router
-from apps.amocrm.api.pair.routes import router as amo_pair_router
-from apps.amocrm.install.web.routes import router as amo_install_router
 from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import \
     IWidgetInstallerRepository
 from apps.amocrm.installer.infrastructure.repositories.impl.WidgetInstallerRepository import \
@@ -128,11 +69,6 @@ from apps.booking.nomenclature.infrastructure.repositories.core.IBookingNomencla
 from apps.booking.nomenclature.infrastructure.repositories.impl.BookingNomenclatureRepository import \
     BookingNomenclatureRepository
 from apps.booking.repeat.web.InstallBookingRepeatWeb import InstallBookingRepeatWeb
-from apps.booking.routers import router as booking_router
-from apps.evotor.routes import router as evotor_router
-from apps.evotor.routes import router_auth as evotor_router_auth
-from apps.module_bank.routes import router as module_bank_router
-from apps.tochka_bank.routes import router as tochka_router
 from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import IYookassaCrmPaymentsRepository
 from apps.yookassa.repositories.core.IYookassaOauthRepository import IYookassaOauthRepository
 from apps.yookassa.repositories.core.IYookassaPaymentsRepository import IYookassaPaymentsRepository
@@ -153,13 +89,84 @@ from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
 from common.utils.ioc.ioc import ioc
+
 from database.db import database
 from database.fixtures import init_db
-from functions.events import write_event
+# import sentry_sdk
+
 from functions.users import get_user_id_cashbox_id_by_token
+from functions.events import write_event
+
+from starlette.types import Message
+
+from api.cashboxes.routers import router as cboxes_router
+from api.contragents.routers import router as contragents_router
+from api.payments.routers import create_payment, router as payments_router
+from api.pboxes.routers import router as pboxes_router
+from api.projects.routers import router as projects_router
+from api.users.routers import router as users_router
+from api.websockets.routers import router as websockets_router
+from api.articles.routers import router as articles_router
+from api.analytics.routers import router as analytics_router
+from api.installs.routers import router as installs_router
+from api.balances.routers import router as balances_router
+from api.cheques.routers import router as cheques_router
+from api.events.routers import router as events_router
+from api.organizations.routers import router as organizations_router
+from api.contracts.routers import router as contracts_router
+from api.categories.routers import router as categories_router
+from api.warehouses.routers import router as warehouses_router
+from api.price_types.routers import router as price_types_router
+from api.prices.routers import router as prices_router
+from api.nomenclature.routers import router as nomenclature_router
+from api.pictures.routers import router as pictures_router
+from api.functions.routers import router as entity_functions_router
+from api.units.routers import router as units_router
+from api.docs_sales.api.routers import router as docs_sales_router
+from api.docs_purchases.routers import router as docs_purchases_router
+from api.docs_warehouses.routers import router as docs_warehouses_router
+from api.docs_reconciliation.routers import router as docs_reconciliation_router
+from api.distribution_docs.routers import router as distribution_docs_router
+from api.fifo_settings.routers import router as fifo_settings_router
+from api.warehouse_balances.routers import router as warehouse_balances_router
+from api.gross_profit_docs.routers import router as gross_profit_docs_router
+from api.autosuggestion.routers import router as autosuggestion_router
+from api.apple_wallet.routers import router as apple_wallet_router
+from api.apple_wallet_card_settings.routers import router as apple_wallet_card_settings_router
+from api.loyality_cards.routers import router as loyality_cards
+from api.loyality_transactions.routers import router as loyality_transactions
+from api.loyality_settings.routers import router as loyality_settings
+
+from apps.amocrm.api.pair.routes import router as amo_pair_router
+from apps.amocrm.install.web.routes import router as amo_install_router
+
+from api.integrations.routers import router as int_router
+from api.oauth.routes import router as oauth_router
+from api.templates.routers import router as templates_router
+from api.docs_generate.routers import router as doc_generate_router
+from api.webapp.routers import router as webapp_router
+from apps.tochka_bank.routes import router as tochka_router
+from api.reports.routers import router as reports_router
+from apps.evotor.routes import router_auth as evotor_router_auth
+from apps.evotor.routes import router as evotor_router
+from apps.module_bank.routes import router as module_bank_router
+from apps.booking.routers import router as booking_router
+from api.settings.amo_triggers.routers import router as triggers_router
+from api.trigger_notification.routers import router as triggers_notification
+from api.docs_sales_utm_tags.routers import router as utm_router
+from api.segments.routers import router as segments_router
+from api.tags.routers import router as tags_router
+from api.tech_cards.router import router as tech_cards_router
+from api.tech_operations.router import router as tech_operations_router
+from api.settings.cashbox.routers import router as cashbox_settings_router
+from api.segments_tags.routers import router as segments_tags_router
+from api.employee_shifts.routers import router as employee_shifts_router
+from api.feeds.routers import router as feeds_router
+from api.chats.routers import router as chats_router
+from api.chats.websocket import router as chats_ws_router
+from api.chats.rabbitmq_consumer import chat_consumer
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 
-# import sentry_sdk
 # from jobs.jobs import scheduler
 
 # sentry_sdk.init(
@@ -171,12 +178,14 @@ from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 #     traces_sample_rate=1.0,
 # )
 
-
 app = FastAPI(
     root_path='/api/v1',
     title="TABLECRM API",
     description="Документация API TABLECRM",
-    version="1.0"
+    version="1.0",
+    # docs_url="/docs",
+    # redoc_url="/redoc",
+    # openapi_url="/openapi.json"
 )
 
 app.add_middleware(GZipMiddleware)
@@ -245,27 +254,26 @@ app.include_router(reports_router)
 app.include_router(module_bank_router)
 app.include_router(utm_router)
 app.include_router(segments_router)
-app.include_router(marketplace_router)
+app.include_router(tech_cards_router)
+app.include_router(tech_operations_router)
+app.include_router(autosuggestion_router)
 
 app.include_router(employee_shifts_router)
 app.include_router(apple_wallet_router)
 app.include_router(apple_wallet_card_settings_router)
-app.include_router(tech_cards_router)
-app.include_router(tech_operations_router)
-app.include_router(autosuggestion_router)
-app.include_router(feeds_router)
 
-@app.get("/")
-async def root():
-    return {"message": "TABLECRM API", "version": "1.0", "status": "running"}
+app.include_router(feeds_router)
+app.include_router(chats_router)
+app.include_router(chats_ws_router)
+
+# @app.get("/api/v1/openapi.json", include_in_schema=False)
+# async def get_openapi():
+#     """Проксировать openapi.json для Swagger UI"""
+#     return app.openapi()
 
 @app.get("/health")
 async def check_health_app():
     return {"status": "ok"}
-
-@app.get("/api/v1/")
-async def api_root():
-    return {"message": "TABLECRM API v1", "status": "running", "docs": "/docs"}
 
 
 @app.middleware("http")
@@ -370,7 +378,6 @@ async def startup():
     ioc.set(IChangeMainNomenclGroupFunction, ChangeMainNomenclGroupFunction())
 
     InstallCategoriesWeb()(app=app)
-    # InstallGlobalCategoriesWeb()(app=app)
     InstallNomenclatureWeb()(app=app)
     ioc.set(IYookasssaAmoTableCrmRepository, YookasssaAmoTableCrmRepository())
     ioc.set(IYookassaTableNomenclature, YookassaTableNomenclature())
@@ -389,11 +396,20 @@ async def startup():
     init_db()
     await database.connect()
 
-    await DefaultImagesUploader().upload_all()
-    # scheduler.start()
+    try:
+        await chat_consumer.start()
+    except Exception as e:
+        print(f"Warning: Failed to start chat consumer: {e}")
+        import traceback
+        traceback.print_exc()
+
+    try:
+        await DefaultImagesUploader().upload_all()
+    except Exception as e:
+        print(f"Warning: Failed to upload default images: {e}")
 
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
-    # scheduler.shutdown()
+    await chat_consumer.stop()
