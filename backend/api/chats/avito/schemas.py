@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 
@@ -125,3 +125,40 @@ class AvitoConnectResponse(BaseModel):
     message: str
     channel_id: int
     cashbox_id: int
+
+
+class AvitoChatListItem(BaseModel):
+    id: str
+    created: Optional[int] = None
+    updated: Optional[int] = None
+    last_message: Optional[Dict[str, Any]] = None
+    users: Optional[List[Dict[str, Any]]] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class AvitoChatsListResponse(BaseModel):
+    success: bool
+    total: int
+    chats: List[AvitoChatListItem]
+    created_in_db: int
+    updated_in_db: int
+
+
+class AvitoMessageItem(BaseModel):
+    id: str
+    author_id: Optional[int] = None
+    created: Optional[int] = None
+    content: Optional[Dict[str, Any]] = None
+    type: Optional[str] = None
+    direction: Optional[str] = None
+    is_read: Optional[bool] = None
+    read: Optional[int] = None
+
+
+class AvitoMessagesResponse(BaseModel):
+    success: bool
+    chat_id: int
+    external_chat_id: str
+    total: int
+    messages: List[AvitoMessageItem]
+    saved_to_db: int

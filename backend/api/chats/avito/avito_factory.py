@@ -4,7 +4,7 @@ from typing import Optional, Callable, Dict, Any
 from datetime import datetime, timedelta
 from cryptography.fernet import Fernet, InvalidToken
 
-from database.db import database
+from database.db import database, channel_credentials
 from .avito_client import AvitoClient
 
 logger = logging.getLogger(__name__)
@@ -56,10 +56,10 @@ async def create_avito_client(
 ) -> Optional[AvitoClient]:
     try:
         credentials = await database.fetch_one(
-            database.table("channel_credentials").select().where(
-                (database.table("channel_credentials").c.channel_id == channel_id) &
-                (database.table("channel_credentials").c.cashbox_id == cashbox_id) &
-                (database.table("channel_credentials").c.is_active.is_(True))
+            channel_credentials.select().where(
+                (channel_credentials.c.channel_id == channel_id) &
+                (channel_credentials.c.cashbox_id == cashbox_id) &
+                (channel_credentials.c.is_active.is_(True))
             )
         )
         
@@ -74,14 +74,33 @@ async def create_avito_client(
         
         token_expires_at = credentials.get('token_expires_at')
         
+        user_id = credentials.get('avito_user_id')
+        
         client = AvitoClient(
             api_key=api_key,
             api_secret=api_secret,
             access_token=access_token,
             refresh_token=refresh_token,
             token_expires_at=token_expires_at,
-            on_token_refresh=on_token_refresh
+            on_token_refresh=on_token_refresh,
+            user_id=user_id
         )
+        
+        if not user_id:
+            try:
+                retrieved_user_id = await client._get_user_id()
+                await database.execute(
+                    channel_credentials.update().where(
+                        (channel_credentials.c.channel_id == channel_id) &
+                        (channel_credentials.c.cashbox_id == cashbox_id)
+                    ).values(
+                        avito_user_id=retrieved_user_id,
+                        updated_at=datetime.utcnow()
+                    )
+                )
+                logger.info(f"Saved avito_user_id {retrieved_user_id} to credentials")
+            except Exception as e:
+                logger.warning(f"Could not retrieve and save user_id: {e}")
         
         logger.info(f"AvitoClient created for channel {channel_id}, cashbox {cashbox_id}")
         return client
@@ -107,9 +126,9 @@ async def save_token_callback(
         token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
         
         await database.execute(
-            database.table("channel_credentials").update().where(
-                (database.table("channel_credentials").c.channel_id == channel_id) &
-                (database.table("channel_credentials").c.cashbox_id == cashbox_id)
+            channel_credentials.update().where(
+                (channel_credentials.c.channel_id == channel_id) &
+                (channel_credentials.c.cashbox_id == cashbox_id)
             ).values(
                 access_token=encrypted_access_token,
                 refresh_token=encrypted_refresh_token,

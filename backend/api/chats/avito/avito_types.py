@@ -75,15 +75,17 @@ class AvitoMessage(BaseModel):
 
 
 class AvitoWebhookValue(BaseModel):
-    """Webhook payload value"""
     id: Optional[str] = None
     chat_id: Optional[str] = None
     user_id: Optional[int] = None
     author_id: Optional[int] = None
     created: Optional[int] = None
+    published_at: Optional[str] = None
     type: Optional[str] = None
     chat_type: Optional[str] = None
+    item_id: Optional[int] = None
     content: Optional[Dict[str, Any]] = None
+    read: Optional[int] = None
 
 
 class AvitoWebhookPayload(BaseModel):

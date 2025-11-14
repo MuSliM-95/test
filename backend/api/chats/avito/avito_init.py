@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime
 
-from database.db import database, channels, organizations
+from database.db import database, channels, organizations, channel_credentials
 from api.chats.avito.avito_factory import _encrypt_credential
 
 logger = logging.getLogger(__name__)
@@ -74,9 +74,9 @@ async def init_avito_credentials():
         encrypted_refresh_token = _encrypt_credential(refresh_token) if refresh_token else None
 
         existing = await database.fetch_one(
-            database.table("channel_credentials").select().where(
-                (database.table("channel_credentials").c.channel_id == channel_id) &
-                (database.table("channel_credentials").c.cashbox_id == cashbox_id)
+            channel_credentials.select().where(
+                (channel_credentials.c.channel_id == channel_id) &
+                (channel_credentials.c.cashbox_id == cashbox_id)
             )
         )
 
@@ -94,8 +94,8 @@ async def init_avito_credentials():
                 update_values["token_expires_at"] = token_expires_at
             
             await database.execute(
-                database.table("channel_credentials").update().where(
-                    database.table("channel_credentials").c.id == existing["id"]
+                channel_credentials.update().where(
+                    channel_credentials.c.id == existing["id"]
                 ).values(**update_values)
             )
             logger.info(f"Updated Avito credentials for channel={channel_id} cashbox={cashbox_id}")
@@ -116,7 +116,7 @@ async def init_avito_credentials():
                 insert_values["token_expires_at"] = token_expires_at
             
             await database.execute(
-                database.table("channel_credentials").insert().values(**insert_values)
+                channel_credentials.insert().values(**insert_values)
             )
             logger.info(f"Inserted Avito credentials for channel={channel_id} cashbox={cashbox_id}")
 

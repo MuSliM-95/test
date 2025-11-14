@@ -1,9 +1,17 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, Header, Query
+from typing import Optional
 from sqlalchemy import select
 from database.db import database, users_cboxes_relation
 
 
-async def get_current_user(token: str):
+async def get_current_user(
+    token: Optional[str] = Query(None, description="User authentication token"),
+    authorization: Optional[str] = Header(None, description="Authorization header (Bearer token or token)")
+):
+    if not token:
+        if authorization:
+            token = authorization.replace("Bearer ", "").strip()
+    
     if not token:
         raise HTTPException(status_code=401, detail="Token required")
     
@@ -28,8 +36,11 @@ async def get_current_user(token: str):
     return user
 
 
-async def get_current_user_owner(token: str):
-    user = await get_current_user(token)
+async def get_current_user_owner(
+    token: Optional[str] = Query(None, description="User authentication token"),
+    authorization: Optional[str] = Header(None, description="Authorization header (Bearer token or token)")
+):
+    user = await get_current_user(token=token, authorization=authorization)
     
     if not user.is_owner:
         raise HTTPException(status_code=403, detail="Owner permissions required")

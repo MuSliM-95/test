@@ -2367,3 +2367,21 @@ chat_messages = sqlalchemy.Table(
     sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
 )
+
+channel_credentials = sqlalchemy.Table(
+    "channel_credentials",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("api_key", String(500), nullable=False),
+    sqlalchemy.Column("api_secret", String(500), nullable=False),
+    sqlalchemy.Column("access_token", String(1000), nullable=True),
+    sqlalchemy.Column("refresh_token", String(1000), nullable=True),
+    sqlalchemy.Column("token_expires_at", DateTime, nullable=True),
+    sqlalchemy.Column("avito_user_id", Integer, nullable=True),
+    sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
+    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
+    UniqueConstraint("channel_id", "cashbox_id", name="uq_channel_credentials_channel_cashbox"),
+)

@@ -399,11 +399,13 @@ async def startup():
     init_db()
     await database.connect()
 
-    try:
-        from api.chats.avito.avito_init import init_avito_credentials
-        await init_avito_credentials()
-    except Exception as e:
-        print(f"Warning: failed to initialize Avito credentials from env: {e}")
+    if os.getenv("ENABLE_AVITO_ENV_INIT", "false").lower() == "true":
+        try:
+            from api.chats.avito.avito_init import init_avito_credentials
+            await init_avito_credentials()
+            print("Avito credentials initialized from env (development mode)")
+        except Exception as e:
+            print(f"Warning: failed to initialize Avito credentials from env: {e}")
 
     try:
         await chat_consumer.start()

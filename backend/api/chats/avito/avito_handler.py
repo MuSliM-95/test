@@ -14,22 +14,25 @@ class AvitoHandler:
     async def handle_message_event(webhook: AvitoWebhook, cashbox_id: int) -> Dict[str, Any]:
         try:
             payload = webhook.payload.value
-            
+
             chat_id_external = payload.chat_id or ""
-            user_id = payload.user_id or 0
+            author_id = payload.author_id
+            user_id = payload.user_id
             message_id = payload.id or ""
-            message_type = payload.type or 'text' 
+            message_type = payload.type or 'text'
+            chat_type = payload.chat_type
+            item_id = payload.item_id
             
             message_content, message_text = AvitoHandler._extract_message_content(
                 payload.content or {},
                 message_type
             )
             
-            user_name = payload.user_name or f"Avito User {user_id}"
-            user_phone = payload.user_phone or None
+            user_name = f"Avito User {author_id}" if author_id else "Unknown User"
+            user_phone = None
             
             logger.info(f"Processing Avito message: {message_id} in chat {chat_id_external}")
-            logger.info(f"From user: {user_name} ({user_id}), phone: {user_phone}")
+            logger.info(f"From author_id: {author_id}, user_id: {user_id}, chat_type: {chat_type}, item_id: {item_id}")
             
             chat = await AvitoHandler._find_or_create_chat(
                 channel_type="AVITO",

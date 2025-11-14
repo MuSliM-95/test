@@ -76,46 +76,54 @@ def extract_cashbox_id_from_webhook(webhook_data: Dict[str, Any]) -> Optional[in
 
 
 async def get_cashbox_id_for_avito_webhook(webhook_data: Dict[str, Any]) -> Optional[int]:
-    from database.db import database
+    from database.db import database, channels, chats
     
     try:
-        payload = webhook_data.get('payload', {})
+        payload_value = webhook_data.get('payload', {}).get('value', {})
+        if not payload_value:
+            logger.warning("No payload.value in webhook data")
+            return None
         
-        avito_identifier = (
-            payload.get('user_id') or
-            payload.get('account_id') or
-            payload.get('seller_id')
-        )
+        external_chat_id = payload_value.get('chat_id') or payload_value.get('chatId')
+        user_id = payload_value.get('user_id') or payload_value.get('userId')
         
-        if not avito_identifier:
-            logger.warning("Could not extract Avito identifier from webhook")
+        if not external_chat_id and not user_id:
+            logger.warning("Could not extract chat_id or user_id from webhook")
             return None
         
         channel = await database.fetch_one(
-            "SELECT id FROM channels WHERE type = 'AVITO' AND is_active = TRUE"
+            channels.select().where(channels.c.type == 'AVITO').where(channels.c.is_active == True)
         )
         
         if not channel:
             logger.error("AVITO channel not found in database")
             return None
         
-        credentials = await database.fetch_one(
-            """
-            SELECT DISTINCT cashbox_id 
-            FROM channel_credentials 
-            WHERE channel_id = :channel_id 
-            AND is_active = TRUE
-            LIMIT 1
-            """,
-            {"channel_id": channel['id']}
+        channel_id = channel['id']
+        
+        if external_chat_id:
+            existing_chat = await database.fetch_one(
+                chats.select().where(
+                    (chats.c.channel_id == channel_id) &
+                    (chats.c.external_chat_id == str(external_chat_id))
+                ).limit(1)
+            )
+            
+            if existing_chat:
+                cashbox_id = existing_chat['cashbox_id']
+                logger.info(f"Found cashbox_id {cashbox_id} from existing chat {existing_chat['id']} by external_chat_id {external_chat_id}")
+                return cashbox_id
+        
+        if user_id:
+            logger.debug(f"Could not find chat by external_chat_id, user_id {user_id} available but not stored in chats table")
+        
+        logger.warning(
+            f"Could not determine cashbox_id from webhook. "
+            f"external_chat_id={external_chat_id}, user_id={user_id}. "
+            f"Chat may need to be created first via API or webhook URL should include cashbox_id parameter."
         )
         
-        if credentials:
-            logger.info(f"Found cashbox_id {credentials['cashbox_id']} for Avito identifier {avito_identifier}")
-            return credentials['cashbox_id']
-        else:
-            logger.warning(f"No active Avito credentials found for identifier {avito_identifier}")
-            return None
+        return None
         
     except Exception as e:
         logger.error(f"Error getting cashbox_id for Avito webhook: {e}", exc_info=True)

@@ -21,7 +21,7 @@ class AvitoClient:
     
     BASE_URL = "https://api.avito.ru"
     MESSENGER_API = f"{BASE_URL}/messenger"
-    AUTH_API = f"{BASE_URL}/oauth"
+    AUTH_API = f"{BASE_URL}"  
     
     def __init__(
         self,
@@ -30,7 +30,8 @@ class AvitoClient:
         access_token: Optional[str] = None,
         refresh_token: Optional[str] = None,
         token_expires_at: Optional[datetime] = None,
-        on_token_refresh: Optional[callable] = None
+        on_token_refresh: Optional[callable] = None,
+        user_id: Optional[int] = None
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -38,6 +39,7 @@ class AvitoClient:
         self.refresh_token = refresh_token
         self.token_expires_at = token_expires_at
         self.on_token_refresh = on_token_refresh
+        self._user_id = user_id  # user_id для эндпоинтов
     
     async def _ensure_token_valid(self) -> None:
         if not self.token_expires_at:
@@ -60,7 +62,7 @@ class AvitoClient:
                 }
                 
                 async with session.post(
-                    f"{self.AUTH_API}/token",
+                    f"{self.AUTH_API}/token/",
                     data=data,
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
@@ -102,7 +104,7 @@ class AvitoClient:
                 }
                 
                 async with session.post(
-                    f"{self.AUTH_API}/token",
+                    f"{self.AUTH_API}/token/",
                     data=data,
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
@@ -134,6 +136,35 @@ class AvitoClient:
             logger.error(f"Token request failed: {str(e)}")
             raise AvitoTokenExpiredError(f"Token request failed: {str(e)}")
     
+    async def _get_user_id(self) -> int:
+        if self._user_id:
+            return self._user_id
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    "Authorization": f"Bearer {self.access_token}",
+                    "Content-Type": "application/json",
+                }
+                async with session.get(
+                    f"{self.BASE_URL}/core/v1/accounts/self",
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 200:
+                        user_data = await response.json()
+                        user_id = user_data.get('id')
+                        if user_id:
+                            self._user_id = user_id
+                            logger.info(f"Retrieved user_id {user_id} from profile")
+                            return user_id
+                    
+                    logger.warning(f"Failed to get user_id from profile: HTTP {response.status}")
+                    raise AvitoAPIError("user_id is required but could not be retrieved from profile")
+        except Exception as e:
+            logger.error(f"Failed to get user_id: {e}")
+            raise AvitoAPIError(f"user_id is required but not set. Error: {str(e)}")
+    
     async def _make_request(
         self,
         method: str,
@@ -149,7 +180,6 @@ class AvitoClient:
         
         headers = {
             "Authorization": f"Bearer {self.access_token}",
-            "X-Developer-Key": self.api_key,
             "Content-Type": "application/json",
         }
         
@@ -180,18 +210,36 @@ class AvitoClient:
                 logger.error(f"Avito API request failed: {str(e)}")
                 raise AvitoAPIError(f"Request failed: {str(e)}")
     
-    async def get_chats(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_chats(
+        self, 
+        limit: int = 50, 
+        offset: int = 0,
+        chat_types: Optional[List[str]] = None,
+        unread_only: bool = False,
+        item_ids: Optional[List[int]] = None
+    ) -> List[Dict[str, Any]]:
         limit = min(limit, 100)
+        user_id = await self._get_user_id()
+        
+        params = {"limit": limit, "offset": offset}
+        if chat_types:
+            params["chat_types"] = ",".join(chat_types)
+        if unread_only:
+            params["unread_only"] = "true"
+        if item_ids:
+            params["item_ids"] = ",".join(map(str, item_ids))
+        
         response = await self._make_request(
             "GET",
-            "/v2/user/chats",
-            params={"limit": limit, "offset": offset}
+            f"/v2/accounts/{user_id}/chats",
+            params=params
         )
         return response.get('chats', [])
     
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
-        response = await self._make_request("GET", f"/v2/user/chats/{chat_id}")
-        return response.get('chat', {})
+        user_id = await self._get_user_id()
+        response = await self._make_request("GET", f"/v2/accounts/{user_id}/chats/{chat_id}")
+        return response
     
     async def get_messages(
         self,
@@ -200,47 +248,69 @@ class AvitoClient:
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         limit = min(limit, 100)
+        user_id = await self._get_user_id()
         response = await self._make_request(
             "GET",
-            f"/v2/user/chats/{chat_id}/messages",
+            f"/v3/accounts/{user_id}/chats/{chat_id}/messages/",
             params={"limit": limit, "offset": offset}
         )
-        return response.get('messages', [])
+        if isinstance(response, list):
+            return response
+        elif isinstance(response, dict) and 'messages' in response:
+            return response.get('messages', [])
+        elif isinstance(response, dict):
+            logger.warning(f"Unexpected response format from get_messages: {type(response)}")
+            return []
+        else:
+            logger.error(f"Unexpected response type from get_messages: {type(response)}, value: {response}")
+            return []
     
     async def send_message(
         self,
         chat_id: str,
         text: Optional[str] = None,
-        attachments: Optional[List[Dict[str, Any]]] = None
+        image_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        if not text and not attachments:
-            raise AvitoAPIError("Either text or attachments must be provided")
+        if not text and not image_id:
+            raise AvitoAPIError("Either text or image_id must be provided")
         
-        payload: Dict[str, Any] = {}
+        user_id = await self._get_user_id()
         
-        if text:
-            payload["text"] = text
+        if image_id:
+            payload = {
+                "image_id": image_id
+            }
+            response = await self._make_request(
+                "POST",
+                f"/v1/accounts/{user_id}/chats/{chat_id}/messages/image",
+                data=payload
+            )
+        else:
+            payload = {
+                "message": {
+                    "text": text
+                },
+                "type": "text"
+            }
+            response = await self._make_request(
+                "POST",
+                f"/v1/accounts/{user_id}/chats/{chat_id}/messages",
+                data=payload
+            )
         
-        if attachments:
-            payload["attachments"] = attachments
-        
-        response = await self._make_request(
-            "POST",
-            f"/v2/user/chats/{chat_id}/messages",
-            data=payload
-        )
-        return response.get('message', {})
+        return response
     
-    async def mark_as_read(self, chat_id: str, message_id: str) -> bool:
+    async def mark_chat_as_read(self, chat_id: str) -> bool:
         try:
+            user_id = await self._get_user_id()
             await self._make_request(
                 "POST",
-                f"/v2/user/chats/{chat_id}/messages/{message_id}/read"
+                f"/v1/accounts/{user_id}/chats/{chat_id}/read"
             )
-            logger.info(f"Message {message_id} marked as read")
+            logger.info(f"Chat {chat_id} marked as read")
             return True
         except AvitoAPIError as e:
-            logger.warning(f"Failed to mark message as read: {e}")
+            logger.warning(f"Failed to mark chat as read: {e}")
             return False
     
     async def close_chat(self, chat_id: str) -> bool:
@@ -256,12 +326,32 @@ class AvitoClient:
             return False
     
     async def get_user_profile(self) -> Dict[str, Any]:
-        response = await self._make_request("GET", "/v2/user")
-        return response.get('user', {})
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    "Authorization": f"Bearer {self.access_token}",
+                    "Content-Type": "application/json",
+                }
+                async with session.get(
+                    f"{self.BASE_URL}/core/v1/accounts/self",
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 200:
+                        user_data = await response.json()
+                        logger.info(f"Retrieved user profile: {user_data.get('id')}")
+                        return user_data
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Failed to get user profile: HTTP {response.status}, {error_text}")
+                        raise AvitoAPIError(f"Failed to get user profile: HTTP {response.status}")
+        except aiohttp.ClientError as e:
+            logger.error(f"Error getting user profile: {str(e)}")
+            raise AvitoAPIError(f"Error getting user profile: {str(e)}")
     
     async def validate_token(self) -> bool:
         try:
-            await self.get_user_profile()
+            await self.get_chats(limit=1)
             return True
         except AvitoAPIError as e:
             logger.error(f"Token validation failed: {e}")
@@ -285,7 +375,7 @@ class AvitoClient:
             if since_timestamp:
                 filtered = [
                     m for m in messages 
-                    if m.get('created_at', 0) > since_timestamp
+                    if m.get('created', 0) > since_timestamp
                 ]
                 all_messages.extend(filtered)
                 if len(filtered) < len(messages):
@@ -294,6 +384,9 @@ class AvitoClient:
                 all_messages.extend(messages)
             
             offset += limit
+            
+            if len(messages) < limit:
+                break
         
         logger.info(f"Synced {len(all_messages)} messages from chat {chat_id}")
         return all_messages
