@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from sqlalchemy import select
 
@@ -77,7 +77,7 @@ async def get_chat(chat_id: int, token: str, user = Depends(get_current_user)):
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     
-    if chat.cashbox_id != user.cashbox_id:
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return chat
@@ -89,16 +89,17 @@ async def get_chats(
     channel_id: Optional[int] = None,
     contragent_id: Optional[int] = None,
     status: Optional[str] = None,
+    search: Optional[str] = Query(None, description="Поиск по имени, телефону или external_chat_id"),
     skip: int = 0,
     limit: int = 100,
     user = Depends(get_current_user)
 ):
-    """Get chats with filters (filtered by user's cashbox)"""
     return await crud.get_chats(
         cashbox_id=user.cashbox_id,
         channel_id=channel_id,
         contragent_id=contragent_id,
         status=status,
+        search=search,
         skip=skip,
         limit=limit
     )
@@ -111,7 +112,7 @@ async def update_chat(chat_id: int, token: str, chat: ChatUpdate, user = Depends
     if not existing_chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     
-    if existing_chat.cashbox_id != user.cashbox_id:
+    if existing_chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return await crud.update_chat(chat_id, **chat.dict(exclude_unset=True))
@@ -124,7 +125,7 @@ async def delete_chat(chat_id: int, token: str, user = Depends(get_current_user)
     if not existing_chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     
-    if existing_chat.cashbox_id != user.cashbox_id:
+    if existing_chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return await crud.delete_chat(chat_id)
@@ -136,7 +137,7 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
     chat = await crud.get_chat(message.chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    if chat.cashbox_id != user.cashbox_id:
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return await crud.create_message_and_update_chat(
@@ -156,8 +157,8 @@ async def get_message(message_id: int, token: str, user = Depends(get_current_us
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
     
-    chat = await crud.get_chat(message.chat_id)
-    if chat.cashbox_id != user.cashbox_id:
+    chat = await crud.get_chat(message['chat_id'])
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return message
@@ -169,7 +170,7 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
     chat = await crud.get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    if chat.cashbox_id != user.cashbox_id:
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return await crud.get_messages(chat_id, skip, limit)
@@ -183,7 +184,7 @@ async def update_message(message_id: int, token: str, message: MessageUpdate, us
         raise HTTPException(status_code=404, detail="Message not found")
     
     chat = await crud.get_chat(existing_message.chat_id)
-    if chat.cashbox_id != user.cashbox_id:
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return await crud.update_message(message_id, **message.dict(exclude_unset=True))
@@ -197,7 +198,7 @@ async def delete_message(message_id: int, token: str, user = Depends(get_current
         raise HTTPException(status_code=404, detail="Message not found")
     
     chat = await crud.get_chat(existing_message.chat_id)
-    if chat.cashbox_id != user.cashbox_id:
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return await crud.delete_message(message_id)
@@ -209,7 +210,7 @@ async def get_chat_files(chat_id: int, token: str, user = Depends(get_current_us
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     
-    if chat.cashbox_id != user.cashbox_id:
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     messages = await crud.get_messages(chat_id, skip=0, limit=1000)
@@ -238,8 +239,8 @@ async def get_message_files(message_id: int, token: str, user = Depends(get_curr
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
     
-    chat = await crud.get_chat(message.chat_id)
-    if chat.cashbox_id != user.cashbox_id:
+    chat = await crud.get_chat(message['chat_id'])
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     query = (
@@ -267,7 +268,7 @@ async def chain_client_endpoint(
     chat = await crud.get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    if chat.cashbox_id != user.cashbox_id:
+    if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return await crud.chain_client(

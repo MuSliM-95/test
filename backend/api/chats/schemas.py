@@ -81,6 +81,11 @@ class ChatResponse(BaseModel):
     last_response_time_seconds: Optional[int]
     created_at: datetime
     updated_at: datetime
+    last_message_preview: Optional[str] = None
+    unread_count: int = 0
+    channel_name: Optional[str] = None
+    channel_icon: Optional[str] = None
+    channel_type: Optional[str] = None
 
 
 

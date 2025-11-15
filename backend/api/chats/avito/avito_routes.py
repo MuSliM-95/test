@@ -567,7 +567,7 @@ async def get_avito_chat_messages(
                 status = "READ" if is_read else "DELIVERED"
                 
                 await crud.create_message_and_update_chat(
-                    chat_id=chat_id,
+                    chat_id=chat['id'],
                     sender_type=sender_type,
                     content=message_text or f"[{message_type_str}]",
                     message_type=message_type,
@@ -719,9 +719,14 @@ async def sync_avito_messages(
                 
                 for avito_msg in avito_messages:
                     try:
+                        external_message_id = avito_msg.get('id')
+                        if not external_message_id:
+                            continue
+                        
+                        from database.db import chat_messages
                         existing = await database.fetch_one(
-                            database.table("chat_messages").select().where(
-                                database.table("chat_messages").c.external_message_id == avito_msg.get('id')
+                            chat_messages.select().where(
+                                chat_messages.c.external_message_id == external_message_id
                             )
                         )
                         
@@ -729,15 +734,46 @@ async def sync_avito_messages(
                             updated_messages += 1
                             continue
                         
+                        content = avito_msg.get('content', {})
+                        message_type_str = avito_msg.get('type', 'text')
+                        message_text = ""
+                        
+                        if isinstance(content, dict):
+                            if message_type_str == 'text':
+                                message_text = content.get('text', '')
+                            elif message_type_str == 'link':
+                                link_data = content.get('link', {})
+                                message_text = link_data.get('text', link_data.get('url', '[Ссылка]'))
+                            elif message_type_str == 'system':
+                                message_text = content.get('text', '[Системное сообщение]')
+                            elif message_type_str == 'image':
+                                message_text = '[Изображение]'
+                            elif message_type_str == 'item':
+                                item_data = content.get('item', {})
+                                message_text = f"Объявление: {item_data.get('title', '[Объявление]')}"
+                            elif message_type_str == 'location':
+                                loc_data = content.get('location', {})
+                                message_text = loc_data.get('text', loc_data.get('title', '[Геолокация]'))
+                            elif message_type_str == 'voice':
+                                message_text = '[Голосовое сообщение]'
+                            else:
+                                message_text = f"[{message_type_str}]"
+                        else:
+                            message_text = str(content) if content else f"[{message_type_str}]"
+                        
+                        direction = avito_msg.get('direction', 'in')
+                        sender_type = "CLIENT" if direction == "in" else "OPERATOR"
+                        
+                        is_read = avito_msg.get('is_read', False) or avito_msg.get('read') is not None
+                        status = "READ" if is_read else "DELIVERED"
+                        
                         await crud.create_message_and_update_chat(
                             chat_id=chat['id'],
-                            sender_type="CLIENT",
-                            content=avito_msg.get('text', ''),
-                            message_type=AvitoHandler._map_message_type(
-                                avito_msg.get('type', 'text')
-                            ),
-                            external_message_id=avito_msg.get('id'),
-                            status="DELIVERED"
+                            sender_type=sender_type,
+                            content=message_text or f"[{message_type_str}]",
+                            message_type=AvitoHandler._map_message_type(message_type_str),
+                            external_message_id=external_message_id,
+                            status=status
                         )
                         new_messages += 1
                     

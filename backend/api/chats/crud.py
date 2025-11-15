@@ -1,7 +1,7 @@
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, or_, func, select
 from database.db import database, channels, chats, chat_messages, contragents
 from fastapi import HTTPException
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -94,9 +94,37 @@ async def get_chat_by_external_id(channel_id: int, external_chat_id: str, cashbo
     return await database.fetch_one(query)
 
 
-async def get_chats(cashbox_id: int, channel_id: Optional[int] = None, contragent_id: Optional[int] = None, status: Optional[str] = None, skip: int = 0, limit: int = 100):
-    """Get chats with filters and pagination (filtered by user cashbox_id)"""
-    query = chats.select()
+async def get_chats(
+    cashbox_id: int, 
+    channel_id: Optional[int] = None, 
+    contragent_id: Optional[int] = None, 
+    status: Optional[str] = None, 
+    search: Optional[str] = None,
+    skip: int = 0, 
+    limit: int = 100
+) -> List[Dict[str, Any]]:
+    query = select([
+        chats.c.id,
+        chats.c.channel_id,
+        chats.c.contragent_id,
+        chats.c.cashbox_id,
+        chats.c.external_chat_id,
+        chats.c.phone,
+        chats.c.name,
+        chats.c.status,
+        chats.c.assigned_operator_id,
+        chats.c.first_message_time,
+        chats.c.first_response_time_seconds,
+        chats.c.last_message_time,
+        chats.c.last_response_time_seconds,
+        chats.c.created_at,
+        chats.c.updated_at,
+        channels.c.name.label('channel_name'),
+        channels.c.type.label('channel_type'),
+        channels.c.svg_icon.label('channel_icon')
+    ]).select_from(
+        chats.join(channels, chats.c.channel_id == channels.c.id)
+    )
     
     conditions = [chats.c.cashbox_id == cashbox_id] 
     
@@ -106,10 +134,49 @@ async def get_chats(cashbox_id: int, channel_id: Optional[int] = None, contragen
         conditions.append(chats.c.contragent_id == contragent_id)
     if status:
         conditions.append(chats.c.status == status)
+    if search:
+        search_condition = or_(
+            chats.c.name.ilike(f"%{search}%"),
+            chats.c.phone.ilike(f"%{search}%"),
+            chats.c.external_chat_id.ilike(f"%{search}%")
+        )
+        conditions.append(search_condition)
     
     query = query.where(and_(*conditions))
-    query = query.offset(skip).limit(limit).order_by(desc(chats.c.created_at))
-    return await database.fetch_all(query)
+    query = query.order_by(desc(chats.c.last_message_time), desc(chats.c.created_at))
+    query = query.offset(skip).limit(limit)
+    
+    chats_data = await database.fetch_all(query)
+    
+    result = []
+    for chat_row in chats_data:
+        chat_dict = dict(chat_row)
+        chat_id = chat_dict['id']
+        
+        last_message_query = select([chat_messages.c.content]).where(
+            chat_messages.c.chat_id == chat_id
+        ).order_by(desc(chat_messages.c.created_at)).limit(1)
+        last_message = await database.fetch_one(last_message_query)
+        
+        if last_message and last_message['content']:
+            preview = last_message['content'][:100]
+            chat_dict['last_message_preview'] = preview
+        else:
+            chat_dict['last_message_preview'] = None
+        
+        unread_query = select([func.count(chat_messages.c.id)]).where(
+            and_(
+                chat_messages.c.chat_id == chat_id,
+                chat_messages.c.sender_type == "CLIENT",
+                chat_messages.c.status != "READ"
+            )
+        )
+        unread_count = await database.fetch_val(unread_query) or 0
+        chat_dict['unread_count'] = unread_count
+        
+        result.append(chat_dict)
+    
+    return result
 
 
 async def update_chat(chat_id: int, **kwargs):
