@@ -156,6 +156,7 @@ from api.trigger_notification.routers import router as triggers_notification
 from api.docs_sales_utm_tags.routers import router as utm_router
 from api.segments.routers import router as segments_router
 from api.tags.routers import router as tags_router
+from api.marketplace.routers import router as marketplace_router
 from api.tech_cards.router import router as tech_cards_router
 from api.tech_operations.router import router as tech_operations_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
@@ -256,6 +257,7 @@ app.include_router(reports_router)
 app.include_router(module_bank_router)
 app.include_router(utm_router)
 app.include_router(segments_router)
+app.include_router(marketplace_router)
 app.include_router(tech_cards_router)
 app.include_router(tech_operations_router)
 app.include_router(autosuggestion_router)

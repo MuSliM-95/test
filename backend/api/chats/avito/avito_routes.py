@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime
 import logging
+import re
 
-from api.chats.auth import get_current_user
+from api.chats.auth import get_current_user_for_avito as get_current_user
 from api.chats.avito.schemas import (
     AvitoCredentialsCreate,
     AvitoWebhookResponse,
@@ -31,6 +32,101 @@ from fastapi import Query
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chats/avito", tags=["chats-avito"])
+
+
+def extract_phone_from_text(text: str) -> Optional[str]:
+    if not text:
+        return None
+    
+    phone_patterns = [
+        r'\+?7\s?\(?\d{3}\)?\s?\d{3}[\s-]?\d{2}[\s-]?\d{2}',
+        r'8\s?\(?\d{3}\)?\s?\d{3}[\s-]?\d{2}[\s-]?\d{2}',
+        r'\+?7\d{10}',
+        r'8\d{10}',
+    ]
+    
+    for pattern in phone_patterns:
+        matches = re.findall(pattern, text)
+        if matches:
+            phone = re.sub(r'[^\d+]', '', matches[0])
+            if phone.startswith('8'):
+                phone = '+7' + phone[1:]
+            elif phone.startswith('7') and not phone.startswith('+7'):
+                phone = '+' + phone
+            elif len(phone) == 10:
+                phone = '+7' + phone
+            
+            if phone.startswith('+7') and len(phone) == 12:
+                return phone
+            elif len(phone) >= 11:
+                return phone
+    
+    return None
+
+
+@router.get("/")
+async def get_avito_api_info():
+    return {
+        "service": "Avito Messenger API Integration",
+        "version": "1.0",
+        "base_url": "/chats/avito",
+        "endpoints": {
+            "connect": {
+                "method": "POST",
+                "path": "/chats/avito/connect",
+                "description": "Подключение канала Avito",
+                "auth_required": True
+            },
+            "status": {
+                "method": "GET",
+                "path": "/chats/avito/status",
+                "description": "Проверка статуса подключения",
+                "auth_required": True
+            },
+            "chats": {
+                "method": "GET",
+                "path": "/chats/avito/chats",
+                "description": "Получение списка чатов",
+                "auth_required": True
+            },
+            "messages": {
+                "method": "GET",
+                "path": "/chats/avito/chats/{chat_id}/messages",
+                "description": "Получение сообщений из чата",
+                "auth_required": True
+            },
+            "send": {
+                "method": "POST",
+                "path": "/chats/avito/send",
+                "description": "Отправка сообщения",
+                "auth_required": True
+            },
+            "sync": {
+                "method": "POST",
+                "path": "/chats/avito/sync",
+                "description": "Синхронизация всех сообщений",
+                "auth_required": True
+            },
+            "webhook": {
+                "method": "POST",
+                "path": "/chats/avito/webhooks/message",
+                "description": "Webhook для получения сообщений от Avito",
+                "auth_required": False
+            }
+        },
+        "documentation": {
+            "swagger": "/docs",
+            "redoc": "/redoc",
+            "openapi": "/openapi.json",
+            "markdown": "See AVITO_API_DOCS.md file"
+        },
+        "authentication": {
+            "methods": [
+                "Query parameter: ?token=YOUR_TOKEN",
+                "Header: Authorization: Bearer YOUR_TOKEN"
+            ]
+        }
+    }
 
 
 @router.post("/connect", response_model=AvitoConnectResponse)
@@ -214,6 +310,27 @@ async def get_avito_chats(
                 if users:
                     first_user = users[0] if users else {}
                     user_name = first_user.get('name')
+                    user_phone = (
+                        first_user.get('phone') or
+                        first_user.get('phone_number') or
+                        first_user.get('public_user_profile', {}).get('phone') or
+                        first_user.get('public_user_profile', {}).get('phone_number')
+                    )
+                
+                if not user_phone:
+                    last_message = avito_chat.get('last_message', {})
+                    if last_message:
+                        message_content = last_message.get('content', {})
+                        message_text = None
+                        if isinstance(message_content, dict):
+                            message_text = message_content.get('text', '')
+                        elif isinstance(message_content, str):
+                            message_text = message_content
+                        
+                        if message_text and ('[Системное сообщение]' in message_text or 'системное' in message_text.lower()):
+                            user_phone = extract_phone_from_text(message_text)
+                            if user_phone:
+                                logger.info(f"Extracted phone {user_phone} from system message in chat {external_chat_id}")
                 
                 existing_chat = await database.fetch_one(
                     chats.select().where(
@@ -306,7 +423,7 @@ async def get_avito_chats(
 
 @router.get("/chats/{chat_id}/messages", response_model=AvitoMessagesResponse)
 async def get_avito_chat_messages(
-    chat_id: int,
+    chat_id: str,
     limit: int = Query(50, ge=1, le=100, description="Количество сообщений для получения"),
     offset: int = Query(0, ge=0, description="Смещение для пагинации"),
     user = Depends(get_current_user)
@@ -314,7 +431,26 @@ async def get_avito_chat_messages(
     try:
         cashbox_id = user.cashbox_id
         
-        chat = await crud.get_chat(chat_id)
+        avito_channel = await database.fetch_one(
+            channels.select().where(channels.c.type == "AVITO")
+        )
+        
+        if not avito_channel:
+            raise HTTPException(status_code=400, detail="Avito channel not configured")
+        
+        chat = None
+        try:
+            internal_chat_id = int(chat_id)
+            chat = await crud.get_chat(internal_chat_id)
+        except ValueError:
+            chat = await database.fetch_one(
+                chats.select().where(
+                    (chats.c.channel_id == avito_channel['id']) &
+                    (chats.c.external_chat_id == chat_id) &
+                    (chats.c.cashbox_id == cashbox_id)
+                )
+            )
+        
         if not chat:
             raise HTTPException(status_code=404, detail="Chat not found")
         
@@ -324,11 +460,7 @@ async def get_avito_chat_messages(
         if not chat.get('external_chat_id'):
             raise HTTPException(status_code=400, detail="Chat has no external_chat_id")
         
-        avito_channel = await database.fetch_one(
-            channels.select().where(channels.c.type == "AVITO")
-        )
-        
-        if not avito_channel or chat['channel_id'] != avito_channel['id']:
+        if chat['channel_id'] != avito_channel['id']:
             raise HTTPException(status_code=400, detail="Chat is not from Avito channel")
         
         client = await create_avito_client(
@@ -354,6 +486,34 @@ async def get_avito_chat_messages(
         )
         
         saved_count = 0
+        extracted_phone = None
+        
+        for avito_msg in avito_messages:
+            msg_type = avito_msg.get('type', 'text')
+            msg_content = avito_msg.get('content', {})
+            msg_text = None
+            
+            if isinstance(msg_content, dict):
+                msg_text = msg_content.get('text', '')
+            elif isinstance(msg_content, str):
+                msg_text = msg_content
+            
+            if msg_text and (msg_type == 'system' or '[Системное сообщение]' in msg_text or 'системное' in msg_text.lower()):
+                phone = extract_phone_from_text(msg_text)
+                if phone:
+                    extracted_phone = phone
+                    logger.info(f"Extracted phone {phone} from system message in chat {chat_id}")
+                    break
+        
+        if extracted_phone and chat.get('phone') != extracted_phone:
+            try:
+                await database.execute(
+                    chats.update().where(chats.c.id == chat['id']).values(phone=extracted_phone)
+                )
+                logger.info(f"Updated phone {extracted_phone} for chat {chat['id']}")
+                chat['phone'] = extracted_phone
+            except Exception as e:
+                logger.warning(f"Failed to update phone in chat: {e}")
         
         for avito_msg in avito_messages:
             try:
@@ -436,7 +596,7 @@ async def get_avito_chat_messages(
         
         return {
             "success": True,
-            "chat_id": chat_id,
+            "chat_id": chat['id'],
             "external_chat_id": chat['external_chat_id'],
             "total": len(avito_messages),
             "messages": message_items,

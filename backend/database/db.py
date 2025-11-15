@@ -2385,3 +2385,71 @@ channel_credentials = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
     UniqueConstraint("channel_id", "cashbox_id", name="uq_channel_credentials_channel_cashbox"),
 )
+
+marketplace_rating_aggregates = sqlalchemy.Table(
+    "marketplace_rating_aggregates",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("entity_type", String, nullable=False),
+    sqlalchemy.Column("avg_rating", Float, nullable=False),
+    sqlalchemy.Column("reviews_count", Integer, nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+marketplace_utm_tags = sqlalchemy.Table(
+    "marketplace_utm_tags",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column("entity_type", String, nullable=True),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("utm_source", String, nullable=True),
+    sqlalchemy.Column("utm_medium", String, nullable=True),
+    sqlalchemy.Column("utm_campaign", String, nullable=True),
+    sqlalchemy.Column("utm_term", ARRAY(item_type=String), nullable=True),
+    sqlalchemy.Column("utm_content", String, nullable=True),
+    sqlalchemy.Column("utm_name", String, nullable=True),
+    sqlalchemy.Column("utm_phone", String, nullable=True),
+    sqlalchemy.Column("utm_email", String, nullable=True),
+    sqlalchemy.Column("utm_leadid", String, nullable=True),
+    sqlalchemy.Column("utm_yclientid", String, nullable=True),
+    sqlalchemy.Column("utm_gaclientid", String, nullable=True),
+)
+
+marketplace_reviews = sqlalchemy.Table(
+    "marketplace_reviews",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("entity_type", String, nullable=False),
+    sqlalchemy.Column("contagent_id", Integer, ForeignKey("contragents.id"), nullable=False),
+    sqlalchemy.Column("rating", Integer, nullable=False),
+    sqlalchemy.Column("text", Text, nullable=False),
+    sqlalchemy.Column("status", String, nullable=False, server_default="visible"),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+marketplace_view_events = sqlalchemy.Table(
+    "marketplace_view_events",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column("entity_type", String, nullable=False),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("listing_pos", Integer, nullable=True),
+    sqlalchemy.Column("listing_page", Integer, nullable=True),
+    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id"), nullable=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+)
+
+favorites_nomenclatures = sqlalchemy.Table(
+    "favorites_nomenclatures",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column("contagent_id", Integer, ForeignKey("contragents.id"), nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)

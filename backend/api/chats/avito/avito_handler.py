@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Optional, Dict, Any
 from datetime import datetime
 from .avito_types import AvitoWebhook
@@ -6,6 +7,36 @@ from ..producer import chat_producer
 from .. import crud
 
 logger = logging.getLogger(__name__)
+
+
+def extract_phone_from_text(text: str) -> Optional[str]:    
+    if not text:
+        return None
+
+    phone_patterns = [
+        r'\+?7\s?\(?\d{3}\)?\s?\d{3}[\s-]?\d{2}[\s-]?\d{2}',
+        r'8\s?\(?\d{3}\)?\s?\d{3}[\s-]?\d{2}[\s-]?\d{2}',
+        r'\+?7\d{10}',
+        r'8\d{10}',
+    ]
+    
+    for pattern in phone_patterns:
+        matches = re.findall(pattern, text)
+        if matches:
+            phone = re.sub(r'[^\d+]', '', matches[0])
+            if phone.startswith('8'):
+                phone = '+7' + phone[1:]
+            elif phone.startswith('7') and not phone.startswith('+7'):
+                phone = '+' + phone
+            elif len(phone) == 10:
+                phone = '+7' + phone
+            
+            if phone.startswith('+7') and len(phone) == 12:
+                return phone
+            elif len(phone) >= 11:
+                return phone
+    
+    return None
 
 
 class AvitoHandler:
@@ -31,6 +62,12 @@ class AvitoHandler:
             user_name = f"Avito User {author_id}" if author_id else "Unknown User"
             user_phone = None
             
+            if message_type == 'system' or (message_text and ('[Системное сообщение]' in message_text or 'системное' in message_text.lower())):
+                extracted_phone = extract_phone_from_text(message_text)
+                if extracted_phone:
+                    user_phone = extracted_phone
+                    logger.info(f"Extracted phone {user_phone} from system message {message_id}")
+            
             logger.info(f"Processing Avito message: {message_id} in chat {chat_id_external}")
             logger.info(f"From author_id: {author_id}, user_id: {user_id}, chat_type: {chat_type}, item_id: {item_id}")
             
@@ -39,11 +76,23 @@ class AvitoHandler:
                 external_chat_id=chat_id_external,
                 cashbox_id=cashbox_id,
                 user_id=user_id,
-                webhook_data=payload
+                webhook_data=payload,
+                user_phone=user_phone
             )
             
             if not chat:
                 raise Exception(f"Failed to create or find chat {chat_id_external}")
+            
+            if user_phone and chat.get('phone') != user_phone:
+                try:
+                    from database.db import database, chats
+                    await database.execute(
+                        chats.update().where(chats.c.id == chat['id']).values(phone=user_phone)
+                    )
+                    logger.info(f"Updated phone {user_phone} for chat {chat['id']}")
+                    chat['phone'] = user_phone
+                except Exception as e:
+                    logger.warning(f"Failed to update phone in chat: {e}")
             
             contragent_result = None
             if user_phone:
@@ -109,7 +158,8 @@ class AvitoHandler:
         external_chat_id: str,
         cashbox_id: int,
         user_id: int,
-        webhook_data: Dict[str, Any]
+        webhook_data: Dict[str, Any],
+        user_phone: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         try:
             channel = await crud.get_channel_by_type(channel_type)
@@ -137,7 +187,7 @@ class AvitoHandler:
                 channel_id=channel['id'],
                 cashbox_id=cashbox_id,
                 external_chat_id=external_chat_id,
-                phone=None,  
+                phone=user_phone,  
                 name=f"Avito Chat {external_chat_id[:8]}"
             )
             

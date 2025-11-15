@@ -1,35 +1,34 @@
 import logging
 import json
 import asyncio
+import os
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
-from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
-from common.utils.ioc.ioc import ioc
+import aio_pika
+from aio_pika.abc import AbstractIncomingMessage
+
 from api.chats import crud
 
 logger = logging.getLogger(__name__)
 
 AVITO_MESSAGES_QUEUE = "avito.messages"
+AVITO_MESSAGES_EXCHANGE = "avito"
 AVITO_MESSAGES_ROUTING_KEY = "avito.messages.*"
 
 
 class AvitoMessageConsumer:
     def __init__(self):
-        self.rabbit_messaging: Optional[IRabbitMessaging] = None
+        self.connection: Optional[aio_pika.abc.AbstractRobustConnection] = None
         self.is_running = False
     
     async def start(self):
         try:
-            rabbit_factory: IRabbitFactory = await ioc.get(IRabbitFactory)()
-            self.rabbit_messaging = await rabbit_factory
-            
             logger.info(f"Avito consumer starting... Listening to queue: {AVITO_MESSAGES_QUEUE}")
             
             self.is_running = True
             
-            await self._consume_messages()
+            asyncio.create_task(self._consume_messages())
             
         except Exception as e:
             logger.error(f"Failed to start Avito consumer: {e}", exc_info=True)
@@ -37,37 +36,53 @@ class AvitoMessageConsumer:
     
     async def stop(self):
         self.is_running = False
+        if self.connection:
+            try:
+                await self.connection.close()
+                logger.info("Avito consumer connection closed")
+            except Exception as e:
+                logger.error(f"Error closing connection: {e}")
         logger.info("Avito consumer stopped")
     
     async def _consume_messages(self):
         try:
-            channel = self.rabbit_messaging.channel.channels.get("publication")
-            
-            if not channel:
-                raise Exception("Publication channel not available")
-            
-            exchange = await channel.declare_exchange(
-                name="avito",
-                type="topic",
-                durable=True
+            self.connection = await aio_pika.connect_robust(
+                host=os.getenv("RABBITMQ_HOST", "localhost"),
+                port=int(os.getenv("RABBITMQ_PORT", "5672")),
+                login=os.getenv("RABBITMQ_USER", "guest"),
+                password=os.getenv("RABBITMQ_PASS", "guest"),
+                virtualhost=os.getenv("RABBITMQ_VHOST", "/"),
+                timeout=10,
             )
             
-            queue = await channel.declare_queue(
-                name=AVITO_MESSAGES_QUEUE,
-                durable=True
-            )
-            
-            await queue.bind(exchange, routing_key=AVITO_MESSAGES_ROUTING_KEY)
-            
-            logger.info(f"Queue {AVITO_MESSAGES_QUEUE} declared and bound")
-            
-            async with queue.iterator() as queue_iter:
-                async for message in queue_iter:
-                    async with message.process():
-                        try:
-                            await self._process_message(message)
-                        except Exception as e:
-                            logger.error(f"Error processing message: {e}", exc_info=True)
+            async with self.connection:
+                channel = await self.connection.channel()
+                await channel.set_qos(prefetch_count=10)
+                
+                exchange = await channel.declare_exchange(
+                    name=AVITO_MESSAGES_EXCHANGE,
+                    type="topic",
+                    durable=True
+                )
+                
+                queue = await channel.declare_queue(
+                    name=AVITO_MESSAGES_QUEUE,
+                    durable=True
+                )
+                
+                await queue.bind(exchange, routing_key=AVITO_MESSAGES_ROUTING_KEY)
+                
+                logger.info(f"Queue {AVITO_MESSAGES_QUEUE} declared and bound to exchange {AVITO_MESSAGES_EXCHANGE}")
+                
+                async with queue.iterator() as queue_iter:
+                    async for message in queue_iter:
+                        if not self.is_running:
+                            break
+                        async with message.process():
+                            try:
+                                await self._process_message(message)
+                            except Exception as e:
+                                logger.error(f"Error processing message: {e}", exc_info=True)
         
         except Exception as e:
             logger.error(f"Error in message consumer loop: {e}", exc_info=True)
