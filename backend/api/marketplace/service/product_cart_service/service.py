@@ -21,6 +21,7 @@ class MarketplaceCartService(BaseMarketplaceService):
             request: MarketplaceAddToCartRequest
     ) -> MarketplaceCartResponse:
         """Add item to cart (creates cart if needed)"""
+        await self._validate_contragent(request.contragent_phone, request.good.nomenclature_id)
         # 1. Get contragent ID
         contragent_id = await self._get_contragent_id_by_phone(request.contragent_phone)
 
