@@ -249,43 +249,55 @@ async def get_prices(
 
     # Если нужны фото, загружаем их для номенклатур
     if with_photos and prices_db:
-        # Собираем уникальные ID номенклатур
-        nomenclature_ids = list(set([price['nomenclature_id'] for price in prices_db]))
+        # Преобразуем Row объекты в dict для модификации
+        prices_db = [dict(price) for price in prices_db]
+        
+        # Собираем уникальные ID номенклатур (пропускаем None)
+        nomenclature_ids = list(set([
+            price['nomenclature_id'] 
+            for price in prices_db 
+            if price.get('nomenclature_id') is not None
+        ]))
 
-        # Загружаем все фото одним запросом
-        photos_query = (
-            select(
-                pictures.c.entity_id.label('nomenclature_id'),
-                pictures.c.id,
-                pictures.c.url,
-                pictures.c.is_main,
-                pictures.c.created_at,
-                pictures.c.updated_at
+        if nomenclature_ids:
+            # Загружаем все фото одним запросом
+            photos_query = (
+                select(
+                    pictures.c.entity_id.label('nomenclature_id'),
+                    pictures.c.id,
+                    pictures.c.url,
+                    pictures.c.is_main,
+                    pictures.c.created_at,
+                    pictures.c.updated_at
+                )
+                .select_from(pictures)
+                .where(
+                    pictures.c.entity == 'nomenclature',
+                    pictures.c.entity_id.in_(nomenclature_ids),
+                    pictures.c.is_deleted.is_not(True)
+                )
+                .order_by(pictures.c.entity_id, pictures.c.is_main.desc(), pictures.c.id.asc())
             )
-            .select_from(pictures)
-            .where(
-                pictures.c.entity == 'nomenclature',
-                pictures.c.entity_id.in_(nomenclature_ids),
-                pictures.c.is_deleted.is_not(True)
-            )
-            .order_by(pictures.c.entity_id, pictures.c.is_main.desc(), pictures.c.id.asc())
-        )
-        photos_list = await database.fetch_all(photos_query)
+            photos_list = await database.fetch_all(photos_query)
 
-        # Группируем фото по nomenclature_id
-        photos_dict = {}
-        for photo in photos_list:
-            nom_id = photo['nomenclature_id']
-            if nom_id not in photos_dict:
-                photos_dict[nom_id] = []
-            photo_dict = dict(photo)
-            del photo_dict['nomenclature_id']
-            photos_dict[nom_id].append(datetime_to_timestamp(photo_dict))
+            # Группируем фото по nomenclature_id
+            photos_dict = {}
+            for photo in photos_list:
+                nom_id = photo['nomenclature_id']
+                if nom_id not in photos_dict:
+                    photos_dict[nom_id] = []
+                photo_dict = dict(photo)
+                del photo_dict['nomenclature_id']
+                photos_dict[nom_id].append(datetime_to_timestamp(photo_dict))
 
-        # Добавляем фото к ценам
-        for price in prices_db:
-            nom_id = price.get('nomenclature_id')
-            price['photos'] = photos_dict.get(nom_id, [])
+            # Добавляем фото к ценам
+            for price in prices_db:
+                nom_id = price.get('nomenclature_id')
+                price['photos'] = photos_dict.get(nom_id, [])
+        else:
+            # Если нет nomenclature_id, добавляем пустые массивы
+            for price in prices_db:
+                price['photos'] = []
 
     q = select(
         func.count(prices.c.id).label("count_prices")).\
