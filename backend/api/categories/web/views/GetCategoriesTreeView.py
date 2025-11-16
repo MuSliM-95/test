@@ -27,8 +27,6 @@ class GetCategoriesTreeView:
         """Получение древа списка категорий"""
         user = await get_user_by_token(token)
 
-        s3_client = self.__s3_factory()
-
         query = (
             select(
                 categories,
@@ -58,16 +56,8 @@ class GetCategoriesTreeView:
             category_dict = dict(category)
             category_dict['key'] = category_dict['id']
 
-            if include_photo:
-                try:
-                    if category_dict.get("picture"):
-                        url = await s3_client.get_link_object(
-                            bucket_name="5075293c-docs_generated",
-                            file_key=category_dict.get("picture")
-                        )
-                        category_dict["picture"] = url
-                except Exception as e:
-                    print(e)
+            # picture уже содержит путь из БД, не нужно генерировать signed URL
+            # Фото доступны через /api/v1/photos/{file_key}
 
             nomenclature_in_category = (
                 select(
@@ -102,17 +92,8 @@ class GetCategoriesTreeView:
             if childrens:
                 category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id,
                                                                   nomenclature_name)
-                if include_photo:
-                    for element in category_dict['children']:
-                        try:
-                            if element.get("picture"):
-                                url = await s3_client.get_link_object(
-                                    bucket_name="5075293c-docs_generated",
-                                    file_key=element.get("picture")
-                                )
-                                element["picture"] = url
-                        except Exception as e:
-                            print(e)
+                # picture для детей уже содержит путь из БД
+                # Фото доступны через /api/v1/photos/{file_key}
             else:
                 category_dict['children'] = []
 

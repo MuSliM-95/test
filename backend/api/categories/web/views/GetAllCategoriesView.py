@@ -23,8 +23,6 @@ class GetAllCategoriesView:
         """Получение списка категорий, отсортированных по дате создания"""
         user = await get_user_by_token(token)
 
-        s3_client = self.__s3_factory()
-
         query = (
             select(
                 categories,
@@ -42,16 +40,8 @@ class GetAllCategoriesView:
 
         categories_db = await database.fetch_all(query)
         categories_db = [*map(datetime_to_timestamp, categories_db)]
-        for category in categories_db:
-            if include_photo and category.get("picture"):
-                try:
-                    url = await s3_client.get_link_object(
-                        bucket_name="5075293c-docs_generated",
-                        file_key=category.get("picture")
-                    )
-                    category["picture"] = url
-                except Exception as e:
-                    print(e)
+        # picture уже содержит путь из БД, не нужно генерировать signed URL
+        # Фото доступны через /api/v1/photos/{file_key}
 
         query = select(func.count(categories.c.id)).where(
             categories.c.owner == user.id,
