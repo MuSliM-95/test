@@ -22,6 +22,7 @@ class GetCategoriesTreeView:
         token: str, nomenclature_name: Optional[str] = None,
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=100)] = 100,
+        include_photo: bool = False
     ):
         """Получение древа списка категорий"""
         user = await get_user_by_token(token)
@@ -57,15 +58,16 @@ class GetCategoriesTreeView:
             category_dict = dict(category)
             category_dict['key'] = category_dict['id']
 
-            try:
-                if category_dict.get("picture"):
-                    url = await s3_client.get_link_object(
-                        bucket_name="5075293c-docs_generated",
-                        file_key=category_dict.get("picture")
-                    )
-                    category_dict["picture"] = url
-            except Exception as e:
-                print(e)
+            if include_photo:
+                try:
+                    if category_dict.get("picture"):
+                        url = await s3_client.get_link_object(
+                            bucket_name="5075293c-docs_generated",
+                            file_key=category_dict.get("picture")
+                        )
+                        category_dict["picture"] = url
+                except Exception as e:
+                    print(e)
 
             nomenclature_in_category = (
                 select(
@@ -100,16 +102,17 @@ class GetCategoriesTreeView:
             if childrens:
                 category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id,
                                                                   nomenclature_name)
-                for element in category_dict['children']:
-                    try:
-                        if element.get("picture"):
-                            url = await s3_client.get_link_object(
-                                bucket_name="5075293c-docs_generated",
-                                file_key=element.get("picture")
-                            )
-                            element["picture"] = url
-                    except Exception as e:
-                        print(e)
+                if include_photo:
+                    for element in category_dict['children']:
+                        try:
+                            if element.get("picture"):
+                                url = await s3_client.get_link_object(
+                                    bucket_name="5075293c-docs_generated",
+                                    file_key=element.get("picture")
+                                )
+                                element["picture"] = url
+                        except Exception as e:
+                            print(e)
             else:
                 category_dict['children'] = []
 
