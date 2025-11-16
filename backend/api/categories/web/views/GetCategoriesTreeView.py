@@ -27,21 +27,35 @@ class GetCategoriesTreeView:
         """Получение древа списка категорий"""
         user = await get_user_by_token(token)
 
-        query = (
-            select(
-                categories,
-                pictures.c.url.label("picture")
+        if include_photo:
+            # Если нужны фото, делаем JOIN с pictures
+            query = (
+                select(
+                    categories,
+                    pictures.c.url.label("picture")
+                )
+                .select_from(categories)
+                .outerjoin(pictures, categories.c.photo_id == pictures.c.id)
+                .where(
+                    categories.c.cashbox == user.cashbox_id,
+                    categories.c.is_deleted.is_not(True),
+                    categories.c.parent == None
+                )
+                .limit(limit)
+                .offset(offset)
             )
-            .select_from(categories)
-            .outerjoin(pictures, categories.c.photo_id == pictures.c.id)
-            .where(
-                categories.c.cashbox == user.cashbox_id,
-                categories.c.is_deleted.is_not(True),
-                categories.c.parent == None
+        else:
+            # Без фото - не делаем JOIN
+            query = (
+                select(categories)
+                .where(
+                    categories.c.cashbox == user.cashbox_id,
+                    categories.c.is_deleted.is_not(True),
+                    categories.c.parent == None
+                )
+                .limit(limit)
+                .offset(offset)
             )
-            .limit(limit)
-            .offset(offset)
-        )
 
         categories_db = await database.fetch_all(query)
         result = []
@@ -73,21 +87,41 @@ class GetCategoriesTreeView:
             category_dict["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
 
             category_dict['expanded_flag'] = False
-            query = (
-                f"""
-                        with recursive categories_hierarchy as (
-                        select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
-                        from categories where parent = {category.id}
+            
+            if include_photo:
+                # С фото - делаем LEFT JOIN
+                query = (
+                    f"""
+                            with recursive categories_hierarchy as (
+                            select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+                            from categories where parent = {category.id}
 
-                        union
-                        select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
-                        from categories_hierarchy as H
-                        join categories as F on F.parent = H.id
-                        ) 
-                        select ch.*, p.url as picture from categories_hierarchy ch
-                        left join pictures p on ch.photo_id = p.id
-                    """
-            )
+                            union
+                            select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+                            from categories_hierarchy as H
+                            join categories as F on F.parent = H.id
+                            ) 
+                            select ch.*, p.url as picture from categories_hierarchy ch
+                            left join pictures p on ch.photo_id = p.id
+                        """
+                )
+            else:
+                # Без фото - не делаем JOIN
+                query = (
+                    f"""
+                            with recursive categories_hierarchy as (
+                            select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+                            from categories where parent = {category.id}
+
+                            union
+                            select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+                            from categories_hierarchy as H
+                            join categories as F on F.parent = H.id
+                            ) 
+                            select ch.* from categories_hierarchy ch
+                        """
+                )
+            
             childrens = await database.fetch_all(query)
             if childrens:
                 category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id,

@@ -23,25 +23,36 @@ class GetAllCategoriesView:
         """Получение списка категорий, отсортированных по дате создания"""
         user = await get_user_by_token(token)
 
-        query = (
-            select(
-                categories,
-                pictures.c.url.label("picture")
+        if include_photo:
+            # Если нужны фото, делаем JOIN с pictures
+            query = (
+                select(
+                    categories,
+                    pictures.c.url.label("picture")
+                )
+                .select_from(categories)
+                .outerjoin(pictures, categories.c.photo_id == pictures.c.id)
+                .where(
+                    categories.c.cashbox == user.cashbox_id,
+                    categories.c.is_deleted.is_not(True),
+                ).order_by(categories.c.created_at.desc())
+                .limit(limit)
+                .offset(offset)
             )
-            .select_from(categories)
-            .outerjoin(pictures, categories.c.photo_id == pictures.c.id)
-            .where(
-                categories.c.cashbox == user.cashbox_id,
-                categories.c.is_deleted.is_not(True),
-            ).order_by(categories.c.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
+        else:
+            # Без фото - не делаем JOIN
+            query = (
+                select(categories)
+                .where(
+                    categories.c.cashbox == user.cashbox_id,
+                    categories.c.is_deleted.is_not(True),
+                ).order_by(categories.c.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
 
         categories_db = await database.fetch_all(query)
         categories_db = [*map(datetime_to_timestamp, categories_db)]
-        # picture уже содержит путь из БД, не нужно генерировать signed URL
-        # Фото доступны через /api/v1/photos/{file_key}
 
         query = select(func.count(categories.c.id)).where(
             categories.c.owner == user.id,
