@@ -52,6 +52,7 @@ class PriceInList(BaseModel):
     price_type: Optional[str]
     date_from: Optional[int]
     date_to: Optional[int]
+    photos: Optional[List[dict]] = []
 
     class Config:
         orm_mode = True

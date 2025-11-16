@@ -15,7 +15,10 @@ class GetAllCategoriesView:
 
     async def __call__(
         self,
-        token: str, limit: int = 100, offset: int = 0
+        token: str,
+        limit: int = 100,
+        offset: int = 0,
+        include_photo: bool = False
     ):
         """Получение списка категорий, отсортированных по дате создания"""
         user = await get_user_by_token(token)
@@ -40,7 +43,7 @@ class GetAllCategoriesView:
         categories_db = await database.fetch_all(query)
         categories_db = [*map(datetime_to_timestamp, categories_db)]
         for category in categories_db:
-            if category.get("picture"):
+            if include_photo and category.get("picture"):
                 try:
                     url = await s3_client.get_link_object(
                         bucket_name="5075293c-docs_generated",
