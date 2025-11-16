@@ -41,8 +41,10 @@ class AvitoLocationContent(BaseModel):
 
 class AvitoVoiceContent(BaseModel):
     """Voice message content"""
-    duration: int
-    url: str
+    duration: Optional[int] = None
+    url: Optional[str] = None
+    voice_id: Optional[str] = None
+    voice_url: Optional[str] = None
 
 
 class AvitoFileContent(BaseModel):

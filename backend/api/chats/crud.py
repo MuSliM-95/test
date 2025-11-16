@@ -234,21 +234,27 @@ async def create_message_and_update_chat(
     content: str,
     message_type: str = "TEXT",
     external_message_id: Optional[str] = None,
-    status: str = "SENT"
+    status: str = "SENT",
+    created_at: Optional[datetime] = None
 ):
     chat = await get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     
+    message_values = {
+        "chat_id": chat_id,
+        "sender_type": sender_type,
+        "content": content,
+        "message_type": message_type,
+        "external_message_id": external_message_id,
+        "status": status
+    }
+    
+    if created_at:
+        message_values["created_at"] = created_at
+    
     message_id = await database.execute(
-        chat_messages.insert().values(
-            chat_id=chat_id,
-            sender_type=sender_type,
-            content=content,
-            message_type=message_type,
-            external_message_id=external_message_id,
-            status=status
-        )
+        chat_messages.insert().values(**message_values)
     )
     message = await get_message(message_id)
     current_time = message.created_at if message.created_at else datetime.now()

@@ -94,8 +94,8 @@ class MessageCreate(BaseModel):
     sender_type: str
     content: str
     message_type: str = "TEXT"
-    external_message_id: Optional[str] = None
     status: str = "SENT"
+    image_url: Optional[str] = None  
 
 
 class MessageUpdate(BaseModel):
