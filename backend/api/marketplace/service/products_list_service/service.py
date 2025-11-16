@@ -1,10 +1,9 @@
 import json
-import math
-from typing import Optional, List
+import os
 from datetime import datetime
+from typing import Optional, List
 
-# Допустим, вы используете UTC. Импортируйте нужный способ получения текущего времени.
-from sqlalchemy import and_, select, func, asc, desc, literal_column, JSON, cast, text
+from sqlalchemy import and_, select, func, asc, desc, literal_column, cast
 from sqlalchemy.dialects.postgresql import JSONB
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
@@ -13,31 +12,11 @@ from api.marketplace.service.products_list_service.schemas import MarketplacePro
 from database.db import nomenclature, prices, price_types, database, warehouses, warehouse_balances, units, categories, \
     manufacturers, cboxes, marketplace_rating_aggregates, pictures, nomenclature_barcodes
 
-# Дополнительный импорт для работы с датами/временем, если нужно явно указать UTC
-from sqlalchemy.sql import func as sql_func
-# from sqlalchemy.dialects.postgresql import INTERVAL # Если нужно учитывать timezone
 
 class MarketplaceProductsListService(BaseMarketplaceService):
     @staticmethod
-    def __count_distance_to_client(client_lat: Optional[float], client_long: Optional[float], warehouse_lat: Optional[float], warehouse_long: Optional[float]) -> Optional[float]:
-        if not all([client_lat, client_long, warehouse_lat, warehouse_long]):
-            return None
-
-        R = 6371.0  # радиус Земли в километрах
-
-        lat1_rad = math.radians(client_lat)
-        lon1_rad = math.radians(client_long)
-        lat2_rad = math.radians(warehouse_lat)
-        lon2_rad = math.radians(warehouse_long)
-
-        dlat = lat2_rad - lat1_rad
-        dlon = lon2_rad - lon1_rad
-
-        a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-        distance = R * c
-        return distance  # в километрах
+    def __transform_photo_route(photo_path: str) -> str:
+        return f'https://{os.getenv("APP_URL")}/{photo_path}'
 
     async def get_products(
             self,
@@ -259,7 +238,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
             # Images
             images = product_dict.get("images")
-            product_dict["images"] = [url for url in images if url] if images and any(images) else None
+            product_dict["images"] = [self.__transform_photo_route(url) for url in images if url] if images and any(images) else None
 
             # Barcodes
             barcodes = product_dict.get("barcodes")
@@ -270,7 +249,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 wh_valid = [w for w in wh_raw if w is not None and w.get("warehouse_id") is not None]
                 if wh_valid:
                     product_dict["available_warehouses"] = sorted([
-                        AvailableWarehouse(**w, distance_to_client=self.__count_distance_to_client(lat, lon, w['latitude'], w['longitude']))
+                        AvailableWarehouse(**w, distance_to_client=self._count_distance_to_client(lat, lon,
+                                                                                                  w['latitude'],
+                                                                                                  w['longitude']))
                         for w in wh_valid
                     ], key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0))
                 else:
@@ -357,7 +338,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         result = []
         for w in raw_warehouses:
-            result.append(AvailableWarehouse(**w, distance_to_client=self.__count_distance_to_client(client_lat, client_lon, w['latitude'], w['longitude'])))
+            result.append(AvailableWarehouse(**w, distance_to_client=self._count_distance_to_client(client_lat,
+                                                                                                    client_lon,
+                                                                                                    w['latitude'],
+                                                                                                    w['longitude'])))
 
         # Сортируем: сначала склады с известным расстоянием (по возрастанию), потом — без координат
         result.sort(key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0))

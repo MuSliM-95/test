@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, Depends
 
 from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse, \
     CreateFavoritesUtm
+from api.marketplace.service.locations_service.schemas import LocationsListResponse, LocationsListRequest
 from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderRequest, \
     CreateOrderUtm
 from api.marketplace.service.products_list_service.schemas import MarketplaceProductList
@@ -59,21 +60,15 @@ async def get_marketplace_products(
     )
 
 
-# @router.get("/locations", response_model=MarketplaceLocationList)
-# async def get_marketplace_locations(
-#     city: Optional[str] = Query(None, description="Город"),
-#     lat: Optional[float] = Query(None, description="Широта"),
-#     lon: Optional[float] = Query(None, description="Долгота"),
-#     radius: Optional[float] = Query(None, description="Радиус поиска в км"),
-#     page: int = Query(1, ge=1, description="Номер страницы"),
-#     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
-#     sort: Optional[str] = Query("name", description="Сортировка: name, distance, rating"),
-#     service: MarketplaceService = Depends(get_marketplace_service)
-# ):
-#     """
-#     Получить список публичных локаций для чекина
-#     """
-#     return await service.get_locations(city=city, lat=lat, lon=lon, radius=radius, page=page, size=size, sort=sort)
+@router.get("/locations", response_model=LocationsListResponse)
+async def get_marketplace_locations(
+    request: LocationsListRequest = Depends(),
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    """
+    Получить список публичных локаций
+    """
+    return await service.get_locations(request)
 
 
 @router.post("/orders", response_model=MarketplaceOrderResponse)
