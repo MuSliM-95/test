@@ -53,6 +53,7 @@ class ReviewListRequest(BaseModel):
     page: Optional[int] = 1
     size: Optional[int] = 20
     sort: Optional[SortBy] = SortBy.newest
+    view_only_rates: Optional[int] = Field(default=None, ge=1, le=5)
 
 
 class UpdateReviewRequest(BaseModel):

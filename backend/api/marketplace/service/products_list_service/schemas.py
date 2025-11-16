@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Optional, List
+from enum import Enum
+from typing import Optional, List, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AvailableWarehouse(BaseModel):
@@ -33,6 +34,9 @@ class MarketplaceProduct(BaseModel):
     updated_at: datetime
     images: Optional[List[str]] = None
     barcodes: Optional[List[str]] = None
+    type: Optional[str] = None
+
+    distance: Optional[float] = None
 
     # Новые поля для расширенной функциональности
     listing_pos: Optional[int] = None  # Позиция в выдаче для аналитики
@@ -41,10 +45,12 @@ class MarketplaceProduct(BaseModel):
 
     tags: Optional[List[str]] = None  # Теги товара
     variations: Optional[List[dict]] = None  # Вариации товара
-    stock_quantity: Optional[float] = None  # Остатки
+    current_amount: Optional[float] = None  # Остатки
 
     seller_name: Optional[str] = None  # Имя селлера
     seller_photo: Optional[str] = None  # Фото селлера
+
+    total_sold: Optional[int] = None
 
     rating: Optional[float] = None  # Рейтинг 1-5
     reviews_count: Optional[int] = None  # Количество отзывов
@@ -60,3 +66,31 @@ class MarketplaceProductList(BaseModel):
     count: int
     page: int
     size: int
+
+
+class MarketplaceSort(Enum):
+    distance = "distance"
+    price = "price"
+    name = "name"
+    rating = "rating"
+    total_sold = "total_sold"
+    created_at = "created_at"
+    updated_at = "updated_at"
+
+class MarketplaceProductsRequest(BaseModel):
+    phone: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    page: int = 1
+    size: int = Field(default=20, le=100)
+    sort_by: Optional[MarketplaceSort] = None
+    sort_order: Optional[Literal["asc", "desc"]] = "desc"
+    category: Optional[str] = None
+    manufacturer: Optional[str] = None
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+    # tags: Optional[str] = None
+    in_stock: Optional[bool] = None
+
+    rating_from: Optional[int] = None
+    rating_to: Optional[int] = None

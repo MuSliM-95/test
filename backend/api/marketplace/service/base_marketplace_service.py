@@ -65,3 +65,6 @@ class BaseMarketplaceService:
 
         distance = R * c
         return distance  # в километрах
+
+    # @staticmethod
+    # async def _hash_order(contragent_id: ):

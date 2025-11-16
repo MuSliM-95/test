@@ -1,6 +1,7 @@
 from api.marketplace.service.favorites_service.service import MarketplaceFavoritesService
 from api.marketplace.service.locations_service.service import MarketplaceLocationsService
 from api.marketplace.service.orders_service.service import MarketplaceOrdersService
+from api.marketplace.service.product_cart_service.service import MarketplaceCartService
 from api.marketplace.service.products_list_service.service import MarketplaceProductsListService
 from api.marketplace.service.qr_service.service import MarketplaceQrService
 from api.marketplace.service.review_service.service import MarketplaceReviewService
@@ -9,7 +10,7 @@ from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.utils.ioc.ioc import ioc
 
 
-class MarketplaceService(MarketplaceProductsListService, MarketplaceOrdersService, MarketplaceReviewService, MarketplaceFavoritesService, MarketplaceQrService, MarketplaceViewEventService, MarketplaceLocationsService):
+class MarketplaceService(MarketplaceProductsListService, MarketplaceOrdersService, MarketplaceReviewService, MarketplaceFavoritesService, MarketplaceQrService, MarketplaceViewEventService, MarketplaceLocationsService, MarketplaceCartService):
     def __init__(self):
         super().__init__()
 
