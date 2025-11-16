@@ -743,7 +743,6 @@ price_types = sqlalchemy.Table(
     sqlalchemy.Column("is_system", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("cashbox", "name", name="uq_price_types_cashbox_name")
 )
 
 pictures = sqlalchemy.Table(
