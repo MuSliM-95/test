@@ -10,7 +10,7 @@ from api.marketplace.service.base_marketplace_service import BaseMarketplaceServ
 from api.marketplace.service.products_list_service.schemas import MarketplaceProduct, MarketplaceProductList, \
     AvailableWarehouse
 from database.db import nomenclature, prices, price_types, database, warehouses, warehouse_balances, units, categories, \
-    manufacturers, cboxes, marketplace_rating_aggregates, pictures, nomenclature_barcodes
+    manufacturers, cboxes, marketplace_rating_aggregates, pictures, nomenclature_barcodes, users
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
@@ -124,6 +124,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 active_prices_subquery.c.price,
                 price_types.c.name.label("price_type"),
                 cboxes.c.name.label("seller_name"),
+                users.c.photo.label("seller_photo"),
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
                 marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
                 func.array_agg(
@@ -142,6 +143,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .join(active_prices_subquery, active_prices_subquery.c.nomenclature_id == nomenclature.c.id)
             .join(price_types, price_types.c.id == active_prices_subquery.c.price_type) # Теперь JOIN к price_types через подзапрос
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
+            .join(users, users.c.id == cboxes.c.admin)
             .join(pictures, and_(
                 pictures.c.entity == "nomenclature",
                 pictures.c.entity_id == nomenclature.c.id,
@@ -197,6 +199,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             active_prices_subquery.c.price,
             price_types.c.name,
             cboxes.c.name,
+            users.c.photo,
             marketplace_rating_aggregates.c.avg_rating,
             marketplace_rating_aggregates.c.reviews_count,
         ]
@@ -265,8 +268,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             product_dict["variations"] = []
             product_dict["stock_quantity"] = 0.0
             product_dict["distance"] = float(product_dict.get("distance")) if product_dict.get("distance") else None
-            product_dict["seller_photo"] = None
             product_dict["cashbox_id"] = product_dict["cashbox"]
+            product_dict["seller_photo"] = self.__transform_photo_route(product_dict["seller_photo"])
 
             products.append(MarketplaceProduct(**product_dict))
 
