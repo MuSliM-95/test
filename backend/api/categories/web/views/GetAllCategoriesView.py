@@ -24,7 +24,7 @@ class GetAllCategoriesView:
         user = await get_user_by_token(token)
 
         if include_photo:
-            # Если нужны фото, делаем JOIN с pictures
+            # Фото ищутся по entity/category, как для nomenclature
             query = (
                 select(
                     categories,
@@ -33,7 +33,8 @@ class GetAllCategoriesView:
                 .select_from(categories)
                 .outerjoin(
                     pictures,
-                    (categories.c.photo_id == pictures.c.id) &
+                    (pictures.c.entity == 'category') &
+                    (pictures.c.entity_id == categories.c.id) &
                     (pictures.c.is_deleted.is_not(True))
                 )
                 .where(
