@@ -67,7 +67,7 @@ class MarketplaceQrService(BaseMarketplaceService):
                 warehouses.c.owner,
                 warehouses.c.created_at,
                 warehouses.c.updated_at,
-            ).where(and_(warehouses.c.id == warehouse_db.warehouses_id, warehouses.c.is_public == True))
+            ).where(and_(warehouses.c.id == warehouse_db.warehouses_id, warehouses.c.is_public == True, warehouses.c.is_deleted.is_not(True)))
 
             warehouse = await database.fetch_one(warehouse_query)
             if not warehouse:

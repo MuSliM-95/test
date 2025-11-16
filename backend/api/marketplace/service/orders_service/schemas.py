@@ -10,6 +10,7 @@ class MarketplaceOrderGood(BaseModel):
     nomenclature_id: int
     warehouse_id: Optional[int] = None # ID помещения
     quantity: int = 1  # Количество товара
+    is_from_cart: Optional[bool] = False
 
 
 class MarketplaceOrderRequest(BaseModel):

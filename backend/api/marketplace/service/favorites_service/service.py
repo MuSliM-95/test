@@ -68,6 +68,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
             nomenclature_id: int
             contagent_id: int
 
+        await self._validate_contragent(favorite_request.contragent_phone, favorite_request.nomenclature_id)
         product_query = select(nomenclature.c.id).where(
             and_(
                 nomenclature.c.id == favorite_request.nomenclature_id,
@@ -109,10 +110,12 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         return FavoriteResponse.from_orm(created_favorite)
 
 
-    async def remove_from_favorites(self, nomeclature_id: int, contragent_phone: str) -> dict:
+    async def remove_from_favorites(self, nomenclature_id: int, contragent_phone: str) -> dict:
         """
         Удаляет запись из избранного, если она принадлежит указанному контрагенту.
         """
+        await self._validate_contragent(contragent_phone, nomenclature_id)
+
         contragent_id = await self._get_contragent_id_by_phone(contragent_phone)
 
         # Проверяем, существует ли такая запись и принадлежит ли она контрагенту
@@ -121,7 +124,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
             .join(nomenclature, nomenclature.c.id == favorites_nomenclatures.c.nomenclature_id)
             .where(
                 and_(
-                    nomenclature.c.id == nomeclature_id,
+                    nomenclature.c.id == nomenclature_id,
                     favorites_nomenclatures.c.contagent_id == contragent_id
                 )
             )

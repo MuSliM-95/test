@@ -2350,3 +2350,25 @@ feeds_tags = sqlalchemy.Table(
                       server_default=func.now(), onupdate=func.now()),
     sqlalchemy.UniqueConstraint("tag_id", "feed_id", name="unique_tag_id_feed_id"),
 )
+
+marketplace_contragent_cart = sqlalchemy.Table(
+    "marketplace_contragent_cart",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column('contragent_id', Integer, ForeignKey('contragents.id'), nullable=False, unique=True),
+)
+
+marketplace_cart_goods = sqlalchemy.Table(
+    "marketplace_cart_goods",
+    metadata,
+    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column('nomenclature_id', Integer, ForeignKey('nomenclature.id'), nullable=False),
+    sqlalchemy.Column('warehouse_id', Integer, ForeignKey('warehouses.id'), nullable=True),
+    sqlalchemy.Column('quantity', Integer, nullable=False),
+    sqlalchemy.Column('cart_id', BigInteger, ForeignKey('marketplace_contragent_cart.id'), nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True),
+                      server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True),
+                      server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.UniqueConstraint('nomenclature_id', 'warehouse_id', 'cart_id', name='ux_marketplace_cart_goods_nomenclature_id_warehouse_id_cart_id')
+)
