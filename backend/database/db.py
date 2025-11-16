@@ -2364,6 +2364,7 @@ chat_messages = sqlalchemy.Table(
     sqlalchemy.Column("content", Text, nullable=False),
     sqlalchemy.Column("external_message_id", String(255), nullable=True),
     sqlalchemy.Column("status", Enum(MessageStatus), nullable=False, server_default="SENT"),
+    sqlalchemy.Column("source", String(50), nullable=True, comment="Источник отправки сообщения: ios, android, api, web, avito, etc."),
     sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
     sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
 )

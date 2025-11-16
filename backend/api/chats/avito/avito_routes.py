@@ -318,15 +318,29 @@ async def get_avito_chats(
                 user_name = None
                 user_phone = None
                 
-                if users:
-                    first_user = users[0] if users else {}
-                    user_name = first_user.get('name')
-                    user_phone = (
-                        first_user.get('phone') or
-                        first_user.get('phone_number') or
-                        first_user.get('public_user_profile', {}).get('phone') or
-                        first_user.get('public_user_profile', {}).get('phone_number')
+                from database.db import channel_credentials
+                creds = await database.fetch_one(
+                    channel_credentials.select().where(
+                        (channel_credentials.c.channel_id == avito_channel['id']) &
+                        (channel_credentials.c.cashbox_id == cashbox_id) &
+                        (channel_credentials.c.is_active.is_(True))
                     )
+                )
+                avito_user_id = creds.get('avito_user_id') if creds else None
+                
+                if users and avito_user_id:
+                    for user in users:
+                        user_id_in_chat = user.get('user_id') or user.get('id')
+                        if user_id_in_chat and user_id_in_chat != avito_user_id:
+                            user_name = user.get('name') or user.get('profile_name')
+                            user_phone = (
+                                user.get('phone') or
+                                user.get('phone_number') or
+                                user.get('public_user_profile', {}).get('phone') or
+                                user.get('public_user_profile', {}).get('phone_number')
+                            )
+                            if user_name or user_phone:
+                                break
                 
                 if not user_phone:
                     last_message = avito_chat.get('last_message', {})
@@ -395,9 +409,7 @@ async def get_avito_chats(
                     except Exception as e:
                         logger.warning(f"Could not get full chat info for {external_chat_id}: {e}")
                     
-                    update_data = {
-                        "updated_at": datetime.utcnow()
-                    }
+                    update_data = {}
                     
                     if user_name and existing_chat.get('name') != user_name:
                         update_data["name"] = user_name
@@ -406,11 +418,15 @@ async def get_avito_chats(
                     
                     last_message = avito_chat.get('last_message')
                     if last_message and last_message.get('created'):
-                        from datetime import datetime as dt
-                        last_message_time = dt.fromtimestamp(last_message['created'])
+                        last_message_time = datetime.fromtimestamp(last_message['created'])
                         update_data["last_message_time"] = last_message_time
                     
-                    if len(update_data) > 1:
+                    if len(update_data) > 0:
+                        if 'last_message_time' in update_data and update_data['last_message_time']:
+                            update_data['updated_at'] = update_data['last_message_time']
+                        else:
+                            update_data['updated_at'] = datetime.utcnow()
+                        
                         await database.execute(
                             chats.update().where(
                                 chats.c.id == existing_chat['id']
@@ -426,19 +442,20 @@ async def get_avito_chats(
                         "phone": user_phone,
                         "status": "ACTIVE",
                         "created_at": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
                     }
                     
                     if avito_chat.get('created'):
-                        from datetime import datetime as dt
-                        first_message_time = dt.fromtimestamp(avito_chat['created'])
+                        first_message_time = datetime.fromtimestamp(avito_chat['created'])
                         chat_data["first_message_time"] = first_message_time
                     
                     last_message = avito_chat.get('last_message')
                     if last_message and last_message.get('created'):
-                        from datetime import datetime as dt
-                        last_message_time = dt.fromtimestamp(last_message['created'])
+                        last_message_time = datetime.fromtimestamp(last_message['created'])
                         chat_data["last_message_time"] = last_message_time
+                        chat_data["updated_at"] = last_message_time
+                    else:
+                        # Если нет last_message_time, используем текущее время
+                        chat_data["updated_at"] = datetime.utcnow()
                     
                     await database.execute(
                         chats.insert().values(**chat_data)
@@ -560,8 +577,12 @@ async def get_avito_chat_messages(
         
         if extracted_phone and chat.get('phone') != extracted_phone:
             try:
+                from datetime import datetime
                 await database.execute(
-                    chats.update().where(chats.c.id == chat['id']).values(phone=extracted_phone)
+                    chats.update().where(chats.c.id == chat['id']).values(
+                        phone=extracted_phone,
+                        updated_at=datetime.utcnow()
+                    )
                 )
                 chat['phone'] = extracted_phone
             except Exception as e:
@@ -667,7 +688,8 @@ async def get_avito_chat_messages(
                     message_type=message_type,
                     external_message_id=external_message_id,
                     status=status,
-                    created_at=created_at
+                    created_at=created_at,
+                    source="avito"
                 )
                 saved_count += 1
                     
@@ -910,6 +932,7 @@ async def sync_avito_messages(
                             message_type=AvitoHandler._map_message_type(message_type_str),
                             external_message_id=external_message_id,
                             status=status,
+                            source="avito",
                             created_at=created_at
                         )
                         new_messages += 1
@@ -962,7 +985,8 @@ async def send_avito_message(
             sender_type="OPERATOR",
             content=request.content,
             message_type=request.message_type or "TEXT",
-            status="SENT"
+            status="SENT",
+            source="avito"
         )
         
         external_message_id = None

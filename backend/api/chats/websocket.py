@@ -92,7 +92,8 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                     sender_type=sender_type,
                     content=message_data.get("content", ""),
                     message_type=message_type,
-                    status="SENT"
+                    status="SENT",
+                    source="web"
                 )
                 print(f"Message saved to DB for chat {chat_id}: {db_message.id}")
             except Exception as e:

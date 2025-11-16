@@ -212,6 +212,8 @@ class AvitoHandler:
                 if update_data:
                     try:
                         from database.db import database, chats
+                        from datetime import datetime
+                        update_data['updated_at'] = datetime.utcnow()
                         await database.execute(
                             chats.update().where(chats.c.id == chat_id).values(**update_data)
                         )
@@ -263,7 +265,8 @@ class AvitoHandler:
                 message_type=AvitoHandler._map_message_type(message_type),
                 external_message_id=message_id,
                 status="DELIVERED",
-                created_at=created_at
+                created_at=created_at,
+                source="avito"
             )
             
             if message_type in ['image', 'voice'] and message_content:
@@ -591,7 +594,8 @@ class AvitoHandler:
                         content=message_text,
                         message_type=AvitoHandler._map_message_type(message_type),
                         external_message_id=message_id,
-                        status="DELIVERED"
+                        status="DELIVERED",
+                        source="avito"
                     )
                     
                     logger.info(f"Synced message {message_id} to chat {chat_id}")

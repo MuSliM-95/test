@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
+from datetime import datetime
 from sqlalchemy import select
 
 from api.chats import crud
@@ -7,7 +8,7 @@ from api.chats.auth import get_current_user, get_current_user_owner
 from api.chats.schemas import (
     ChannelCreate, ChannelUpdate, ChannelResponse,
     ChatCreate, ChatUpdate, ChatResponse,
-    MessageCreate, MessageResponse,
+    MessageCreate, MessageResponse, MessagesList,
     ChainClientRequest
 )
 from database.db import pictures, database
@@ -90,6 +91,12 @@ async def get_chats(
     contragent_id: Optional[int] = None,
     status: Optional[str] = None,
     search: Optional[str] = Query(None, description="Поиск по имени, телефону или external_chat_id"),
+    created_from: Optional[datetime] = Query(None, description="Фильтр: дата создания от (ISO 8601)"),
+    created_to: Optional[datetime] = Query(None, description="Фильтр: дата создания до (ISO 8601)"),
+    updated_from: Optional[datetime] = Query(None, description="Фильтр: дата обновления от (ISO 8601)"),
+    updated_to: Optional[datetime] = Query(None, description="Фильтр: дата обновления до (ISO 8601)"),
+    sort_by: Optional[str] = Query(None, description="Сортировка по полю: created_at, updated_at, last_message_time, name"),
+    sort_order: Optional[str] = Query("desc", description="Порядок сортировки: asc или desc"),
     skip: int = 0,
     limit: int = 100,
     user = Depends(get_current_user)
@@ -100,6 +107,12 @@ async def get_chats(
         contragent_id=contragent_id,
         status=status,
         search=search,
+        created_from=created_from,
+        created_to=created_to,
+        updated_from=updated_from,
+        updated_to=updated_to,
+        sort_by=sort_by,
+        sort_order=sort_order,
         skip=skip,
         limit=limit
     )
@@ -180,7 +193,8 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
         content=message.content,
         message_type=message.message_type,
         external_message_id=None,  
-        status=message.status
+        status=message.status,
+        source=message.source or "api"
     )
     
     if message.sender_type == "OPERATOR":
@@ -329,7 +343,7 @@ async def get_message(message_id: int, token: str, user = Depends(get_current_us
     return message
 
 
-@router.get("/messages/chat/{chat_id}", response_model=list)
+@router.get("/messages/chat/{chat_id}", response_model=MessagesList)
 async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int = 100, user = Depends(get_current_user)):
     """Get messages from chat (must belong to user's cashbox)"""
     chat = await crud.get_chat(chat_id)
@@ -338,7 +352,87 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
     if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    return await crud.get_messages(chat_id, skip, limit)
+    messages = await crud.get_messages(chat_id, skip, limit)
+    total = await crud.get_messages_count(chat_id)
+    
+    messages_list = []
+    if messages:
+        channel = await crud.get_channel(chat['channel_id'])
+        client_avatar = chat.get('client_avatar')
+        operator_avatar = None
+        
+        if channel and channel['type'] == 'AVITO':
+            try:
+                from database.db import channel_credentials
+                from api.chats.avito.avito_factory import create_avito_client, save_token_callback
+                
+                creds = await database.fetch_one(
+                    channel_credentials.select().where(
+                        (channel_credentials.c.channel_id == chat['channel_id']) &
+                        (channel_credentials.c.cashbox_id == user.cashbox_id) &
+                        (channel_credentials.c.is_active.is_(True))
+                    )
+                )
+                
+                if creds:
+                    client = await create_avito_client(
+                        channel_id=chat['channel_id'],
+                        cashbox_id=user.cashbox_id,
+                        on_token_refresh=lambda token_data: save_token_callback(
+                            chat['channel_id'],
+                            user.cashbox_id,
+                            token_data
+                        )
+                    )
+                    
+                    if client:
+                        chat_info = await client.get_chat_info(chat['external_chat_id'])
+                        users = chat_info.get('users', [])
+                        avito_user_id = creds.get('avito_user_id')
+                        
+                        if users:
+                            for user_data in users:
+                                user_id_in_chat = user_data.get('user_id') or user_data.get('id')
+                                if user_id_in_chat:
+                                    avatar_url = None
+                                    public_profile = user_data.get('public_user_profile', {})
+                                    if public_profile:
+                                        avatar_data = public_profile.get('avatar', {})
+                                        if isinstance(avatar_data, dict):
+                                            avatar_url = (
+                                                avatar_data.get('default') or
+                                                avatar_data.get('images', {}).get('256x256') or
+                                                avatar_data.get('images', {}).get('128x128') or
+                                                (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                            )
+                                        elif isinstance(avatar_data, str):
+                                            avatar_url = avatar_data
+                                    
+                                    if avatar_url:
+                                        if avito_user_id and user_id_in_chat == avito_user_id:
+                                            operator_avatar = avatar_url
+                                        elif not client_avatar:
+                                            client_avatar = avatar_url
+            except Exception:
+                pass
+        
+        for msg in messages:
+            msg_dict = dict(msg)
+            if msg_dict.get('sender_type') == 'CLIENT':
+                msg_dict['sender_avatar'] = client_avatar
+            elif msg_dict.get('sender_type') == 'OPERATOR':
+                msg_dict['sender_avatar'] = operator_avatar
+            else:
+                msg_dict['sender_avatar'] = None
+            messages_list.append(MessageResponse(**msg_dict))
+    
+    return MessagesList(
+        data=messages_list,
+        total=total,
+        skip=skip,
+        limit=limit,
+        date=chat.get('last_message_time')
+    )
 
 
 

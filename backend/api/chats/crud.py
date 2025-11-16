@@ -79,9 +79,148 @@ async def create_chat(channel_id: int, cashbox_id: int, contragent_id: Optional[
 
 
 async def get_chat(chat_id: int):
-    """Get chat by ID"""
-    query = chats.select().where(chats.c.id == chat_id)
-    return await database.fetch_one(query)
+    """Get chat by ID with additional fields"""
+    query = select([
+        chats.c.id,
+        chats.c.channel_id,
+        chats.c.contragent_id,
+        chats.c.cashbox_id,
+        chats.c.external_chat_id,
+        chats.c.phone,
+        chats.c.name,
+        chats.c.status,
+        chats.c.assigned_operator_id,
+        chats.c.first_message_time,
+        chats.c.first_response_time_seconds,
+        chats.c.last_message_time,
+        chats.c.last_response_time_seconds,
+        chats.c.created_at,
+        chats.c.updated_at,
+        channels.c.name.label('channel_name'),
+        channels.c.type.label('channel_type'),
+        channels.c.svg_icon.label('channel_icon')
+    ]).select_from(
+        chats.join(channels, chats.c.channel_id == channels.c.id)
+    ).where(chats.c.id == chat_id)
+    
+    chat_row = await database.fetch_one(query)
+    if not chat_row:
+        return None
+    
+    chat_dict = dict(chat_row)
+    
+    last_message_query = select([chat_messages.c.content]).where(
+        chat_messages.c.chat_id == chat_id
+    ).order_by(desc(chat_messages.c.created_at)).limit(1)
+    last_message = await database.fetch_one(last_message_query)
+    
+    if last_message and last_message['content']:
+        preview = last_message['content'][:100]
+        chat_dict['last_message_preview'] = preview
+    else:
+        chat_dict['last_message_preview'] = None
+    
+    unread_query = select([func.count(chat_messages.c.id)]).where(
+        and_(
+            chat_messages.c.chat_id == chat_id,
+            chat_messages.c.sender_type == "CLIENT",
+            chat_messages.c.status != "READ"
+        )
+    )
+    unread_count = await database.fetch_val(unread_query) or 0
+    chat_dict['unread_count'] = unread_count
+    
+    is_avito_chat = (
+        chat_dict.get('channel_type') == 'AVITO' or 
+        (chat_dict.get('external_chat_id') and chat_dict.get('external_chat_id', '').startswith('u2'))
+    )
+    
+    if is_avito_chat:
+        try:
+            from database.db import channel_credentials
+            from api.chats.avito.avito_factory import create_avito_client, save_token_callback
+            
+            if not chat_dict.get('channel_type'):
+                channel = await get_channel(chat_dict['channel_id'])
+                if channel and channel.get('type') == 'AVITO':
+                    chat_dict['channel_type'] = 'AVITO'
+                    chat_dict['channel_name'] = channel.get('name')
+                    chat_dict['channel_icon'] = channel.get('svg_icon')
+            
+            if chat_dict.get('channel_type') == 'AVITO':
+                creds = await database.fetch_one(
+                    channel_credentials.select().where(
+                        (channel_credentials.c.channel_id == chat_dict['channel_id']) &
+                        (channel_credentials.c.cashbox_id == chat_dict['cashbox_id']) &
+                        (channel_credentials.c.is_active.is_(True))
+                    )
+                )
+                
+                if creds:
+                    client = await create_avito_client(
+                        channel_id=chat_dict['channel_id'],
+                        cashbox_id=chat_dict['cashbox_id'],
+                        on_token_refresh=lambda token_data: save_token_callback(
+                            chat_dict['channel_id'],
+                            chat_dict['cashbox_id'],
+                            token_data
+                        )
+                    )
+                    
+                    if client:
+                        chat_info = await client.get_chat_info(chat_dict['external_chat_id'])
+                        users = chat_info.get('users', [])
+                        avito_user_id = creds.get('avito_user_id')
+                        
+                        if users:
+                            for user in users:
+                                user_id_in_chat = user.get('user_id') or user.get('id')
+                                if avito_user_id:
+                                    if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                        avatar_url = None
+                                        public_profile = user.get('public_user_profile', {})
+                                        if public_profile:
+                                            avatar_data = public_profile.get('avatar', {})
+                                            if isinstance(avatar_data, dict):
+                                                avatar_url = (
+                                                    avatar_data.get('default') or
+                                                    avatar_data.get('images', {}).get('256x256') or
+                                                    avatar_data.get('images', {}).get('128x128') or
+                                                    (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                                )
+                                            elif isinstance(avatar_data, str):
+                                                avatar_url = avatar_data
+                                        
+                                        if avatar_url:
+                                            chat_dict['client_avatar'] = avatar_url
+                                            break
+                                else:
+                                    public_profile = user.get('public_user_profile', {})
+                                    if public_profile:
+                                        avatar_data = public_profile.get('avatar', {})
+                                        if isinstance(avatar_data, dict):
+                                            avatar_url = (
+                                                avatar_data.get('default') or
+                                                avatar_data.get('images', {}).get('256x256') or
+                                                avatar_data.get('images', {}).get('128x128') or
+                                                (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                            )
+                                        elif isinstance(avatar_data, str):
+                                            avatar_url = avatar_data
+                                        
+                                        if avatar_url:
+                                            chat_dict['client_avatar'] = avatar_url
+                                            break
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to get client_avatar for chat {chat_id}: {e}")
+            chat_dict['client_avatar'] = None
+    
+    if 'client_avatar' not in chat_dict:
+        chat_dict['client_avatar'] = None
+    
+    return chat_dict
 
 
 async def get_chat_by_external_id(channel_id: int, external_chat_id: str, cashbox_id: int):
@@ -100,6 +239,12 @@ async def get_chats(
     contragent_id: Optional[int] = None, 
     status: Optional[str] = None, 
     search: Optional[str] = None,
+    created_from: Optional[datetime] = None,
+    created_to: Optional[datetime] = None,
+    updated_from: Optional[datetime] = None,
+    updated_to: Optional[datetime] = None,
+    sort_by: Optional[str] = None,
+    sort_order: Optional[str] = "desc",
     skip: int = 0, 
     limit: int = 100
 ) -> List[Dict[str, Any]]:
@@ -107,7 +252,6 @@ async def get_chats(
         chats.c.id,
         chats.c.channel_id,
         chats.c.contragent_id,
-        chats.c.cashbox_id,
         chats.c.external_chat_id,
         chats.c.phone,
         chats.c.name,
@@ -142,8 +286,39 @@ async def get_chats(
         )
         conditions.append(search_condition)
     
+    if created_from:
+        conditions.append(chats.c.created_at >= created_from)
+    if created_to:
+        conditions.append(chats.c.created_at <= created_to)
+    
+    if updated_from:
+        conditions.append(chats.c.updated_at >= updated_from)
+    if updated_to:
+        conditions.append(chats.c.updated_at <= updated_to)
+    
     query = query.where(and_(*conditions))
-    query = query.order_by(desc(chats.c.last_message_time), desc(chats.c.created_at))
+
+    if sort_by:
+        sort_column = None
+        if sort_by == "created_at":
+            sort_column = chats.c.created_at
+        elif sort_by == "updated_at":
+            sort_column = chats.c.updated_at
+        elif sort_by == "last_message_time":
+            sort_column = chats.c.last_message_time
+        elif sort_by == "name":
+            sort_column = chats.c.name
+        
+        if sort_column:
+            if sort_order and sort_order.lower() == "asc":
+                query = query.order_by(sort_column.asc().nulls_last())
+            else:
+                query = query.order_by(sort_column.desc().nulls_last())
+        else:
+            query = query.order_by(desc(chats.c.updated_at).nulls_last())
+    else:
+        query = query.order_by(desc(chats.c.updated_at).nulls_last())
+    
     query = query.offset(skip).limit(limit)
     
     chats_data = await database.fetch_all(query)
@@ -174,6 +349,96 @@ async def get_chats(
         unread_count = await database.fetch_val(unread_query) or 0
         chat_dict['unread_count'] = unread_count
         
+        is_avito_chat = (
+            chat_dict.get('channel_type') == 'AVITO' or 
+            (chat_dict.get('external_chat_id') and chat_dict.get('external_chat_id', '').startswith('u2'))
+        )
+        
+        if is_avito_chat:
+            try:
+                from database.db import channel_credentials
+                from api.chats.avito.avito_factory import create_avito_client, save_token_callback
+                
+                if not chat_dict.get('channel_type'):
+                    channel = await get_channel(chat_dict['channel_id'])
+                    if channel and channel.get('type') == 'AVITO':
+                        chat_dict['channel_type'] = 'AVITO'
+                        chat_dict['channel_name'] = channel.get('name')
+                        chat_dict['channel_icon'] = channel.get('svg_icon')
+                
+                if chat_dict.get('channel_type') == 'AVITO':
+                    creds = await database.fetch_one(
+                        channel_credentials.select().where(
+                            (channel_credentials.c.channel_id == chat_dict['channel_id']) &
+                            (channel_credentials.c.cashbox_id == cashbox_id) &
+                            (channel_credentials.c.is_active.is_(True))
+                        )
+                    )
+                    
+                    if creds:
+                        client = await create_avito_client(
+                            channel_id=chat_dict['channel_id'],
+                            cashbox_id=cashbox_id,
+                            on_token_refresh=lambda token_data: save_token_callback(
+                                chat_dict['channel_id'],
+                                cashbox_id,
+                                token_data
+                            )
+                        )
+                        
+                        if client:
+                            chat_info = await client.get_chat_info(chat_dict['external_chat_id'])
+                            users = chat_info.get('users', [])
+                            avito_user_id = creds.get('avito_user_id')
+                            
+                            if users:
+                                for user in users:
+                                    user_id_in_chat = user.get('user_id') or user.get('id')
+                                    if avito_user_id:
+                                        if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                            avatar_url = None
+                                            public_profile = user.get('public_user_profile', {})
+                                            if public_profile:
+                                                avatar_data = public_profile.get('avatar', {})
+                                                if isinstance(avatar_data, dict):
+                                                    avatar_url = (
+                                                        avatar_data.get('default') or
+                                                        avatar_data.get('images', {}).get('256x256') or
+                                                        avatar_data.get('images', {}).get('128x128') or
+                                                        (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                                    )
+                                                elif isinstance(avatar_data, str):
+                                                    avatar_url = avatar_data
+                                            
+                                            if avatar_url:
+                                                chat_dict['client_avatar'] = avatar_url
+                                                break
+                                    else:
+                                        public_profile = user.get('public_user_profile', {})
+                                        if public_profile:
+                                            avatar_data = public_profile.get('avatar', {})
+                                            if isinstance(avatar_data, dict):
+                                                avatar_url = (
+                                                    avatar_data.get('default') or
+                                                    avatar_data.get('images', {}).get('256x256') or
+                                                    avatar_data.get('images', {}).get('128x128') or
+                                                    (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                                )
+                                            elif isinstance(avatar_data, str):
+                                                avatar_url = avatar_data
+                                            
+                                            if avatar_url:
+                                                chat_dict['client_avatar'] = avatar_url
+                                                break
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to get client_avatar for chat {chat_dict.get('id')}: {e}")
+                chat_dict['client_avatar'] = None
+        
+        if 'client_avatar' not in chat_dict:
+            chat_dict['client_avatar'] = None
+        
         result.append(chat_dict)
     
     return result
@@ -192,10 +457,20 @@ async def update_chat(chat_id: int, **kwargs):
         if isinstance(dt, datetime) and dt.tzinfo is not None:
             kwargs['first_message_time'] = dt.replace(tzinfo=None)
     
+    last_message_time_normalized = None
     if 'last_message_time' in kwargs and kwargs['last_message_time'] is not None:
         dt = kwargs['last_message_time']
-        if isinstance(dt, datetime) and dt.tzinfo is not None:
-            kwargs['last_message_time'] = dt.replace(tzinfo=None)
+        if isinstance(dt, datetime):
+            if dt.tzinfo is not None:
+                last_message_time_normalized = dt.replace(tzinfo=None)
+            else:
+                last_message_time_normalized = dt
+            kwargs['last_message_time'] = last_message_time_normalized
+    
+    if last_message_time_normalized is not None:
+        kwargs['updated_at'] = last_message_time_normalized
+    else:
+        kwargs['updated_at'] = datetime.utcnow()
     
     query = chats.update().where(chats.c.id == chat_id).values(**kwargs)
     await database.execute(query)
@@ -214,15 +489,16 @@ async def delete_chat(chat_id: int):
 
 
 
-async def create_message(chat_id: int, sender_type: str, content: str, message_type: str = "TEXT", external_message_id: Optional[str] = None, status: str = "SENT"):
-    """Create a new message (sender_id removed - use sender_type only)"""
+async def create_message(chat_id: int, sender_type: str, content: str, message_type: str = "TEXT", external_message_id: Optional[str] = None, status: str = "SENT", source: Optional[str] = None):
+    """Create a new message"""
     query = chat_messages.insert().values(
         chat_id=chat_id,
         sender_type=sender_type,
         content=content,
         message_type=message_type,
         external_message_id=external_message_id,
-        status=status
+        status=status,
+        source=source
     )
     message_id = await database.execute(query)
     return await get_message(message_id)
@@ -235,7 +511,8 @@ async def create_message_and_update_chat(
     message_type: str = "TEXT",
     external_message_id: Optional[str] = None,
     status: str = "SENT",
-    created_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None,
+    source: Optional[str] = None
 ):
     chat = await get_chat(chat_id)
     if not chat:
@@ -247,7 +524,8 @@ async def create_message_and_update_chat(
         "content": content,
         "message_type": message_type,
         "external_message_id": external_message_id,
-        "status": status
+        "status": status,
+        "source": source
     }
     
     if created_at:
@@ -287,6 +565,11 @@ async def create_message_and_update_chat(
             chat_updates['last_response_time_seconds'] = int(time_diff.total_seconds())
         
         chat_updates['last_message_time'] = current_time
+    else:
+        chat_updates['last_message_time'] = current_time
+    
+    if not chat_updates.get('last_message_time'):
+        chat_updates['last_message_time'] = current_time
     
     if chat_updates:
         await update_chat(chat_id, **chat_updates)
@@ -304,6 +587,13 @@ async def get_messages(chat_id: int, skip: int = 0, limit: int = 100):
     """Get messages from chat with pagination"""
     query = chat_messages.select().where(chat_messages.c.chat_id == chat_id).offset(skip).limit(limit).order_by(chat_messages.c.created_at)
     return await database.fetch_all(query)
+
+
+async def get_messages_count(chat_id: int):
+    """Get total count of messages in chat"""
+    query = select([func.count(chat_messages.c.id)]).where(chat_messages.c.chat_id == chat_id)
+    result = await database.fetch_one(query)
+    return result[0] if result else 0
 
 
 async def update_message(message_id: int, **kwargs):
@@ -413,7 +703,8 @@ async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Op
     
     update_data = {
         "phone": phone,
-        "contragent_id": contragent_id
+        "contragent_id": contragent_id,
+        "updated_at": datetime.utcnow()
     }
     if name:
         update_data["name"] = name

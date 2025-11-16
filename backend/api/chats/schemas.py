@@ -69,7 +69,6 @@ class ChatResponse(BaseModel):
     id: int
     channel_id: int
     contragent_id: Optional[int]
-    cashbox_id: int
     external_chat_id: str
     phone: Optional[str]
     name: Optional[str]
@@ -86,6 +85,7 @@ class ChatResponse(BaseModel):
     channel_name: Optional[str] = None
     channel_icon: Optional[str] = None
     channel_type: Optional[str] = None
+    client_avatar: Optional[str] = None
 
 
 
@@ -95,7 +95,8 @@ class MessageCreate(BaseModel):
     content: str
     message_type: str = "TEXT"
     status: str = "SENT"
-    image_url: Optional[str] = None  
+    image_url: Optional[str] = None
+    source: Optional[str] = None
 
 
 class MessageUpdate(BaseModel):
@@ -113,6 +114,8 @@ class MessageResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    sender_avatar: Optional[str] = None
+    source: Optional[str] = None
 
     @validator('created_at', 'updated_at', pre=True)
     def convert_datetime(cls, v):
@@ -157,3 +160,14 @@ class MessagesList(BaseModel):
     total: int
     skip: int
     limit: int
+    date: Optional[datetime] = None
+
+    @validator('date', pre=True)
+    def convert_datetime(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            if v.tzinfo is not None:
+                return v.replace(tzinfo=None)
+            return v
+        return v
