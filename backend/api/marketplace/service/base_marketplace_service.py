@@ -25,6 +25,16 @@ class BaseMarketplaceService:
             raise HTTPException(status_code=404, detail="Контрагент с таким номером телефона не найден")
 
     @staticmethod
+    async def _validate_contragent(contragent_phone: str, nomenclature_id: int):
+        try:
+            contragent_query = select(contragents.c.cashbox).where(contragents.c.phone == contragent_phone)
+            nomenclature_query = select(nomenclature.c.cashbox).where(nomenclature.c.id == nomenclature_id)
+            if not ((await database.fetch_one(contragent_query)).cashbox == (await database.fetch_one(nomenclature_query)).cashbox):
+                raise HTTPException(status_code=422, detail='Контрагент не принадлежит этому кешбоксу')
+        except AttributeError:
+            raise HTTPException(status_code=404, detail="Контрагент или номенклатура с таким номером телефона не найден")
+
+    @staticmethod
     async def _add_utm(entity_id: int, utm: BaseMarketplaceUtm) -> int:
         query = marketplace_utm_tags.insert().values(
             entity_id=entity_id,
