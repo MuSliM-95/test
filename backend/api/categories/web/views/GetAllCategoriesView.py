@@ -33,7 +33,7 @@ class GetAllCategoriesView:
                 .select_from(categories)
                 .outerjoin(
                     pictures,
-                    (pictures.c.entity == 'category') &
+                    (pictures.c.entity == 'categories') &
                     (pictures.c.entity_id == categories.c.id) &
                     (pictures.c.is_deleted.is_not(True))
                 )
