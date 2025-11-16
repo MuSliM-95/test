@@ -22,27 +22,40 @@ class GetCategoriesTreeView:
         token: str, nomenclature_name: Optional[str] = None,
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=100)] = 100,
+        include_photo: bool = False
     ):
         """Получение древа списка категорий"""
         user = await get_user_by_token(token)
 
-        s3_client = self.__s3_factory()
-
-        query = (
-            select(
-                categories,
-                pictures.c.url.label("picture")
+        if include_photo:
+            # Если нужны фото, делаем JOIN с pictures
+            query = (
+                select(
+                    categories,
+                    pictures.c.url.label("picture")
+                )
+                .select_from(categories)
+                .outerjoin(pictures, categories.c.photo_id == pictures.c.id)
+                .where(
+                    categories.c.cashbox == user.cashbox_id,
+                    categories.c.is_deleted.is_not(True),
+                    categories.c.parent == None
+                )
+                .limit(limit)
+                .offset(offset)
             )
-            .select_from(categories)
-            .outerjoin(pictures, categories.c.photo_id == pictures.c.id)
-            .where(
-                categories.c.cashbox == user.cashbox_id,
-                categories.c.is_deleted.is_not(True),
-                categories.c.parent == None
+        else:
+            # Без фото - не делаем JOIN
+            query = (
+                select(categories)
+                .where(
+                    categories.c.cashbox == user.cashbox_id,
+                    categories.c.is_deleted.is_not(True),
+                    categories.c.parent == None
+                )
+                .limit(limit)
+                .offset(offset)
             )
-            .limit(limit)
-            .offset(offset)
-        )
 
         categories_db = await database.fetch_all(query)
         result = []
@@ -57,15 +70,8 @@ class GetCategoriesTreeView:
             category_dict = dict(category)
             category_dict['key'] = category_dict['id']
 
-            try:
-                if category_dict.get("picture"):
-                    url = await s3_client.get_link_object(
-                        bucket_name="5075293c-docs_generated",
-                        file_key=category_dict.get("picture")
-                    )
-                    category_dict["picture"] = url
-            except Exception as e:
-                print(e)
+            # picture уже содержит путь из БД, не нужно генерировать signed URL
+            # Фото доступны через /api/v1/photos/{file_key}
 
             nomenclature_in_category = (
                 select(
@@ -81,35 +87,47 @@ class GetCategoriesTreeView:
             category_dict["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
 
             category_dict['expanded_flag'] = False
-            query = (
-                f"""
-                        with recursive categories_hierarchy as (
-                        select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
-                        from categories where parent = {category.id}
+            
+            if include_photo:
+                # С фото - делаем LEFT JOIN
+                query = (
+                    f"""
+                            with recursive categories_hierarchy as (
+                            select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+                            from categories where parent = {category.id}
 
-                        union
-                        select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
-                        from categories_hierarchy as H
-                        join categories as F on F.parent = H.id
-                        ) 
-                        select ch.*, p.url as picture from categories_hierarchy ch
-                        left join pictures p on ch.photo_id = p.id
-                    """
-            )
+                            union
+                            select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+                            from categories_hierarchy as H
+                            join categories as F on F.parent = H.id
+                            ) 
+                            select ch.*, p.url as picture from categories_hierarchy ch
+                            left join pictures p on ch.photo_id = p.id
+                        """
+                )
+            else:
+                # Без фото - не делаем JOIN
+                query = (
+                    f"""
+                            with recursive categories_hierarchy as (
+                            select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+                            from categories where parent = {category.id}
+
+                            union
+                            select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+                            from categories_hierarchy as H
+                            join categories as F on F.parent = H.id
+                            ) 
+                            select ch.* from categories_hierarchy ch
+                        """
+                )
+            
             childrens = await database.fetch_all(query)
             if childrens:
                 category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id,
                                                                   nomenclature_name)
-                for element in category_dict['children']:
-                    try:
-                        if element.get("picture"):
-                            url = await s3_client.get_link_object(
-                                bucket_name="5075293c-docs_generated",
-                                file_key=element.get("picture")
-                            )
-                            element["picture"] = url
-                    except Exception as e:
-                        print(e)
+                # picture для детей уже содержит путь из БД
+                # Фото доступны через /api/v1/photos/{file_key}
             else:
                 category_dict['children'] = []
 
