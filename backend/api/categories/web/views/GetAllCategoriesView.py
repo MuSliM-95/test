@@ -31,7 +31,11 @@ class GetAllCategoriesView:
                     pictures.c.url.label("picture")
                 )
                 .select_from(categories)
-                .outerjoin(pictures, categories.c.photo_id == pictures.c.id)
+                .outerjoin(
+                    pictures,
+                    (categories.c.photo_id == pictures.c.id) &
+                    (pictures.c.is_deleted.is_not(True))
+                )
                 .where(
                     categories.c.cashbox == user.cashbox_id,
                     categories.c.is_deleted.is_not(True),
