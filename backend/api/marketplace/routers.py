@@ -1,7 +1,4 @@
-
-
-
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, File, UploadFile
 
 from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse, \
     CreateFavoritesUtm
@@ -18,6 +15,13 @@ from api.marketplace.service.service import MarketplaceService
 from api.marketplace.service.view_event_service.schemas import GetViewEventsRequest, CreateViewEventResponse, \
     CreateViewEventRequest, ViewEventsUtm
 from api.marketplace.utils import get_marketplace_service
+from api.marketplace.service.public_categories.schema import (
+    GlobalCategoryTree,
+    GlobalCategoryTreeList,
+    GlobalCategoryCreate,
+    GlobalCategoryUpdate,
+    GlobalCategoryList,
+)
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
 
@@ -29,11 +33,11 @@ async def get_marketplace_products(
 ):
     """
     Получение всех публичных товаров маркетплейса
-    
+
     Фильтрует только товары с:
     - price_type = 'chatting'
     """
-    
+
     return await service.get_products(request)
 
 
@@ -166,9 +170,6 @@ async def remove_from_cart(
 
     return await service.remove_from_cart(request)
 
-
-
-from fastapi import File, UploadFile
 
 @router.get("/categories/", response_model=GlobalCategoryList)
 async def get_global_categories(
