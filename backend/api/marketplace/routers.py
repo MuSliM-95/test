@@ -14,6 +14,7 @@ from api.marketplace.service.service import MarketplaceService
 from api.marketplace.service.view_event_service.schemas import GetViewEventsRequest, CreateViewEventResponse, \
     CreateViewEventRequest, ViewEventsUtm
 from api.marketplace.utils import get_marketplace_service
+from api.marketplace.market.app.api.v1.endpoints.categories import router as categories_router
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
 
@@ -153,3 +154,8 @@ async def get_view_events_info(request: GetViewEventsRequest = Depends(), servic
 async def create_view_event(request: CreateViewEventRequest, utm: ViewEventsUtm = Depends(), service: MarketplaceService = Depends(get_marketplace_service)):
     """Создание события просмотра товара"""
     return await service.create_view_event(request, utm)
+
+
+router.include_router(categories_router,
+                      prefix="/categories",
+                      tags=["categories"])
