@@ -108,6 +108,9 @@ class MarketplaceReviewService(BaseMarketplaceService):
             marketplace_reviews.c.status == "visible"
         ]
 
+        if request.view_only_rates:
+            conditions.append(marketplace_reviews.c.rating == request.view_only_rates)
+
         query = select(marketplace_reviews).where(and_(*conditions))
 
         # Применяем сортировку
@@ -136,7 +139,8 @@ class MarketplaceReviewService(BaseMarketplaceService):
         )
         agg = await database.fetch_one(agg_query)
 
-        total_count = agg.reviews_count if agg else 0
+        total_count_query = select(func.count(marketplace_reviews.c.id)).where(*conditions)
+        total_count = await database.fetch_val(total_count_query)
         avg_rating = float(agg.avg_rating) if agg and agg.avg_rating is not None else None
 
         # Преобразуем в схемы

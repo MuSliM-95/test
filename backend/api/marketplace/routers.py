@@ -4,9 +4,12 @@ from fastapi import APIRouter, Query, Depends
 
 from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse, \
     CreateFavoritesUtm
+from api.marketplace.service.locations_service.schemas import LocationsListResponse, LocationsListRequest
 from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderRequest, \
     CreateOrderUtm
-from api.marketplace.service.products_list_service.schemas import MarketplaceProductList
+from api.marketplace.service.product_cart_service.schemas import MarketplaceRemoveFromCartRequest, \
+    MarketplaceCartResponse, MarketplaceGetCartRequest, MarketplaceAddToCartRequest
+from api.marketplace.service.products_list_service.schemas import MarketplaceProductList, MarketplaceProductsRequest
 from api.marketplace.service.qr_service.schemas import QRResolveResponse
 from api.marketplace.service.review_service.schemas import UpdateReviewRequest, MarketplaceReview, CreateReviewRequest, \
     ReviewListResponse, ReviewListRequest
@@ -21,19 +24,7 @@ router = APIRouter(prefix="/mp", tags=["marketplace"])
 
 @router.get("/products", response_model=MarketplaceProductList)
 async def get_marketplace_products(
-    phone: Optional[str] = Query(None, description="Телефон клиента"),
-    lat: Optional[float] = Query(None, description="Широта"),
-    lon: Optional[float] = Query(None, description="Долгота"),
-    city: Optional[str] = Query(None, description="Город"),
-    page: int = Query(1, ge=1, description="Номер страницы"),
-    size: int = Query(20, ge=1, le=100, description="Размер страницы"),
-    sort: Optional[str] = Query(None, description="Сортировка: distance, price, name, created_at, rating"),
-    category: Optional[str] = Query(None, description="Фильтр по категории"),
-    manufacturer: Optional[str] = Query(None, description="Фильтр по производителю"),
-    min_price: Optional[float] = Query(None, description="Минимальная цена"),
-    max_price: Optional[float] = Query(None, description="Максимальная цена"),
-    tags: Optional[str] = Query(None, description="Фильтр по тегам (через запятую)"),
-    in_stock: Optional[bool] = Query(None, description="Только товары в наличии"),
+    request: MarketplaceProductsRequest = Depends(),
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
     """
@@ -43,38 +34,18 @@ async def get_marketplace_products(
     - price_type = 'chatting'
     """
     
-    return await service.get_products(
-        phone=phone,
-        lat=lat,
-        lon=lon,
-        city=city,
-        page=page,
-        size=size,
-        sort=sort,
-        category_filter=category,
-        manufacturer_filter=manufacturer,
-        min_price=min_price,
-        max_price=max_price,
-        tags_filter=tags,
-        in_stock=in_stock,
-    )
+    return await service.get_products(request)
 
 
-# @router.get("/locations", response_model=MarketplaceLocationList)
-# async def get_marketplace_locations(
-#     city: Optional[str] = Query(None, description="Город"),
-#     lat: Optional[float] = Query(None, description="Широта"),
-#     lon: Optional[float] = Query(None, description="Долгота"),
-#     radius: Optional[float] = Query(None, description="Радиус поиска в км"),
-#     page: int = Query(1, ge=1, description="Номер страницы"),
-#     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
-#     sort: Optional[str] = Query("name", description="Сортировка: name, distance, rating"),
-#     service: MarketplaceService = Depends(get_marketplace_service)
-# ):
-#     """
-#     Получить список публичных локаций для чекина
-#     """
-#     return await service.get_locations(city=city, lat=lat, lon=lon, radius=radius, page=page, size=size, sort=sort)
+@router.get("/locations", response_model=LocationsListResponse)
+async def get_marketplace_locations(
+    request: LocationsListRequest = Depends(),
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    """
+    Получить список публичных локаций
+    """
+    return await service.get_locations(request)
 
 
 @router.post("/orders", response_model=MarketplaceOrderResponse)
@@ -156,6 +127,40 @@ async def create_view_event(request: CreateViewEventRequest, utm: ViewEventsUtm 
     return await service.create_view_event(request, utm)
 
 
-router.include_router(categories_router,
-                      prefix="/categories",
-                      tags=["categories"])
+@router.post("/cart/add", response_model=MarketplaceCartResponse)
+async def add_to_cart(
+        request: MarketplaceAddToCartRequest,
+        service: MarketplaceService = Depends(get_marketplace_service)
+):
+    """
+    Добавить товар в корзину покупок
+
+    Если корзина не существует, она будет создана автоматически.
+    Если товар уже есть в корзине, количество будет увеличено.
+    """
+    return await service.add_to_cart(request)
+
+
+@router.get("/cart", response_model=MarketplaceCartResponse)
+async def get_cart(
+        request: MarketplaceGetCartRequest = Depends(),
+        service: MarketplaceService = Depends(get_marketplace_service)
+):
+    """
+    Получить содержимое корзины покупок для указанного номера телефона
+    """
+    return await service.get_cart(request)
+
+
+@router.delete("/cart/remove", response_model=MarketplaceCartResponse)
+async def remove_from_cart(
+        request: MarketplaceRemoveFromCartRequest,
+        service: MarketplaceService = Depends(get_marketplace_service)
+):
+    """
+    Удалить товар из корзины покупок
+
+    Если warehouse_id не указан, будет удален товар без привязки к складу.
+    Если указан - будет удален товар конкретного склада.
+    """
+    return await service.remove_from_cart(request)

@@ -51,7 +51,7 @@ if settings.UPLOAD_DIR.exists():
 # Подключаем роутеры
 app.include_router(
     categories.router,
-    prefix=settings.API_V1_PREFIX,
+    prefix=f"{settings.API_V1_PREFIX}/mp",
     tags=["categories"]
 )
 

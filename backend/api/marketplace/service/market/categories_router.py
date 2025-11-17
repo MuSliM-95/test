@@ -1,32 +1,28 @@
-"""API endpoints для категорий"""
+"""Маркетплейс: публичные категории (роутер)"""
 import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import func, select
 
-from ...dependencies import verify_admin_key
-from ...config import settings
-from ...schemas.category import (
+from ...database.db import database, global_categories
+from ...utils.helpers import datetime_to_timestamp
+from .category import (
     GlobalCategoryCreate,
     GlobalCategoryList,
     GlobalCategoryTree,
     GlobalCategoryTreeList,
     GlobalCategoryUpdate,
 )
-from ...utils.helpers import datetime_to_timestamp
-from ...database.db import database, global_categories
 
-router = APIRouter(prefix="/global_categories", tags=["categories"])
+router = APIRouter(prefix="/mp/categories", tags=["categories"])
 
 
 async def build_global_hierarchy(
     categories_data: List[dict], parent_id: Optional[int] = None
 ) -> List[dict]:
-    """Построение иерархического дерева категорий"""
     result = []
-
     for category in categories_data:
         if category.get("parent_id") == parent_id:
             category_dict = dict(category)
@@ -35,13 +31,11 @@ async def build_global_hierarchy(
             )
             category_dict["children"] = children
             result.append(category_dict)
-
     return result
 
 
 @router.get("/", response_model=GlobalCategoryList)
 async def get_global_categories(limit: int = 100, offset: int = 0):
-    """Получение списка глобальных категорий"""
     query = (
         select(global_categories)
         .where(global_categories.c.is_active.is_(True))
@@ -49,121 +43,62 @@ async def get_global_categories(limit: int = 100, offset: int = 0):
         .limit(limit)
         .offset(offset)
     )
-
     categories_db = await database.fetch_all(query)
     categories_db = [*map(datetime_to_timestamp, categories_db)]
-
     count_query = select(func.count(global_categories.c.id)).where(
         global_categories.c.is_active.is_(True)
     )
     categories_count = await database.fetch_one(count_query)
-
     return {"result": categories_db, "count": categories_count.count_1}
 
 
 @router.get("/tree/", response_model=GlobalCategoryTreeList)
 async def get_global_categories_tree():
-    """Получение дерева категорий"""
     query = (
         select(global_categories)
         .where(global_categories.c.is_active.is_(True))
         .order_by(global_categories.c.name)
     )
-
     categories_db = await database.fetch_all(query)
     categories_db = [*map(datetime_to_timestamp, categories_db)]
-
-    # Строим дерево
     tree = await build_global_hierarchy(categories_db, parent_id=None)
-
     count_query = select(func.count(global_categories.c.id)).where(
         global_categories.c.is_active.is_(True)
     )
     categories_count = await database.fetch_one(count_query)
-
     return {"result": tree, "count": categories_count.count_1}
 
 
 @router.get("/{category_id}/", response_model=GlobalCategoryTree)
-async def get_global_category_by_id(category_id: int):
-    """Получение категории по ID с дочерними элементами"""
+async def get_global_category(category_id: int):
     query = select(global_categories).where(
         global_categories.c.id == category_id,
         global_categories.c.is_active.is_(True),
     )
-
-    category_db = await database.fetch_one(query)
-    if not category_db:
-        raise HTTPException(
-            status_code=404, detail=f"Категория с ID {category_id} не найдена"
-        )
-
-    category_dict = dict(datetime_to_timestamp(category_db))
-
-    # Получаем дочерние элементы
-    children_query = (
-        select(global_categories)
-        .where(
-            global_categories.c.parent_id == category_id,
-            global_categories.c.is_active.is_(True),
-        )
-        .order_by(global_categories.c.name)
+    category = await database.fetch_one(query)
+    if not category:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    category_dict = dict(datetime_to_timestamp(category))
+    # Получаем дерево для этой категории
+    children_query = select(global_categories).where(
+        global_categories.c.parent_id == category_id,
+        global_categories.c.is_active.is_(True),
     )
-
-    children_db = await database.fetch_all(children_query)
-    children_db = [*map(datetime_to_timestamp, children_db)]
-
-    category_dict["children"] = children_db
-
+    children = await database.fetch_all(children_query)
+    category_dict["children"] = [dict(datetime_to_timestamp(child)) for child in children]
     return category_dict
 
 
-@router.post(
-    "/", response_model=GlobalCategoryTree, status_code=201
-)
-async def create_global_category(
-    category: GlobalCategoryCreate
-):
-    """
-    Создание новой категории
-    """
-    # Проверяем существование parent_id если он указан
-    if category.parent_id:
-        parent_query = select(global_categories).where(
-            global_categories.c.id == category.parent_id,
-            global_categories.c.is_active.is_(True),
-        )
-        parent_exists = await database.fetch_one(parent_query)
-        if not parent_exists:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Родительская категория с ID "
-                    f"{category.parent_id} не найдена"
-                ),
-            )
-
-    # Создаём категорию
-    query = global_categories.insert().values(
-        name=category.name,
-        description=category.description,
-        code=category.code,
-        parent_id=category.parent_id,
-        external_id=category.external_id,
-        image_url=category.image_url,
-        is_active=category.is_active,
-    )
-
-    new_category_id = await database.execute(query)
-
-    # Получаем созданную категорию
+@router.post("/", response_model=GlobalCategoryTree, status_code=201)
+async def create_global_category(category: GlobalCategoryCreate):
+    insert_query = global_categories.insert().values(**category.model_dump())
+    new_category_id = await database.execute(insert_query)
     created_category_query = select(global_categories).where(
         global_categories.c.id == new_category_id
     )
     created_category = await database.fetch_one(created_category_query)
     created_category_dict = dict(datetime_to_timestamp(created_category))
     created_category_dict["children"] = []
-
     return created_category_dict
 
 
@@ -176,76 +111,49 @@ async def update_global_category(
     Обновление категории
     Можно обновить только указанные поля, остальные остаются без изменений
     """
-    # Проверяем существование категории
     check_query = select(global_categories).where(
         global_categories.c.id == category_id,
         global_categories.c.is_active.is_(True),
     )
     existing_category = await database.fetch_one(check_query)
-
     if not existing_category:
-        raise HTTPException(
-            status_code=404, detail=f"Категория с ID {category_id} не найдена"
-        )
-
-    # Собираем только не-None поля
+        raise HTTPException(status_code=404, detail=f"Категория с ID {category_id} не найдена")
     update_data = category_update.model_dump(exclude_unset=True)
-
     if not update_data:
-        raise HTTPException(
-            status_code=400,
-            detail="Не передано ни одного поля для обновления",
-        )
-
-    # Обновляем категорию
-    update_query = (
-        global_categories.update()
-        .where(global_categories.c.id == category_id)
-        .values(**update_data)
-    )
+        raise HTTPException(status_code=400, detail="Нет данных для обновления")
+    update_query = global_categories.update().where(
+        global_categories.c.id == category_id
+    ).values(**update_data)
     await database.execute(update_query)
-
-    # Возвращаем обновлённую категорию
-    updated_category = await database.fetch_one(check_query)
+    updated_category_query = select(global_categories).where(
+        global_categories.c.id == category_id
+    )
+    updated_category = await database.fetch_one(updated_category_query)
     updated_category_dict = dict(datetime_to_timestamp(updated_category))
-    updated_category_dict["children"] = []
-
+    # Получаем дерево для этой категории
+    children_query = select(global_categories).where(
+        global_categories.c.parent_id == category_id,
+        global_categories.c.is_active.is_(True),
+    )
+    children = await database.fetch_all(children_query)
+    updated_category_dict["children"] = [dict(datetime_to_timestamp(child)) for child in children]
     return updated_category_dict
 
 
 @router.delete("/{category_id}/")
-async def delete_global_category(
-    category_id: int
-):
-    """
-    Удаление (деактивация) категории
-
-    Категория не удаляется физически, только помечается как неактивная
-    """
-    # Проверяем существование категории
+async def delete_global_category(category_id: int):
     check_query = select(global_categories).where(
         global_categories.c.id == category_id,
         global_categories.c.is_active.is_(True),
     )
     existing_category = await database.fetch_one(check_query)
-
     if not existing_category:
-        raise HTTPException(
-            status_code=404, detail=f"Категория с ID {category_id} не найдена"
-        )
-
-    # Деактивируем категорию (мягкое удаление)
-    delete_query = (
-        global_categories.update()
-        .where(global_categories.c.id == category_id)
-        .values(is_active=False)
-    )
+        raise HTTPException(status_code=404, detail=f"Категория с ID {category_id} не найдена")
+    delete_query = global_categories.update().where(
+        global_categories.c.id == category_id
+    ).values(is_active=False)
     await database.execute(delete_query)
-
-    return {
-        "success": True,
-        "message": f"Категория {category_id} успешно удалена",
-    }
+    return {"success": True, "message": f"Категория {category_id} успешно удалена"}
 
 
 @router.post("/{category_id}/upload_image/")
@@ -259,39 +167,27 @@ async def upload_category_image(
     Принимает изображение и сохраняет его на сервере.
     Поддерживаемые форматы: jpg, jpeg, png, gif, webp
     """
-    """
-    # Проверяем существование категории
     check_query = select(global_categories).where(
         global_categories.c.id == category_id,
         global_categories.c.is_active.is_(True),
     )
     existing_category = await database.fetch_one(check_query)
-
     if not existing_category:
         raise HTTPException(
             status_code=404, detail=f"Категория с ID {category_id} не найдена"
         )
-
-    # Проверяем формат файла
     file_extension = Path(file.filename).suffix.lower()
-
+    from ...config import settings
     if file_extension not in settings.ALLOWED_EXTENSIONS:
         allowed = ', '.join(settings.ALLOWED_EXTENSIONS)
         raise HTTPException(
             status_code=400,
             detail=f"Недопустимый формат файла. Разрешены: {allowed}",
         )
-
-    # Создаём уникальное имя файла
     unique_filename = f"{uuid.uuid4()}{file_extension}"
-
     file_path = settings.UPLOAD_DIR / unique_filename
-
-    # Сохраняем файл
     try:
         contents = await file.read()
-
-        # Проверяем размер файла
         if len(contents) > settings.MAX_UPLOAD_SIZE:
             max_mb = settings.MAX_UPLOAD_SIZE / 1024 / 1024
             raise HTTPException(
@@ -304,18 +200,13 @@ async def upload_category_image(
         raise HTTPException(
             status_code=500, detail=f"Ошибка при сохранении файла: {str(e)}"
         )
-
-    # Формируем URL для доступа к файлу
     image_url = f"/uploads/categories/{unique_filename}"
-
-    # Обновляем image_url в базе данных
     update_query = (
         global_categories.update()
         .where(global_categories.c.id == category_id)
         .values(image_url=image_url)
     )
     await database.execute(update_query)
-
     return {
         "success": True,
         "image_url": image_url,
