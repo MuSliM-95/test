@@ -17,7 +17,7 @@ from api.marketplace.service.service import MarketplaceService
 from api.marketplace.service.view_event_service.schemas import GetViewEventsRequest, CreateViewEventResponse, \
     CreateViewEventRequest, ViewEventsUtm
 from api.marketplace.utils import get_marketplace_service
-from api.marketplace.market.app.api.v1.endpoints.categories import router as categories_router
+from api.marketplace.service.public_categories.categories_router import router as categories_router
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
 

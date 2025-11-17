@@ -1,1 +1,0 @@
-Вся логика публичных категорий перенесена в service/market/categories_router.py и service/market/category.py. Старые файлы main.py, config.py, api/v1/endpoints/categories.py, schemas/category.py подлежат удалению.

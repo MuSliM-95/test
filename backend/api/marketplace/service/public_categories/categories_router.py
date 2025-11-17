@@ -6,15 +6,11 @@ from typing import List, Optional
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import func, select
 
-from ...database.db import database, global_categories
-from ...utils.helpers import datetime_to_timestamp
-from .category import (
-    GlobalCategoryCreate,
-    GlobalCategoryList,
-    GlobalCategoryTree,
-    GlobalCategoryTreeList,
-    GlobalCategoryUpdate,
-)
+from .category import (GlobalCategoryCreate, GlobalCategoryList,
+                       GlobalCategoryTree, GlobalCategoryTreeList,
+                       GlobalCategoryUpdate)
+from .database import database, global_categories
+from .helpers import serialize_datetime_fields
 
 router = APIRouter(prefix="/mp/categories", tags=["categories"])
 
@@ -44,7 +40,7 @@ async def get_global_categories(limit: int = 100, offset: int = 0):
         .offset(offset)
     )
     categories_db = await database.fetch_all(query)
-    categories_db = [*map(datetime_to_timestamp, categories_db)]
+    categories_db = [*map(serialize_datetime_fields, categories_db)]
     count_query = select(func.count(global_categories.c.id)).where(
         global_categories.c.is_active.is_(True)
     )
@@ -60,7 +56,7 @@ async def get_global_categories_tree():
         .order_by(global_categories.c.name)
     )
     categories_db = await database.fetch_all(query)
-    categories_db = [*map(datetime_to_timestamp, categories_db)]
+    categories_db = [*map(serialize_datetime_fields, categories_db)]
     tree = await build_global_hierarchy(categories_db, parent_id=None)
     count_query = select(func.count(global_categories.c.id)).where(
         global_categories.c.is_active.is_(True)
@@ -78,14 +74,17 @@ async def get_global_category(category_id: int):
     category = await database.fetch_one(query)
     if not category:
         raise HTTPException(status_code=404, detail="Категория не найдена")
-    category_dict = dict(datetime_to_timestamp(category))
+    category_dict = dict(serialize_datetime_fields(category))
     # Получаем дерево для этой категории
     children_query = select(global_categories).where(
         global_categories.c.parent_id == category_id,
         global_categories.c.is_active.is_(True),
     )
     children = await database.fetch_all(children_query)
-    category_dict["children"] = [dict(datetime_to_timestamp(child)) for child in children]
+    category_dict["children"] = [
+        dict(serialize_datetime_fields(child))
+        for child in children
+    ]
     return category_dict
 
 
@@ -97,7 +96,7 @@ async def create_global_category(category: GlobalCategoryCreate):
         global_categories.c.id == new_category_id
     )
     created_category = await database.fetch_one(created_category_query)
-    created_category_dict = dict(datetime_to_timestamp(created_category))
+    created_category_dict = dict(serialize_datetime_fields(created_category))
     created_category_dict["children"] = []
     return created_category_dict
 
@@ -117,10 +116,16 @@ async def update_global_category(
     )
     existing_category = await database.fetch_one(check_query)
     if not existing_category:
-        raise HTTPException(status_code=404, detail=f"Категория с ID {category_id} не найдена")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Категория с ID {category_id} не найдена"
+        )
     update_data = category_update.model_dump(exclude_unset=True)
     if not update_data:
-        raise HTTPException(status_code=400, detail="Нет данных для обновления")
+        raise HTTPException(
+            status_code=400,
+            detail="Нет данных для обновления"
+        )
     update_query = global_categories.update().where(
         global_categories.c.id == category_id
     ).values(**update_data)
@@ -129,14 +134,17 @@ async def update_global_category(
         global_categories.c.id == category_id
     )
     updated_category = await database.fetch_one(updated_category_query)
-    updated_category_dict = dict(datetime_to_timestamp(updated_category))
+    updated_category_dict = dict(serialize_datetime_fields(updated_category))
     # Получаем дерево для этой категории
     children_query = select(global_categories).where(
         global_categories.c.parent_id == category_id,
         global_categories.c.is_active.is_(True),
     )
     children = await database.fetch_all(children_query)
-    updated_category_dict["children"] = [dict(datetime_to_timestamp(child)) for child in children]
+    updated_category_dict["children"] = [
+        dict(serialize_datetime_fields(child))
+        for child in children
+    ]
     return updated_category_dict
 
 
@@ -148,12 +156,18 @@ async def delete_global_category(category_id: int):
     )
     existing_category = await database.fetch_one(check_query)
     if not existing_category:
-        raise HTTPException(status_code=404, detail=f"Категория с ID {category_id} не найдена")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Категория с ID {category_id} не найдена"
+        )
     delete_query = global_categories.update().where(
         global_categories.c.id == category_id
     ).values(is_active=False)
     await database.execute(delete_query)
-    return {"success": True, "message": f"Категория {category_id} успешно удалена"}
+    return {
+        "success": True,
+        "message": f"Категория {category_id} успешно удалена"
+    }
 
 
 @router.post("/{category_id}/upload_image/")
@@ -177,19 +191,19 @@ async def upload_category_image(
             status_code=404, detail=f"Категория с ID {category_id} не найдена"
         )
     file_extension = Path(file.filename).suffix.lower()
-    from ...config import settings
-    if file_extension not in settings.ALLOWED_EXTENSIONS:
-        allowed = ', '.join(settings.ALLOWED_EXTENSIONS)
+    from .settings import ALLOWED_EXTENSIONS, MAX_UPLOAD_SIZE, UPLOAD_DIR
+    if file_extension not in ALLOWED_EXTENSIONS:
+        allowed = ', '.join(ALLOWED_EXTENSIONS)
         raise HTTPException(
             status_code=400,
             detail=f"Недопустимый формат файла. Разрешены: {allowed}",
         )
     unique_filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = settings.UPLOAD_DIR / unique_filename
+    file_path = UPLOAD_DIR / unique_filename
     try:
         contents = await file.read()
-        if len(contents) > settings.MAX_UPLOAD_SIZE:
-            max_mb = settings.MAX_UPLOAD_SIZE / 1024 / 1024
+        if len(contents) > MAX_UPLOAD_SIZE:
+            max_mb = MAX_UPLOAD_SIZE / 1024 / 1024
             raise HTTPException(
                 status_code=413,
                 detail=f"Файл слишком большой. Максимум: {max_mb:.1f}MB",
