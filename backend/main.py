@@ -42,7 +42,9 @@ from api.loyality_settings.routers import router as loyality_settings
 from api.loyality_transactions.routers import router as loyality_transactions
 from api.loyality_transactions.web.InstallLoyalityTransactionsWeb import InstallLoyalityTransactionsWeb
 from api.manufacturers.web.InstallManufacturersWeb import InstallManufacturersWeb
+
 from api.marketplace.routers import router as marketplace_router
+from api.marketplace.service.public_categories.database import database as public_categories_database
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import INomenclatureReader
 from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import NomenclatureReader
 from api.nomenclature.routers import router as nomenclature_router
@@ -254,6 +256,15 @@ app.include_router(tech_cards_router)
 app.include_router(tech_operations_router)
 app.include_router(autosuggestion_router)
 app.include_router(feeds_router)
+
+# Подключение базы public_categories
+@app.on_event("startup")
+async def startup_public_categories():
+    await public_categories_database.connect()
+
+@app.on_event("shutdown")
+async def shutdown_public_categories():
+    await public_categories_database.disconnect()
 
 @app.get("/")
 async def root():

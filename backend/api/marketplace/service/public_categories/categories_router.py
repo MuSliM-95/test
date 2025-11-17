@@ -12,7 +12,7 @@ from .category import (GlobalCategoryCreate, GlobalCategoryList,
 from .database import database, global_categories
 from .helpers import serialize_datetime_fields
 
-router = APIRouter(prefix="/mp/categories", tags=["categories"])
+router = APIRouter(prefix="/categories", tags=["categories"])
 
 
 async def build_global_hierarchy(

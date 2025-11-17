@@ -4,7 +4,11 @@ import databases
 from sqlalchemy import (Boolean, Column, DateTime, Integer, MetaData, String,
                         Table)
 
-DATABASE_URL = "sqlite:///./test.db"  # Замените на свой URL БД
+import os
+DATABASE_URL = (
+    f"postgresql://{os.environ.get('POSTGRES_USER', 'example')}:{os.environ.get('POSTGRES_PASS', 'example')}"
+    f"@{os.environ.get('POSTGRES_HOST', 'postgres-bridge')}:{os.environ.get('POSTGRES_PORT', '5432')}/cash_2"
+)
 
 database = databases.Database(DATABASE_URL)
 metadata = MetaData()

@@ -20,6 +20,7 @@ from api.marketplace.utils import get_marketplace_service
 from api.marketplace.service.public_categories.categories_router import router as categories_router
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
+router.include_router(categories_router)
 
 
 @router.get("/products", response_model=MarketplaceProductList)
