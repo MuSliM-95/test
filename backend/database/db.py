@@ -2372,3 +2372,18 @@ marketplace_cart_goods = sqlalchemy.Table(
                       server_default=func.now(), onupdate=func.now()),
     sqlalchemy.UniqueConstraint('nomenclature_id', 'warehouse_id', 'cart_id', name='ux_marketplace_cart_goods_nomenclature_id_warehouse_id_cart_id')
 )
+
+global_categories = sqlalchemy.Table(
+    "global_categories",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True),
+    sqlalchemy.Column("name", String, nullable=False),
+    sqlalchemy.Column("description", String),
+    sqlalchemy.Column("code", Integer),
+    sqlalchemy.Column("parent_id", Integer),
+    sqlalchemy.Column("external_id", String),
+    sqlalchemy.Column("image_url", String),
+    sqlalchemy.Column("is_active", Boolean, default=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)

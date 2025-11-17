@@ -1,4 +1,5 @@
-from typing import Optional
+
+
 
 from fastapi import APIRouter, Query, Depends
 
@@ -17,10 +18,8 @@ from api.marketplace.service.service import MarketplaceService
 from api.marketplace.service.view_event_service.schemas import GetViewEventsRequest, CreateViewEventResponse, \
     CreateViewEventRequest, ViewEventsUtm
 from api.marketplace.utils import get_marketplace_service
-from api.marketplace.service.public_categories.categories_router import router as categories_router
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
-router.include_router(categories_router)
 
 
 @router.get("/products", response_model=MarketplaceProductList)
@@ -164,4 +163,66 @@ async def remove_from_cart(
     Если warehouse_id не указан, будет удален товар без привязки к складу.
     Если указан - будет удален товар конкретного склада.
     """
+
     return await service.remove_from_cart(request)
+
+
+
+from fastapi import File, UploadFile
+
+@router.get("/categories/", response_model=GlobalCategoryList)
+async def get_global_categories(
+    limit: int = 100,
+    offset: int = 0,
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.get_global_categories(limit=limit, offset=offset)
+
+
+@router.get("/categories/tree/", response_model=GlobalCategoryTreeList)
+async def get_global_categories_tree(
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.get_global_categories_tree()
+
+
+@router.get("/categories/{category_id}/", response_model=GlobalCategoryTree)
+async def get_global_category(
+    category_id: int,
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.get_global_category(category_id)
+
+
+@router.post("/categories/", response_model=GlobalCategoryTree, status_code=201)
+async def create_global_category(
+    category: GlobalCategoryCreate,
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.create_global_category(category)
+
+
+@router.patch("/categories/{category_id}/", response_model=GlobalCategoryTree)
+async def update_global_category(
+    category_id: int,
+    category_update: GlobalCategoryUpdate,
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.update_global_category(category_id, category_update)
+
+
+@router.delete("/categories/{category_id}/")
+async def delete_global_category(
+    category_id: int,
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.delete_global_category(category_id)
+
+
+@router.post("/categories/{category_id}/upload_image/")
+async def upload_category_image(
+    category_id: int,
+    file: UploadFile = File(...),
+    service: MarketplaceService = Depends(get_marketplace_service)
+):
+    return await service.upload_category_image(category_id, file)

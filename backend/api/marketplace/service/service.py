@@ -6,11 +6,12 @@ from api.marketplace.service.products_list_service.service import MarketplacePro
 from api.marketplace.service.qr_service.service import MarketplaceQrService
 from api.marketplace.service.review_service.service import MarketplaceReviewService
 from api.marketplace.service.view_event_service.service import MarketplaceViewEventService
+from api.marketplace.service.public_categories.public_categories_service import MarketplacePublicCategoriesService
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.utils.ioc.ioc import ioc
 
 
-class MarketplaceService(MarketplaceProductsListService, MarketplaceOrdersService, MarketplaceReviewService, MarketplaceFavoritesService, MarketplaceQrService, MarketplaceViewEventService, MarketplaceLocationsService, MarketplaceCartService):
+class MarketplaceService(MarketplaceProductsListService, MarketplaceOrdersService, MarketplaceReviewService, MarketplaceFavoritesService, MarketplaceQrService, MarketplaceViewEventService, MarketplaceLocationsService, MarketplaceCartService, MarketplacePublicCategoriesService):
     def __init__(self):
         super().__init__()
 
