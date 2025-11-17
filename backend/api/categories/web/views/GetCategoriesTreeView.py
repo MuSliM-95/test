@@ -22,7 +22,7 @@ class GetCategoriesTreeView:
         token: str, nomenclature_name: Optional[str] = None,
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=100)] = 100,
-        include_photo: bool = False
+        include_photo: bool = True
     ):
         """Получение древа списка категорий"""
         user = await get_user_by_token(token)
