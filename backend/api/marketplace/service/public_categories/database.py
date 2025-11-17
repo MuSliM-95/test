@@ -5,9 +5,16 @@ from sqlalchemy import (Boolean, Column, DateTime, Integer, MetaData, String,
                         Table)
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
+POSTGRES_USER = os.getenv('POSTGRES_USER', 'example')
+POSTGRES_PASS = os.getenv('POSTGRES_PASS', 'example')
+POSTGRES_HOST = os.getenv('POSTGRES_HOST', 'postgres-bridge')
+POSTGRES_PORT = os.getenv('POSTGRES_PORT', '5432')
+POSTGRES_DB = os.getenv('POSTGRES_DB', 'cash_2')
+
 DATABASE_URL = (
-    f"postgresql://{os.environ.get('POSTGRES_USER', 'example')}:{os.environ.get('POSTGRES_PASS', 'example')}"
-    f"@{os.environ.get('POSTGRES_HOST', 'postgres-bridge')}:{os.environ.get('POSTGRES_PORT', '5432')}/cash_2"
+    f"postgresql://{POSTGRES_USER}:{POSTGRES_PASS}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 )
 
 database = databases.Database(DATABASE_URL)
