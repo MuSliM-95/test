@@ -168,6 +168,7 @@ from api.chats.websocket import router as chats_ws_router
 from api.chats.rabbitmq_consumer import chat_consumer
 from api.chats.avito.avito_routes import router as avito_router
 from api.chats.avito.avito_consumer import avito_consumer
+from api.chats.avito.avito_default_webhook import router as avito_default_webhook_router
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 
 from jobs.jobs import scheduler
@@ -270,6 +271,7 @@ app.include_router(feeds_router)
 app.include_router(chats_router)
 app.include_router(chats_ws_router)
 app.include_router(avito_router)
+app.include_router(avito_default_webhook_router)
 
 # @app.get("/api/v1/openapi.json", include_in_schema=False)
 # async def get_openapi():

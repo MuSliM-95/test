@@ -260,6 +260,25 @@ async def connect_avito_channel(
                 channel_credentials.insert().values(**insert_values)
             )
         
+        try:
+            default_webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
+            client = await create_avito_client(
+                channel_id=channel_id,
+                cashbox_id=cashbox_id,
+                on_token_refresh=lambda token_data: save_token_callback(
+                    channel_id,
+                    cashbox_id,
+                    token_data
+                )
+            )
+            if client:
+                try:
+                    await client.register_webhook(default_webhook_url)
+                except Exception as webhook_error:
+                    logger.warning(f"Failed to auto-register webhook: {webhook_error}")
+        except Exception as e:
+            logger.warning(f"Could not auto-register webhook: {e}")
+        
         return {
             "success": True,
             "message": f"Avito канал успешно подключен к кабинету {cashbox_id}",
