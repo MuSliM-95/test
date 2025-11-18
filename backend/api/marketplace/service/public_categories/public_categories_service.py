@@ -103,7 +103,7 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         return category_dict
 
     async def create_global_category(self, category: GlobalCategoryCreate):
-        insert_query = global_categories.insert().values(**category.model_dump())
+        insert_query = global_categories.insert().values(**category.dict())
         new_category_id = await database.execute(insert_query)
         created_category_query = select(global_categories).where(
             global_categories.c.id == new_category_id
@@ -124,7 +124,7 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
                 status_code=404,
                 detail=f"Категория с ID {category_id} не найдена"
             )
-        update_data = category_update.model_dump(exclude_unset=True)
+        update_data = category_update.dict(exclude_unset=True)
         if not update_data:
             raise HTTPException(
                 status_code=400,
