@@ -101,13 +101,11 @@ class AvitoSyncResponse(BaseModel):
 
 class AvitoWebhookRegisterRequest(BaseModel):
     webhook_url: str
-    cashbox_id: Optional[int] = None
     
     class Config:
         json_schema_extra = {
             "example": {
-                "webhook_url": "https://your-domain.com/api/v1/hook/chat/1",
-                "cashbox_id": 1
+                "webhook_url": "https://your-domain.com/chats/avito/webhooks/message"
             }
         }
 
@@ -117,27 +115,6 @@ class AvitoWebhookRegisterResponse(BaseModel):
     message: str
     webhook_url: Optional[str] = None
     webhook_id: Optional[str] = None
-
-
-class AvitoSendMessageRequest(BaseModel):
-    chat_id: int  
-    content: str
-    message_type: str = "TEXT"
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "chat_id": 10,
-                "content": "Спасибо за покупку!",
-                "message_type": "TEXT"
-            }
-        }
-
-
-class AvitoSendMessageResponse(BaseModel):
-    success: bool
-    message_id: Optional[str] = None
-    external_message_id: Optional[str] = None
 
 
 class AvitoConnectResponse(BaseModel):
