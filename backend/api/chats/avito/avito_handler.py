@@ -42,7 +42,7 @@ def extract_phone_from_text(text: str) -> Optional[str]:
 class AvitoHandler:
     
     @staticmethod
-    async def handle_message_event(webhook: AvitoWebhook, cashbox_id: int) -> Dict[str, Any]:
+    async def handle_message_event(webhook: AvitoWebhook, cashbox_id: int, channel_id: Optional[int] = None) -> Dict[str, Any]:
         try:
             payload = webhook.payload.value
 
@@ -57,15 +57,77 @@ class AvitoHandler:
                 message_type
             )
             
+            existing_chat = None
+            avito_channel = None
+            if chat_id_external:
+                from database.db import database, chats, channels
+                from sqlalchemy import select, and_
+                query = select([
+                    chats.c.id,
+                    chats.c.channel_id,
+                    chats.c.cashbox_id
+                ]).select_from(
+                    chats.join(
+                        channels,
+                        chats.c.channel_id == channels.c.id
+                    )
+                ).where(
+                    and_(
+                        channels.c.type == 'AVITO',
+                        channels.c.is_active.is_(True),
+                        chats.c.external_chat_id == str(chat_id_external),
+                        chats.c.cashbox_id == cashbox_id
+                    )
+                ).limit(1)
+                existing_chat = await database.fetch_one(query)
+                if existing_chat:
+                    existing_channel_id = existing_chat['channel_id']
+                    avito_channel = await crud.get_channel(existing_channel_id)
+                    logger.info(f"Found existing chat {existing_chat['id']} with channel_id {existing_channel_id} for external_chat_id {chat_id_external}")
+            
+            # Если channel_id передан явно, используем его
+            if channel_id:
+                avito_channel = await crud.get_channel(channel_id)
+                if avito_channel:
+                    logger.info(f"Using provided channel_id {channel_id} for webhook processing")
+            
+            # Если чат не найден и channel_id не передан, пытаемся определить канал по user_id
+            if not avito_channel and user_id:
+                from database.db import channel_credentials
+                from sqlalchemy import select, and_
+                query = select([
+                    channel_credentials.c.channel_id
+                ]).select_from(
+                    channel_credentials.join(
+                        channels,
+                        channel_credentials.c.channel_id == channels.c.id
+                    )
+                ).where(
+                    and_(
+                        channels.c.type == 'AVITO',
+                        channels.c.is_active.is_(True),
+                        channel_credentials.c.avito_user_id == user_id,
+                        channel_credentials.c.cashbox_id == cashbox_id,
+                        channel_credentials.c.is_active.is_(True)
+                    )
+                ).limit(1)
+                creds_result = await database.fetch_one(query)
+                if creds_result:
+                    found_channel_id = creds_result['channel_id']
+                    avito_channel = await crud.get_channel(found_channel_id)
+                    logger.info(f"Found channel_id {found_channel_id} by avito_user_id {user_id} for cashbox {cashbox_id}")
+            
+            # Если все еще не найден, используем get_channel_by_cashbox (fallback)
+            if not avito_channel:
+                avito_channel = await crud.get_channel_by_cashbox(cashbox_id, "AVITO")
+                if avito_channel:
+                    logger.warning(f"Using fallback channel {avito_channel['id']} for cashbox {cashbox_id} (chat not found, user_id not matched)")
+            
             if message_type == 'voice' and isinstance(message_content, dict):
                 voice_id = message_content.get('voice_id')
                 if voice_id and not message_content.get('url') and not message_content.get('voice_url'):
                     try:
                         from api.chats.avito.avito_factory import create_avito_client, save_token_callback
-                        from database.db import database, channels
-                        avito_channel = await database.fetch_one(
-                            channels.select().where(channels.c.type == "AVITO")
-                        )
                         if avito_channel:
                             voice_client = await create_avito_client(
                                 channel_id=avito_channel['id'],
@@ -92,10 +154,7 @@ class AvitoHandler:
             sender_type = "CLIENT"
             avito_user_id = None
             try:
-                from database.db import database, channel_credentials, channels
-                avito_channel = await database.fetch_one(
-                    channels.select().where(channels.c.type == "AVITO")
-                )
+                from database.db import channel_credentials
                 if avito_channel:
                     creds = await database.fetch_one(
                         channel_credentials.select().where(
@@ -187,15 +246,45 @@ class AvitoHandler:
                 else:
                     user_name = None
             
-            chat = await AvitoHandler._find_or_create_chat(
-                channel_type="AVITO",
-                external_chat_id=chat_id_external,
-                cashbox_id=cashbox_id,
-                user_id=user_id or 0,
-                webhook_data=payload,
-                user_phone=user_phone,
-                user_name=user_name
-            )
+            if channel_id:
+                target_channel = await crud.get_channel(channel_id)
+                if target_channel:
+                    existing_chat = await crud.get_chat_by_external_id(
+                        channel_id=channel_id,
+                        external_chat_id=chat_id_external,
+                        cashbox_id=cashbox_id
+                    )
+                    if existing_chat:
+                        chat = existing_chat
+                    else:
+                        chat_name = user_name if user_name else f"Avito Chat {chat_id_external[:8]}"
+                        chat = await crud.create_chat(
+                            channel_id=channel_id,
+                            cashbox_id=cashbox_id,
+                            external_chat_id=chat_id_external,
+                            phone=user_phone,
+                            name=chat_name
+                        )
+                else:
+                    chat = await AvitoHandler._find_or_create_chat(
+                        channel_type="AVITO",
+                        external_chat_id=chat_id_external,
+                        cashbox_id=cashbox_id,
+                        user_id=user_id or 0,
+                        webhook_data=payload,
+                        user_phone=user_phone,
+                        user_name=user_name
+                    )
+            else:
+                chat = await AvitoHandler._find_or_create_chat(
+                    channel_type="AVITO",
+                    external_chat_id=chat_id_external,
+                    cashbox_id=cashbox_id,
+                    user_id=user_id or 0,
+                    webhook_data=payload,
+                    user_phone=user_phone,
+                    user_name=user_name
+                )
             
             if not chat:
                 raise Exception(f"Failed to create or find chat {chat_id_external}")
@@ -235,7 +324,8 @@ class AvitoHandler:
             from database.db import chat_messages
             existing_message = await database.fetch_one(
                 chat_messages.select().where(
-                    chat_messages.c.external_message_id == message_id
+                    (chat_messages.c.external_message_id == message_id) &
+                    (chat_messages.c.chat_id == chat_id)
                 )
             )
             
@@ -290,22 +380,24 @@ class AvitoHandler:
                                 if voice_id:
                                     try:
                                         from api.chats.avito.avito_factory import create_avito_client, save_token_callback
-                                        from database.db import channels
-                                        avito_channel = await database.fetch_one(
-                                            channels.select().where(channels.c.type == "AVITO")
+                                        chat_data = await database.fetch_one(
+                                            chats.select().where(chats.c.id == chat_id)
                                         )
-                                        if avito_channel:
-                                            voice_client = await create_avito_client(
-                                                channel_id=avito_channel['id'],
-                                                cashbox_id=cashbox_id,
-                                                on_token_refresh=lambda token_data: save_token_callback(
-                                                    avito_channel['id'],
-                                                    cashbox_id,
-                                                    token_data
+                                        if chat_data:
+                                            channel_id = chat_data['channel_id']
+                                            avito_channel = await crud.get_channel(channel_id)
+                                            if avito_channel and avito_channel.get('type') == 'AVITO':
+                                                voice_client = await create_avito_client(
+                                                    channel_id=channel_id,
+                                                    cashbox_id=cashbox_id,
+                                                    on_token_refresh=lambda token_data: save_token_callback(
+                                                        channel_id,
+                                                        cashbox_id,
+                                                        token_data
+                                                    )
                                                 )
-                                            )
-                                            if voice_client:
-                                                file_url = await voice_client.get_voice_file_url(voice_id)
+                                                if voice_client:
+                                                    file_url = await voice_client.get_voice_file_url(voice_id)
                                     except Exception as e:
                                         logger.warning(f"Failed to get voice URL for voice_id {voice_id}: {e}")
                     
@@ -371,15 +463,79 @@ class AvitoHandler:
         user_name: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         try:
-            channel = await crud.get_channel_by_type(channel_type)
-            
-            if not channel:
-                logger.warning(f"Channel {channel_type} not found, creating new one")
-                channel = await crud.create_channel(
-                    name=channel_type,
-                    type=channel_type,
-                    description=f"{channel_type} integration channel"
-                )
+            if channel_type == "AVITO":
+                from database.db import database, channels, chats
+                from sqlalchemy import select, and_
+                
+                existing_chat_query = select([
+                    chats.c.id,
+                    chats.c.channel_id,
+                    chats.c.cashbox_id
+                ]).select_from(
+                    chats.join(
+                        channels,
+                        chats.c.channel_id == channels.c.id
+                    )
+                ).where(
+                    and_(
+                        channels.c.type == 'AVITO',
+                        channels.c.is_active.is_(True),
+                        chats.c.external_chat_id == str(external_chat_id),
+                        chats.c.cashbox_id == cashbox_id
+                    )
+                ).limit(1)
+                
+                existing_chat_result = await database.fetch_one(existing_chat_query)
+                
+                if existing_chat_result:
+                    channel_id = existing_chat_result['channel_id']
+                    chat = await crud.get_chat(existing_chat_result['id'])
+                    logger.info(f"Found existing chat {chat['id']} in channel {channel_id}")
+                    return chat
+                
+                channel = None
+                if user_id and user_id > 0:
+                    from database.db import channel_credentials
+                    query = select([
+                        channel_credentials.c.channel_id
+                    ]).select_from(
+                        channel_credentials.join(
+                            channels,
+                            channel_credentials.c.channel_id == channels.c.id
+                        )
+                    ).where(
+                        and_(
+                            channels.c.type == 'AVITO',
+                            channels.c.is_active.is_(True),
+                            channel_credentials.c.avito_user_id == user_id,
+                            channel_credentials.c.cashbox_id == cashbox_id,
+                            channel_credentials.c.is_active.is_(True)
+                        )
+                    ).limit(1)
+                    
+                    creds_result = await database.fetch_one(query)
+                    if creds_result:
+                        channel_id = creds_result['channel_id']
+                        channel = await crud.get_channel(channel_id)
+                        logger.info(f"Found channel {channel_id} by avito_user_id {user_id} for cashbox {cashbox_id}")
+                
+                if not channel:
+                    channel = await crud.get_channel_by_cashbox(cashbox_id, channel_type)
+                    if channel:
+                        logger.warning(f"Using fallback channel {channel['id']} for cashbox {cashbox_id} (user_id not matched)")
+                
+                if not channel:
+                    logger.warning(f"Avito channel not found for cashbox {cashbox_id}. Channel should be created via /connect endpoint first.")
+                    return None
+            else:
+                channel = await crud.get_channel_by_type(channel_type)
+                if not channel:
+                    logger.warning(f"Channel {channel_type} not found, creating new one")
+                    channel = await crud.create_chat(
+                        name=channel_type,
+                        type=channel_type,
+                        description=f"{channel_type} integration channel"
+                    )
             
             existing_chat = await crud.get_chat_by_external_id(
                 channel_id=channel['id'],
@@ -393,7 +549,7 @@ class AvitoHandler:
             
             chat_name = user_name if user_name else f"Avito Chat {external_chat_id[:8]}"
             
-            logger.info(f"Creating new chat for Avito chat {external_chat_id} with name: {chat_name}")
+            logger.info(f"Creating new chat for Avito chat {external_chat_id} with name: {chat_name} in channel {channel['id']}")
             new_chat = await crud.create_chat(
                 channel_id=channel['id'],
                 cashbox_id=cashbox_id,
@@ -520,13 +676,14 @@ class AvitoHandler:
     @staticmethod
     async def handle_webhook_event(
         webhook: AvitoWebhook,
-        cashbox_id: int
+        cashbox_id: int,
+        channel_id: Optional[int] = None
     ) -> Dict[str, Any]:
         
         event_type = webhook.payload.type
         
         if event_type == 'message':
-            return await AvitoHandler.handle_message_event(webhook, cashbox_id)
+            return await AvitoHandler.handle_message_event(webhook, cashbox_id, channel_id)
         
         elif event_type == 'status':
             logger.info(f"Status event received (not implemented): {webhook.id}")

@@ -1,5 +1,5 @@
 from sqlalchemy import desc, and_, or_, func, select
-from database.db import database, channels, chats, chat_messages, contragents
+from database.db import database, channels, chats, chat_messages, contragents, channel_credentials
 from fastapi import HTTPException
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -30,6 +30,118 @@ async def get_channel(channel_id: int):
 async def get_channel_by_type(channel_type: str):
     """Get channel by type (optimized single lookup)"""
     query = channels.select().where(channels.c.type == channel_type)
+    return await database.fetch_one(query)
+
+
+async def get_channel_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
+    """Get channel for specific cashbox by type through channel_credentials"""
+    query = select([
+        channels.c.id,
+        channels.c.name,
+        channels.c.type,
+        channels.c.description,
+        channels.c.svg_icon,
+        channels.c.tags,
+        channels.c.api_config_name,
+        channels.c.is_active,
+        channels.c.created_at,
+        channels.c.updated_at
+    ]).select_from(
+        channels.join(
+            channel_credentials,
+            channels.c.id == channel_credentials.c.channel_id
+        )
+    ).where(
+        and_(
+            channel_credentials.c.cashbox_id == cashbox_id,
+            channels.c.type == channel_type,
+            channel_credentials.c.is_active.is_(True)
+        )
+    ).limit(1)
+    
+    return await database.fetch_one(query)
+
+
+async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
+    """Get all channels for specific cashbox by type through channel_credentials"""
+    query = select([
+        channels.c.id, channels.c.name, channels.c.type, channels.c.description,
+        channels.c.svg_icon, channels.c.tags, channels.c.api_config_name,
+        channels.c.is_active, channels.c.created_at, channels.c.updated_at
+    ]).select_from(
+        channels.join(
+            channel_credentials,
+            channels.c.id == channel_credentials.c.channel_id
+        )
+    ).where(
+        and_(
+            channel_credentials.c.cashbox_id == cashbox_id,
+            channels.c.type == channel_type,
+            channel_credentials.c.is_active.is_(True),
+            channels.c.is_active.is_(True)
+        )
+    )
+    return await database.fetch_all(query)
+
+
+async def get_channel_by_cashbox_and_avito_user(cashbox_id: int, avito_user_id: int, channel_type: str = "AVITO"):
+    """Get channel for specific cashbox and avito_user_id through channel_credentials"""
+    query = select([
+        channels.c.id,
+        channels.c.name,
+        channels.c.type,
+        channels.c.description,
+        channels.c.svg_icon,
+        channels.c.tags,
+        channels.c.api_config_name,
+        channels.c.is_active,
+        channels.c.created_at,
+        channels.c.updated_at
+    ]).select_from(
+        channels.join(
+            channel_credentials,
+            channels.c.id == channel_credentials.c.channel_id
+        )
+    ).where(
+        and_(
+            channel_credentials.c.cashbox_id == cashbox_id,
+            channel_credentials.c.avito_user_id == avito_user_id,
+            channels.c.type == channel_type,
+            channel_credentials.c.is_active.is_(True)
+        )
+    ).limit(1)
+    
+    return await database.fetch_one(query)
+
+
+async def get_channel_by_cashbox_and_api_key(cashbox_id: int, encrypted_api_key: str, channel_type: str = "AVITO"):
+    """Get channel for specific cashbox and api_key through channel_credentials
+    Используется для различения разных приложений/бизнесов одного пользователя Avito"""
+    query = select([
+        channels.c.id,
+        channels.c.name,
+        channels.c.type,
+        channels.c.description,
+        channels.c.svg_icon,
+        channels.c.tags,
+        channels.c.api_config_name,
+        channels.c.is_active,
+        channels.c.created_at,
+        channels.c.updated_at
+    ]).select_from(
+        channels.join(
+            channel_credentials,
+            channels.c.id == channel_credentials.c.channel_id
+        )
+    ).where(
+        and_(
+            channel_credentials.c.cashbox_id == cashbox_id,
+            channel_credentials.c.api_key == encrypted_api_key,
+            channels.c.type == channel_type,
+            channel_credentials.c.is_active.is_(True)
+        )
+    ).limit(1)
+    
     return await database.fetch_one(query)
 
 
@@ -535,19 +647,23 @@ async def create_message_and_update_chat(
         chat_messages.insert().values(**message_values)
     )
     message = await get_message(message_id)
-    current_time = message.created_at if message.created_at else datetime.now()
+    if isinstance(message, dict):
+        current_time = message.get('created_at') or datetime.now()
+    else:
+        current_time = message.created_at if message.created_at else datetime.now()
     
     chat_updates = {}
     
     if sender_type == "CLIENT":
-        if chat.first_message_time is None:
+        if chat.get('first_message_time') is None:
             chat_updates['first_message_time'] = current_time
         
         chat_updates['last_message_time'] = current_time
     
     elif sender_type == "OPERATOR":
-        if chat.first_response_time_seconds is None and chat.first_message_time is not None:
-            time_diff = current_time - chat.first_message_time
+        first_message_time = chat.get('first_message_time')
+        if chat.get('first_response_time_seconds') is None and first_message_time is not None:
+            time_diff = current_time - first_message_time
             chat_updates['first_response_time_seconds'] = int(time_diff.total_seconds())
         
         last_client_msg = await database.fetch_one(
@@ -560,7 +676,7 @@ async def create_message_and_update_chat(
         )
         
         if last_client_msg:
-            last_client_time = last_client_msg.created_at
+            last_client_time = last_client_msg.get('created_at') if isinstance(last_client_msg, dict) else last_client_msg.created_at
             time_diff = current_time - last_client_time
             chat_updates['last_response_time_seconds'] = int(time_diff.total_seconds())
         
