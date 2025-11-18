@@ -1,5 +1,5 @@
 
-from backend.database.db import database, global_categories
+from database.db import database, global_categories
 from sqlalchemy import select, func
 from fastapi import HTTPException, UploadFile
 from pathlib import Path
