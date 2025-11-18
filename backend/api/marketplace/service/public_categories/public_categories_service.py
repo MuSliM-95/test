@@ -103,7 +103,7 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         return category_dict
 
     async def create_global_category(self, category: GlobalCategoryCreate):
-        insert_query = global_categories.insert().values(**category.dict())
+        insert_query = global_categories.insert().values(**category.dict(exclude={"model_config"}))
         new_category_id = await database.execute(insert_query)
         created_category_query = select(global_categories).where(
             global_categories.c.id == new_category_id
