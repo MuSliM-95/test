@@ -38,12 +38,23 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             .limit(limit)
             .offset(offset)
         )
-        categories_db = await database.fetch_all(query)
+        try:
+            categories_db = await database.fetch_all(query)
+            print("[DEBUG] after fetch_all categories")
+        except Exception as e:
+            print(f"[ERROR] fetch_all categories: {e}")
+            raise
         categories_db = [*map(serialize_datetime_fields, categories_db)]
+        print("[DEBUG] before fetch_one count_query")
         count_query = select(func.count(global_categories.c.id)).where(
             global_categories.c.is_active.is_(True)
         )
-        categories_count = await database.fetch_one(count_query)
+        try:
+            categories_count = await database.fetch_one(count_query)
+            print("[DEBUG] after fetch_one count_query")
+        except Exception as e:
+            print(f"[ERROR] fetch_one count_query: {e}")
+            raise
         return {"result": categories_db, "count": categories_count.count_1}
 
     async def build_global_hierarchy(self, categories_data, parent_id=None):
