@@ -1,4 +1,0 @@
-asyncpg
-sqlalchemy
-databases
-python-dotenv

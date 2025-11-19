@@ -1,21 +1,6 @@
-#!/usr/bin/env python3
-"""
-Скрипт для загрузки категорий Авито в таблицу global_categories
-"""
-
-import asyncio
 import json
-import os
-import sys
-from pathlib import Path
-from typing import Optional
 
-# Добавляем путь к проекту
-sys.path.append(str(Path(__file__).parent.parent))
-
-from database.db import database, global_categories
-
-# Данные категорий Авито (исправленная версия)
+# Скопируйте сюда вашу структуру AVITO_CATEGORIES из load_avito_categories.py
 AVITO_CATEGORIES = [
   {
     "value": "Транспорт",
@@ -1270,59 +1255,26 @@ AVITO_CATEGORIES = [
   }
 ]
 
+result = []
+id_counter = 1
 
-async def insert_category_recursive(category_data: dict, parent_id: Optional[int] = None) -> int:
-    """Рекурсивно вставляет категорию и её детей в БД"""
-    
-    # Вставляем текущую категорию
-    category_values = {
-        "name": category_data["title"],
-        "description": category_data.get("description"),
-        "external_id": category_data["value"],  # Используем value как external_id
-        "parent_id": parent_id,
-        "is_active": True
-    }
-    
-    query = global_categories.insert().values(category_values)
-    category_id = await database.execute(query)
-    
-    # Рекурсивно вставляем детей
-    if "children" in category_data:
-        for child in category_data["children"]:
-            await insert_category_recursive(child, category_id)
-    
-    return category_id
+def flatten_categories(categories, parent_id=None):
+    global id_counter
+    for cat in categories:
+        current_id = id_counter
+        id_counter += 1
+        result.append({
+            "id": current_id,
+            "name": cat["title"],
+            "parent_id": parent_id,
+            "external_id": cat["value"],
+            "description": cat.get("description"),
+            "is_active": True
+        })
+        if "children" in cat:
+            flatten_categories(cat["children"], current_id)
 
+flatten_categories(AVITO_CATEGORIES)
 
-async def load_avito_categories():
-    """Загружает все категории Авито в БД"""
-    print("Начинаем загрузку категорий Авито...")
-    
-    try:
-        # Очищаем существующие глобальные категории (опционально)
-        # await database.execute(global_categories.delete())
-        
-        # Загружаем категории
-        for category in AVITO_CATEGORIES:
-            category_id = await insert_category_recursive(category)
-            print(f"Загружена категория: {category['title']} (ID: {category_id})")
-        
-        print("Загрузка завершена успешно!")
-        
-    except Exception as e:
-        print(f"Ошибка при загрузке: {e}")
-        raise
-
-
-async def main():
-    """Основная функция"""
-    # Инициализируем подключение к базе данных
-    await database.connect()
-    try:
-        await load_avito_categories()
-    finally:
-        await database.disconnect()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+with open("global_categories.json", "w", encoding="utf-8") as f:
+    json.dump(result, f, ensure_ascii=False, indent=2)

@@ -39,8 +39,7 @@ class RabbitFactory(IRabbitFactory):
                 await asyncio.sleep(1 * retries)
 
         channels: Dict[str, AbstractRobustChannel] = {}
-        channels[f"publication"] = aio_pika.abc.AbstractChannel = await amqp_connection.get_channel()
-
+        channels[f"publication"] = await amqp_connection.get_channel()
 
         rabbit_channel = RabbitChannel(
             channels=channels,
@@ -49,8 +48,21 @@ class RabbitFactory(IRabbitFactory):
         rabbit_messaging = RabbitMessagingImpl(channel=rabbit_channel)
 
         class RabbitMessageImpl(IRabbitFactory):
+            """Wrapper для RabbitMessagingImpl, реализующий IRabbitFactory"""
+            
+            def __init__(self, messaging: IRabbitMessaging):
+                self._messaging = messaging
 
             async def __call__(self) -> IRabbitMessaging:
-                return rabbit_messaging
+                return self._messaging
+            
+            async def publish(self, *args, **kwargs):
+                return await self._messaging.publish(*args, **kwargs)
+            
+            async def subscribe(self, *args, **kwargs):
+                return await self._messaging.subscribe(*args, **kwargs)
+            
+            async def install(self, *args, **kwargs):
+                return await self._messaging.install(*args, **kwargs)
 
-        return RabbitMessageImpl()
+        return RabbitMessageImpl(rabbit_messaging)
