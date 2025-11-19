@@ -8,7 +8,8 @@ from datetime import datetime
 from api.marketplace.service.public_categories.schema import (
     GlobalCategoryCreate, GlobalCategoryUpdate
 )
-from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
+from api.marketplace.service.base_marketplace_service import \
+    BaseMarketplaceService
 
 UPLOAD_DIR = Path("/uploads/categories")
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
@@ -62,7 +63,9 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         for category in categories_data:
             if category.get("parent_id") == parent_id:
                 category_dict = dict(category)
-                children = await self.build_global_hierarchy(categories_data, category["id"])
+                children = await self.build_global_hierarchy(
+                    categories_data, category["id"]
+                )
                 category_dict["children"] = children
                 result.append(category_dict)
         return result
@@ -103,17 +106,23 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         return category_dict
 
     async def create_global_category(self, category: GlobalCategoryCreate):
-        insert_query = global_categories.insert().values(**category.dict(exclude={"model_config"}))
+        insert_query = global_categories.insert().values(
+            **category.dict(exclude={"model_config"})
+        )
         new_category_id = await database.execute(insert_query)
         created_category_query = select(global_categories).where(
             global_categories.c.id == new_category_id
         )
         created_category = await database.fetch_one(created_category_query)
-        created_category_dict = dict(serialize_datetime_fields(created_category))
+        created_category_dict = dict(
+            serialize_datetime_fields(created_category)
+        )
         created_category_dict["children"] = []
         return created_category_dict
 
-    async def update_global_category(self, category_id: int, category_update: GlobalCategoryUpdate):
+    async def update_global_category(
+        self, category_id: int, category_update: GlobalCategoryUpdate
+    ):
         check_query = select(global_categories).where(
             global_categories.c.id == category_id,
             global_categories.c.is_active.is_(True),
@@ -138,7 +147,9 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             global_categories.c.id == category_id
         )
         updated_category = await database.fetch_one(updated_category_query)
-        updated_category_dict = dict(serialize_datetime_fields(updated_category))
+        updated_category_dict = dict(
+            serialize_datetime_fields(updated_category)
+        )
         children_query = select(global_categories).where(
             global_categories.c.parent_id == category_id,
             global_categories.c.is_active.is_(True),
@@ -178,7 +189,8 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
             raise HTTPException(
-                status_code=404, detail=f"Категория с ID {category_id} не найдена"
+                status_code=404,
+                detail=f"Категория с ID {category_id} не найдена"
             )
         file_extension = Path(file.filename).suffix.lower()
 
@@ -218,7 +230,8 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
                 f.write(contents)
         except Exception as e:
             raise HTTPException(
-                status_code=500, detail=f"Ошибка при сохранении файла: {str(e)}"
+                status_code=500,
+                detail=f"Ошибка при сохранении файла: {str(e)}"
             )
         image_url = f"/uploads/categories/{unique_filename}"
         update_query = (
