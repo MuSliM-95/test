@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-AVITO_WEBHOOK_SECRET = os.getenv("AVITO_WEBHOOK_SECRET", "")  # Must be set in production
+AVITO_WEBHOOK_SECRET = "" 
 
 
 def verify_webhook_signature(
