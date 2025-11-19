@@ -253,7 +253,7 @@ async def connect_avito_channel(
         webhook_error_message = None
         webhook_url = None
         try:
-            webhook_url = os.getenv("AVITO_DEFAULT_WEBHOOK_URL")
+            webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
             
             if not webhook_url:
                 webhook_error_message = "AVITO_DEFAULT_WEBHOOK_URL not set in .env file"
@@ -1177,7 +1177,7 @@ async def update_all_avito_webhooks(
                 "results": []
             }
         
-        webhook_url = os.getenv("AVITO_DEFAULT_WEBHOOK_URL")
+        webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
         
         if not webhook_url:
             return {
