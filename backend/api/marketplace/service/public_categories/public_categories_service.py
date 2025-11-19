@@ -3,6 +3,9 @@ from database.db import database, global_categories
 from sqlalchemy import select, func
 from fastapi import HTTPException, UploadFile
 from pathlib import Path
+import os
+from common.s3_service.impl.S3Client import S3Client
+from common.s3_service.models.S3SettingsModel import S3SettingsModel
 import uuid
 from datetime import datetime
 from api.marketplace.service.public_categories.schema import (
@@ -11,7 +14,16 @@ from api.marketplace.service.public_categories.schema import (
 from api.marketplace.service.base_marketplace_service import \
     BaseMarketplaceService
 
-UPLOAD_DIR = Path("/uploads/categories")
+S3_BUCKET_NAME = "5075293c-docs_generated"
+S3_FOLDER = "categories"
+S3_URL = os.getenv("S3_URL", "https://s3.yandexcloud.net")
+AWS_ACCESS_KEY_ID = os.getenv("S3_ACCESS")
+AWS_SECRET_ACCESS_KEY = os.getenv("S3_SECRET")
+S3_SETTINGS = S3SettingsModel(
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    endpoint_url=S3_URL
+)
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 
@@ -31,6 +43,11 @@ def serialize_datetime_fields(record):
 
 
 class MarketplacePublicCategoriesService(BaseMarketplaceService):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__bucket_name = S3_BUCKET_NAME
+        self.__s3_client = S3Client(S3_SETTINGS)
+
     async def get_global_categories(self, limit: int = 100, offset: int = 0):
         query = (
             select(global_categories)
@@ -194,7 +211,6 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             )
         file_extension = Path(file.filename).suffix.lower()
 
-        UPLOAD_DIR = Path("/uploads/categories")
         ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
         MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 
@@ -217,7 +233,7 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
                 detail=f"Недопустимый формат файла. Разрешены: {allowed}",
             )
         unique_filename = f"{uuid.uuid4()}{file_extension}"
-        file_path = UPLOAD_DIR / unique_filename
+        s3_key = f"{S3_FOLDER}/{unique_filename}"
         try:
             contents = await file.read()
             if len(contents) > MAX_UPLOAD_SIZE:
@@ -226,14 +242,14 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
                     status_code=413,
                     detail=f"Файл слишком большой. Максимум: {max_mb:.1f}MB",
                 )
-            with open(file_path, "wb") as f:
-                f.write(contents)
+            await self.__s3_client.upload_file_object(self.__bucket_name, s3_key, contents)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Ошибка при сохранении файла: {str(e)}"
+                detail=f"Ошибка при загрузке файла в S3: {str(e)}"
             )
-        image_url = f"/uploads/categories/{unique_filename}"
+        # Формируем публичную ссылку (может отличаться для вашего S3)
+        image_url = f"{S3_URL}/{self.__bucket_name}/{s3_key}"
         update_query = (
             global_categories.update()
             .where(global_categories.c.id == category_id)
