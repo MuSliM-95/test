@@ -8,7 +8,7 @@ from sqlalchemy import select, and_
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/avito", tags=["avito-webhook"])
+router = APIRouter(prefix="/avito", tags=["avito-webhook"])
 
 @router.post("/hook", response_model=AvitoWebhookResponse)
 async def receive_avito_webhook_default(request: Request):
