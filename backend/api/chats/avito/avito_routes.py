@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime
-import logging
 import re
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 from api.chats.auth import get_current_user_for_avito as get_current_user
 from api.chats.avito.schemas import (
@@ -14,7 +17,8 @@ from api.chats.avito.schemas import (
     AvitoMessagesResponse,
     AvitoMessageItem,
     AvitoWebhookRegisterRequest,
-    AvitoWebhookRegisterResponse
+    AvitoWebhookRegisterResponse,
+    AvitoWebhookUpdateResponse
 )
 from api.chats.avito.avito_handler import AvitoHandler
 from api.chats.avito.avito_factory import (
@@ -28,8 +32,6 @@ from api.chats import crud
 from database.db import database, channels, channel_credentials, chats
 from typing import Optional
 from fastapi import Query
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chats/avito", tags=["chats-avito"])
 
@@ -100,12 +102,6 @@ async def get_avito_api_info():
                 "path": "/chats/avito/sync",
                 "description": "Синхронизация всех сообщений",
                 "auth_required": True
-            },
-            "webhook": {
-                "method": "POST",
-                "path": "/chats/avito/webhooks/message",
-                "description": "Webhook для получения сообщений от Avito",
-                "auth_required": False
             },
             "webhook_register": {
                 "method": "POST",
@@ -183,17 +179,11 @@ async def connect_avito_channel(
             user_profile = await temp_client.get_user_profile()
             avito_account_name = user_profile.get('name') or f"Cashbox {cashbox_id}"
         except Exception as e:
-            logger.warning(f"Could not retrieve user info from Avito profile: {e}")
             avito_account_name = f"Cashbox {cashbox_id}"
         
         encrypted_api_key = _encrypt_credential(credentials.api_key)
         
         avito_channel = await crud.get_channel_by_cashbox_and_api_key(cashbox_id, encrypted_api_key, "AVITO")
-        
-        if avito_channel:
-            logger.info(f"Found existing Avito channel '{avito_channel['name']}' (id={avito_channel['id']}) for cashbox {cashbox_id} with api_key {credentials.api_key[:10]}...")
-        else:
-            logger.info(f"No existing channel found for cashbox {cashbox_id} with api_key {credentials.api_key[:10]}..., creating new one")
         
         if not avito_channel:
             channel_name = f"Avito - {avito_account_name}" if avito_account_name else f"Avito - Cashbox {cashbox_id}"
@@ -212,7 +202,6 @@ async def connect_avito_channel(
                 )
             )
             avito_channel = await crud.get_channel(channel_id)
-            logger.info(f"Created new Avito channel '{channel_name}' (id={channel_id}) for cashbox {cashbox_id} with api_key {credentials.api_key[:10]}...")
         
         channel_id = avito_channel['id']
         
@@ -260,36 +249,54 @@ async def connect_avito_channel(
                 channel_credentials.insert().values(**insert_values)
             )
         
+        webhook_registered = False
+        webhook_error_message = None
+        webhook_url = None
         try:
-            default_webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
-            client = await create_avito_client(
-                channel_id=channel_id,
-                cashbox_id=cashbox_id,
-                on_token_refresh=lambda token_data: save_token_callback(
-                    channel_id,
-                    cashbox_id,
-                    token_data
+            webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
+            
+            if not webhook_url:
+                webhook_error_message = "AVITO_DEFAULT_WEBHOOK_URL not set in .env file"
+            else:
+                client = await create_avito_client(
+                    channel_id=channel_id,
+                    cashbox_id=cashbox_id,
+                    on_token_refresh=lambda token_data: save_token_callback(
+                        channel_id,
+                        cashbox_id,
+                        token_data
+                    )
                 )
-            )
-            if client:
-                try:
-                    await client.register_webhook(default_webhook_url)
-                except Exception as webhook_error:
-                    logger.warning(f"Failed to auto-register webhook: {webhook_error}")
+                if client:
+                    try:
+                        result = await client.register_webhook(webhook_url)
+                        webhook_registered = True
+                    except Exception as webhook_error:
+                        webhook_error_message = str(webhook_error)
+                else:
+                    webhook_error_message = "Could not create Avito client"
         except Exception as e:
-            logger.warning(f"Could not auto-register webhook: {e}")
+            webhook_error_message = str(e)
         
-        return {
+        response = {
             "success": True,
             "message": f"Avito канал успешно подключен к кабинету {cashbox_id}",
             "channel_id": channel_id,
             "cashbox_id": cashbox_id
         }
+        
+        if webhook_registered:
+            response["webhook_registered"] = True
+            response["webhook_url"] = webhook_url
+        elif webhook_error_message:
+            response["webhook_registered"] = False
+            response["webhook_error"] = webhook_error_message
+        
+        return response
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error connecting Avito channel: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Ошибка подключения: {str(e)}")
 
 
@@ -325,7 +332,6 @@ async def get_avito_chats(
                 )
                 
                 if not client:
-                    logger.warning(f"Could not create Avito API client for channel {avito_channel['id']}")
                     continue
                 
                 avito_chats = await client.get_chats(
@@ -398,7 +404,6 @@ async def get_avito_chats(
                                 except Exception as chat_error:
                                     error_str = str(chat_error)
                                     if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
-                                        logger.debug(f"Chat {external_chat_id} requires subscription (402) to get chat info. Skipping.")
                                         chat_info = {}
                                     else:
                                         raise
@@ -444,11 +449,11 @@ async def get_avito_chats(
                                     except Exception as e:
                                         error_str = str(e)
                                         if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
-                                            logger.debug(f"Chat {external_chat_id} requires subscription (402) to get messages. Skipping message extraction.")
+                                            pass
                                         else:
-                                            logger.warning(f"Could not get messages to extract phone for chat {external_chat_id}: {e}")
+                                            pass
                             except Exception as e:
-                                logger.warning(f"Could not get full chat info for {external_chat_id}: {e}")
+                                pass
                             
                             update_data = {}
                             
@@ -504,10 +509,9 @@ async def get_avito_chats(
                             created_count += 1
                     
                     except Exception as e:
-                        logger.error(f"Failed to sync chat {avito_chat.get('id')}: {e}", exc_info=True)
+                        logger.warning(f"Failed to sync chat: {e}")
             
             except Exception as e:
-                logger.error(f"Failed to process channel {avito_channel['id']}: {e}", exc_info=True)
                 continue
         
         chat_items = [
@@ -533,7 +537,6 @@ async def get_avito_chats(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting Avito chats: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Error getting chats: {str(e)}")
 
 
@@ -641,7 +644,7 @@ async def get_avito_chat_messages(
                 )
                 chat['phone'] = extracted_phone
             except Exception as e:
-                logger.warning(f"Failed to update phone in chat: {e}")
+                pass
         
         for avito_msg in avito_messages:
             try:
@@ -788,7 +791,7 @@ async def get_avito_chat_messages(
                         logger.warning(f"Failed to save {message_type_str} file for message {external_message_id}: {e}")
             
             except Exception as e:
-                logger.error(f"Failed to save message {avito_msg.get('id')}: {e}", exc_info=True)
+                logger.warning(f"Failed to save message {avito_msg.get('id')}: {e}")
         
         message_items = [
             AvitoMessageItem(
@@ -816,104 +819,8 @@ async def get_avito_chat_messages(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting Avito messages: {e}", exc_info=True)
+        logger.error(f"Error getting Avito messages: {e}")
         raise HTTPException(status_code=400, detail=f"Error getting messages: {str(e)}")
-
-
-@router.post("/webhooks/message", response_model=AvitoWebhookResponse)
-async def receive_avito_webhook(request: Request):
-    try:
-        body = await request.body()
-        
-        signature_header = request.headers.get("X-Avito-Signature")
-        
-        is_valid, webhook_data, cashbox_id = await process_avito_webhook(
-            body,
-            signature_header
-        )
-        
-        if not is_valid:
-            logger.error("Invalid webhook received")
-            return {
-                "success": False,
-                "message": "Invalid webhook signature or structure"
-            }
-        
-        if not cashbox_id:
-            logger.error("Could not determine cashbox_id from webhook")
-            return {
-                "success": False,
-                "message": "Could not determine cashbox_id"
-            }
-        
-        try:
-            from api.chats.avito.avito_types import AvitoWebhook
-            webhook = AvitoWebhook(**webhook_data)
-        except Exception as e:
-            logger.error(f"Failed to parse webhook data into AvitoWebhook model: {e}")
-            return {
-                "success": False,
-                "message": f"Invalid webhook structure: {str(e)}"
-            }
-        
-        user_id = None
-        if hasattr(webhook.payload, 'value') and webhook.payload.value:
-            user_id = getattr(webhook.payload.value, 'user_id', None)
-        
-        if user_id:
-            from database.db import channel_credentials
-            from sqlalchemy import select, and_
-            
-            channels_query = select([
-                channel_credentials.c.channel_id
-            ]).select_from(
-                channel_credentials.join(
-                    channels,
-                    channel_credentials.c.channel_id == channels.c.id
-                )
-            ).where(
-                and_(
-                    channels.c.type == 'AVITO',
-                    channels.c.is_active.is_(True),
-                    channel_credentials.c.avito_user_id == user_id,
-                    channel_credentials.c.cashbox_id == cashbox_id,
-                    channel_credentials.c.is_active.is_(True)
-                )
-            )
-            
-            channels_result = await database.fetch_all(channels_query)
-            
-            if channels_result and len(channels_result) > 1:
-                results = []
-                for channel_row in channels_result:
-                    channel_id = channel_row['channel_id']
-                    logger.info(f"Processing webhook for channel {channel_id} (user_id: {user_id})")
-                    result = await AvitoHandler.handle_webhook_event(webhook, cashbox_id, channel_id)
-                    results.append(result)
-                
-                success_result = next((r for r in results if r.get('success')), results[-1] if results else None)
-                result = success_result if success_result else {
-                    "success": False,
-                    "message": "Failed to process webhook for any channel"
-                }
-            else:
-                result = await AvitoHandler.handle_webhook_event(webhook, cashbox_id)
-        else:
-            result = await AvitoHandler.handle_webhook_event(webhook, cashbox_id)
-        
-        return {
-            "success": result.get("success", False),
-            "message": result.get("message", "Event processed"),
-            "chat_id": result.get("chat_id"),
-            "message_id": result.get("message_id")
-        }
-    
-    except Exception as e:
-        logger.error(f"Error processing Avito webhook: {e}", exc_info=True)
-        return {
-            "success": False,
-            "message": f"Error: {str(e)}"
-        }
 
 
 @router.post("/sync", response_model=AvitoSyncResponse)
@@ -969,11 +876,9 @@ async def sync_avito_messages(
                             )
                         except Exception as sync_error:
                             error_str = str(sync_error)
-                            # Если ошибка 402 (нет подписки), пропускаем этот чат
                             if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
-                                logger.warning(f"Chat {chat['id']} (external: {external_chat_id}) requires subscription (402). Skipping.")
+                                logger.info(f"Chat {chat['id']} (external: {external_chat_id}) requires subscription (402). Skipping.")
                                 continue
-                            # Для других ошибок пробрасываем исключение
                             raise
                         
                         for avito_msg in avito_messages:
@@ -983,8 +888,6 @@ async def sync_avito_messages(
                                     continue
                                 
                                 from database.db import chat_messages
-                                # Проверяем существование сообщения по external_message_id И chat_id
-                                # Это важно, так как один и тот же external_message_id может быть в разных чатах разных каналов
                                 existing = await database.fetch_one(
                                     chat_messages.select().where(
                                         (chat_messages.c.external_message_id == external_message_id) &
@@ -1048,13 +951,13 @@ async def sync_avito_messages(
                                 new_messages += 1
                             
                             except Exception as e:
-                                logger.error(f"Failed to save message {avito_msg.get('id')}: {e}")
+                                logger.warning(f"Failed to save message {avito_msg.get('id')}: {e}")
                                 errors.append(f"Failed to save message: {str(e)}")
                         
                         synced_count += 1
                     
                     except Exception as e:
-                        logger.error(f"Failed to sync chat {chat['id']}: {e}")
+                        logger.warning(f"Failed to sync chat {chat['id']}: {e}")
                         errors.append(f"Failed to sync chat {chat['id']}: {str(e)}")
             
             except Exception as e:
@@ -1072,7 +975,7 @@ async def sync_avito_messages(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Sync error: {e}", exc_info=True)
+        logger.error(f"Sync error: {e}")
         raise HTTPException(status_code=400, detail=f"Sync error: {str(e)}")
 
 
@@ -1139,7 +1042,7 @@ async def get_avito_status(
             }
         
         except Exception as e:
-            logger.warning(f"Failed to validate Avito token: {e}")
+            logger.error(f"Failed to validate Avito token: {e}")
             return {
                 "connected": False,
                 "channel_id": avito_channel['id'],
@@ -1200,7 +1103,7 @@ async def register_avito_webhook(
             }
         
         except Exception as e:
-            logger.error(f"Failed to register webhook: {e}", exc_info=True)
+            logger.error(f"Failed to register webhook: {e}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Failed to register webhook in Avito API: {str(e)}"
@@ -1209,7 +1112,7 @@ async def register_avito_webhook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error registering webhook: {e}", exc_info=True)
+        logger.error(f"Error registering webhook: {e}")
         raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
 
 
@@ -1252,5 +1155,109 @@ async def get_avito_webhooks(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting webhooks: {e}", exc_info=True)
+        logger.error(f"Error getting webhooks: {e}")
+        raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
+
+
+@router.post("/webhooks/update-all", response_model=AvitoWebhookUpdateResponse)
+async def update_all_avito_webhooks(
+    user = Depends(get_current_user)
+):
+    try:
+        cashbox_id = user.cashbox_id
+        
+        avito_channels = await crud.get_all_channels_by_cashbox(cashbox_id, "AVITO")
+        
+        if not avito_channels:
+            return {
+                "success": True,
+                "message": "No Avito channels found for this cashbox",
+                "updated_channels": 0,
+                "failed_channels": 0,
+                "results": []
+            }
+        
+        webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
+        
+        if not webhook_url:
+            return {
+                "success": False,
+                "message": "AVITO_DEFAULT_WEBHOOK_URL not set in .env file",
+                "updated_channels": 0,
+                "failed_channels": 0,
+                "results": []
+            }
+        
+        logger.info(f"Using webhook URL from .env for update-all: {webhook_url}")
+        updated_count = 0
+        failed_count = 0
+        results = []
+        
+        for avito_channel in avito_channels:
+            channel_id = avito_channel['id']
+            channel_name = avito_channel.get('name', f'Channel {channel_id}')
+            
+            try:
+                client = await create_avito_client(
+                    channel_id=channel_id,
+                    cashbox_id=cashbox_id,
+                    on_token_refresh=lambda token_data, ch_id=channel_id: save_token_callback(
+                        ch_id,
+                        cashbox_id,
+                        token_data
+                    )
+                )
+                
+                if not client:
+                    failed_count += 1
+                    results.append({
+                        "channel_id": channel_id,
+                        "channel_name": channel_name,
+                        "success": False,
+                        "error": "Could not create Avito API client"
+                    })
+                    continue
+                
+                try:
+                    await client.register_webhook(webhook_url)
+                    updated_count += 1
+                    results.append({
+                        "channel_id": channel_id,
+                        "channel_name": channel_name,
+                        "success": True,
+                        "webhook_url": webhook_url
+                    })
+                    logger.info(f"Webhook updated for channel {channel_id} ({channel_name})")
+                except Exception as webhook_error:
+                    failed_count += 1
+                    results.append({
+                        "channel_id": channel_id,
+                        "channel_name": channel_name,
+                        "success": False,
+                        "error": str(webhook_error)
+                    })
+                    logger.warning(f"Failed to update webhook for channel {channel_id}: {webhook_error}")
+                    
+            except Exception as e:
+                failed_count += 1
+                results.append({
+                    "channel_id": channel_id,
+                    "channel_name": channel_name,
+                    "success": False,
+                    "error": str(e)
+                })
+                logger.error(f"Error updating webhook for channel {channel_id}: {e}")
+        
+        return {
+            "success": True,
+            "message": f"Updated webhooks for {updated_count} channel(s), failed: {failed_count}",
+            "updated_channels": updated_count,
+            "failed_channels": failed_count,
+            "results": results
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating webhooks: {e}")
         raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
