@@ -32,17 +32,15 @@ async def create_channel(token: str, channel: ChannelCreate, user = Depends(get_
 
 @router.get("/channels/{channel_id}", response_model=ChannelResponse)
 async def get_channel(channel_id: int, token: str, user = Depends(get_current_user)):
-    """Get channel by ID"""
-    channel = await crud.get_channel(channel_id)
+    channel = await crud.get_channel_by_id_and_cashbox(channel_id, user.cashbox_id)
     if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found")
+        raise HTTPException(status_code=404, detail="Channel not found or access denied")
     return channel
 
 
 @router.get("/channels/", response_model=list)
 async def get_channels(token: str, skip: int = 0, limit: int = 100, user = Depends(get_current_user)):
-    """Get all channels"""
-    return await crud.get_channels(skip, limit)
+    return await crud.get_all_channels_by_cashbox(user.cashbox_id)
 
 
 @router.put("/channels/{channel_id}", response_model=ChannelResponse)
@@ -223,6 +221,7 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                 import aiohttp
                                 
                                 image_url = message.image_url
+                                
                                 if 'google.com/imgres' in image_url or 'imgurl=' in image_url:
                                     from urllib.parse import unquote, parse_qs, urlparse
                                     try:
@@ -238,7 +237,8 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                 if 'avito' in image_url.lower():
                                     headers['Authorization'] = f"Bearer {client.access_token}"
                                 
-                                async with aiohttp.ClientSession() as session:
+                                connector = aiohttp.TCPConnector(ssl=False)
+                                async with aiohttp.ClientSession(connector=connector) as session:
                                     async with session.get(image_url, headers=headers) as img_response:
                                         if img_response.status == 200:
                                             content_type = img_response.headers.get('Content-Type', '')
@@ -265,6 +265,7 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                                             filename = "image.jpg"
                                                     
                                                     upload_result = await client.upload_image(image_data, filename)
+                                                    
                                                     if upload_result:
                                                         if isinstance(upload_result, tuple):
                                                             image_id, image_url = upload_result
@@ -281,11 +282,20 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                 image_id = None
                                 image_url = None
                         
-                        if image_id or (message.message_type != "IMAGE" and message.content):
+                        if message.message_type == "IMAGE":
+                            if not image_id:
+                                logger.warning(f"Cannot send IMAGE message: image upload failed. image_url: {message.image_url}")
+                                raise Exception("Cannot send IMAGE message: image upload failed")
                             avito_message = await client.send_message(
                                 chat_id=chat['external_chat_id'],
-                                text=message.content if message.message_type != "IMAGE" else None,
+                                text=None,
                                 image_id=image_id
+                            )
+                        elif message.content:
+                            avito_message = await client.send_message(
+                                chat_id=chat['external_chat_id'],
+                                text=message.content,
+                                image_id=None
                             )
                         else:
                             logger.warning("Cannot send message: no image_id and no text content")

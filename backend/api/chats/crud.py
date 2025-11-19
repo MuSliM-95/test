@@ -33,6 +33,35 @@ async def get_channel_by_type(channel_type: str):
     return await database.fetch_one(query)
 
 
+async def get_channel_by_id_and_cashbox(channel_id: int, cashbox_id: int):
+    query = select([
+        channels.c.id,
+        channels.c.name,
+        channels.c.type,
+        channels.c.description,
+        channels.c.svg_icon,
+        channels.c.tags,
+        channels.c.api_config_name,
+        channels.c.is_active,
+        channels.c.created_at,
+        channels.c.updated_at
+    ]).select_from(
+        channels.join(
+            channel_credentials,
+            channels.c.id == channel_credentials.c.channel_id
+        )
+    ).where(
+        and_(
+            channels.c.id == channel_id,
+            channel_credentials.c.cashbox_id == cashbox_id,
+            channel_credentials.c.is_active.is_(True),
+            channels.c.is_active.is_(True)
+        )
+    ).limit(1)
+    
+    return await database.fetch_one(query)
+
+
 async def get_channel_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
     """Get channel for specific cashbox by type through channel_credentials"""
     query = select([
@@ -55,7 +84,8 @@ async def get_channel_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
         and_(
             channel_credentials.c.cashbox_id == cashbox_id,
             channels.c.type == channel_type,
-            channel_credentials.c.is_active.is_(True)
+            channel_credentials.c.is_active.is_(True),
+            channels.c.is_active.is_(True)
         )
     ).limit(1)
     

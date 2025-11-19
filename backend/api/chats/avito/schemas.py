@@ -117,11 +117,22 @@ class AvitoWebhookRegisterResponse(BaseModel):
     webhook_id: Optional[str] = None
 
 
+class AvitoWebhookUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    updated_channels: int
+    failed_channels: int
+    results: Optional[list] = None
+
+
 class AvitoConnectResponse(BaseModel):
     success: bool
     message: str
     channel_id: int
     cashbox_id: int
+    webhook_registered: Optional[bool] = None
+    webhook_url: Optional[str] = None
+    webhook_error: Optional[str] = None
 
 
 class AvitoChatListItem(BaseModel):
