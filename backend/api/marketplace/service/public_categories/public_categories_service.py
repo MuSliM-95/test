@@ -248,17 +248,16 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
                 status_code=500,
                 detail=f"Ошибка при загрузке файла в S3: {str(e)}"
             )
-        # Формируем публичную ссылку (может отличаться для вашего S3)
-        image_url = f"{S3_URL}/{self.__bucket_name}/{s3_key}"
+        # Сохраняем только ключ (key) файла, а не полный URL
         update_query = (
             global_categories.update()
             .where(global_categories.c.id == category_id)
-            .values(image_url=image_url)
+            .values(image_url=s3_key)
         )
         await database.execute(update_query)
         return {
             "success": True,
-            "image_url": image_url,
+            "image_key": s3_key,
             "filename": unique_filename,
             "message": (
                 f"Изображение успешно загружено "
