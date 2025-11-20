@@ -10,6 +10,14 @@ from functions.helpers import get_user_by_token, datetime_to_timestamp
 
 
 class GetCategoriesTreeView:
+    def add_picture_url_recursive(self, node, api_url):
+        if node.get('picture'):
+            node['picture_url'] = f"{api_url}/api/photos/{node['picture']}"
+        else:
+            node['picture_url'] = None
+        if 'children' in node and isinstance(node['children'], list):
+            for child in node['children']:
+                self.add_picture_url_recursive(child, api_url)
 
     def __init__(
         self,
@@ -39,7 +47,7 @@ class GetCategoriesTreeView:
                 .where(
                     categories.c.cashbox == user.cashbox_id,
                     categories.c.is_deleted.is_not(True),
-                    categories.c.parent == None
+                    categories.c.parent is None
                 )
                 .limit(limit)
                 .offset(offset)
@@ -51,7 +59,7 @@ class GetCategoriesTreeView:
                 .where(
                     categories.c.cashbox == user.cashbox_id,
                     categories.c.is_deleted.is_not(True),
-                    categories.c.parent == None
+                    categories.c.parent is None
                 )
                 .limit(limit)
                 .offset(offset)
@@ -61,9 +69,11 @@ class GetCategoriesTreeView:
         result = []
 
         nomenclature_list = []
-        if nomenclature_name != None:
-            q = nomenclature.select().where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"),
-                                            nomenclature.c.category != None)
+        if nomenclature_name is not None:
+            q = nomenclature.select().where(
+                nomenclature.c.name.ilike(f"%{nomenclature_name}%"),
+                nomenclature.c.category is not None
+            )
             nomenclature_list = await database.fetch_all(q)
 
         import os
@@ -71,15 +81,6 @@ class GetCategoriesTreeView:
         for category in categories_db:
             category_dict = dict(category)
             category_dict['key'] = category_dict['id']
-
-            # picture уже содержит путь из БД (например, photos/uuid.jpg)
-            # Формируем абсолютный URL для фронта
-            if category_dict.get('picture'):
-                category_dict['picture_url'] = (
-                    f"{API_URL}/api/photos/{category_dict['picture']}"
-                )
-            else:
-                category_dict['picture_url'] = None
 
             nomenclature_in_category = (
                 select(
@@ -108,10 +109,12 @@ class GetCategoriesTreeView:
                 query = (
                     f"""
 with recursive categories_hierarchy as (
-    select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+        select id, name, parent, description, code, status, updated_at, created_at, photo_id,
+            1 as lvl
     from categories where parent = {category.id}
     union
-    select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+        select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at,
+            F.created_at, F.photo_id, H.lvl+1
     from categories_hierarchy as H
     join categories as F on F.parent = H.id
 )
@@ -123,10 +126,12 @@ left join pictures p on ch.photo_id = p.id
                 query = (
                     f"""
 with recursive categories_hierarchy as (
-    select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+        select id, name, parent, description, code, status, updated_at, created_at, photo_id,
+            1 as lvl
     from categories where parent = {category.id}
     union
-    select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+        select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at,
+            F.created_at, F.photo_id, H.lvl+1
     from categories_hierarchy as H
     join categories as F on F.parent = H.id
 )
@@ -141,8 +146,6 @@ select ch.* from categories_hierarchy ch
                     category.id,
                     nomenclature_name
                 )
-                # picture для детей уже содержит путь из БД
-                # Фото доступны через /api/v1/photos/{file_key}
             else:
                 category_dict['children'] = []
 
@@ -160,6 +163,8 @@ select ch.* from categories_hierarchy ch
                         break
 
             if flag is True:
+                # Рекурсивно добавить picture_url для всех детей
+                self.add_picture_url_recursive(category_dict, API_URL)
                 result.append(category_dict)
 
         categories_db = [*map(datetime_to_timestamp, result)]
