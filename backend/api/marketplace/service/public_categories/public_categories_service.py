@@ -15,7 +15,7 @@ from api.marketplace.service.base_marketplace_service import \
     BaseMarketplaceService
 
 S3_BUCKET_NAME = "5075293c-docs_generated"
-S3_FOLDER = "categories"
+S3_FOLDER = "photos"
 S3_URL = os.getenv("S3_URL", "https://s3.yandexcloud.net")
 AWS_ACCESS_KEY_ID = os.getenv("S3_ACCESS")
 AWS_SECRET_ACCESS_KEY = os.getenv("S3_SECRET")
