@@ -1,3 +1,4 @@
+import os
 from typing import Optional, Annotated
 
 from fastapi import Query
@@ -88,21 +89,13 @@ class GetCategoriesTreeView:
                 if pic and not (
                     pic.startswith('http://') or pic.startswith('https://')
                 ):
-                    file_key = pic
+                    file_key = pic.replace('\\', '/').lstrip()
                     if file_key.startswith('photos/'):
                         file_key = file_key[len('photos/'):]
-                    base_url = (
-                        str(request.base_url)
-                        if request and hasattr(request, 'base_url') else ''
+                    base_url = os.getenv("BASE_URL", "https://app.tablecrm.com")
+                    category_dict['picture'] = (
+                        base_url.rstrip('/') + '/api/v1/photos/' + file_key.lstrip('/')
                     )
-                    if base_url:
-                        category_dict['picture'] = (
-                            base_url.rstrip('/') + '/api/v1/photos/' + file_key.lstrip('/')
-                        )
-                    else:
-                        category_dict['picture'] = (
-                            '/api/v1/photos/' + file_key.lstrip('/')
-                        )
 
             # Фото доступны через /api/v1/photos/{file_key}
             nomenclature_in_category_result = await database.fetch_one(
@@ -157,21 +150,13 @@ class GetCategoriesTreeView:
                     if child.get('picture') and not (
                         child['picture'].startswith('http://') or child['picture'].startswith('https://')
                     ):
-                        file_key = child['picture']
+                        file_key = child['picture'].replace('\\', '/').lstrip()
                         if file_key.startswith('photos/'):
                             file_key = file_key[len('photos/'):]
-                        base_url = (
-                            str(request.base_url)
-                            if request and hasattr(request, 'base_url') else ''
+                        base_url = os.getenv("BASE_URL", "https://app.tablecrm.com")
+                        child['picture'] = (
+                            base_url.rstrip('/') + '/api/v1/photos/' + file_key.lstrip('/')
                         )
-                        if base_url:
-                            child['picture'] = (
-                                base_url.rstrip('/') + '/api/v1/photos/' + file_key.lstrip('/')
-                            )
-                        else:
-                            child['picture'] = (
-                                '/api/v1/photos/' + file_key.lstrip('/')
-                            )
             if childrens:
                 category_dict['children'] = await build_hierarchy(
                     children_dicts, category.id, nomenclature_name
