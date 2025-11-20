@@ -10,7 +10,6 @@ import functions.filter_schemas as filter_schemas
 import api.pboxes.schemas as pboxes_schemas
 
 from functions.helpers import get_filters_pboxes, check_user_permission, hide_balance_for_non_admin
-from functions.cboxes import update_cashbox_balance
 from datetime import datetime
 
 router = APIRouter(tags=["pboxes"])
@@ -138,8 +137,6 @@ async def create_paybox(token: str, paybox_data: pboxes_schemas.PayboxesCreate):
 
     q = pboxes.insert().values(pbox_data_dict)
     new_pbox_id = await database.execute(q)
-            
-    await update_cashbox_balance(user.cashbox_id)
 
     q = pboxes.select().where(pboxes.c.id == new_pbox_id)
     pbox = await database.fetch_one(q)
@@ -227,8 +224,6 @@ async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit)
                                             "update_start_balance_date": int(datetime.utcnow().timestamp())
                                         })
                                     )
-                                    if pbox_to.cashbox:
-                                        await update_cashbox_balance(pbox_to.cashbox)
 
                 # print(f"j:{j} - date_ts:{date_ts} - today_ts:{today_ts}")
                 # print(all_payments_amount)
@@ -245,8 +240,6 @@ async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit)
         q = pboxes.update().where(pboxes.c.id == pbox_data.id, pboxes.c.cashbox == user.cashbox_id).values(
             new_pbox)
         await database.execute(q)
-        
-        await update_cashbox_balance(user.cashbox_id)
 
         q = pboxes.select().where(pboxes.c.id == pbox_data.id,
                                   pboxes.c.cashbox == user.cashbox_id)

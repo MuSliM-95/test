@@ -102,7 +102,7 @@ from starlette.types import Message
 from api.cashboxes.routers import router as cboxes_router
 from api.contragents.routers import router as contragents_router
 from api.payments.routers import create_payment, router as payments_router
-from api.payments.transactions_routers import router as transactions_router, tinkoff_router
+from api.balances.transactions_routers import router as transactions_router, tinkoff_router
 from api.pboxes.routers import router as pboxes_router
 from api.projects.routers import router as projects_router
 from api.users.routers import router as users_router
@@ -175,7 +175,7 @@ from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 from jobs.jobs import scheduler
 
 from fastapi import Request
-from api.payments.transactions_routers import tinkoff_callback
+from api.balances.transactions_routers import tinkoff_callback
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
