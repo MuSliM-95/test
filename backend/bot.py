@@ -770,11 +770,18 @@ async def prepare_registration(message):
 
 
 async def create_balance(cashbox_id, message, tariff=None):
-    """Creates balance and sets demo for a new cashbox. Sends message with result."""
+    """Creates balance and sets demo for a new cashbox."""
     created = int(datetime.utcnow().timestamp())
     if not tariff:
-        tariff_query = tariffs.select().where(tariffs.c.actual == True)
+        tariff_query = (
+            tariffs.select()
+            .where(tariffs.c.actual == True)
+            .order_by(tariffs.c.price.asc())
+        )
         tariff = await database.fetch_one(tariff_query)
+        
+        if not tariff:
+            raise Exception("No actual tariffs found")
 
     balance_query = accounts_balances.insert().values(
         cashbox=cashbox_id,
@@ -786,30 +793,35 @@ async def create_balance(cashbox_id, message, tariff=None):
     )
     await database.execute(balance_query)
 
-    await bot.send_message(
-        message.chat.id,
-        texts.you_got_demo.format(
-            n=tariff.demo_days,
-            tax=tariff.price,
-            for_user=" за пользователя" if tariff.per_user else "",
-            link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
-        ), reply_markup=types.ReplyKeyboardRemove(), # Удаляем клавиатуру с кнопками "отправить номер телефона, отменить регистрацию"
-        # Чтобы скрыть предпросмотр ссылки на бота для оплаты
-        # link_preview_is_disabled=True
-    )
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.you_got_demo.format(
-        n=tariff.demo_days,
-        tax=tariff.price,
-        for_user=" за пользователя" if tariff.per_user else "",
-        link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
-    ))
+    # await bot.send_message(
+    #     message.chat.id,
+    #     texts.you_got_demo.format(
+    #         n=tariff.demo_days,
+    #         tax=tariff.price,
+    #         for_user=" за пользователя" if tariff.per_user else "",
+    #         link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
+    #     ), reply_markup=types.ReplyKeyboardRemove(), # Удаляем клавиатуру с кнопками "отправить номер телефона, отменить регистрацию"
+    #     # Чтобы скрыть предпросмотр ссылки на бота для оплаты
+    #     # link_preview_is_disabled=True
+    # )
+    # await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.you_got_demo.format(
+    #     n=tariff.demo_days,
+    #     tax=tariff.price,
+    #     for_user=" за пользователя" if tariff.per_user else "",
+    #     link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
+    # ))
 
 
 @router_comm.message(Form.start, content_types=['contact'])
 async def reg_user_create(message: types.Message, state: FSMContext):
     await store_user_message(message)
     if message.contact:
-        tariff_query = tariffs.select().where(tariffs.c.actual is True)
+        # Выбираем бесплатный тариф (price = 0) среди актуальных, сортируем по цене по возрастанию
+        tariff_query = (
+            tariffs.select()
+            .where(tariffs.c.actual == True)
+            .order_by(tariffs.c.price.asc())
+        )
         tariff = await database.fetch_one(tariff_query)
 
         created, user_query = await prepare_registration(message)

@@ -1,8 +1,9 @@
 from datetime import datetime
+from sqlalchemy import func, select
 
 from functions.helpers import gen_token
-from database.db import database, cboxes, pboxes, users, users_cboxes_relation, price_types, cashbox_settings
-
+from database.db import database, cboxes, pboxes, users, users_cboxes_relation, price_types, cashbox_settings, accounts_balances, tariffs
+from const import DEMO
 
 import websockets
 import json
@@ -79,7 +80,61 @@ async def create_cbox(user):
     )
     await database.execute(query)
 
+    try:
+        tariff_query = (
+            tariffs.select()
+            .where(tariffs.c.actual == True)
+            .order_by(tariffs.c.price.asc())
+        )
+        tariff = await database.fetch_one(tariff_query)
+        
+        if tariff:
+            balance_query = accounts_balances.insert().values(
+                cashbox=cashbox.id,
+                balance=0,
+                tariff=tariff.id,
+                tariff_type=DEMO,
+                created_at=created,
+                updated_at=created,
+            )
+            await database.execute(balance_query)
+    except Exception as e:
+        print(f"Warning: Failed to create balance for cashbox {cashbox.id}: {e}")
+
     return rl
+
+
+async def update_cashbox_balance(cashbox_id: int) -> None:
+    try:
+        sum_query = select(func.sum(pboxes.c.balance)).where(
+            pboxes.c.cashbox == cashbox_id
+        )
+        total_balance = await database.execute(sum_query)
+        
+        if total_balance is None:
+            total_balance = 0.0
+        else:
+            total_balance = round(float(total_balance), 2)
+        
+        current_cbox = await database.fetch_one(
+            cboxes.select().where(cboxes.c.id == cashbox_id)
+        )
+        old_balance = current_cbox.balance if current_cbox else 0.0
+        
+        if old_balance != total_balance:
+            update_query = (
+                cboxes.update()
+                .where(cboxes.c.id == cashbox_id)
+                .values({
+                    "balance": total_balance,
+                    "updated_at": int(datetime.utcnow().timestamp())
+                })
+            )
+            await database.execute(update_query)
+    except Exception as e:
+        import traceback
+        print(f"Error updating cashbox balance for cashbox {cashbox_id}: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
 
 
 async def join_cbox(user, cbox):

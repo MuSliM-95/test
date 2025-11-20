@@ -1179,16 +1179,7 @@ async def update_all_avito_webhooks(
         
         webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
         
-        if not webhook_url:
-            return {
-                "success": False,
-                "message": "AVITO_DEFAULT_WEBHOOK_URL not set in .env file",
-                "updated_channels": 0,
-                "failed_channels": 0,
-                "results": []
-            }
-        
-        logger.info(f"Using webhook URL from .env for update-all: {webhook_url}")
+        logger.info(f"Using webhook URL for update-all: {webhook_url}")
         updated_count = 0
         failed_count = 0
         results = []

@@ -180,17 +180,28 @@ async def read_payments_meta(token: str, limit: int = 100, offset: int = 0):
             )
             cboxes_db = await database.fetch_all(q)
 
+            from functions.account import fix_account_balance
+            from database.db import accounts_balances
+            
             for cbox in cboxes_db:
+                recalculation = await fix_account_balance(cbox.cashbox_id, auto_fix=True)
+                
                 q = cboxes.select(cboxes.c.id == cbox.cashbox_id)
                 cbox_db = await database.fetch_one(q)
-
-                cboxes_list.append(
-                    {
-                        "name": cbox_db.name,
-                        "token": cbox.token,
-                        "balance": cbox_db.balance,
-                    }
+                
+                account_balance_query = accounts_balances.select().where(
+                    accounts_balances.c.cashbox == cbox.cashbox_id
                 )
+                account_balance = await database.fetch_one(account_balance_query)
+                
+                display_balance = account_balance.balance if account_balance else (cbox_db.balance if cbox_db else 0.0)
+
+                cbox_data = {
+                    "name": cbox_db.name if cbox_db else "Unknown",
+                    "token": cbox.token,
+                    "balance": display_balance,
+                }
+                cboxes_list.append(cbox_data)
 
             resp = {"invite_token": None, "cboxes": cboxes_list}
 
