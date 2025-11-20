@@ -22,7 +22,8 @@ class GetCategoriesTreeView:
         token: str, nomenclature_name: Optional[str] = None,
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=100)] = 100,
-        include_photo: bool = True
+        include_photo: bool = True,
+        request=None
     ):
         """Получение древа списка категорий"""
         user = await get_user_by_token(token)
@@ -60,12 +61,6 @@ class GetCategoriesTreeView:
         categories_db = await database.fetch_all(query)
         result = []
 
-        nomenclature_list = []
-        if nomenclature_name != None:
-            q = nomenclature.select().where(nomenclature.c.name.ilike(f"%{nomenclature_name}%"),
-                                            nomenclature.c.category != None)
-            nomenclature_list = await database.fetch_all(q)
-
         for category in categories_db:
             category_dict = dict(category)
             category_dict['key'] = category_dict['id']
@@ -83,11 +78,24 @@ class GetCategoriesTreeView:
                 )
                 .group_by(nomenclature.c.category)
             )
+
+            # Patch: convert picture to absolute URL if present and not already absolute
+            if include_photo and category_dict.get('picture'):
+                pic = category_dict['picture']
+                if pic and not (pic.startswith('http://') or pic.startswith('https://')):
+                    # Use request.base_url if available, else fallback to /api/v1/photos/
+                    base_url = str(request.base_url) if request and hasattr(request, 'base_url') else ''
+                    if base_url:
+                        category_dict['picture'] = base_url.rstrip('/') + '/api/v1/photos/' + pic.lstrip('/')
+                    else:
+                        category_dict['picture'] = '/api/v1/photos/' + pic.lstrip('/')
+
+            # Фото доступны через /api/v1/photos/{file_key}
             nomenclature_in_category_result = await database.fetch_one(nomenclature_in_category)
             category_dict["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
 
             category_dict['expanded_flag'] = False
-            
+         
             if include_photo:
                 # С фото - делаем LEFT JOIN
                 query = (
@@ -121,28 +129,24 @@ class GetCategoriesTreeView:
                             select ch.* from categories_hierarchy ch
                         """
                 )
-            
+          
             childrens = await database.fetch_all(query)
+            # Patch: convert picture to absolute URL for children
+            children_dicts = [dict(child) for child in childrens]
+            if include_photo:
+                for child in children_dicts:
+                    if child.get('picture') and not (child['picture'].startswith('http://') or child['picture'].startswith('https://')):
+                        base_url = str(request.base_url) if request and hasattr(request, 'base_url') else ''
+                        if base_url:
+                            child['picture'] = base_url.rstrip('/') + '/api/v1/photos/' + child['picture'].lstrip('/')
+                        else:
+                            child['picture'] = '/api/v1/photos/' + child['picture'].lstrip('/')
             if childrens:
-                category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id,
-                                                                  nomenclature_name)
-                # picture для детей уже содержит путь из БД
-                # Фото доступны через /api/v1/photos/{file_key}
+                category_dict['children'] = await build_hierarchy(children_dicts, category.id, nomenclature_name)
             else:
                 category_dict['children'] = []
 
             flag = True
-            if nomenclature_name != None:
-                flag = False
-                cats_ids = [child.parent for child in childrens]
-                if len(childrens) != 0:
-                    cats_ids.append(childrens[-1].id)
-                else:
-                    cats_ids = [category.id]
-                for nomenclature_entity in nomenclature_list:
-                    if nomenclature_entity.category in cats_ids:
-                        flag = True
-                        break
 
             if flag is True:
                 result.append(category_dict)
