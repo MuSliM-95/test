@@ -40,7 +40,7 @@ class GetCategoriesTreeView:
                 .where(
                     categories.c.cashbox == user.cashbox_id,
                     categories.c.is_deleted.is_not(True),
-                    categories.c.parent == None
+                    categories.c.parent.is_(None)
                 )
                 .limit(limit)
                 .offset(offset)
@@ -52,7 +52,7 @@ class GetCategoriesTreeView:
                 .where(
                     categories.c.cashbox == user.cashbox_id,
                     categories.c.is_deleted.is_not(True),
-                    categories.c.parent == None
+                    categories.c.parent.is_(None)
                 )
                 .limit(limit)
                 .offset(offset)
@@ -74,33 +74,49 @@ class GetCategoriesTreeView:
                 )
                 .where(
                     nomenclature.c.category == category.get("id"),
-                    nomenclature.c.name.ilike(f"%{nomenclature_name}%") if nomenclature_name else True
+                    (
+                        nomenclature.c.name.ilike(f"%{nomenclature_name}%")
+                        if nomenclature_name else True
+                    )
                 )
                 .group_by(nomenclature.c.category)
             )
 
-            # Patch: convert picture to absolute URL if present and not already absolute
+            # преобразует изображение в абсолютный URL, если оно присутствует, но еще не является абсолютным
             if include_photo and category_dict.get('picture'):
                 pic = category_dict['picture']
-                if pic and not (pic.startswith('http://') or pic.startswith('https://')):
-                    # Use request.base_url if available, else fallback to /api/v1/photos/
-                    base_url = str(request.base_url) if request and hasattr(request, 'base_url') else ''
+                if pic and not (
+                    pic.startswith('http://') or pic.startswith('https://')
+                ):
+                    base_url = (
+                        str(request.base_url)
+                        if request and hasattr(request, 'base_url') else ''
+                    )
                     if base_url:
-                        category_dict['picture'] = base_url.rstrip('/') + '/api/v1/photos/' + pic.lstrip('/')
+                        category_dict['picture'] = (
+                            base_url.rstrip('/') + '/api/v1/photos/' + pic.lstrip('/')
+                        )
                     else:
-                        category_dict['picture'] = '/api/v1/photos/' + pic.lstrip('/')
+                        category_dict['picture'] = (
+                            '/api/v1/photos/' + pic.lstrip('/')
+                        )
 
             # Фото доступны через /api/v1/photos/{file_key}
-            nomenclature_in_category_result = await database.fetch_one(nomenclature_in_category)
-            category_dict["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
+            nomenclature_in_category_result = await database.fetch_one(
+                nomenclature_in_category
+            )
+            category_dict["nom_count"] = (
+                0 if not nomenclature_in_category_result
+                else nomenclature_in_category_result.nom_count
+            )
 
             category_dict['expanded_flag'] = False
-         
+
             if include_photo:
                 # С фото - делаем LEFT JOIN
                 query = (
                     f"""
-                            with recursive categories_hierarchy as (
+                        with recursive categories_hierarchy as (
                             select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
                             from categories where parent = {category.id}
 
@@ -108,16 +124,16 @@ class GetCategoriesTreeView:
                             select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
                             from categories_hierarchy as H
                             join categories as F on F.parent = H.id
-                            ) 
-                            select ch.*, p.url as picture from categories_hierarchy ch
-                            left join pictures p on ch.photo_id = p.id
-                        """
+                        )
+                        select ch.*, p.url as picture from categories_hierarchy ch
+                        left join pictures p on ch.photo_id = p.id
+                    """
                 )
             else:
                 # Без фото - не делаем JOIN
                 query = (
                     f"""
-                            with recursive categories_hierarchy as (
+                        with recursive categories_hierarchy as (
                             select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
                             from categories where parent = {category.id}
 
@@ -125,24 +141,35 @@ class GetCategoriesTreeView:
                             select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
                             from categories_hierarchy as H
                             join categories as F on F.parent = H.id
-                            ) 
-                            select ch.* from categories_hierarchy ch
-                        """
+                        )
+                        select ch.* from categories_hierarchy ch
+                    """
                 )
-          
+
             childrens = await database.fetch_all(query)
-            # Patch: convert picture to absolute URL for children
+            # преобразует изображение в абсолютный URL для детей
             children_dicts = [dict(child) for child in childrens]
             if include_photo:
                 for child in children_dicts:
-                    if child.get('picture') and not (child['picture'].startswith('http://') or child['picture'].startswith('https://')):
-                        base_url = str(request.base_url) if request and hasattr(request, 'base_url') else ''
+                    if child.get('picture') and not (
+                        child['picture'].startswith('http://') or child['picture'].startswith('https://')
+                    ):
+                        base_url = (
+                            str(request.base_url)
+                            if request and hasattr(request, 'base_url') else ''
+                        )
                         if base_url:
-                            child['picture'] = base_url.rstrip('/') + '/api/v1/photos/' + child['picture'].lstrip('/')
+                            child['picture'] = (
+                                base_url.rstrip('/') + '/api/v1/photos/' + child['picture'].lstrip('/')
+                            )
                         else:
-                            child['picture'] = '/api/v1/photos/' + child['picture'].lstrip('/')
+                            child['picture'] = (
+                                '/api/v1/photos/' + child['picture'].lstrip('/')
+                            )
             if childrens:
-                category_dict['children'] = await build_hierarchy(children_dicts, category.id, nomenclature_name)
+                category_dict['children'] = await build_hierarchy(
+                    children_dicts, category.id, nomenclature_name
+                )
             else:
                 category_dict['children'] = []
 
