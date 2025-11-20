@@ -88,17 +88,20 @@ class GetCategoriesTreeView:
                 if pic and not (
                     pic.startswith('http://') or pic.startswith('https://')
                 ):
+                    file_key = pic
+                    if file_key.startswith('photos/'):
+                        file_key = file_key[len('photos/'):]
                     base_url = (
                         str(request.base_url)
                         if request and hasattr(request, 'base_url') else ''
                     )
                     if base_url:
                         category_dict['picture'] = (
-                            base_url.rstrip('/') + '/api/v1/photos/' + pic.lstrip('/')
+                            base_url.rstrip('/') + '/api/v1/photos/' + file_key.lstrip('/')
                         )
                     else:
                         category_dict['picture'] = (
-                            '/api/v1/photos/' + pic.lstrip('/')
+                            '/api/v1/photos/' + file_key.lstrip('/')
                         )
 
             # Фото доступны через /api/v1/photos/{file_key}
@@ -154,17 +157,20 @@ class GetCategoriesTreeView:
                     if child.get('picture') and not (
                         child['picture'].startswith('http://') or child['picture'].startswith('https://')
                     ):
+                        file_key = child['picture']
+                        if file_key.startswith('photos/'):
+                            file_key = file_key[len('photos/'):]
                         base_url = (
                             str(request.base_url)
                             if request and hasattr(request, 'base_url') else ''
                         )
                         if base_url:
                             child['picture'] = (
-                                base_url.rstrip('/') + '/api/v1/photos/' + child['picture'].lstrip('/')
+                                base_url.rstrip('/') + '/api/v1/photos/' + file_key.lstrip('/')
                             )
                         else:
                             child['picture'] = (
-                                '/api/v1/photos/' + child['picture'].lstrip('/')
+                                '/api/v1/photos/' + file_key.lstrip('/')
                             )
             if childrens:
                 category_dict['children'] = await build_hierarchy(
