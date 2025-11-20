@@ -66,20 +66,12 @@ class GetCategoriesTreeView:
                                             nomenclature.c.category != None)
             nomenclature_list = await database.fetch_all(q)
 
-        import os
-        API_URL = os.getenv("API_URL", "http://localhost:7000")
         for category in categories_db:
             category_dict = dict(category)
             category_dict['key'] = category_dict['id']
 
-            # picture уже содержит путь из БД (например, photos/uuid.jpg)
-            # Формируем абсолютный URL для фронта
-            if category_dict.get('picture'):
-                category_dict['picture_url'] = (
-                    f"{API_URL}/api/photos/{category_dict['picture']}"
-                )
-            else:
-                category_dict['picture_url'] = None
+            # picture уже содержит путь из БД, не нужно генерировать signed URL
+            # Фото доступны через /api/v1/photos/{file_key}
 
             nomenclature_in_category = (
                 select(
@@ -87,67 +79,60 @@ class GetCategoriesTreeView:
                 )
                 .where(
                     nomenclature.c.category == category.get("id"),
-                    (
-                        nomenclature.c.name.ilike(f"%{nomenclature_name}%")
-                        if nomenclature_name else True
-                    )
+                    nomenclature.c.name.ilike(f"%{nomenclature_name}%") if nomenclature_name else True
                 )
                 .group_by(nomenclature.c.category)
             )
-            nomenclature_in_category_result = await database.fetch_one(
-                nomenclature_in_category
-            )
-            category_dict["nom_count"] = (
-                0 if not nomenclature_in_category_result
-                else nomenclature_in_category_result.nom_count
-            )
+            nomenclature_in_category_result = await database.fetch_one(nomenclature_in_category)
+            category_dict["nom_count"] = 0 if not nomenclature_in_category_result else nomenclature_in_category_result.nom_count
 
             category_dict['expanded_flag'] = False
-
+            
             if include_photo:
+                # С фото - делаем LEFT JOIN
                 query = (
                     f"""
-with recursive categories_hierarchy as (
-    select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
-    from categories where parent = {category.id}
-    union
-    select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
-    from categories_hierarchy as H
-    join categories as F on F.parent = H.id
-)
-select ch.*, p.url as picture from categories_hierarchy ch
-left join pictures p on ch.photo_id = p.id
-"""
+                            with recursive categories_hierarchy as (
+                            select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+                            from categories where parent = {category.id}
+
+                            union
+                            select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+                            from categories_hierarchy as H
+                            join categories as F on F.parent = H.id
+                            ) 
+                            select ch.*, p.url as picture from categories_hierarchy ch
+                            left join pictures p on ch.photo_id = p.id
+                        """
                 )
             else:
+                # Без фото - не делаем JOIN
                 query = (
                     f"""
-with recursive categories_hierarchy as (
-    select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
-    from categories where parent = {category.id}
-    union
-    select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
-    from categories_hierarchy as H
-    join categories as F on F.parent = H.id
-)
-select ch.* from categories_hierarchy ch
-"""
-                )
+                            with recursive categories_hierarchy as (
+                            select id, name, parent, description, code, status, updated_at, created_at, photo_id, 1 as lvl
+                            from categories where parent = {category.id}
 
+                            union
+                            select F.id, F.name, F.parent, F.description, F.code, F.status, F.updated_at, F.created_at, F.photo_id, H.lvl+1
+                            from categories_hierarchy as H
+                            join categories as F on F.parent = H.id
+                            ) 
+                            select ch.* from categories_hierarchy ch
+                        """
+                )
+            
             childrens = await database.fetch_all(query)
             if childrens:
-                category_dict['children'] = await build_hierarchy(
-                    [dict(child) for child in childrens],
-                    category.id,
-                    nomenclature_name
-                )
+                category_dict['children'] = await build_hierarchy([dict(child) for child in childrens], category.id,
+                                                                  nomenclature_name)
                 # picture для детей уже содержит путь из БД
                 # Фото доступны через /api/v1/photos/{file_key}
             else:
                 category_dict['children'] = []
 
             flag = True
-            if nomenclature_name is not None:
+            if nomenclature_name != None:
                 flag = False
                 cats_ids = [child.parent for child in childrens]
                 if len(childrens) != 0:
