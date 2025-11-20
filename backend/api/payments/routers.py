@@ -30,7 +30,6 @@ from database.db import (
 )
 from functions.helpers import get_filters, check_user_permission, hide_balance_for_non_admin, build_sql_filters
 from functions.users import raschet
-from functions.cboxes import update_cashbox_balance
 from ws_manager import manager
 from producer import queue_notification
 
@@ -496,7 +495,6 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
     )
     await database.execute(paybox_q)
     
-    await update_cashbox_balance(user.cashbox_id)
 
     query = f"""
     SELECT payments.id, payments.type, payments.name, payments.external_id, payments.article,
@@ -846,7 +844,6 @@ async def delete_payment(token: str, payment_id: int):
                 )
                 await database.execute(q)
                 
-                await update_cashbox_balance(user.cashbox_id)
 
                 if payment.project_id:
                     if payment.status:
