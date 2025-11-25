@@ -842,7 +842,7 @@ async def delete_payment(token: str, payment_id: int):
                     )
                 )
                 await database.execute(q)
-                
+
                 if payment.project_id:
                     if payment.status:
                         query = projects.select().where(
