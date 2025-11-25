@@ -3,6 +3,7 @@ from datetime import datetime
 from functions.helpers import gen_token
 from database.db import database, cboxes, pboxes, users, users_cboxes_relation, price_types, cashbox_settings
 
+
 import websockets
 import json
 
