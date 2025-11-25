@@ -29,7 +29,7 @@ from api.balances.transactions_schemas import (
     TinkoffCallbackData,
 )
 from const import PaymentType, SUCCESS
-from functions.account import make_deposit
+from api.balances.services.balance_service import make_deposit
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 tinkoff_router = APIRouter(prefix="/payments/tinkoff", tags=["tinkoff"])
@@ -295,7 +295,8 @@ async def tinkoff_callback(
         
     except Exception as e:
         import traceback
-        logger.error(f"Error processing callback: {e}\n{traceback.format_exc()}")
+        error_msg = f"Error processing callback: {e}\n{traceback.format_exc()}"
+        logger.error(error_msg)
         return {"error": "Error processing callback", "details": str(e)}
     
     order_id = callback_data.OrderId
@@ -349,6 +350,7 @@ async def tinkoff_callback(
                     break
     
     if not transaction:
+        logger.error(f"Transaction not found for order_id={order_id}")
         return {"error": "Transaction not found"}
     
     was_already_success = transaction.status == SUCCESS
@@ -372,7 +374,6 @@ async def tinkoff_callback(
         balance = await database.fetch_one(balance_query)
         
         if balance:
-            old_balance = balance.balance
             new_balance = balance.balance + amount_rubles
             
             update_balance_query = (
@@ -475,4 +476,5 @@ async def check_payment_status(
         "updated_at": matching_transaction.updated_at,
         "message": f"Transaction status: {matching_transaction.status}",
     }
+
 

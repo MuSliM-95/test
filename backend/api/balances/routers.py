@@ -17,7 +17,6 @@ async def get_account_info(token: str):
     query = users_cboxes_relation.select(
         users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
-    print(dict(user))
     if user:
         if user.status:
             balance = await database.fetch_one(

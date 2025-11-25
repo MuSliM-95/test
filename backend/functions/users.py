@@ -5,7 +5,6 @@ from sqlalchemy import select
 from ws_manager import manager
 
 from database.db import database, pboxes, users, users_cboxes_relation, projects
-from functions.cboxes import update_cashbox_balance
 
 from datetime import datetime
 import time
@@ -107,5 +106,3 @@ async def raschet(user, token):
         q = projects.select().where(projects.c.id == z_project['id'])
         project = await database.fetch_one(q)
         await manager.send_message(token, {"action": "edit", "target": "projects", "result": dict(project)})
-    
-    await update_cashbox_balance(user.cashbox_id)
