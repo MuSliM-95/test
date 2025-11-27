@@ -264,4 +264,3 @@ class TinkoffApiService:
         }
         return status_mapping.get(tinkoff_status, "pending")
 
-

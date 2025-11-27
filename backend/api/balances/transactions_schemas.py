@@ -59,4 +59,3 @@ class TinkoffCallbackData(BaseModel):
     ErrorCode: Optional[str] = None
     Message: Optional[str] = None
 
-

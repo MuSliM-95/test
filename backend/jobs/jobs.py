@@ -46,6 +46,8 @@ from jobs.module_bank_job.job import module_bank_update_transaction
 from jobs.tochka_bank_job.job import tochka_update_transaction
 from jobs.check_account.job import check_account
 from jobs.segment_jobs.job import segment_update
+from jobs.avito_status_check_job.job import check_avito_accounts_status
+from jobs.avito_auto_sync_chats_job.job import sync_avito_chats_and_messages
 
 # Добавляем импорт для обновления времени смен
 from api.employee_shifts.websocket_service import send_shift_time_updates
@@ -90,6 +92,12 @@ scheduler.add_job(func=segment_update, trigger="interval", seconds=60, id="segme
 
 # Добавляем джоб для обновления времени смен каждую минуту
 scheduler.add_job(func=send_shift_time_updates, trigger="interval", minutes=1, id="shift_time_updates", max_instances=1, replace_existing=True)
+
+# Добавляем джоб для проверки статусов Avito аккаунтов каждые 5 минут
+scheduler.add_job(func=check_avito_accounts_status, trigger="interval", minutes=5, id="avito_status_check", max_instances=1, replace_existing=True)
+
+# Добавляем джоб для автоматической выгрузки чатов и сообщений из Avito каждые 5 минут
+scheduler.add_job(func=sync_avito_chats_and_messages, trigger="interval", minutes=5, id="avito_auto_sync_chats", max_instances=1, replace_existing=True)
 
 scheduler.add_jobstore(jobstore)
 

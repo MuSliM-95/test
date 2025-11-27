@@ -183,13 +183,13 @@ async def read_payments_meta(token: str, limit: int = 100, offset: int = 0):
             for cbox in cboxes_db:
                 q = cboxes.select(cboxes.c.id == cbox.cashbox_id)
                 cbox_db = await database.fetch_one(q)
-
+                
                 cboxes_list.append(
                     {
                         "name": cbox_db.name,
-                        "token": cbox.token,
+                    "token": cbox.token,
                         "balance": cbox_db.balance,
-                    }
+                }
                 )
 
             resp = {"invite_token": None, "cboxes": cboxes_list}
