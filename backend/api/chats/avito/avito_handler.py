@@ -123,6 +123,20 @@ class AvitoHandler:
                 if avito_channel:
                     logger.warning(f"Using fallback channel {avito_channel['id']} for cashbox {cashbox_id} (chat not found, user_id not matched)")
             
+            if avito_channel:
+                if not avito_channel.get('is_active', True):
+                    return {"success": True, "message": "Event processed"}
+                
+                from database.db import channel_credentials
+                creds = await database.fetch_one(
+                    channel_credentials.select().where(
+                        (channel_credentials.c.channel_id == avito_channel['id']) &
+                        (channel_credentials.c.cashbox_id == cashbox_id)
+                    )
+                )
+                if not creds or not creds.get('is_active', True):
+                    return {"success": True, "message": "Event processed"}
+            
             if message_type == 'voice' and isinstance(message_content, dict):
                 voice_id = message_content.get('voice_id')
                 if voice_id and not message_content.get('url') and not message_content.get('voice_url'):
@@ -257,13 +271,35 @@ class AvitoHandler:
                     if existing_chat:
                         chat = existing_chat
                     else:
-                        chat_name = user_name if user_name else f"Avito Chat {chat_id_external[:8]}"
+                        # Извлекаем название объявления из payload, если есть
+                        ad_title = None
+                        metadata = {}
+                        
+                        if isinstance(payload, dict):
+                            context = payload.get('context', {})
+                            if isinstance(context, dict):
+                                item = context.get('item', {})
+                                if isinstance(item, dict):
+                                    ad_title = item.get('title')
+                                    ad_id = item.get('id')
+                                    if ad_title:
+                                        metadata['ad_title'] = ad_title
+                                    if ad_id:
+                                        metadata['ad_id'] = ad_id
+                                if context:
+                                    metadata['context'] = context
+                        
+                        # Используем название объявления как название чата
+                        chat_name = ad_title or user_name or f"Avito Chat {chat_id_external[:8]}"
+                        
                         chat = await crud.create_chat(
                             channel_id=channel_id,
                             cashbox_id=cashbox_id,
                             external_chat_id=chat_id_external,
+                            external_contact_id=chat_id_external,
+                            name=chat_name,
                             phone=user_phone,
-                            name=chat_name
+                            metadata=metadata if metadata else None
                         )
                 else:
                     chat = await AvitoHandler._find_or_create_chat(
@@ -309,17 +345,6 @@ class AvitoHandler:
                         chat.update(update_data)
                     except Exception as e:
                         logger.warning(f"Failed to update chat info: {e}")
-                
-                contragent_result = None
-                if user_phone:
-                    try:
-                        contragent_result = await crud.chain_client(
-                            chat_id=chat_id,
-                            phone=user_phone,
-                            name=user_name or f"Avito User {author_id}"
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to link contragent: {e}")
             
             from database.db import chat_messages
             existing_message = await database.fetch_one(
@@ -547,15 +572,37 @@ class AvitoHandler:
                 logger.info(f"Found existing chat: {existing_chat['id']}")
                 return existing_chat
             
-            chat_name = user_name if user_name else f"Avito Chat {external_chat_id[:8]}"
+            # Извлекаем название объявления из webhook_data, если есть
+            ad_title = None
+            metadata = {}
+            
+            # Пытаемся получить context из webhook_data
+            if isinstance(webhook_data, dict):
+                context = webhook_data.get('context', {})
+                if isinstance(context, dict):
+                    item = context.get('item', {})
+                    if isinstance(item, dict):
+                        ad_title = item.get('title')
+                        ad_id = item.get('id')
+                        if ad_title:
+                            metadata['ad_title'] = ad_title
+                        if ad_id:
+                            metadata['ad_id'] = ad_id
+                    if context:
+                        metadata['context'] = context
+            
+            # Используем название объявления как название чата
+            chat_name = ad_title or user_name or f"Avito Chat {external_chat_id[:8]}"
             
             logger.info(f"Creating new chat for Avito chat {external_chat_id} with name: {chat_name} in channel {channel['id']}")
             new_chat = await crud.create_chat(
                 channel_id=channel['id'],
                 cashbox_id=cashbox_id,
                 external_chat_id=external_chat_id,
-                phone=user_phone,  
-                name=chat_name
+                external_contact_id=external_chat_id,
+                name=chat_name,
+                phone=user_phone,
+                metadata=metadata if metadata else None
             )
             
             return new_chat

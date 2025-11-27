@@ -1,5 +1,5 @@
 from sqlalchemy import desc, and_, or_, func, select
-from database.db import database, channels, chats, chat_messages, contragents, channel_credentials
+from database.db import database, channels, chats, chat_messages, contragents, channel_credentials, chat_contacts
 from fastapi import HTTPException
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -204,16 +204,116 @@ async def delete_channel(channel_id: int):
 
 
 
-async def create_chat(channel_id: int, cashbox_id: int, contragent_id: Optional[int] = None, external_chat_id: Optional[str] = None, assigned_operator_id: Optional[int] = None, phone: Optional[str] = None, name: Optional[str] = None):
-    """Create a new chat (cashbox_id comes from user token)"""
+async def get_or_create_chat_contact(
+    channel_id: int,
+    external_contact_id: Optional[str] = None,
+    name: Optional[str] = None,
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+    avatar: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> int:
+    """
+    Получить или создать chat_contact.
+    Возвращает ID chat_contact.
+    """
+    # Ищем существующий контакт
+    if external_contact_id:
+        existing = await database.fetch_one(
+            chat_contacts.select().where(
+                (chat_contacts.c.channel_id == channel_id) &
+                (chat_contacts.c.external_contact_id == external_contact_id)
+            )
+        )
+        
+        if existing:
+            # Обновляем существующий контакт, если есть новые данные
+            update_data = {"updated_at": datetime.utcnow()}
+            if name and name != existing.get('name'):
+                update_data['name'] = name
+            if phone and phone != existing.get('phone'):
+                update_data['phone'] = phone
+            if email and email != existing.get('email'):
+                update_data['email'] = email
+            if avatar and avatar != existing.get('avatar'):
+                update_data['avatar'] = avatar
+            if metadata:
+                existing_metadata = existing.get('metadata') or {}
+                if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
+                    existing_metadata.update(metadata)
+                    update_data['metadata'] = existing_metadata
+                else:
+                    update_data['metadata'] = metadata
+            
+            if len(update_data) > 1:  # Больше чем только updated_at
+                await database.execute(
+                    chat_contacts.update().where(
+                        chat_contacts.c.id == existing['id']
+                    ).values(**update_data)
+                )
+            
+            return existing['id']
+    
+    # Создаем новый контакт
+    contact_id = await database.execute(
+        chat_contacts.insert().values(
+            channel_id=channel_id,
+            external_contact_id=external_contact_id,
+            name=name,
+            phone=phone,
+            email=email,
+            avatar=avatar,
+            metadata=metadata,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+    )
+    return contact_id
+
+
+async def get_chat_contact(contact_id: int) -> Optional[Dict[str, Any]]:
+    """Получить chat_contact по ID"""
+    contact = await database.fetch_one(
+        chat_contacts.select().where(chat_contacts.c.id == contact_id)
+    )
+    return dict(contact) if contact else None
+
+
+async def create_chat(
+    channel_id: int,
+    cashbox_id: int,
+    external_chat_id: Optional[str] = None,
+    assigned_operator_id: Optional[int] = None,
+    chat_contact_id: Optional[int] = None,
+    external_contact_id: Optional[str] = None,
+    name: Optional[str] = None,
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+    avatar: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+):
+    """
+    Create a new chat.
+    Если chat_contact_id не указан, создается или находится chat_contact на основе переданных данных.
+    """
+    # Если chat_contact_id не указан, создаем/находим chat_contact
+    if not chat_contact_id:
+        chat_contact_id = await get_or_create_chat_contact(
+            channel_id=channel_id,
+            external_contact_id=external_contact_id or external_chat_id,
+            name=name,
+            phone=phone,
+            email=email,
+            avatar=avatar,
+            metadata=metadata
+        )
+    
     query = chats.insert().values(
         channel_id=channel_id,
-        contragent_id=contragent_id,
+        chat_contact_id=chat_contact_id,
         cashbox_id=cashbox_id,
-        external_chat_id=external_chat_id,
+        external_chat_id=external_chat_id or "",
         assigned_operator_id=assigned_operator_id,
-        phone=phone,
-        name=name,
         status="ACTIVE"
     )
     chat_id = await database.execute(query)
@@ -225,11 +325,9 @@ async def get_chat(chat_id: int):
     query = select([
         chats.c.id,
         chats.c.channel_id,
-        chats.c.contragent_id,
+        chats.c.chat_contact_id,
         chats.c.cashbox_id,
         chats.c.external_chat_id,
-        chats.c.phone,
-        chats.c.name,
         chats.c.status,
         chats.c.assigned_operator_id,
         chats.c.first_message_time,
@@ -240,9 +338,16 @@ async def get_chat(chat_id: int):
         chats.c.updated_at,
         channels.c.name.label('channel_name'),
         channels.c.type.label('channel_type'),
-        channels.c.svg_icon.label('channel_icon')
+        channels.c.svg_icon.label('channel_icon'),
+        chat_contacts.c.name.label('contact_name'),
+        chat_contacts.c.phone.label('contact_phone'),
+        chat_contacts.c.email.label('contact_email'),
+        chat_contacts.c.avatar.label('contact_avatar'),
+        chat_contacts.c.contragent_id.label('contact_contragent_id'),
+        chat_contacts.c.metadata.label('contact_metadata')
     ]).select_from(
         chats.join(channels, chats.c.channel_id == channels.c.id)
+        .outerjoin(chat_contacts, chats.c.chat_contact_id == chat_contacts.c.id)
     ).where(chats.c.id == chat_id)
     
     chat_row = await database.fetch_one(query)
@@ -250,6 +355,11 @@ async def get_chat(chat_id: int):
         return None
     
     chat_dict = dict(chat_row)
+    
+    # Добавляем обратную совместимость: name и phone из chat_contact
+    chat_dict['name'] = chat_dict.get('contact_name')
+    chat_dict['phone'] = chat_dict.get('contact_phone')
+    chat_dict['contragent_id'] = chat_dict.get('contact_contragent_id')
     
     last_message_query = select([chat_messages.c.content]).where(
         chat_messages.c.chat_id == chat_id
@@ -367,12 +477,16 @@ async def get_chat(chat_id: int):
 
 async def get_chat_by_external_id(channel_id: int, external_chat_id: str, cashbox_id: int):
     """Find chat by external_chat_id, channel_id and cashbox_id (optimized single query)"""
-    query = chats.select().where(and_(
-        chats.c.channel_id == channel_id,
-        chats.c.external_chat_id == external_chat_id,
-        chats.c.cashbox_id == cashbox_id
-    ))
-    return await database.fetch_one(query)
+    chat = await database.fetch_one(
+        chats.select().where(and_(
+            chats.c.channel_id == channel_id,
+            chats.c.external_chat_id == external_chat_id,
+            chats.c.cashbox_id == cashbox_id
+        ))
+    )
+    if chat:
+        return await get_chat(chat['id'])
+    return None
 
 
 async def get_chats(
@@ -393,10 +507,8 @@ async def get_chats(
     query = select([
         chats.c.id,
         chats.c.channel_id,
-        chats.c.contragent_id,
+        chats.c.chat_contact_id,
         chats.c.external_chat_id,
-        chats.c.phone,
-        chats.c.name,
         chats.c.status,
         chats.c.assigned_operator_id,
         chats.c.first_message_time,
@@ -407,9 +519,16 @@ async def get_chats(
         chats.c.updated_at,
         channels.c.name.label('channel_name'),
         channels.c.type.label('channel_type'),
-        channels.c.svg_icon.label('channel_icon')
+        channels.c.svg_icon.label('channel_icon'),
+        chat_contacts.c.name.label('contact_name'),
+        chat_contacts.c.phone.label('contact_phone'),
+        chat_contacts.c.email.label('contact_email'),
+        chat_contacts.c.avatar.label('contact_avatar'),
+        chat_contacts.c.contragent_id.label('contact_contragent_id'),
+        chat_contacts.c.metadata.label('contact_metadata')
     ]).select_from(
         chats.join(channels, chats.c.channel_id == channels.c.id)
+        .outerjoin(chat_contacts, chats.c.chat_contact_id == chat_contacts.c.id)
     )
     
     conditions = [chats.c.cashbox_id == cashbox_id] 
@@ -417,13 +536,14 @@ async def get_chats(
     if channel_id:
         conditions.append(chats.c.channel_id == channel_id)
     if contragent_id:
-        conditions.append(chats.c.contragent_id == contragent_id)
+        # Ищем через chat_contact.contragent_id
+        conditions.append(chat_contacts.c.contragent_id == contragent_id)
     if status:
         conditions.append(chats.c.status == status)
     if search:
         search_condition = or_(
-            chats.c.name.ilike(f"%{search}%"),
-            chats.c.phone.ilike(f"%{search}%"),
+            chat_contacts.c.name.ilike(f"%{search}%"),
+            chat_contacts.c.phone.ilike(f"%{search}%"),
             chats.c.external_chat_id.ilike(f"%{search}%")
         )
         conditions.append(search_condition)
@@ -449,7 +569,7 @@ async def get_chats(
         elif sort_by == "last_message_time":
             sort_column = chats.c.last_message_time
         elif sort_by == "name":
-            sort_column = chats.c.name
+            sort_column = chat_contacts.c.name
         
         if sort_column:
             if sort_order and sort_order.lower() == "asc":
@@ -469,6 +589,11 @@ async def get_chats(
     for chat_row in chats_data:
         chat_dict = dict(chat_row)
         chat_id = chat_dict['id']
+        
+        # Добавляем обратную совместимость: name и phone из chat_contact
+        chat_dict['name'] = chat_dict.get('contact_name')
+        chat_dict['phone'] = chat_dict.get('contact_phone')
+        chat_dict['contragent_id'] = chat_dict.get('contact_contragent_id')
         
         last_message_query = select([chat_messages.c.content]).where(
             chat_messages.c.chat_id == chat_id
@@ -587,12 +712,31 @@ async def get_chats(
 
 
 async def update_chat(chat_id: int, **kwargs):
-    """Update chat"""
+    """Update chat. Note: phone and name should be updated via chat_contact."""
     from datetime import datetime
     
     chat = await get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    
+    # Удаляем phone и name из kwargs, так как они теперь в chat_contact
+    # Если нужно обновить phone/name, используйте update_chat_contact
+    chat_contact_update = {}
+    if 'phone' in kwargs:
+        chat_contact_update['phone'] = kwargs.pop('phone')
+    if 'name' in kwargs:
+        chat_contact_update['name'] = kwargs.pop('name')
+    
+    # Обновляем chat_contact, если нужно
+    if chat_contact_update:
+        chat_contact_id = chat.get('chat_contact_id')
+        if chat_contact_id:
+            chat_contact_update['updated_at'] = datetime.utcnow()
+            await database.execute(
+                chat_contacts.update().where(
+                    chat_contacts.c.id == chat_contact_id
+                ).values(**chat_contact_update)
+            )
     
     if 'first_message_time' in kwargs and kwargs['first_message_time'] is not None:
         dt = kwargs['first_message_time']
@@ -614,8 +758,9 @@ async def update_chat(chat_id: int, **kwargs):
     else:
         kwargs['updated_at'] = datetime.utcnow()
     
-    query = chats.update().where(chats.c.id == chat_id).values(**kwargs)
-    await database.execute(query)
+    if kwargs:  # Обновляем чат только если есть что обновлять
+        query = chats.update().where(chats.c.id == chat_id).values(**kwargs)
+        await database.execute(query)
     return await get_chat(chat_id)
 
 
@@ -765,6 +910,10 @@ async def delete_message(message_id: int):
 
 
 async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Optional[str] = None, name: Optional[str] = None):
+    """
+    Привязать chat_contact к contragent.
+    Обновляет chat_contact.contragent_id.
+    """
     chat = await get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -774,13 +923,23 @@ async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Op
         if not message:
             raise HTTPException(status_code=404, detail="Message not found")
     
+    chat_contact_id = chat.get('chat_contact_id')
+    if not chat_contact_id:
+        raise HTTPException(status_code=400, detail="Chat has no associated contact")
+    
+    # Получаем данные из chat_contact
+    chat_contact = await get_chat_contact(chat_contact_id)
+    if not chat_contact:
+        raise HTTPException(status_code=404, detail="Chat contact not found")
+    
+    # Используем переданные данные или данные из chat_contact
     if not phone:
-        phone = chat.get('phone')
+        phone = chat_contact.get('phone') or chat.get('phone')
         if not phone:
             raise HTTPException(status_code=400, detail="Phone number required")
     
     if not name:
-        name = chat.get('name')
+        name = chat_contact.get('name') or chat.get('name')
     
     cashbox_id = chat['cashbox_id']
     channel_id = chat['channel_id']
@@ -806,7 +965,7 @@ async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Op
     if existing_contragent:
         contragent_id = existing_contragent['id']
         contragent_name = existing_contragent['name']
-        message_result = "Chat linked with existing contragent"
+        message_result = "Chat contact linked with existing contragent"
         
         existing_data = existing_contragent.get('data') or {}
         if not isinstance(existing_data, dict):
@@ -845,18 +1004,25 @@ async def chain_client(chat_id: int, message_id: Optional[int] = None, phone: Op
             data=contragent_data
         )
         contragent_id = await database.execute(insert_query)
-        message_result = "New contragent created and linked to chat"
+        message_result = "New contragent created and linked to chat contact"
     
-    update_data = {
-        "phone": phone,
+    # Обновляем chat_contact: привязываем к contragent и обновляем данные
+    update_contact_data = {
         "contragent_id": contragent_id,
         "updated_at": datetime.utcnow()
     }
-    if name:
-        update_data["name"] = name
     
-    query = chats.update().where(chats.c.id == chat_id).values(**update_data)
-    await database.execute(query)
+    if phone and phone != chat_contact.get('phone'):
+        update_contact_data["phone"] = phone
+    
+    if name and name != chat_contact.get('name'):
+        update_contact_data["name"] = name
+    
+    await database.execute(
+        chat_contacts.update().where(
+            chat_contacts.c.id == chat_contact_id
+        ).values(**update_contact_data)
+    )
     
     updated_chat = await get_chat(chat_id)
     

@@ -17,6 +17,28 @@ class ChatMessageModel(BaseModelMessage):
     timestamp: str
 
 
+class ChatTypingEventModel(BaseModelMessage):
+    chat_id: int
+    user_id: int
+    user_type: str
+    is_typing: bool
+    timestamp: str
+
+
+class ChatUserConnectedEventModel(BaseModelMessage):
+    chat_id: int
+    user_id: int
+    user_type: str
+    timestamp: str
+
+
+class ChatUserDisconnectedEventModel(BaseModelMessage):
+    chat_id: int
+    user_id: int
+    user_type: str
+    timestamp: str
+
+
 class ChatMessageProducer:
     """Producer для отправки сообщений чатов в RabbitMQ"""
     
@@ -44,6 +66,82 @@ class ChatMessageProducer:
             
         except Exception as e:
             print(f"[PRODUCER] Failed to send message to RabbitMQ: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    async def send_typing_event(self, chat_id: int, user_id: int, user_type: str, is_typing: bool):
+        """Отправить событие печати в очередь"""
+        try:
+            rabbit_messaging: IRabbitMessaging = await ioc.get(IRabbitFactory)()
+            
+            event = ChatTypingEventModel(
+                message_id=uuid.uuid4(),
+                chat_id=chat_id,
+                user_id=user_id,
+                user_type=user_type,
+                is_typing=is_typing,
+                timestamp=datetime.utcnow().isoformat()
+            )
+            
+            await rabbit_messaging.publish(
+                message=event,
+                routing_key="chat.events.typing"
+            )
+            
+            print(f"[PRODUCER] Typing event sent to RabbitMQ for chat {chat_id}, user {user_id}, typing: {is_typing}")
+            
+        except Exception as e:
+            print(f"[PRODUCER] Failed to send typing event to RabbitMQ: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    async def send_user_connected_event(self, chat_id: int, user_id: int, user_type: str):
+        """Отправить событие подключения пользователя в очередь"""
+        try:
+            rabbit_messaging: IRabbitMessaging = await ioc.get(IRabbitFactory)()
+            
+            event = ChatUserConnectedEventModel(
+                message_id=uuid.uuid4(),
+                chat_id=chat_id,
+                user_id=user_id,
+                user_type=user_type,
+                timestamp=datetime.utcnow().isoformat()
+            )
+            
+            await rabbit_messaging.publish(
+                message=event,
+                routing_key="chat.events.user_connected"
+            )
+            
+            print(f"[PRODUCER] User connected event sent to RabbitMQ for chat {chat_id}, user {user_id}")
+            
+        except Exception as e:
+            print(f"[PRODUCER] Failed to send user connected event to RabbitMQ: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    async def send_user_disconnected_event(self, chat_id: int, user_id: int, user_type: str):
+        """Отправить событие отключения пользователя в очередь"""
+        try:
+            rabbit_messaging: IRabbitMessaging = await ioc.get(IRabbitFactory)()
+            
+            event = ChatUserDisconnectedEventModel(
+                message_id=uuid.uuid4(),
+                chat_id=chat_id,
+                user_id=user_id,
+                user_type=user_type,
+                timestamp=datetime.utcnow().isoformat()
+            )
+            
+            await rabbit_messaging.publish(
+                message=event,
+                routing_key="chat.events.user_disconnected"
+            )
+            
+            print(f"[PRODUCER] User disconnected event sent to RabbitMQ for chat {chat_id}, user {user_id}")
+            
+        except Exception as e:
+            print(f"[PRODUCER] Failed to send user disconnected event to RabbitMQ: {e}")
             import traceback
             traceback.print_exc()
 

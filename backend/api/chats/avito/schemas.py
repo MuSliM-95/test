@@ -170,3 +170,48 @@ class AvitoMessagesResponse(BaseModel):
     total: int
     messages: List[AvitoMessageItem]
     saved_to_db: int
+
+
+class AvitoHistoryLoadResponse(BaseModel):
+    success: bool
+    channel_id: int
+    from_date: int
+    chats_processed: int
+    chats_created: int
+    chats_updated: int
+    messages_loaded: int
+    messages_created: int
+    messages_updated: int
+    errors: Optional[List[str]] = None
+
+
+class AvitoApplicantPhoneResponse(BaseModel):
+    success: bool
+    chat_id: int
+    phone: Optional[str] = None
+    name: Optional[str] = None
+
+
+class AvitoChatMetadataResponse(BaseModel):
+    success: bool
+    chat_id: int
+    external_chat_id: str
+    metadata: Dict[str, Any]
+
+
+class AvitoOAuthAuthorizeResponse(BaseModel):
+    """Ответ с URL для OAuth авторизации"""
+    authorization_url: str
+    state: Optional[str] = None
+    message: str = "Перейдите по ссылке для авторизации в Avito"
+
+
+class AvitoOAuthCallbackResponse(BaseModel):
+    """Ответ после успешного OAuth callback"""
+    success: bool
+    message: str
+    channel_id: Optional[int] = None
+    cashbox_id: Optional[int] = None
+    webhook_registered: Optional[bool] = None
+    webhook_url: Optional[str] = None
+    webhook_error: Optional[str] = None

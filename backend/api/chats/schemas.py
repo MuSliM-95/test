@@ -39,14 +39,14 @@ class ChatCreate(BaseModel):
     external_chat_id: str
     phone: Optional[str] = None
     name: Optional[str] = None
-    contragent_id: Optional[int] = None
+    # contragent_id теперь привязывается через chat_contact
     assigned_operator_id: Optional[int] = None
 
 
 class ChatUpdate(BaseModel):
     status: Optional[str] = None
     assigned_operator_id: Optional[int] = None
-    contragent_id: Optional[int] = None
+    # phone и name теперь обновляются через chat_contact
     phone: Optional[str] = None
     name: Optional[str] = None
     first_message_time: Optional[datetime] = None
@@ -171,3 +171,17 @@ class MessagesList(BaseModel):
                 return v.replace(tzinfo=None)
             return v
         return v
+
+
+class ManagerInChat(BaseModel):
+    """Информация о менеджере, подключенном к чату"""
+    user_id: int
+    user_type: str
+    connected_at: str
+
+
+class ManagersInChatResponse(BaseModel):
+    """Ответ со списком менеджеров в чате"""
+    chat_id: int
+    managers: List[ManagerInChat]
+    total: int

@@ -9,8 +9,10 @@ from api.chats.schemas import (
     ChannelCreate, ChannelUpdate, ChannelResponse,
     ChatCreate, ChatUpdate, ChatResponse,
     MessageCreate, MessageResponse, MessagesList,
-    ChainClientRequest
+    ChainClientRequest,
+    ManagersInChatResponse, ManagerInChat
 )
+from api.chats.websocket import chat_manager
 from database.db import pictures, database
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -60,10 +62,10 @@ async def create_chat(token: str, chat: ChatCreate, user = Depends(get_current_u
     """Create a new chat (cashbox_id from token)"""
     return await crud.create_chat(
         channel_id=chat.channel_id,
-        contragent_id=chat.contragent_id,
         cashbox_id=user.cashbox_id,
         external_chat_id=chat.external_chat_id,
         assigned_operator_id=chat.assigned_operator_id,
+        external_contact_id=chat.external_chat_id,
         phone=chat.phone,
         name=chat.name
     )
@@ -567,4 +569,40 @@ async def chain_client_endpoint(
         message_id=message_id,
         phone=request.phone,
         name=request.name
+    )
+
+
+@router.get("/chats/{chat_id}/managers/", response_model=ManagersInChatResponse)
+async def get_managers_in_chat(
+    chat_id: int,
+    token: str,
+    user = Depends(get_current_user)
+):
+    """Получить список менеджеров, которые сейчас подключены к чату"""
+    # Проверяем существование чата и доступ
+    chat = await crud.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
+    if chat['cashbox_id'] != user.cashbox_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Получаем всех подключенных пользователей
+    connected_users = chat_manager.get_connected_users(chat_id)
+    
+    # Фильтруем только менеджеров (OPERATOR)
+    managers = [
+        ManagerInChat(
+            user_id=user_info['user_id'],
+            user_type=user_info['user_type'],
+            connected_at=user_info['connected_at']
+        )
+        for user_info in connected_users
+        if user_info['user_type'] == "OPERATOR"
+    ]
+    
+    return ManagersInChatResponse(
+        chat_id=chat_id,
+        managers=managers,
+        total=len(managers)
     )

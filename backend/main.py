@@ -2,7 +2,8 @@ import json
 import os
 import time
 import logging
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -187,13 +188,13 @@ from api.balances.transactions_routers import tinkoff_callback
 # )
 
 app = FastAPI(
-    root_path='/api/v1',
+    # root_path='/api/v1',
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0",
-    # docs_url="/docs",
-    # redoc_url="/redoc",
-    # openapi_url="/openapi.json"
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 app.add_middleware(GZipMiddleware)
@@ -279,10 +280,10 @@ app.include_router(chats_ws_router)
 app.include_router(avito_router)
 app.include_router(avito_default_webhook_router)
 
-# @app.get("/api/v1/openapi.json", include_in_schema=False)
-# async def get_openapi():
-#     """Проксировать openapi.json для Swagger UI"""
-#     return app.openapi()
+@app.get("/api/v1/openapi.json", include_in_schema=False)
+async def get_openapi():
+    """Проксировать openapi.json для Swagger UI"""
+    return app.openapi()
 
 @app.get("/health")
 async def check_health_app():
@@ -292,6 +293,80 @@ async def check_health_app():
 @app.get("/api/v1/payments/tinkoff/callback")
 async def tinkoff_callback_direct(request: Request):
     return await tinkoff_callback(request)
+
+
+@app.get("/api/v1/hook/chat/123456/test", include_in_schema=False)
+async def avito_oauth_callback_test():
+    """Тестовый endpoint для проверки доступности callback URL"""
+    print("[OAUTH TEST] Test endpoint called - callback URL is accessible!")
+    return {
+        "status": "ok",
+        "message": "OAuth callback endpoint is accessible",
+        "endpoint": "/api/v1/hook/chat/123456"
+    }
+
+@app.get("/api/v1/hook/chat/123456", include_in_schema=False)
+@app.post("/api/v1/hook/chat/123456", include_in_schema=False)
+async def avito_oauth_callback_legacy(
+    request: Request,
+    code: str = Query(None, description="Authorization code from Avito"),
+    state: str = Query(None, description="State parameter for CSRF protection"),
+    error: str = Query(None, description="Error from Avito OAuth"),
+    error_description: str = Query(None, description="Error description from Avito OAuth"),
+    token: str = Query(None, description="Optional user authentication token")
+):
+    """
+    OAuth callback эндпоинт для пути, зарегистрированного в Avito.
+    Обрабатывает OAuth callback используя логику из avito_routes.
+    """
+    print("=" * 80)
+    print("[MAIN OAUTH] ====== OAuth callback received in main.py ======")
+    print(f"[MAIN OAUTH] Method: {request.method}")
+    print(f"[MAIN OAUTH] Full URL: {request.url}")
+    print(f"[MAIN OAUTH] Path: {request.url.path}")
+    print(f"[MAIN OAUTH] Query params: {dict(request.query_params)}")
+    print(f"[MAIN OAUTH] Headers: {dict(request.headers)}")
+    print(f"[MAIN OAUTH] code present: {code is not None}, value: {code}")
+    print(f"[MAIN OAUTH] state present: {state is not None}, value: {state}")
+    print(f"[MAIN OAUTH] error: {error}")
+    print(f"[MAIN OAUTH] error_description: {error_description}")
+    print(f"[MAIN OAUTH] token: {token}")
+    print("=" * 80)
+    
+    # Если запрос пришел без параметров - это может быть проверка доступности
+    if not code and not state and not error:
+        print("[MAIN OAUTH] Request received but no OAuth parameters present - might be availability check")
+        return {"status": "ok", "message": "OAuth callback endpoint is available"}
+    
+    # Если есть ошибка от Avito
+    if error:
+        print(f"[MAIN OAUTH ERROR] OAuth error from Avito: {error} - {error_description}")
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"OAuth error: {error}. {error_description or ''}"
+        )
+    
+    if not code or not state:
+        print(f"[MAIN OAUTH ERROR] Missing required OAuth parameters: code={code is not None}, state={state is not None}")
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required OAuth parameters: code and state are required"
+        )
+    
+    try:
+        from api.chats.avito.avito_routes import avito_oauth_callback
+        print(f"[MAIN OAUTH] Calling avito_oauth_callback with code={code[:20] if code else None}..., state={state[:20] if state else None}...")
+        # Вызываем существующий обработчик OAuth callback
+        result = await avito_oauth_callback(code=code, state=state, token=token)
+        print("[MAIN OAUTH] OAuth callback processing completed successfully")
+        return result
+    except Exception as e:
+        print(f"[MAIN OAUTH ERROR] Error in OAuth callback handler: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @app.post("/api/v1/hook/chat/{cashbox_id}", include_in_schema=False)

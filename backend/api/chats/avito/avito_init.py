@@ -4,6 +4,7 @@ from datetime import datetime
 
 from database.db import database, channels, organizations, channel_credentials
 from api.chats.avito.avito_factory import _encrypt_credential
+from api.chats.avito.avito_constants import AVITO_SVG_ICON
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +29,25 @@ async def init_avito_credentials():
                     name="Avito",
                     type="AVITO",
                     description="Avito White API Integration",
+                    svg_icon=AVITO_SVG_ICON,
                     is_active=True,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
                 )
             )
             avito_channel = await database.fetch_one(channels.select().where(channels.c.id == channel_id))
+        else:
+            # Обновляем иконку для существующего канала, если она отсутствует
+            if not avito_channel.get('svg_icon'):
+                await database.execute(
+                    channels.update().where(
+                        channels.c.id == avito_channel["id"]
+                    ).values(
+                        svg_icon=AVITO_SVG_ICON,
+                        updated_at=datetime.utcnow()
+                    )
+                )
+                logger.info(f"Updated Avito channel icon for channel {avito_channel['id']}")
 
         channel_id = avito_channel["id"]
 

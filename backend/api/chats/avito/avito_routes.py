@@ -3,6 +3,8 @@ from datetime import datetime
 import re
 import os
 import logging
+import urllib.parse
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +20,24 @@ from api.chats.avito.schemas import (
     AvitoMessageItem,
     AvitoWebhookRegisterRequest,
     AvitoWebhookRegisterResponse,
-    AvitoWebhookUpdateResponse
+    AvitoWebhookUpdateResponse,
+    AvitoOAuthAuthorizeResponse,
+    AvitoOAuthCallbackResponse
 )
 from api.chats.avito.avito_handler import AvitoHandler
 from api.chats.avito.avito_factory import (
     create_avito_client,
     validate_avito_credentials,
     save_token_callback,
-    _encrypt_credential
+    _encrypt_credential,
+    _decrypt_credential
 )
 from api.chats.avito.avito_webhook import process_avito_webhook
+from api.chats.avito.avito_client import AvitoClient, AvitoAPIError
 from api.chats import crud
 from database.db import database, channels, channel_credentials, chats
 from typing import Optional
-from fastapi import Query
+from fastapi import Query, Request
 
 router = APIRouter(prefix="/chats/avito", tags=["chats-avito"])
 
@@ -1252,3 +1258,368 @@ async def update_all_avito_webhooks(
     except Exception as e:
         logger.error(f"Error updating webhooks: {e}")
         raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
+
+
+@router.get("/oauth/authorize", response_model=AvitoOAuthAuthorizeResponse)
+async def avito_oauth_authorize(
+    token: str = Query(..., description="User authentication token"),
+    user = Depends(get_current_user)
+):
+    """
+    Начать OAuth авторизацию Avito.
+    Генерирует URL для перенаправления пользователя на страницу авторизации Avito.
+    
+    Использует сохраненные OAuth credentials (client_id и client_secret) из channel_credentials
+    для конкретного cashbox_id. Эти credentials должны быть предварительно сохранены через /connect.
+    """
+    try:
+        cashbox_id = user.cashbox_id
+        
+        # Получаем существующий канал Avito для этого cashbox
+        avito_channel = await crud.get_channel_by_cashbox(cashbox_id, "AVITO")
+        if not avito_channel:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Avito channel not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint."
+            )
+        
+        channel_id = avito_channel['id']
+        
+        # Получаем credentials из БД для этого cashbox
+        credentials = await database.fetch_one(
+            channel_credentials.select().where(
+                (channel_credentials.c.channel_id == channel_id) &
+                (channel_credentials.c.cashbox_id == cashbox_id) &
+                (channel_credentials.c.is_active.is_(True))
+            )
+        )
+        
+        if not credentials:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Avito credentials not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint."
+            )
+        
+        # Расшифровываем OAuth credentials (client_id нужен для генерации URL авторизации)
+        oauth_client_id = _decrypt_credential(credentials['api_key'])
+        
+        # Используем зарегистрированный redirect_uri в Avito (должен точно совпадать с тем, что в ЛК Avito)
+        redirect_uri = "https://app.tablecrm.com/api/v1/hook/chat/123456"
+        
+        # Генерируем state для защиты от CSRF (сохраняем cashbox_id)
+        state = secrets.token_urlsafe(32)
+        state_data = f"{cashbox_id}:{state}"
+        
+        # Параметры для OAuth авторизации
+        oauth_params = {
+            "client_id": oauth_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "messenger:read messenger:write",
+            "state": state_data
+        }
+        
+        # Формируем URL авторизации
+        auth_url = "https://avito.ru/oauth" + "?" + urllib.parse.urlencode(oauth_params)
+        
+        print("=" * 80)
+        print(f"[OAUTH AUTHORIZE] Generated OAuth authorization URL for cashbox {cashbox_id}")
+        print(f"[OAUTH AUTHORIZE] Channel ID: {channel_id}")
+        print(f"[OAUTH AUTHORIZE] Client ID: {oauth_client_id[:10]}...")
+        print(f"[OAUTH AUTHORIZE] Redirect URI: {redirect_uri}")
+        print(f"[OAUTH AUTHORIZE] State: {state_data}")
+        print(f"[OAUTH AUTHORIZE] Full authorization URL: {auth_url}")
+        print("=" * 80)
+        
+        return AvitoOAuthAuthorizeResponse(
+            authorization_url=auth_url,
+            state=state_data,
+            message="Перейдите по ссылке для авторизации в Avito"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[OAUTH AUTHORIZE ERROR] Error generating OAuth authorization URL: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
+
+
+@router.get("/oauth/callback", response_model=AvitoOAuthCallbackResponse)
+async def avito_oauth_callback(
+    code: str = Query(..., description="Authorization code from Avito"),
+    state: str = Query(..., description="State parameter for CSRF protection"),
+    token: Optional[str] = Query(None, description="Optional user authentication token")
+):
+    """
+    OAuth callback эндпоинт.
+    Получает authorization code от Avito, обменивает его на токены и подключает канал.
+    
+    Токены (access_token, refresh_token) сохраняются в channel_credentials для конкретного
+    cashbox_id. Каждый клиент (cashbox) может подключить свой Avito аккаунт через OAuth.
+    """
+    print("=" * 80)
+    print("[OAUTH CALLBACK] OAuth callback processing started")
+    print(f"[OAUTH CALLBACK] code length: {len(code) if code else 0}")
+    print(f"[OAUTH CALLBACK] state: {state}")
+    print("=" * 80)
+    
+    try:
+        # Извлекаем cashbox_id из state
+        try:
+            cashbox_id_str, state_token = state.split(":", 1)
+            cashbox_id = int(cashbox_id_str)
+            print(f"[OAUTH CALLBACK] Extracted cashbox_id: {cashbox_id} from state")
+        except (ValueError, IndexError) as e:
+            print(f"[OAUTH CALLBACK ERROR] Failed to parse state parameter: {state}, error: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid state parameter"
+            )
+        
+        # Получаем существующий канал Avito для этого cashbox
+        avito_channel = await crud.get_channel_by_cashbox(cashbox_id, "AVITO")
+        if not avito_channel:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Avito channel not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint."
+            )
+        
+        channel_id = avito_channel['id']
+        
+        # Получаем OAuth credentials из БД
+        credentials = await database.fetch_one(
+            channel_credentials.select().where(
+                (channel_credentials.c.channel_id == channel_id) &
+                (channel_credentials.c.cashbox_id == cashbox_id) &
+                (channel_credentials.c.is_active.is_(True))
+            )
+        )
+        
+        if not credentials:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Avito credentials not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint."
+            )
+        
+        # Расшифровываем OAuth credentials (client_id и client_secret)
+        oauth_client_id = _decrypt_credential(credentials['api_key'])
+        oauth_client_secret = _decrypt_credential(credentials['api_secret'])
+        
+        # Используем зарегистрированный redirect_uri в Avito (должен точно совпадать с тем, что в ЛК Avito)
+        redirect_uri = "https://app.tablecrm.com/api/v1/hook/chat/123456"
+        
+        # Обмениваем authorization code на токены
+        print(f"[OAUTH CALLBACK] Exchanging authorization code for tokens...")
+        print(f"[OAUTH CALLBACK] client_id: {oauth_client_id[:10]}...")
+        print(f"[OAUTH CALLBACK] redirect_uri: {redirect_uri}")
+        print(f"[OAUTH CALLBACK] code length: {len(code) if code else 0}")
+        try:
+            token_data = await AvitoClient.exchange_authorization_code_for_tokens(
+                client_id=oauth_client_id,
+                client_secret=oauth_client_secret,
+                authorization_code=code,
+                redirect_uri=redirect_uri
+            )
+            print(f"[OAUTH CALLBACK] Token exchange successful! Got access_token: {bool(token_data.get('access_token'))}, refresh_token: {bool(token_data.get('refresh_token'))}")
+        except AvitoAPIError as e:
+            print(f"[OAUTH CALLBACK ERROR] Failed to exchange authorization code for tokens: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to exchange authorization code: {str(e)}"
+            )
+        
+        access_token = token_data.get('access_token')
+        refresh_token = token_data.get('refresh_token')
+        expires_at_str = token_data.get('expires_at')
+        
+        token_expires_at = datetime.fromisoformat(expires_at_str) if expires_at_str else None
+        
+        if not access_token:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to obtain access token from Avito OAuth"
+            )
+        
+        # Создаем временный клиент для получения информации о пользователе
+        temp_client = AvitoClient(
+            api_key=oauth_client_id,
+            api_secret=oauth_client_secret,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=token_expires_at
+        )
+        
+        avito_user_id = None
+        avito_account_name = None
+        try:
+            avito_user_id = await temp_client._get_user_id()
+            user_profile = await temp_client.get_user_profile()
+            avito_account_name = user_profile.get('name') or f"Cashbox {cashbox_id}"
+        except Exception as e:
+            print(f"[OAUTH CALLBACK WARNING] Could not get user profile: {e}")
+            avito_account_name = f"Cashbox {cashbox_id}"
+        
+        # Шифруем полученные OAuth токены
+        encrypted_access_token = _encrypt_credential(access_token)
+        encrypted_refresh_token = _encrypt_credential(refresh_token) if refresh_token else None
+        
+        # Обновляем credentials с полученными OAuth токенами
+        # api_key и api_secret остаются без изменений (это OAuth client_id и client_secret)
+        update_values = {
+            "access_token": encrypted_access_token,
+            "is_active": True,
+            "updated_at": datetime.utcnow()
+        }
+        
+        if encrypted_refresh_token:
+            update_values["refresh_token"] = encrypted_refresh_token
+        if token_expires_at:
+            update_values["token_expires_at"] = token_expires_at
+        if avito_user_id:
+            update_values["avito_user_id"] = avito_user_id
+        
+        # Обновляем существующие credentials
+        await database.execute(
+            channel_credentials.update().where(
+                channel_credentials.c.id == credentials['id']
+            ).values(**update_values)
+        )
+        
+        # Регистрируем webhook
+        webhook_registered = False
+        webhook_error_message = None
+        webhook_url = None
+        try:
+            webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
+            
+            if webhook_url:
+                client = await create_avito_client(
+                    channel_id=channel_id,
+                    cashbox_id=cashbox_id,
+                    on_token_refresh=lambda token_data: save_token_callback(
+                        channel_id,
+                        cashbox_id,
+                        token_data
+                    )
+                )
+                if client:
+                    try:
+                        result = await client.register_webhook(webhook_url)
+                        webhook_registered = True
+                    except Exception as webhook_error:
+                        webhook_error_message = str(webhook_error)
+                else:
+                    webhook_error_message = "Could not create Avito client"
+        except Exception as e:
+            webhook_error_message = str(e)
+        
+        response_data = {
+            "success": True,
+            "message": f"Avito канал успешно подключен через OAuth к кабинету {cashbox_id}",
+            "channel_id": channel_id,
+            "cashbox_id": cashbox_id
+        }
+        
+        if webhook_registered:
+            response_data["webhook_registered"] = True
+            response_data["webhook_url"] = webhook_url
+        elif webhook_error_message:
+            response_data["webhook_registered"] = False
+            response_data["webhook_error"] = webhook_error_message
+        
+        print(f"[OAUTH CALLBACK SUCCESS] Avito OAuth connection successful for cashbox {cashbox_id}, channel {channel_id}")
+        
+        return AvitoOAuthCallbackResponse(**response_data)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[OAUTH CALLBACK ERROR] Error in OAuth callback: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
+
+
+@router.get("/hook", response_model=AvitoOAuthCallbackResponse)
+async def avito_oauth_callback_hook(
+    request: Request,
+    code: str = Query(None, description="Authorization code from Avito"),
+    state: str = Query(None, description="State parameter for CSRF protection"),
+    error: str = Query(None, description="Error from Avito OAuth"),
+    error_description: str = Query(None, description="Error description from Avito OAuth"),
+    token: Optional[str] = Query(None, description="Optional user authentication token")
+):
+    """
+    OAuth callback эндпоинт на пути /hook для совместимости с зарегистрированным redirect_uri.
+    Обрабатывает OAuth callback используя ту же логику, что и /oauth/callback.
+    """
+    # Детальное логирование всех параметров запроса
+    print("=" * 80)
+    print("[OAUTH HOOK] OAuth callback received on /hook")
+    print(f"[OAUTH HOOK] Full URL: {request.url}")
+    print(f"[OAUTH HOOK] Path: {request.url.path}")
+    print(f"[OAUTH HOOK] Query params: {dict(request.query_params)}")
+    print(f"[OAUTH HOOK] Headers: {dict(request.headers)}")
+    print(f"[OAUTH HOOK] code present: {code is not None}")
+    print(f"[OAUTH HOOK] state present: {state is not None}")
+    print(f"[OAUTH HOOK] error: {error}")
+    print(f"[OAUTH HOOK] error_description: {error_description}")
+    print("=" * 80)
+    
+    # Если есть ошибка от Avito
+    if error:
+        print(f"[OAUTH HOOK ERROR] OAuth error from Avito: {error}")
+        print(f"[OAUTH HOOK ERROR] OAuth error description: {error_description}")
+        print(f"[OAUTH HOOK ERROR] Full error details - error={error}, error_description={error_description}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"OAuth error: {error}. {error_description or ''}"
+        )
+    
+    if not code or not state:
+        print(f"[OAUTH HOOK ERROR] Missing required OAuth parameters:")
+        print(f"[OAUTH HOOK ERROR]   - code present: {code is not None} (value: {code})")
+        print(f"[OAUTH HOOK ERROR]   - state present: {state is not None} (value: {state})")
+        print(f"[OAUTH HOOK ERROR]   - All query params: {dict(request.query_params)}")
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required OAuth parameters: code and state are required"
+        )
+    
+    print(f"[OAUTH HOOK] Calling avito_oauth_callback with code={code[:20] if code else None}..., state={state[:20] if state else None}...")
+    
+    # Вызываем существующий обработчик OAuth callback
+    try:
+        result = await avito_oauth_callback(code=code, state=state, token=token)
+        print("[OAUTH HOOK] OAuth callback processing completed successfully")
+        return result
+    except HTTPException as e:
+        print(f"[OAUTH HOOK ERROR] HTTPException in avito_oauth_callback: {e.status_code} - {e.detail}")
+        raise
+    except Exception as e:
+        print(f"[OAUTH HOOK ERROR] Error in avito_oauth_callback: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error during OAuth callback: {str(e)}"
+        )
+
+
+@router.get("/oauth/debug")
+async def avito_oauth_debug(
+    request: Request
+):
+    """
+    Debug endpoint для проверки OAuth callback параметров.
+    Возвращает все query параметры и заголовки для диагностики.
+    """
+    return {
+        "url": str(request.url),
+        "path": request.url.path,
+        "query_params": dict(request.query_params),
+        "headers": dict(request.headers),
+        "message": "Это debug endpoint для проверки OAuth параметров"
+    }
