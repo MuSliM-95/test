@@ -23,7 +23,7 @@ scrape_configs:
     static_configs:
     - targets: ["telegraf:9126"]
 
-  - job_name: 'nginx-json-exporter'
+  - job_name: "nginx-json-exporter"
     static_configs:
-      - targets: ['localhost:8005']
+      - targets: ["localhost:8005"]
     scrape_interval: 15s
