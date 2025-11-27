@@ -1046,6 +1046,8 @@ tariffs = sqlalchemy.Table(
     sqlalchemy.Column("archived", Boolean, default=False, nullable=False),
     sqlalchemy.Column("actual", Boolean, default=True, nullable=False),
     sqlalchemy.Column("demo_days", Integer, nullable=False),
+    sqlalchemy.Column("offer_hours", Integer, nullable=True, server_default="0"),
+    sqlalchemy.Column("discount_percent", Float, nullable=True, server_default="0"),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
@@ -1059,6 +1061,9 @@ transactions = sqlalchemy.Table(
     sqlalchemy.Column("users", Integer),
     sqlalchemy.Column("amount", Float),
     sqlalchemy.Column("status", String),
+    sqlalchemy.Column("type", String, nullable=False),  
+    sqlalchemy.Column("is_manual_deposit", Boolean, nullable=False, server_default=sqlalchemy.false()),
+    sqlalchemy.Column("external_id", String, nullable=True),  
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
