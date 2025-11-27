@@ -173,6 +173,7 @@ async def get_prices(
 
     filters_nom = []
     filters_price = []
+    filters_price_type = []
     if filters.name:
         filters_nom.append(nomenclature.c.name.ilike(f"%{filters.name}%"))
     if filters.type:
@@ -200,6 +201,17 @@ async def get_prices(
         filters_price.append(prices.c.date_from >= filters.date_from)
     if filters.date_to:
         filters_price.append(prices.c.date_to <= filters.date_to)
+
+    if filters.price_type_tags:
+        tag_list = [tag.strip() for tag in filters.price_type_tags.split(",")]
+
+        if filters.price_type_tags_mode not in ("and", "or"):
+            raise_bad_request("price_type_tags_mode must be 'and' or 'or'")
+
+        if filters.price_type_tags_mode == "and":
+            filters_price_type.append(price_types.c.tags.contains(tag_list))
+        else:
+            filters_price_type.append(price_types.c.tags.overlap(tag_list))
 
     if limit == -1:
         q = (
@@ -238,7 +250,8 @@ async def get_prices(
                 prices.c.is_deleted == False,
                 nomenclature.c.is_deleted == False,
                 *filters_price,
-                *filters_nom
+                *filters_nom,
+                *filters_price_type
                 )
             .order_by(desc(prices.c.id))
             .limit(limit)
@@ -299,17 +312,22 @@ async def get_prices(
             for price in prices_db:
                 price['photos'] = []
 
-    q = select(
-        func.count(prices.c.id).label("count_prices")).\
-        join(nomenclature, nomenclature.c.id == prices.c.nomenclature).\
-        where(
-        prices.c.cashbox == user.cashbox_id,
-        prices.c.is_deleted == False,
-        nomenclature.c.is_deleted == False,
-        *filters_price,
-        *filters_nom
+    count_query = (
+        select(func.count(prices.c.id).label("count_prices"))
+        .select_from(prices)
+        .join(nomenclature, nomenclature.c.id == prices.c.nomenclature)
+        .join(price_types, price_types.c.id == prices.c.price_type, isouter=True)
+        .where(
+            prices.c.cashbox == user.cashbox_id,
+            prices.c.is_deleted == False,
+            nomenclature.c.is_deleted == False,
+            *filters_price,
+            *filters_nom,
+            *filters_price_type
+        )
     )
-    prices_db_count = await database.fetch_one(q)
+
+    prices_db_count = await database.fetch_one(count_query)
 
     return {"result": prices_db, "count": prices_db_count.count_prices}
 

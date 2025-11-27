@@ -70,6 +70,8 @@ class PricesFiltersQuery(BaseModel):
     price_type_id: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    price_type_tags: Optional[str] = None
+    price_type_tags_mode: Optional[str] = "or"
 
 
 class CUIntegerFilters(BaseModel):

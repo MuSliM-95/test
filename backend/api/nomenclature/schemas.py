@@ -16,6 +16,7 @@ class NomenclatureType(str, Enum):
     resourse = "resourse"
     rental = "rental"
     property = "property"
+    work = "work"
     
 
 class NomenclatureBarcodeCreate(BaseModel):
