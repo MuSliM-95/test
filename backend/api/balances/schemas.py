@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 
 class AccountInfo(BaseModel):
@@ -13,3 +14,8 @@ class AccountInfo(BaseModel):
     tariff: str
     link_for_pay: str
     demo_period: int
+
+
+class BalanceCreate(BaseModel):
+    tariff_id: Optional[int] = None
+    tariff_type: Optional[str] = "demo"
