@@ -72,6 +72,7 @@ class MarketplaceProductDetail(MarketplaceProduct):
     seo_description: Optional[str] = None
     seo_keywords: Optional[List[str]] = None
     attributes: Optional[List[MarketplaceProductAttribute]] = None
+    nomenclatures: Optional[List[dict]] = None
 
     class Config:
         orm_mode = True

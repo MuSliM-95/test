@@ -12,7 +12,7 @@ from api.marketplace.service.products_list_service.schemas import MarketplacePro
     MarketplaceProductAttribute, MarketplaceProductList, AvailableWarehouse, MarketplaceProductsRequest, MarketplaceSort
 from database.db import nomenclature, prices, price_types, database, warehouses, warehouse_balances, units, categories, \
     manufacturers, cboxes, marketplace_rating_aggregates, pictures, nomenclature_barcodes, users, docs_sales_goods, \
-    docs_sales, nomenclature_attributes, nomenclature_attributes_value
+    docs_sales, nomenclature_attributes, nomenclature_attributes_value, nomenclature_groups_value
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
@@ -198,6 +198,49 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 )
             )
 
+        product["available_warehouses"] = available_warehouses or None
+        product["current_amount"] = total_amount
+
+        # Вариации товаров
+        group_query = select(
+            nomenclature_groups_value.c.group_id
+        ).where(
+            nomenclature_groups_value.c.nomenclature_id == product_id
+        )
+
+        group_row = await database.fetch_one(group_query)
+        nomenclatures_list = []
+
+        if group_row and group_row["group_id"]:
+            group_id = group_row["group_id"]
+
+            variations_query = (
+                select(
+                    nomenclature.c.id,
+                    nomenclature.c.name,
+                    nomenclature_groups_value.c.is_main
+                )
+                .select_from(nomenclature_groups_value)
+                .join(
+                    nomenclature,
+                    nomenclature.c.id == nomenclature_groups_value.c.nomenclature_id
+                )
+                .where(nomenclature_groups_value.c.group_id == group_id)
+            )
+
+            variations = await database.fetch_all(variations_query)
+
+            nomenclatures_list = [
+                {
+                    "id": v.id,
+                    "name": v.name,
+                    "is_main": v.is_main
+                }
+                for v in variations
+            ]
+
+        product["nomenclatures"] = nomenclatures_list
+
         # Фото
         if product["images"]:
             product["images"] = [
@@ -218,8 +261,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         product["listing_page"] = 1
         product["is_ad_pos"] = False
         product["variations"] = []
-        product["available_warehouses"] = available_warehouses or None
-        product["current_amount"] = total_amount
 
         # distance — расстояние до ближайшего склада
         if product["available_warehouses"]:
