@@ -12,7 +12,7 @@ from api.marketplace.service.products_list_service.schemas import MarketplacePro
     MarketplaceProductAttribute, MarketplaceProductList, AvailableWarehouse, MarketplaceProductsRequest, MarketplaceSort
 from database.db import nomenclature, prices, price_types, database, warehouses, warehouse_balances, units, categories, \
     manufacturers, cboxes, marketplace_rating_aggregates, pictures, nomenclature_barcodes, users, docs_sales_goods, \
-    docs_sales, nomenclature_attributes, nomenclature_attributes_value, nomenclature_groups_value
+    docs_sales, nomenclature_attributes, nomenclature_attributes_value, nomenclature_groups_value, nomenclature_groups
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
@@ -202,17 +202,28 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         product["current_amount"] = total_amount
 
         # Вариации товаров
-        group_query = select(
-            nomenclature_groups_value.c.group_id
-        ).where(
-            nomenclature_groups_value.c.nomenclature_id == product_id
+        # 1. Получаем все группы, к которым принадлежит товар
+        group_query = (
+            select(
+                nomenclature_groups_value.c.group_id,
+                nomenclature_groups.c.name.label("group_name")
+            )
+            .select_from(nomenclature_groups_value)
+            .join(
+                nomenclature_groups,
+                nomenclature_groups.c.id == nomenclature_groups_value.c.group_id
+            )
+            .where(nomenclature_groups_value.c.nomenclature_id == product_id)
         )
 
-        group_row = await database.fetch_one(group_query)
-        nomenclatures_list = []
+        groups = await database.fetch_all(group_query)
 
-        if group_row and group_row["group_id"]:
-            group_id = group_row["group_id"]
+        nomenclatures_result = []
+
+        # 2. Для каждой группы — получаем вариации
+        for group in groups:
+            group_id = group["group_id"]
+            group_name = group["group_name"]
 
             variations_query = (
                 select(
@@ -230,7 +241,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
             variations = await database.fetch_all(variations_query)
 
-            nomenclatures_list = [
+            items = [
                 {
                     "id": v.id,
                     "name": v.name,
@@ -239,7 +250,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 for v in variations
             ]
 
-        product["nomenclatures"] = nomenclatures_list
+            nomenclatures_result.append({
+                "group_name": group_name,
+                "items": items
+            })
+
+        product["nomenclatures"] = nomenclatures_result or None
 
         # Фото
         if product["images"]:
