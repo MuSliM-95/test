@@ -18,7 +18,8 @@ from database.db import nomenclature, prices, price_types, database, warehouses,
 class MarketplaceProductsListService(BaseMarketplaceService):
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
-        return f'https://{os.getenv("APP_URL")}/{photo_path}'
+        base_url = os.getenv("APP_URL")
+        return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
 
