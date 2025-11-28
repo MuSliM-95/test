@@ -194,9 +194,18 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # Штрихкоды
         product["barcodes"] = [b for b in (product["barcodes"] or []) if b]
 
+        # Поле cashbox_id
+        product["cashbox_id"] = product["cashbox"]
+
+        product["listing_pos"] = 1
+        product["listing_page"] = 1
+        product["is_ad_pos"] = False
+        product["variations"] = []
+
         # Склады
         wh_raw = product.get("available_warehouses")
         if wh_raw:
+            wh_raw = [w for w in wh_raw if w is not None and w.get("warehouse_id") is not None]
             product["available_warehouses"] = [
                 AvailableWarehouse(**w, distance_to_client=self._count_distance_to_client(None, None, w["latitude"],
                                                                                           w["longitude"]))
@@ -204,6 +213,17 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             ]
         else:
             product["available_warehouses"] = None
+
+        # distance — расстояние до ближайшего склада
+        if product["available_warehouses"]:
+            product["distance"] = (
+                min(
+                    product["available_warehouses"],
+                    key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0)
+                ).distance_to_client
+            )
+        else:
+            product["distance"] = None
 
         # Добавляем аттрибуты
         attrs = await database.fetch_all(
