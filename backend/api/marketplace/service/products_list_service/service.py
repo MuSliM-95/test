@@ -167,7 +167,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .select_from(warehouse_balances)
             .join(warehouses, and_(
                 warehouses.c.id == warehouse_balances.c.warehouse_id,
-                warehouses.c.is_public.is_(True),
                 warehouses.c.status.is_(True),
                 warehouses.c.is_deleted.is_not(True)
             ))
