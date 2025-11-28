@@ -21,7 +21,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         return f'https://{os.getenv("APP_URL")}/{photo_path}'
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
-        request = MarketplaceProductsRequest(page=1, size=1)
 
         current_timestamp = int(datetime.now().timestamp())
 
@@ -135,7 +134,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 pictures.c.is_deleted.is_not(True)
             ), isouter=True)
             .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, isouter=True)
-            .join(warehouses, warehouses.c.cashbox == nomenclature.c.cashbox)
             .join(
                 marketplace_rating_aggregates,
                 and_(
