@@ -21,7 +21,66 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         return f'https://{os.getenv("APP_URL")}/{photo_path}'
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
-        # Базовые данные товара
+        request = MarketplaceProductsRequest(page=1, size=1)
+
+        current_timestamp = int(datetime.now().timestamp())
+
+        ranked_prices_subquery = (
+            select(
+                prices.c.nomenclature.label('nomenclature_id'),
+                prices.c.id.label('price_id'),
+                prices.c.price,
+                prices.c.price_type,
+                prices.c.created_at,
+                prices.c.date_from,
+                prices.c.date_to,
+                prices.c.is_deleted,
+                func.row_number().over(
+                    partition_by=prices.c.nomenclature,
+                    order_by=[
+                        desc(func.coalesce(prices.c.date_from <= current_timestamp, True)
+                             & func.coalesce(current_timestamp < prices.c.date_to, True)),
+                        desc(prices.c.created_at),
+                        desc(prices.c.id)
+                    ]
+                ).label('rn')
+            )
+            .where(prices.c.is_deleted.is_not(True))
+            .subquery()
+        )
+
+        active_prices_subquery = (
+            select(ranked_prices_subquery)
+            .where(ranked_prices_subquery.c.rn == 1)
+            .subquery()
+        )
+
+        total_sold_subquery = (
+            select(
+                docs_sales_goods.c.nomenclature,
+                func.count(docs_sales_goods.c.id).label("total_sold")
+            )
+            .group_by(docs_sales_goods.c.nomenclature)
+            .subquery()
+        )
+
+        # агрегация складов
+        wh_bal = warehouses.alias("wh_bal")
+        json_obj = func.jsonb_build_object(
+            literal_column("'warehouse_id'"), wh_bal.c.id,
+            literal_column("'organization_id'"), warehouse_balances.c.organization_id,
+            literal_column("'warehouse_name'"), wh_bal.c.name,
+            literal_column("'warehouse_address'"), wh_bal.c.address,
+            literal_column("'latitude'"), wh_bal.c.latitude,
+            literal_column("'longitude'"), wh_bal.c.longitude
+        )
+        available_warehouses_agg = (
+            func.array_agg(cast(json_obj, JSONB).distinct())
+            .filter(wh_bal.c.id.is_not(None))
+            .label("available_warehouses")
+        )
+
+        # Основной SELECT — как в get_products, только с фильтром по ID
         query = (
             select(
                 nomenclature.c.id,
@@ -43,16 +102,40 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 categories.c.name.label("category_name"),
                 manufacturers.c.name.label("manufacturer_name"),
 
-                pictures.c.url.label("image"),
-                nomenclature_barcodes.c.code.label("barcode"),
+                active_prices_subquery.c.price,
+                price_types.c.name.label("price_type"),
+
+                cboxes.c.name.label("seller_name"),
+                users.c.photo.label("seller_photo"),
 
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
-                marketplace_rating_aggregates.c.reviews_count.label("reviews_count")
+                marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
+
+                func.array_agg(func.distinct(pictures.c.url))
+                .filter(pictures.c.url.is_not(None)).label("images"),
+
+                func.array_agg(func.distinct(nomenclature_barcodes.c.code))
+                .filter(nomenclature_barcodes.c.code.is_not(None)).label("barcodes"),
+
+                warehouse_balances.c.current_amount,
+                func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
+                available_warehouses_agg
             )
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
             .join(categories, categories.c.id == nomenclature.c.category, isouter=True)
             .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, isouter=True)
+            .join(active_prices_subquery, active_prices_subquery.c.nomenclature_id == nomenclature.c.id)
+            .join(price_types, price_types.c.id == active_prices_subquery.c.price_type)
+            .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
+            .join(users, users.c.id == cboxes.c.admin)
+            .join(pictures, and_(
+                pictures.c.entity == "nomenclature",
+                pictures.c.entity_id == nomenclature.c.id,
+                pictures.c.is_deleted.is_not(True)
+            ), isouter=True)
+            .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, isouter=True)
+            .join(warehouses, warehouses.c.cashbox == nomenclature.c.cashbox)
             .join(
                 marketplace_rating_aggregates,
                 and_(
@@ -61,53 +144,69 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 ),
                 isouter=True
             )
-            .join(pictures, and_(
-                pictures.c.entity == "nomenclature",
-                pictures.c.entity_id == nomenclature.c.id,
-                pictures.c.is_deleted.is_not(True)
+            .join(warehouse_balances, warehouse_balances.c.nomenclature_id == nomenclature.c.id, isouter=True)
+            .join(wh_bal, and_(
+                wh_bal.c.id == warehouse_balances.c.warehouse_id,
+                wh_bal.c.is_public.is_(True),
+                wh_bal.c.status.is_(True),
+                wh_bal.c.is_deleted.is_not(True)
             ), isouter=True)
-            .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, isouter=True)
+            .join(total_sold_subquery, total_sold_subquery.c.nomenclature == nomenclature.c.id, isouter=True)
             .where(
                 and_(
                     nomenclature.c.id == product_id,
-                    nomenclature.c.is_deleted.is_not(True)
-                )
-            )
-        )
-
-        rows = await database.fetch_all(query)
-        if not rows:
-            raise HTTPException(status_code=404, detail="Товар не найден")
-
-        base = rows[0]
-        images = list({r.image for r in rows if r.image})
-        barcodes = list({r.barcode for r in rows if r.barcode})
-
-        # Цена
-        price_query = (
-            select(prices.c.price, price_types.c.name.label("price_type"))
-            .select_from(prices)
-            .join(price_types, price_types.c.id == prices.c.price_type)
-            .where(
-                and_(
-                    prices.c.nomenclature == product_id,
-                    prices.c.is_deleted.is_not(True),
+                    nomenclature.c.is_deleted.is_not(True),
                     price_types.c.name == "chatting"
                 )
             )
-            .order_by(prices.c.created_at.desc())
-            .limit(1)
+            .group_by(
+                nomenclature.c.id,
+                units.c.convent_national_view,
+                categories.c.name,
+                manufacturers.c.name,
+                active_prices_subquery.c.price,
+                price_types.c.name,
+                cboxes.c.name,
+                users.c.photo,
+                marketplace_rating_aggregates.c.avg_rating,
+                marketplace_rating_aggregates.c.reviews_count,
+                warehouse_balances.c.current_amount,
+                total_sold_subquery.c.total_sold
+            )
         )
-        price_row = await database.fetch_one(price_query)
-        if price_row:
-            price = price_row.price
-            price_type = price_row.price_type
-        else:
-            price = 0.0
-            price_type = "chatting"
 
-        # Атрибуты
-        attr_query = (
+        row = await database.fetch_one(query)
+        if not row:
+            raise HTTPException(status_code=404, detail="Товар не найден")
+
+        product = dict(row)
+
+        # Фото
+        if product["images"]:
+            product["images"] = [
+                self.__transform_photo_route(url) for url in product["images"]
+            ]
+
+        # Селлер
+        if product["seller_photo"]:
+            product["seller_photo"] = self.__transform_photo_route(product["seller_photo"])
+
+        # Штрихкоды
+        product["barcodes"] = [b for b in (product["barcodes"] or []) if b]
+
+        # Склады
+        wh_raw = product.get("available_warehouses")
+        if wh_raw:
+            product["available_warehouses"] = [
+                AvailableWarehouse(**w, distance_to_client=self._count_distance_to_client(None, None, w["latitude"],
+                                                                                          w["longitude"]))
+                for w in wh_raw
+            ]
+        else:
+            product["available_warehouses"] = None
+
+        # Добавляем аттрибуты
+        attrs = await database.fetch_all(
             select(
                 nomenclature_attributes.c.name,
                 nomenclature_attributes_value.c.value
@@ -116,44 +215,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .join(nomenclature_attributes, nomenclature_attributes.c.id == nomenclature_attributes_value.c.attribute_id)
             .where(nomenclature_attributes_value.c.nomenclature_id == product_id)
         )
-
-        attr_rows = await database.fetch_all(attr_query)
-        attributes = [
-            MarketplaceProductAttribute(name=row.name, value=row.value) for row in attr_rows
+        product_attributes = [
+            MarketplaceProductAttribute(name=a.name, value=a.value)
+            for a in attrs
         ]
 
-        # Склады
-        available_warehouses = await self._fetch_available_warehouses(product_id)
+        return MarketplaceProductDetail(**product, attributes=product_attributes)
 
-        # Формируем итоговую модель
-        return MarketplaceProductDetail(
-            id=base.id,
-            name=base.name,
-            description_short=base.description_short,
-            description_long=base.description_long,
-            code=base.code,
-            unit_name=base.unit_name,
-            cashbox_id=base.cashbox,
-            category_name=base.category_name,
-            manufacturer_name=base.manufacturer_name,
-            created_at=base.created_at,
-            updated_at=base.updated_at,
-            images=images,
-            barcodes=barcodes,
-            type=base.type,
-            tags=base.tags,
-            rating=base.rating,
-            reviews_count=base.reviews_count,
-            price=price,
-            price_type=price_type,
-            available_warehouses=available_warehouses,
-
-            seo_title=base.seo_title,
-            seo_description=base.seo_description,
-            seo_keywords=base.seo_keywords,
-
-            attributes=attributes,
-        )
 
     async def get_products(
             self,
