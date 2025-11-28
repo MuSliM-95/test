@@ -2,22 +2,158 @@ import json
 import os
 from datetime import datetime
 from typing import Optional, List
+from fastapi import HTTPException
 
 from sqlalchemy import and_, select, func, asc, desc, literal_column, cast
 from sqlalchemy.dialects.postgresql import JSONB
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
-from api.marketplace.service.products_list_service.schemas import MarketplaceProduct, MarketplaceProductList, \
-    AvailableWarehouse, MarketplaceProductsRequest, MarketplaceSort
+from api.marketplace.service.products_list_service.schemas import MarketplaceProduct, MarketplaceProductDetail, \
+    MarketplaceProductAttribute, MarketplaceProductList, AvailableWarehouse, MarketplaceProductsRequest, MarketplaceSort
 from database.db import nomenclature, prices, price_types, database, warehouses, warehouse_balances, units, categories, \
     manufacturers, cboxes, marketplace_rating_aggregates, pictures, nomenclature_barcodes, users, docs_sales_goods, \
-    docs_sales
+    docs_sales, nomenclature_attributes, nomenclature_attributes_value
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
         return f'https://{os.getenv("APP_URL")}/{photo_path}'
+
+    async def get_product(self, product_id: int) -> MarketplaceProductDetail:
+        # Базовые данные товара
+        query = (
+            select(
+                nomenclature.c.id,
+                nomenclature.c.name,
+                nomenclature.c.description_short,
+                nomenclature.c.description_long,
+                nomenclature.c.code,
+                nomenclature.c.cashbox,
+                nomenclature.c.created_at,
+                nomenclature.c.updated_at,
+                nomenclature.c.tags,
+                nomenclature.c.type,
+
+                nomenclature.c.seo_title,
+                nomenclature.c.seo_description,
+                nomenclature.c.seo_keywords,
+
+                units.c.convent_national_view.label("unit_name"),
+                categories.c.name.label("category_name"),
+                manufacturers.c.name.label("manufacturer_name"),
+
+                pictures.c.url.label("image"),
+                nomenclature_barcodes.c.code.label("barcode"),
+
+                marketplace_rating_aggregates.c.avg_rating.label("rating"),
+                marketplace_rating_aggregates.c.reviews_count.label("reviews_count")
+            )
+            .select_from(nomenclature)
+            .join(units, units.c.id == nomenclature.c.unit, isouter=True)
+            .join(categories, categories.c.id == nomenclature.c.category, isouter=True)
+            .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, isouter=True)
+            .join(
+                marketplace_rating_aggregates,
+                and_(
+                    marketplace_rating_aggregates.c.entity_id == nomenclature.c.id,
+                    marketplace_rating_aggregates.c.entity_type == "nomenclature"
+                ),
+                isouter=True
+            )
+            .join(pictures, and_(
+                pictures.c.entity == "nomenclature",
+                pictures.c.entity_id == nomenclature.c.id,
+                pictures.c.is_deleted.is_not(True)
+            ), isouter=True)
+            .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, isouter=True)
+            .where(
+                and_(
+                    nomenclature.c.id == product_id,
+                    nomenclature.c.is_deleted.is_not(True)
+                )
+            )
+        )
+
+        rows = await database.fetch_all(query)
+        if not rows:
+            raise HTTPException(status_code=404, detail="Товар не найден")
+
+        base = rows[0]
+        images = list({r.image for r in rows if r.image})
+        barcodes = list({r.barcode for r in rows if r.barcode})
+
+        # Цена
+        price_query = (
+            select(prices.c.price, price_types.c.name.label("price_type"))
+            .select_from(prices)
+            .join(price_types, price_types.c.id == prices.c.price_type)
+            .where(
+                and_(
+                    prices.c.nomenclature == product_id,
+                    prices.c.is_deleted.is_not(True),
+                    price_types.c.name == "chatting"
+                )
+            )
+            .order_by(prices.c.created_at.desc())
+            .limit(1)
+        )
+        price_row = await database.fetch_one(price_query)
+        if price_row:
+            price = price_row.price
+            price_type = price_row.price_type
+        else:
+            price = 0.0
+            price_type = "chatting"
+
+        # Атрибуты
+        attr_query = (
+            select(
+                nomenclature_attributes.c.name,
+                nomenclature_attributes_value.c.value
+            )
+            .select_from(nomenclature_attributes_value)
+            .join(nomenclature_attributes, nomenclature_attributes.c.id == nomenclature_attributes_value.c.attribute_id)
+            .where(nomenclature_attributes_value.c.nomenclature_id == product_id)
+        )
+
+        attr_rows = await database.fetch_all(attr_query)
+        attributes = [
+            MarketplaceProductAttribute(name=row.name, value=row.value) for row in attr_rows
+        ]
+
+        # Склады
+        available_warehouses = await self._fetch_available_warehouses(product_id)
+
+        # Формируем итоговую модель
+        return MarketplaceProductDetail(
+            id=base.id,
+            name=base.name,
+            description_short=base.description_short,
+            description_long=base.description_long,
+            code=base.code,
+            unit_name=base.unit_name,
+            cashbox_id=base.cashbox,
+            category_name=base.category_name,
+            manufacturer_name=base.manufacturer_name,
+            created_at=base.created_at,
+            updated_at=base.updated_at,
+            images=images,
+            barcodes=barcodes,
+            type=base.type,
+            tags=base.tags,
+            rating=base.rating,
+            reviews_count=base.reviews_count,
+            price=price,
+            price_type=price_type,
+            available_warehouses=available_warehouses,
+
+            seo_title=base.seo_title,
+            seo_description=base.seo_description,
+            seo_keywords=base.seo_keywords,
+
+            attributes=attributes,
+        )
 
     async def get_products(
             self,

@@ -60,6 +60,21 @@ class MarketplaceProduct(BaseModel):
     class Config:
         orm_mode = True
 
+class MarketplaceProductAttribute(BaseModel):
+    """Атрибуты товара"""
+    name: str
+    value: str
+
+class MarketplaceProductDetail(MarketplaceProduct):
+    """Дополненная модель товара для маркетплейса"""
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    seo_keywords: Optional[List[str]] = None
+    attributes: Optional[List[MarketplaceProductAttribute]] = None
+
+    class Config:
+        orm_mode = True
+
 class MarketplaceProductList(BaseModel):
     """Список товаров маркетплейса"""
     result: List[MarketplaceProduct]
