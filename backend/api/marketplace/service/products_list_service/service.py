@@ -71,14 +71,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             literal_column("'warehouse_name'"), wh_bal.c.name,
             literal_column("'warehouse_address'"), wh_bal.c.address,
             literal_column("'latitude'"), wh_bal.c.latitude,
-            literal_column("'longitude'"), wh_bal.c.longitude,
-            literal_column("'current_amount'"), warehouse_balances.c.current_amount
+            literal_column("'longitude'"), wh_bal.c.longitude
         )
         available_warehouses_agg = (
-            func.coalesce(
-                func.array_agg(func.distinct(cast(json_obj, JSONB))),
-                []
-            ).label("available_warehouses")
+            func.array_agg(cast(json_obj, JSONB).distinct())
+            .filter(wh_bal.c.id.is_not(None))
+            .label("available_warehouses")
         )
 
         # Основной SELECT — как в get_products, только с фильтром по ID
