@@ -63,25 +63,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .subquery()
         )
 
-        # агрегация складов
-        wh_bal = warehouses.alias("wh_bal")
-        json_obj = func.jsonb_build_object(
-            literal_column("'warehouse_id'"), wh_bal.c.id,
-            literal_column("'organization_id'"), warehouse_balances.c.organization_id,
-            literal_column("'warehouse_name'"), wh_bal.c.name,
-            literal_column("'warehouse_address'"), wh_bal.c.address,
-            literal_column("'latitude'"), wh_bal.c.latitude,
-            literal_column("'longitude'"), wh_bal.c.longitude,
-            literal_column("'current_amount'"), warehouse_balances.c.current_amount
-        )
-        available_warehouses_agg = (
-            func.coalesce(
-                func.array_agg(func.distinct(cast(json_obj, JSONB))),
-                []
-            ).label("available_warehouses")
-        )
-
-        # Основной SELECT — как в get_products, только с фильтром по ID
+        # Основной запрос для получения базовой информации о товаре
         query = (
             select(
                 nomenclature.c.id,
@@ -118,9 +100,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 func.array_agg(func.distinct(nomenclature_barcodes.c.code))
                 .filter(nomenclature_barcodes.c.code.is_not(None)).label("barcodes"),
 
-                warehouse_balances.c.current_amount,
                 func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
-                available_warehouses_agg
             )
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
@@ -144,13 +124,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 ),
                 isouter=True
             )
-            .join(warehouse_balances, warehouse_balances.c.nomenclature_id == nomenclature.c.id, isouter=True)
-            .join(wh_bal, and_(
-                wh_bal.c.id == warehouse_balances.c.warehouse_id,
-                wh_bal.c.is_public.is_(True),
-                wh_bal.c.status.is_(True),
-                wh_bal.c.is_deleted.is_not(True)
-            ), isouter=True)
             .join(total_sold_subquery, total_sold_subquery.c.nomenclature == nomenclature.c.id, isouter=True)
             .where(
                 and_(
@@ -170,7 +143,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 users.c.photo,
                 marketplace_rating_aggregates.c.avg_rating,
                 marketplace_rating_aggregates.c.reviews_count,
-                warehouse_balances.c.current_amount,
                 total_sold_subquery.c.total_sold
             )
         )
@@ -180,6 +152,51 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             raise HTTPException(status_code=404, detail="Товар не найден")
 
         product = dict(row)
+
+        # Отдельный запрос для получения складов с остатками
+        warehouses_query = (
+            select(
+                warehouses.c.id.label("warehouse_id"),
+                warehouses.c.name.label("warehouse_name"),
+                warehouses.c.address.label("warehouse_address"),
+                warehouses.c.latitude,
+                warehouses.c.longitude,
+                warehouse_balances.c.current_amount,
+                warehouse_balances.c.organization_id
+            )
+            .select_from(warehouse_balances)
+            .join(warehouses, and_(
+                warehouses.c.id == warehouse_balances.c.warehouse_id,
+                warehouses.c.is_public.is_(True),
+                warehouses.c.status.is_(True),
+                warehouses.c.is_deleted.is_not(True)
+            ))
+            .where(and_(
+                warehouse_balances.c.nomenclature_id == product_id,
+                warehouse_balances.c.current_amount > 0  # Только склады с остатками
+            ))
+        )
+
+        warehouses_rows = await database.fetch_all(warehouses_query)
+
+        total_amount = 0
+        available_warehouses = []
+        for wh_row in warehouses_rows:
+            wh_dict = dict(wh_row)
+            total_amount += wh_dict["current_amount"] or 0
+            available_warehouses.append(
+                AvailableWarehouse(
+                    warehouse_id=wh_dict["warehouse_id"],
+                    organization_id=wh_dict["organization_id"],
+                    warehouse_name=wh_dict["warehouse_name"],
+                    warehouse_address=wh_dict["warehouse_address"],
+                    latitude=wh_dict["latitude"],
+                    longitude=wh_dict["longitude"],
+                    current_amount=wh_dict["current_amount"],
+                    distance_to_client=self._count_distance_to_client(None, None, wh_dict["latitude"],
+                                                                      wh_dict["longitude"])
+                )
+            )
 
         # Фото
         if product["images"]:
@@ -201,18 +218,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         product["listing_page"] = 1
         product["is_ad_pos"] = False
         product["variations"] = []
-
-        # Склады
-        wh_raw = product.get("available_warehouses")
-        if wh_raw:
-            wh_raw = [w for w in wh_raw if w is not None and w.get("warehouse_id") is not None]
-            product["available_warehouses"] = [
-                AvailableWarehouse(**w, distance_to_client=self._count_distance_to_client(None, None, w["latitude"],
-                                                                                          w["longitude"]))
-                for w in wh_raw
-            ]
-        else:
-            product["available_warehouses"] = None
+        product["available_warehouses"] = available_warehouses or None
+        product["current_amount"] = total_amount
 
         # distance — расстояние до ближайшего склада
         if product["available_warehouses"]:
@@ -225,7 +232,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         else:
             product["distance"] = None
 
-        # Добавляем аттрибуты
+        # Добавляем атрибуты
         attrs = await database.fetch_all(
             select(
                 nomenclature_attributes.c.name,

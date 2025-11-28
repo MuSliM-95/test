@@ -13,6 +13,7 @@ class AvailableWarehouse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     distance_to_client: Optional[float] = None
+    current_amount: Optional[float] = None
 
     class Config:
         orm_mode = True
