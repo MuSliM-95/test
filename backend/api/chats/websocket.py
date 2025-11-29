@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException
 import json
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -12,10 +12,9 @@ router = APIRouter(prefix="/chats", tags=["chats-ws"])
 
 @dataclass
 class ChatConnectionInfo:
-    """Информация о подключенном пользователе"""
     websocket: WebSocket
     user_id: int
-    user_type: str  # OPERATOR или CLIENT
+    user_type: str
     connected_at: datetime
 
 
@@ -24,8 +23,6 @@ class ChatConnectionManager:
         self.active_connections: Dict[int, List[ChatConnectionInfo]] = {}
     
     async def connect(self, chat_id: int, websocket: WebSocket, user_id: int, user_type: str):
-        """Подключить пользователя к чату"""
-        await websocket.accept()
         if chat_id not in self.active_connections:
             self.active_connections[chat_id] = []
         
@@ -37,10 +34,8 @@ class ChatConnectionManager:
         )
         
         self.active_connections[chat_id].append(connection_info)
-        print(f"User {user_id} ({user_type}) connected to chat {chat_id}. Total clients: {len(self.active_connections[chat_id])}")
     
     async def disconnect(self, chat_id: int, websocket: WebSocket) -> Optional[ChatConnectionInfo]:
-        """Отключить пользователя от чата и вернуть информацию о подключении"""
         if chat_id in self.active_connections:
             connection_info = None
             for conn_info in self.active_connections[chat_id]:
@@ -53,17 +48,13 @@ class ChatConnectionManager:
                 del self.active_connections[chat_id]
             
             if connection_info:
-                print(f"User {connection_info.user_id} ({connection_info.user_type}) disconnected from chat {chat_id}")
                 return connection_info
             else:
-                print(f"Client disconnect failed - connection not found in chat {chat_id}")
                 return None
         else:
-            print(f"Client disconnect failed - chat {chat_id} not in active connections")
             return None
     
     def get_connection_info(self, chat_id: int, websocket: WebSocket) -> Optional[ChatConnectionInfo]:
-        """Получить информацию о подключении по WebSocket"""
         if chat_id in self.active_connections:
             for conn_info in self.active_connections[chat_id]:
                 if conn_info.websocket == websocket:
@@ -71,7 +62,6 @@ class ChatConnectionManager:
         return None
     
     def get_connected_users(self, chat_id: int) -> List[Dict]:
-        """Получить список подключенных пользователей в чате"""
         if chat_id not in self.active_connections:
             return []
         
@@ -86,14 +76,12 @@ class ChatConnectionManager:
         return users
     
     async def broadcast_to_chat(self, chat_id: int, message: dict):
-        """Транслировать сообщение всем подключенным к чату"""
         if chat_id in self.active_connections:
             disconnected_clients = []
             for i, conn_info in enumerate(self.active_connections[chat_id]):
                 try:
                     await conn_info.websocket.send_json(message)
                 except Exception as e:
-                    print(f"Failed to send to client in chat {chat_id}: {e}")
                     disconnected_clients.append(i)
             
             for i in reversed(disconnected_clients):
@@ -107,52 +95,94 @@ chat_manager = ChatConnectionManager()
 @router.websocket("/ws/{chat_id}/")
 async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(...)):
     """WebSocket для чатов с аутентификацией и RabbitMQ"""
+    await websocket.accept()
+    
     try:
         try:
             user = await get_current_user(token)
+        except HTTPException as e:
+            error_detail = e.detail if hasattr(e, 'detail') else str(e)
+            await websocket.send_json({
+                "error": "Unauthorized",
+                "detail": error_detail,
+                "status_code": e.status_code
+            })
+            await websocket.close(code=1008)
+            return
         except Exception as e:
-            await websocket.accept()
             await websocket.send_json({"error": "Unauthorized", "detail": str(e)})
             await websocket.close(code=1008)
-            print(f"Authentication failed for chat {chat_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return
         
         chat = await crud.get_chat(chat_id)
         if not chat:
-            await websocket.accept()
-            await websocket.send_json({"error": "Chat not found"})
+            await websocket.send_json({"error": "Chat not found", "chat_id": chat_id})
             await websocket.close(code=1008)
-            print(f"Chat not found for WebSocket connection: {chat_id}")
             return
         
-        if chat.cashbox_id != user.cashbox_id:
-            await websocket.accept()
-            await websocket.send_json({"error": "Access denied"})
+        chat_cashbox_id = chat.get('cashbox_id') if isinstance(chat, dict) else chat.cashbox_id
+        
+        if chat_cashbox_id != user.cashbox_id:
+            await websocket.send_json({
+                "error": "Access denied",
+                "detail": "Chat belongs to different cashbox",
+                "chat_cashbox_id": chat_cashbox_id,
+                "user_cashbox_id": user.cashbox_id
+            })
             await websocket.close(code=1008)
-            print(f"Access denied - cashbox mismatch for chat {chat_id}")
             return
         
-        # Определяем тип пользователя (OPERATOR или CLIENT)
-        user_type = "OPERATOR" if user.is_owner else "OPERATOR"  # Пока все через WebSocket - операторы
+        user_type = "OPERATOR" if user.is_owner else "OPERATOR"
         
-        # Подключаем пользователя
         await chat_manager.connect(chat_id, websocket, user.user, user_type)
         
-        # Отправляем событие подключения через RabbitMQ
         try:
             await chat_producer.send_user_connected_event(chat_id, user.user, user_type)
         except Exception as e:
-            print(f"Failed to send user connected event to RabbitMQ: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        try:
+            await websocket.send_json({
+                "type": "connected",
+                "chat_id": chat_id,
+                "user_id": user.user,
+                "user_type": user_type,
+                "message": "Successfully connected to chat",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        except Exception as e:
+            pass
         
         while True:
-            data = await websocket.receive_text()
-            message_data = json.loads(data)
+            try:
+                data = await websocket.receive_text()
+                message_data = json.loads(data)
+                
+                event_type = message_data.get("type", "message")
+            except WebSocketDisconnect:
+                raise
+            except json.JSONDecodeError as e:
+                await websocket.send_json({
+                    "error": "Invalid JSON",
+                    "detail": str(e)
+                })
+                continue
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                try:
+                    await websocket.send_json({
+                        "error": "Failed to process message",
+                        "detail": str(e)
+                    })
+                except:
+                    pass
+                continue
             
-            event_type = message_data.get("type", "message")
-            
-            # Обработка разных типов событий
             if event_type == "message":
-                # Обработка обычных сообщений
                 sender_type = message_data.get("sender_type", "OPERATOR").upper()
                 message_type = message_data.get("message_type", "TEXT").upper()
                 
@@ -165,9 +195,7 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                         status="SENT",
                         source="web"
                     )
-                    print(f"Message saved to DB for chat {chat_id}: {db_message.id}")
                 except Exception as e:
-                    print(f"Failed to save message to DB for chat {chat_id}: {e}")
                     await websocket.send_json({"error": "Failed to save message", "detail": str(e)})
                     continue
                 
@@ -180,7 +208,7 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                         "timestamp": datetime.utcnow().isoformat()
                     })
                 except Exception as e:
-                    print(f"Failed to send message to RabbitMQ for chat {chat_id}: {e}")
+                    pass
                 
                 response = {
                     "type": "message",
@@ -195,17 +223,14 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                 await chat_manager.broadcast_to_chat(chat_id, response)
             
             elif event_type == "typing":
-                # Обработка события печати
                 is_typing = message_data.get("is_typing", False)
                 
-                # Отправляем событие через RabbitMQ
                 try:
                     await chat_producer.send_typing_event(chat_id, user.user, user_type, is_typing)
                 except Exception as e:
-                    print(f"Failed to send typing event to RabbitMQ: {e}")
+                    pass
             
             elif event_type == "get_users":
-                # Получение списка подключенных пользователей
                 users = chat_manager.get_connected_users(chat_id)
                 await websocket.send_json({
                     "type": "users_list",
@@ -226,12 +251,16 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
             try:
                 await chat_producer.send_user_disconnected_event(chat_id, connection_info.user_id, connection_info.user_type)
             except Exception as e:
-                print(f"Failed to send user disconnected event to RabbitMQ: {e}")
+                pass
     except Exception as e:
-        print(f"Critical error in WebSocket for chat {chat_id}: {e}")
-        connection_info = await chat_manager.disconnect(chat_id, websocket)
-        if connection_info:
-            try:
-                await chat_producer.send_user_disconnected_event(chat_id, connection_info.user_id, connection_info.user_type)
-            except Exception as e2:
-                print(f"Failed to send user disconnected event to RabbitMQ: {e2}")
+        import traceback
+        traceback.print_exc()
+        try:
+            connection_info = await chat_manager.disconnect(chat_id, websocket)
+            if connection_info:
+                try:
+                    await chat_producer.send_user_disconnected_event(chat_id, connection_info.user_id, connection_info.user_type)
+                except Exception as e2:
+                    pass
+        except Exception as disconnect_error:
+            pass

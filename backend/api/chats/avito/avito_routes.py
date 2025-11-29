@@ -5,6 +5,7 @@ import os
 import logging
 import urllib.parse
 import secrets
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,10 @@ from api.chats.avito.schemas import (
     AvitoWebhookRegisterResponse,
     AvitoWebhookUpdateResponse,
     AvitoOAuthAuthorizeResponse,
-    AvitoOAuthCallbackResponse
+    AvitoOAuthCallbackResponse,
+    AvitoHistoryLoadResponse,
+    AvitoApplicantPhoneResponse,
+    AvitoChatMetadataResponse
 )
 from api.chats.avito.avito_handler import AvitoHandler
 from api.chats.avito.avito_factory import (
@@ -199,10 +203,12 @@ async def connect_avito_channel(
             if existing_channel:
                 channel_name = f"Avito - {avito_account_name} ({cashbox_id})" if avito_account_name else f"Avito - Cashbox {cashbox_id}"
             
+            from api.chats.avito.avito_constants import AVITO_SVG_ICON
             channel_id = await database.execute(
                 channels.insert().values(
                     name=channel_name,
                     type="AVITO",
+                    svg_icon=AVITO_SVG_ICON,
                     description=f"Avito White API Integration for {avito_account_name or f'Cashbox {cashbox_id}'}",
                     is_active=True
                 )
@@ -461,56 +467,87 @@ async def get_avito_chats(
                             except Exception as e:
                                 pass
                             
-                            update_data = {}
+                            metadata = {}
+                            context = avito_chat.get('context', {})
+                            if isinstance(context, dict):
+                                item = context.get('item', {})
+                                if isinstance(item, dict):
+                                    ad_title = item.get('title')
+                                    ad_id = item.get('id')
+                                    ad_url = item.get('url')
+                                    if ad_title:
+                                        metadata['ad_title'] = ad_title
+                                    if ad_id:
+                                        metadata['ad_id'] = ad_id
+                                    if ad_url:
+                                        metadata['ad_url'] = ad_url
+                                if context:
+                                    metadata['context'] = context
                             
-                            if user_name and existing_chat.get('name') != user_name:
-                                update_data["name"] = user_name
-                            if user_phone and existing_chat.get('phone') != user_phone:
-                                update_data["phone"] = user_phone
+                            if existing_chat.get('chat_contact_id'):
+                                from database.db import chat_contacts
+                                contact_update = {}
+                                if user_name:
+                                    contact_update['name'] = user_name
+                                if user_phone:
+                                    contact_update['phone'] = user_phone
+                                if metadata:
+                                    existing_contact = await database.fetch_one(
+                                        chat_contacts.select().where(chat_contacts.c.id == existing_chat['chat_contact_id'])
+                                    )
+                                    existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
+                                    if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
+                                        existing_metadata.update(metadata)
+                                        contact_update['metadata'] = existing_metadata
+                                    elif not existing_metadata:
+                                        contact_update['metadata'] = metadata
+                                
+                                if contact_update:
+                                    await database.execute(
+                                        chat_contacts.update().where(
+                                            chat_contacts.c.id == existing_chat['chat_contact_id']
+                                        ).values(**contact_update)
+                                    )
                             
                             last_message = avito_chat.get('last_message')
                             if last_message and last_message.get('created'):
                                 last_message_time = datetime.fromtimestamp(last_message['created'])
-                                update_data["last_message_time"] = last_message_time
-                            
-                            if len(update_data) > 0:
-                                if 'last_message_time' in update_data and update_data['last_message_time']:
-                                    update_data['updated_at'] = update_data['last_message_time']
-                                else:
-                                    update_data['updated_at'] = datetime.utcnow()
-                                
                                 await database.execute(
                                     chats.update().where(
                                         chats.c.id == existing_chat['id']
-                                    ).values(**update_data)
+                                    ).values(
+                                        last_message_time=last_message_time,
+                                        updated_at=last_message_time
+                                    )
                                 )
-                                updated_count += 1
+                            
+                            updated_count += 1
                         else:
-                            chat_data = {
-                                "channel_id": avito_channel['id'],
-                                "cashbox_id": cashbox_id,
-                                "external_chat_id": external_chat_id,
-                                "name": user_name,
-                                "phone": user_phone,
-                                "status": "ACTIVE",
-                                "created_at": datetime.utcnow(),
-                            }
+                            metadata = {}
+                            context = avito_chat.get('context', {})
+                            if isinstance(context, dict):
+                                item = context.get('item', {})
+                                if isinstance(item, dict):
+                                    ad_title = item.get('title')
+                                    ad_id = item.get('id')
+                                    ad_url = item.get('url')
+                                    if ad_title:
+                                        metadata['ad_title'] = ad_title
+                                    if ad_id:
+                                        metadata['ad_id'] = ad_id
+                                    if ad_url:
+                                        metadata['ad_url'] = ad_url
+                                if context:
+                                    metadata['context'] = context
                             
-                            if avito_chat.get('created'):
-                                first_message_time = datetime.fromtimestamp(avito_chat['created'])
-                                chat_data["first_message_time"] = first_message_time
-                            
-                            last_message = avito_chat.get('last_message')
-                            if last_message and last_message.get('created'):
-                                last_message_time = datetime.fromtimestamp(last_message['created'])
-                                chat_data["last_message_time"] = last_message_time
-                                chat_data["updated_at"] = last_message_time
-                            else:
-                                # Если нет last_message_time, используем текущее время
-                                chat_data["updated_at"] = datetime.utcnow()
-                            
-                            await database.execute(
-                                chats.insert().values(**chat_data)
+                            await crud.create_chat(
+                                channel_id=avito_channel['id'],
+                                cashbox_id=cashbox_id,
+                                external_chat_id=external_chat_id,
+                                external_contact_id=external_chat_id,
+                                name=user_name or (metadata.get('ad_title') if metadata else None) or f"Avito Chat {external_chat_id[:8]}",
+                                phone=user_phone,
+                                metadata=metadata if metadata else None
                             )
                             created_count += 1
                     
@@ -520,17 +557,37 @@ async def get_avito_chats(
             except Exception as e:
                 continue
         
-        chat_items = [
-            AvitoChatListItem(
-                id=chat.get('id', ''),
-                created=chat.get('created'),
-                updated=chat.get('updated'),
-                last_message=chat.get('last_message'),
-                users=chat.get('users'),
-                context=chat.get('context')
+        chat_items = []
+        for chat in all_avito_chats:
+            last_message = chat.get('last_message')
+            if last_message and isinstance(last_message, dict):
+                last_message_clean = {k: v for k, v in last_message.items() if k != 'chat_id'}
+                last_message_clean = {k: v for k, v in last_message_clean.items() if k != 'author_id'}
+            else:
+                last_message_clean = last_message
+            
+            context = chat.get('context')
+            if context and isinstance(context, dict):
+                context_clean = context.copy()
+                if 'value' in context_clean and 'item' in context_clean:
+                    value = context_clean.get('value', {})
+                    item = context_clean.get('item', {})
+                    if isinstance(value, dict) and isinstance(item, dict):
+                        if value.get('id') == item.get('id'):
+                            context_clean.pop('item', None)
+            else:
+                context_clean = context
+            
+            chat_items.append(
+                AvitoChatListItem(
+                    id=chat.get('id', ''),
+                    created=chat.get('created'),
+                    updated=chat.get('updated'),
+                    last_message=last_message_clean,
+                    users=chat.get('users'),
+                    context=context_clean
+                )
             )
-            for chat in all_avito_chats
-        ]
         
         return {
             "success": True,
@@ -829,6 +886,378 @@ async def get_avito_chat_messages(
         raise HTTPException(status_code=400, detail=f"Error getting messages: {str(e)}")
 
 
+@router.get("/chats/{chat_id}/applicant/phone", response_model=AvitoApplicantPhoneResponse)
+async def get_avito_applicant_phone(
+    chat_id: str,
+    user = Depends(get_current_user)
+):
+ 
+    try:
+        cashbox_id = user.cashbox_id
+        
+        chat = None
+        try:
+            internal_chat_id = int(chat_id)
+            chat = await crud.get_chat(internal_chat_id)
+        except ValueError:
+            from database.db import channels
+            from sqlalchemy import select, and_
+            query = select([
+                chats.c.id,
+                chats.c.channel_id,
+                chats.c.cashbox_id,
+                chats.c.external_chat_id
+            ]).select_from(
+                chats.join(
+                    channels,
+                    chats.c.channel_id == channels.c.id
+                )
+            ).where(
+                and_(
+                    channels.c.type == 'AVITO',
+                    channels.c.is_active.is_(True),
+                    chats.c.external_chat_id == chat_id,
+                    chats.c.cashbox_id == cashbox_id
+                )
+            ).limit(1)
+            chat_result = await database.fetch_one(query)
+            if chat_result:
+                chat = await crud.get_chat(chat_result['id'])
+        
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        
+        if chat['cashbox_id'] != cashbox_id:
+            raise HTTPException(status_code=403, detail="Access denied - chat belongs to another cashbox")
+        
+        if not chat.get('external_chat_id'):
+            raise HTTPException(status_code=400, detail="Chat has no external_chat_id")
+        
+        avito_channel = await crud.get_channel(chat['channel_id'])
+        if not avito_channel or avito_channel.get('type') != 'AVITO':
+            raise HTTPException(status_code=400, detail="Chat is not from Avito channel")
+        
+        applicant_phone = None
+        applicant_name = None
+        
+        if chat.get('chat_contact_id'):
+            from database.db import chat_contacts
+            contact = await database.fetch_one(
+                chat_contacts.select().where(chat_contacts.c.id == chat['chat_contact_id'])
+            )
+            if contact:
+                applicant_phone = contact.get('phone')
+                applicant_name = contact.get('name')
+        
+        if not applicant_phone:
+            client = await create_avito_client(
+                channel_id=chat['channel_id'],
+                cashbox_id=cashbox_id,
+                on_token_refresh=lambda token_data: save_token_callback(
+                    chat['channel_id'],
+                    cashbox_id,
+                    token_data
+                )
+            )
+            
+            if client:
+                try:
+                    external_chat_id = chat['external_chat_id']
+                    chat_info = await client.get_chat_info(external_chat_id)
+                    
+                    users = chat_info.get('users', [])
+                    
+                    from database.db import channel_credentials as cc
+                    creds = await database.fetch_one(
+                        cc.select().where(
+                            (cc.c.channel_id == chat['channel_id']) &
+                            (cc.c.cashbox_id == cashbox_id) &
+                            (cc.c.is_active.is_(True))
+                        )
+                    )
+                    avito_user_id = creds.get('avito_user_id') if creds else None
+                    
+                    if users and avito_user_id:
+                        for user in users:
+                            user_id_in_chat = user.get('user_id') or user.get('id')
+                            if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                applicant_phone = (
+                                    user.get('phone') or
+                                    user.get('phone_number') or
+                                    user.get('public_user_profile', {}).get('phone') or
+                                    user.get('public_user_profile', {}).get('phone_number')
+                                )
+                                if not applicant_name:
+                                    applicant_name = user.get('name') or user.get('profile_name')
+                                
+                                if applicant_phone:
+                                    break
+                    
+                    if not applicant_phone:
+                        try:
+                            messages = await client.get_messages(external_chat_id, limit=100)
+                            for msg in messages:
+                                msg_type = msg.get('type', 'text')
+                                msg_content = msg.get('content', {})
+                                msg_text = None
+                                
+                                if isinstance(msg_content, dict):
+                                    msg_text = msg_content.get('text', '')
+                                elif isinstance(msg_content, str):
+                                    msg_text = msg_content
+                                
+                                if msg_text and (msg_type == 'system' or msg_text.startswith('[Системное сообщение]')):
+                                    extracted_phone = extract_phone_from_text(msg_text)
+                                    if extracted_phone:
+                                        applicant_phone = extracted_phone
+                                        logger.info(f"Found phone in system message: {applicant_phone}")
+                                        break
+                            
+                            if not applicant_phone:
+                                for msg in messages:
+                                    msg_type = msg.get('type', 'text')
+                                    msg_content = msg.get('content', {})
+                                    msg_text = None
+                                    
+                                    if isinstance(msg_content, dict):
+                                        msg_text = msg_content.get('text', '')
+                                    elif isinstance(msg_content, str):
+                                        msg_text = msg_content
+                                    
+                                    if msg_text and msg_type == 'text':
+                                        extracted_phone = extract_phone_from_text(msg_text)
+                                        if extracted_phone:
+                                            applicant_phone = extracted_phone
+                                            logger.info(f"Found phone in text message: {applicant_phone}")
+                                            break
+                        except Exception as e:
+                            logger.warning(f"Could not extract phone from messages: {e}")
+                            
+                except Exception as e:
+                    error_str = str(e)
+                    if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
+                        logger.info(f"Chat {chat['external_chat_id']} requires subscription (402) for getting applicant phone")
+                    else:
+                        logger.warning(f"Could not get applicant phone from Avito API: {e}")
+        
+        if applicant_phone and chat.get('chat_contact_id'):
+            from database.db import chat_contacts
+            current_contact = await database.fetch_one(
+                chat_contacts.select().where(chat_contacts.c.id == chat['chat_contact_id'])
+            )
+            update_values = {"phone": applicant_phone}
+            if applicant_name:
+                update_values["name"] = applicant_name
+            elif current_contact and not current_contact.get('name'):
+                pass
+            
+            await database.execute(
+                chat_contacts.update().where(
+                    chat_contacts.c.id == chat['chat_contact_id']
+                ).values(**update_values)
+            )
+        elif applicant_phone and not chat.get('chat_contact_id'):
+            from database.db import chat_contacts
+            contact_data = {
+                "channel_id": chat['channel_id'],
+                "name": applicant_name,
+                "phone": applicant_phone
+            }
+            contact_result = await database.fetch_one(
+                chat_contacts.insert().values(**contact_data).returning(chat_contacts.c.id)
+            )
+            if contact_result:
+                await database.execute(
+                    chats.update().where(chats.c.id == chat['id']).values(
+                        chat_contact_id=contact_result['id']
+                    )
+                )
+        
+        return AvitoApplicantPhoneResponse(
+            success=True,
+            chat_id=chat['id'],
+            phone=applicant_phone,
+            name=applicant_name
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting applicant phone: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Error getting applicant phone: {str(e)}")
+
+
+@router.get("/chats/{chat_id}/metadata", response_model=AvitoChatMetadataResponse)
+async def get_avito_chat_metadata(
+    chat_id: str,
+    user = Depends(get_current_user)
+):
+
+    try:
+        cashbox_id = user.cashbox_id
+        
+        chat = None
+        try:
+            internal_chat_id = int(chat_id)
+            chat = await crud.get_chat(internal_chat_id)
+        except ValueError:
+            from database.db import channels
+            from sqlalchemy import select, and_
+            query = select([
+                chats.c.id,
+                chats.c.channel_id,
+                chats.c.cashbox_id,
+                chats.c.external_chat_id,
+                chats.c.chat_contact_id
+            ]).select_from(
+                chats.join(
+                    channels,
+                    chats.c.channel_id == channels.c.id
+                )
+            ).where(
+                and_(
+                    channels.c.type == 'AVITO',
+                    channels.c.is_active.is_(True),
+                    chats.c.external_chat_id == chat_id,
+                    chats.c.cashbox_id == cashbox_id
+                )
+            ).limit(1)
+            chat_result = await database.fetch_one(query)
+            if chat_result:
+                chat = await crud.get_chat(chat_result['id'])
+        
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        
+        if chat['cashbox_id'] != cashbox_id:
+            raise HTTPException(status_code=403, detail="Access denied - chat belongs to another cashbox")
+        
+        if not chat.get('external_chat_id'):
+            raise HTTPException(status_code=400, detail="Chat has no external_chat_id")
+        
+        avito_channel = await crud.get_channel(chat['channel_id'])
+        if not avito_channel or avito_channel.get('type') != 'AVITO':
+            raise HTTPException(status_code=400, detail="Chat is not from Avito channel")
+        
+        metadata = {}
+        
+        if chat.get('contact_metadata'):
+            if isinstance(chat['contact_metadata'], dict):
+                metadata.update(chat['contact_metadata'])
+            elif isinstance(chat['contact_metadata'], str):
+                try:
+                    import json
+                    db_metadata = json.loads(chat['contact_metadata'])
+                    if isinstance(db_metadata, dict):
+                        metadata.update(db_metadata)
+                except:
+                    pass
+        
+        client = await create_avito_client(
+            channel_id=chat['channel_id'],
+            cashbox_id=cashbox_id,
+            on_token_refresh=lambda token_data: save_token_callback(
+                chat['channel_id'],
+                cashbox_id,
+                token_data
+            )
+        )
+        
+        if client:
+            try:
+                chat_info = await client.get_chat_info(chat['external_chat_id'])
+                
+                context = chat_info.get('context', {})
+                if context:
+                    metadata['context'] = context
+                    
+                    context_value = context.get('value') or context.get('item') or {}
+                    
+                    if context.get('value'):
+                        context_value = context['value']
+                        ad_title = context_value.get('title')
+                        ad_id = context_value.get('id')
+                        ad_url = context_value.get('url')
+                        price_string = context_value.get('price_string')
+                        status_id = context_value.get('status_id')
+                        location = context_value.get('location', {})
+                        location_title = location.get('title') if isinstance(location, dict) else None
+                        images = context_value.get('images', {})
+                        
+                        if ad_title:
+                            metadata['ad_title'] = ad_title
+                            metadata['avito_title'] = ad_title
+                        if ad_id:
+                            metadata['ad_id'] = ad_id
+                        if ad_url:
+                            metadata['ad_url'] = ad_url
+                            metadata['avito_ad'] = ad_url
+                        if price_string:
+                            metadata['price'] = price_string
+                            metadata['price_string'] = price_string
+                        if status_id is not None:
+                            metadata['status_id'] = status_id
+                        if location_title:
+                            metadata['avito_location'] = location_title
+                            metadata['location'] = location_title
+                        if images:
+                            metadata['images'] = images
+                    
+                    elif context.get('item'):
+                        item = context['item']
+                        ad_title = item.get('title')
+                        ad_id = item.get('id')
+                        ad_url = item.get('url')
+                        
+                        if ad_title:
+                            metadata['ad_title'] = ad_title
+                            metadata['avito_title'] = ad_title
+                        if ad_id:
+                            metadata['ad_id'] = ad_id
+                        if ad_url:
+                            metadata['ad_url'] = ad_url
+                            metadata['avito_ad'] = ad_url
+                
+                if chat_info.get('created'):
+                    metadata['avito_chat_created'] = chat_info.get('created')
+                if chat_info.get('unread_count') is not None:
+                    metadata['unread_count'] = chat_info.get('unread_count')
+                if chat_info.get('messages_count') is not None:
+                    metadata['messages_count'] = chat_info.get('messages_count')
+                
+                users = chat_info.get('users', [])
+                if users:
+                    metadata['users_count'] = len(users)
+                    metadata['users'] = [
+                        {
+                            'user_id': user.get('user_id') or user.get('id'),
+                            'name': user.get('name') or user.get('profile_name'),
+                            'is_blocked': user.get('is_blocked', False)
+                        }
+                        for user in users
+                    ]
+                
+            except Exception as e:
+                error_str = str(e)
+                if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
+                    logger.info(f"Chat {chat['external_chat_id']} requires subscription (402) for getting metadata from Avito API")
+                else:
+                    logger.warning(f"Could not get metadata from Avito API: {e}")
+        
+        return AvitoChatMetadataResponse(
+            success=True,
+            chat_id=chat['id'],
+            external_chat_id=chat['external_chat_id'],
+            metadata=metadata
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting chat metadata: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Error getting chat metadata: {str(e)}")
+
+
 @router.post("/sync", response_model=AvitoSyncResponse)
 async def sync_avito_messages(
     user = Depends(get_current_user)
@@ -983,6 +1412,407 @@ async def sync_avito_messages(
     except Exception as e:
         logger.error(f"Sync error: {e}")
         raise HTTPException(status_code=400, detail=f"Sync error: {str(e)}")
+
+
+@router.post("/history/load", response_model=AvitoHistoryLoadResponse)
+async def load_avito_history(
+    channel_id: int = Query(..., description="ID канала Avito"),
+    from_date: int = Query(..., description="Unix timestamp, начиная с которого загружать историю"),
+    user = Depends(get_current_user)
+):
+    try:
+        cashbox_id = user.cashbox_id
+        
+        avito_channel = await crud.get_channel(channel_id)
+        if not avito_channel:
+            raise HTTPException(status_code=404, detail=f"Channel {channel_id} not found")
+        
+        if avito_channel.get('type') != 'AVITO':
+            raise HTTPException(status_code=400, detail=f"Channel {channel_id} is not an Avito channel")
+        
+        channel_creds = await database.fetch_one(
+            channel_credentials.select().where(
+                (channel_credentials.c.channel_id == channel_id) &
+                (channel_credentials.c.cashbox_id == cashbox_id) &
+                (channel_credentials.c.is_active.is_(True))
+            )
+        )
+        
+        if not channel_creds:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Channel {channel_id} does not belong to cashbox {cashbox_id}"
+            )
+        
+        client = await create_avito_client(
+            channel_id=channel_id,
+            cashbox_id=cashbox_id,
+            on_token_refresh=lambda token_data: save_token_callback(
+                channel_id,
+                cashbox_id,
+                token_data
+            )
+        )
+        
+        if not client:
+            raise HTTPException(
+                status_code=500,
+                detail="Could not create Avito API client. Check credentials."
+            )
+        
+        chats_processed = 0
+        chats_created = 0
+        chats_updated = 0
+        messages_loaded = 0
+        messages_created = 0
+        messages_updated = 0
+        errors = []
+        
+        all_chats = []
+        offset = 0
+        limit = 100
+        max_offset = 1000
+        
+        logger.info(f"Loading Avito history for channel {channel_id} from timestamp {from_date}")
+        
+        while offset < max_offset:
+            try:
+                avito_chats = await client.get_chats(limit=limit, offset=offset)
+                
+                if not avito_chats:
+                    break
+                
+                filtered_chats = [
+                    chat for chat in avito_chats
+                    if chat.get('created', 0) >= from_date
+                ]
+                
+                all_chats.extend(filtered_chats)
+                
+                oldest_chat_time = min((chat.get('created', 0) for chat in avito_chats), default=0)
+                if oldest_chat_time < from_date:
+                    logger.info(f"Reached chats older than from_date at offset {offset}. Stopping pagination.")
+                    break
+                
+                if len(avito_chats) < limit:
+                    break
+                
+                offset += limit
+                    
+            except Exception as e:
+                error_str = str(e)
+                if "400" in error_str or offset >= 500:
+                    logger.warning(f"Stopping pagination at offset {offset} due to error or large offset: {e}")
+                    break
+                if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
+                    logger.info(f"Stopping pagination at offset {offset} due to subscription required (402)")
+                    break
+                logger.error(f"Error loading chats at offset {offset}: {e}")
+                errors.append(f"Error loading chats at offset {offset}: {str(e)}")
+                break
+        
+        logger.info(f"Found {len(all_chats)} chats created after {from_date}")
+        
+        for avito_chat in all_chats:
+            try:
+                external_chat_id = avito_chat.get('id')
+                if not external_chat_id:
+                    continue
+                
+                chats_processed += 1
+                
+                users = avito_chat.get('users', [])
+                user_name = None
+                user_phone = None
+                
+                from database.db import channel_credentials as cc
+                creds = await database.fetch_one(
+                    cc.select().where(
+                        (cc.c.channel_id == channel_id) &
+                        (cc.c.cashbox_id == cashbox_id) &
+                        (cc.c.is_active.is_(True))
+                    )
+                )
+                avito_user_id = creds.get('avito_user_id') if creds else None
+                
+                if users and avito_user_id:
+                    for user in users:
+                        user_id_in_chat = user.get('user_id') or user.get('id')
+                        if user_id_in_chat and user_id_in_chat != avito_user_id:
+                            user_name = user.get('name') or user.get('profile_name')
+                            user_phone = (
+                                user.get('phone') or
+                                user.get('phone_number') or
+                                user.get('public_user_profile', {}).get('phone') or
+                                user.get('public_user_profile', {}).get('phone_number')
+                            )
+                            if user_name or user_phone:
+                                break
+                
+                if not user_phone:
+                    last_message = avito_chat.get('last_message', {})
+                    if last_message:
+                        message_content = last_message.get('content', {})
+                        message_text = None
+                        if isinstance(message_content, dict):
+                            message_text = message_content.get('text', '')
+                        elif isinstance(message_content, str):
+                            message_text = message_content
+                        
+                        if message_text and ('[Системное сообщение]' in message_text or 'системное' in message_text.lower()):
+                            user_phone = extract_phone_from_text(message_text)
+                
+                from sqlalchemy import select
+                existing_chat_query = select([
+                    chats.c.id,
+                    chats.c.channel_id,
+                    chats.c.external_chat_id,
+                    chats.c.cashbox_id,
+                    chats.c.status,
+                    chats.c.chat_contact_id,
+                    chats.c.assigned_operator_id,
+                    chats.c.first_message_time,
+                    chats.c.last_message_time,
+                    chats.c.created_at,
+                    chats.c.updated_at
+                ]).where(
+                    (chats.c.channel_id == channel_id) &
+                    (chats.c.external_chat_id == external_chat_id) &
+                    (chats.c.cashbox_id == cashbox_id)
+                )
+                existing_chat = await database.fetch_one(existing_chat_query)
+                
+                if existing_chat:
+                    metadata = {}
+                    context = avito_chat.get('context', {})
+                    if isinstance(context, dict):
+                        item = context.get('item', {})
+                        if isinstance(item, dict):
+                            ad_title = item.get('title')
+                            ad_id = item.get('id')
+                            ad_url = item.get('url')
+                            if ad_title:
+                                metadata['ad_title'] = ad_title
+                            if ad_id:
+                                metadata['ad_id'] = ad_id
+                            if ad_url:
+                                metadata['ad_url'] = ad_url
+                        if context:
+                            metadata['context'] = context
+                    
+                    if existing_chat.get('chat_contact_id'):
+                        from database.db import chat_contacts
+                        contact_update = {}
+                        if user_name:
+                            contact_update['name'] = user_name
+                        if user_phone:
+                            contact_update['phone'] = user_phone
+                        if metadata:
+                            existing_contact = await database.fetch_one(
+                                chat_contacts.select().where(chat_contacts.c.id == existing_chat['chat_contact_id'])
+                            )
+                            existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
+                            if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
+                                existing_metadata.update(metadata)
+                                contact_update['metadata'] = existing_metadata
+                            elif not existing_metadata:
+                                contact_update['metadata'] = metadata
+                        
+                        if contact_update:
+                            await database.execute(
+                                chat_contacts.update().where(
+                                    chat_contacts.c.id == existing_chat['chat_contact_id']
+                                ).values(**contact_update)
+                            )
+                    elif (user_name or user_phone) and existing_chat['id']:
+                        from database.db import chat_contacts
+                        contact_data = {
+                            "channel_id": channel_id,
+                            "name": user_name,
+                            "phone": user_phone,
+                            "metadata": metadata if metadata else None
+                        }
+                        contact_result = await database.fetch_one(
+                            chat_contacts.insert().values(**contact_data).returning(chat_contacts.c.id)
+                        )
+                        if contact_result:
+                            await database.execute(
+                                chats.update().where(
+                                    chats.c.id == existing_chat['id']
+                                ).values(chat_contact_id=contact_result['id'])
+                            )
+                    
+                    last_message = avito_chat.get('last_message')
+                    if last_message and last_message.get('created'):
+                        last_message_time = datetime.fromtimestamp(last_message['created'])
+                        await database.execute(
+                            chats.update().where(
+                                chats.c.id == existing_chat['id']
+                            ).values(
+                                last_message_time=last_message_time,
+                                updated_at=last_message_time
+                            )
+                        )
+                    
+                    chats_updated += 1
+                    chat_id = existing_chat['id']
+                else:
+                    metadata = {}
+                    context = avito_chat.get('context', {})
+                    if isinstance(context, dict):
+                        item = context.get('item', {})
+                        if isinstance(item, dict):
+                            ad_title = item.get('title')
+                            ad_id = item.get('id')
+                            ad_url = item.get('url')
+                            if ad_title:
+                                metadata['ad_title'] = ad_title
+                            if ad_id:
+                                metadata['ad_id'] = ad_id
+                            if ad_url:
+                                metadata['ad_url'] = ad_url
+                        if context:
+                            metadata['context'] = context
+                    
+                    chat_name = user_name or (metadata.get('ad_title') if metadata else None) or f"Avito Chat {external_chat_id[:8]}"
+                    new_chat = await crud.create_chat(
+                        channel_id=channel_id,
+                        cashbox_id=cashbox_id,
+                        external_chat_id=external_chat_id,
+                        external_contact_id=external_chat_id,
+                        name=chat_name,
+                        phone=user_phone,
+                        metadata=metadata if metadata else None
+                    )
+                    
+                    if not new_chat or not new_chat.get('id'):
+                        logger.error(f"Failed to create chat with external_id {external_chat_id}")
+                        errors.append(f"Failed to create chat {external_chat_id}")
+                        continue
+                    
+                    chat_id = new_chat['id']
+                    chats_created += 1
+                
+                try:
+                    avito_messages = await client.sync_messages(
+                        chat_id=external_chat_id,
+                        since_timestamp=from_date
+                    )
+                    messages_loaded += len(avito_messages)
+                    
+                    for avito_msg in avito_messages:
+                        try:
+                            external_message_id = avito_msg.get('id')
+                            if not external_message_id:
+                                continue
+                            
+                            from database.db import chat_messages
+                            existing_message = await database.fetch_one(
+                                chat_messages.select().where(
+                                    (chat_messages.c.external_message_id == external_message_id) &
+                                    (chat_messages.c.chat_id == chat_id)
+                                )
+                            )
+                            
+                            if existing_message:
+                                messages_updated += 1
+                                continue
+                            
+                            content = avito_msg.get('content', {})
+                            message_type_str = avito_msg.get('type', 'text')
+                            message_text = ""
+                            
+                            if isinstance(content, dict):
+                                if message_type_str == 'text':
+                                    message_text = content.get('text', '')
+                                elif message_type_str == 'link':
+                                    link_data = content.get('link', {})
+                                    message_text = link_data.get('text', link_data.get('url', '[Ссылка]'))
+                                elif message_type_str == 'system':
+                                    message_text = content.get('text', '[Системное сообщение]')
+                                elif message_type_str == 'image':
+                                    message_text = '[Изображение]'
+                                elif message_type_str == 'item':
+                                    item_data = content.get('item', {})
+                                    message_text = f"Объявление: {item_data.get('title', '[Объявление]')}"
+                                elif message_type_str == 'location':
+                                    loc_data = content.get('location', {})
+                                    message_text = loc_data.get('text', loc_data.get('title', '[Геолокация]'))
+                                elif message_type_str == 'voice':
+                                    message_text = '[Голосовое сообщение]'
+                                else:
+                                    message_text = f"[{message_type_str}]"
+                            else:
+                                message_text = str(content) if content else f"[{message_type_str}]"
+                            
+                            direction = avito_msg.get('direction', 'in')
+                            sender_type = "CLIENT" if direction == "in" else "OPERATOR"
+                            
+                            is_read = avito_msg.get('is_read', False) or avito_msg.get('read') is not None
+                            status = "READ" if is_read else "DELIVERED"
+                            
+                            created_timestamp = avito_msg.get('created')
+                            created_at = None
+                            if created_timestamp:
+                                created_at = datetime.fromtimestamp(created_timestamp)
+                            
+                            await crud.create_message_and_update_chat(
+                                chat_id=chat_id,
+                                sender_type=sender_type,
+                                content=message_text or f"[{message_type_str}]",
+                                message_type=AvitoHandler._map_message_type(message_type_str),
+                                external_message_id=external_message_id,
+                                status=status,
+                                source="avito",
+                                created_at=created_at
+                            )
+                            messages_created += 1
+                            
+                        except Exception as e:
+                            logger.warning(f"Failed to save message {avito_msg.get('id')}: {e}")
+                            errors.append(f"Failed to save message {avito_msg.get('id')}: {str(e)}")
+                    
+                except Exception as sync_error:
+                    error_str = str(sync_error)
+                    if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
+                        logger.info(f"Chat {external_chat_id} requires subscription (402). Skipping messages.")
+                    else:
+                        logger.warning(f"Failed to sync messages for chat {external_chat_id}: {sync_error}")
+                        errors.append(f"Failed to sync messages for chat {external_chat_id}: {str(sync_error)}")
+                
+            except Exception as e:
+                error_str = str(e)
+                if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
+                    logger.info(f"Chat {avito_chat.get('id')} requires subscription (402). Skipping.")
+                else:
+                    logger.warning(f"Failed to process chat {avito_chat.get('id')}: {e}")
+                    errors.append(f"Failed to process chat {avito_chat.get('id')}: {str(e)}")
+        
+        logger.info(
+            f"History load completed for channel {channel_id}: "
+            f"chats_processed={chats_processed}, chats_created={chats_created}, "
+            f"chats_updated={chats_updated}, messages_loaded={messages_loaded}, "
+            f"messages_created={messages_created}, messages_updated={messages_updated}"
+        )
+        
+        return AvitoHistoryLoadResponse(
+            success=True,
+            channel_id=channel_id,
+            from_date=from_date,
+            chats_processed=chats_processed,
+            chats_created=chats_created,
+            chats_updated=chats_updated,
+            messages_loaded=messages_loaded,
+            messages_created=messages_created,
+            messages_updated=messages_updated,
+            errors=errors if errors else None
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"History load error: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"History load error: {str(e)}")
 
 
 @router.get("/status")
@@ -1262,20 +2092,11 @@ async def update_all_avito_webhooks(
 
 @router.get("/oauth/authorize", response_model=AvitoOAuthAuthorizeResponse)
 async def avito_oauth_authorize(
-    token: str = Query(..., description="User authentication token"),
     user = Depends(get_current_user)
 ):
-    """
-    Начать OAuth авторизацию Avito.
-    Генерирует URL для перенаправления пользователя на страницу авторизации Avito.
-    
-    Использует сохраненные OAuth credentials (client_id и client_secret) из channel_credentials
-    для конкретного cashbox_id. Эти credentials должны быть предварительно сохранены через /connect.
-    """
     try:
         cashbox_id = user.cashbox_id
         
-        # Получаем существующий канал Avito для этого cashbox
         avito_channel = await crud.get_channel_by_cashbox(cashbox_id, "AVITO")
         if not avito_channel:
             raise HTTPException(
@@ -1285,7 +2106,6 @@ async def avito_oauth_authorize(
         
         channel_id = avito_channel['id']
         
-        # Получаем credentials из БД для этого cashbox
         credentials = await database.fetch_one(
             channel_credentials.select().where(
                 (channel_credentials.c.channel_id == channel_id) &
@@ -1300,36 +2120,23 @@ async def avito_oauth_authorize(
                 detail=f"Avito credentials not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint."
             )
         
-        # Расшифровываем OAuth credentials (client_id нужен для генерации URL авторизации)
         oauth_client_id = _decrypt_credential(credentials['api_key'])
         
-        # Используем зарегистрированный redirect_uri в Avito (должен точно совпадать с тем, что в ЛК Avito)
         redirect_uri = "https://app.tablecrm.com/api/v1/hook/chat/123456"
         
-        # Генерируем state для защиты от CSRF (сохраняем cashbox_id)
         state = secrets.token_urlsafe(32)
-        state_data = f"{cashbox_id}:{state}"
+        state_data = f"{cashbox_id}_{state}"
         
-        # Параметры для OAuth авторизации
+        scope = "messenger:read,messenger:write"
         oauth_params = {
             "client_id": oauth_client_id,
-            "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": "messenger:read messenger:write",
+            "scope": scope,
             "state": state_data
         }
         
-        # Формируем URL авторизации
-        auth_url = "https://avito.ru/oauth" + "?" + urllib.parse.urlencode(oauth_params)
-        
-        print("=" * 80)
-        print(f"[OAUTH AUTHORIZE] Generated OAuth authorization URL for cashbox {cashbox_id}")
-        print(f"[OAUTH AUTHORIZE] Channel ID: {channel_id}")
-        print(f"[OAUTH AUTHORIZE] Client ID: {oauth_client_id[:10]}...")
-        print(f"[OAUTH AUTHORIZE] Redirect URI: {redirect_uri}")
-        print(f"[OAUTH AUTHORIZE] State: {state_data}")
-        print(f"[OAUTH AUTHORIZE] Full authorization URL: {auth_url}")
-        print("=" * 80)
+        encoded_params = urllib.parse.urlencode(oauth_params, safe=':,', quote_via=urllib.parse.quote)
+        auth_url = "https://avito.ru/oauth" + "?" + encoded_params
         
         return AvitoOAuthAuthorizeResponse(
             authorization_url=auth_url,
@@ -1340,7 +2147,6 @@ async def avito_oauth_authorize(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[OAUTH AUTHORIZE ERROR] Error generating OAuth authorization URL: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
@@ -1352,33 +2158,19 @@ async def avito_oauth_callback(
     state: str = Query(..., description="State parameter for CSRF protection"),
     token: Optional[str] = Query(None, description="Optional user authentication token")
 ):
-    """
-    OAuth callback эндпоинт.
-    Получает authorization code от Avito, обменивает его на токены и подключает канал.
-    
-    Токены (access_token, refresh_token) сохраняются в channel_credentials для конкретного
-    cashbox_id. Каждый клиент (cashbox) может подключить свой Avito аккаунт через OAuth.
-    """
-    print("=" * 80)
-    print("[OAUTH CALLBACK] OAuth callback processing started")
-    print(f"[OAUTH CALLBACK] code length: {len(code) if code else 0}")
-    print(f"[OAUTH CALLBACK] state: {state}")
-    print("=" * 80)
-    
     try:
-        # Извлекаем cashbox_id из state
         try:
-            cashbox_id_str, state_token = state.split(":", 1)
+            parts = state.split("_", 1)
+            if len(parts) != 2:
+                raise ValueError("State format invalid: expected cashbox_id_state_token")
+            cashbox_id_str, state_token = parts
             cashbox_id = int(cashbox_id_str)
-            print(f"[OAUTH CALLBACK] Extracted cashbox_id: {cashbox_id} from state")
         except (ValueError, IndexError) as e:
-            print(f"[OAUTH CALLBACK ERROR] Failed to parse state parameter: {state}, error: {e}")
             raise HTTPException(
                 status_code=400,
                 detail="Invalid state parameter"
             )
         
-        # Получаем существующий канал Avito для этого cashbox
         avito_channel = await crud.get_channel_by_cashbox(cashbox_id, "AVITO")
         if not avito_channel:
             raise HTTPException(
@@ -1388,7 +2180,6 @@ async def avito_oauth_callback(
         
         channel_id = avito_channel['id']
         
-        # Получаем OAuth credentials из БД
         credentials = await database.fetch_one(
             channel_credentials.select().where(
                 (channel_credentials.c.channel_id == channel_id) &
@@ -1403,28 +2194,18 @@ async def avito_oauth_callback(
                 detail=f"Avito credentials not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint."
             )
         
-        # Расшифровываем OAuth credentials (client_id и client_secret)
         oauth_client_id = _decrypt_credential(credentials['api_key'])
         oauth_client_secret = _decrypt_credential(credentials['api_secret'])
         
-        # Используем зарегистрированный redirect_uri в Avito (должен точно совпадать с тем, что в ЛК Avito)
         redirect_uri = "https://app.tablecrm.com/api/v1/hook/chat/123456"
         
-        # Обмениваем authorization code на токены
-        print(f"[OAUTH CALLBACK] Exchanging authorization code for tokens...")
-        print(f"[OAUTH CALLBACK] client_id: {oauth_client_id[:10]}...")
-        print(f"[OAUTH CALLBACK] redirect_uri: {redirect_uri}")
-        print(f"[OAUTH CALLBACK] code length: {len(code) if code else 0}")
         try:
             token_data = await AvitoClient.exchange_authorization_code_for_tokens(
                 client_id=oauth_client_id,
                 client_secret=oauth_client_secret,
-                authorization_code=code,
-                redirect_uri=redirect_uri
+                authorization_code=code
             )
-            print(f"[OAUTH CALLBACK] Token exchange successful! Got access_token: {bool(token_data.get('access_token'))}, refresh_token: {bool(token_data.get('refresh_token'))}")
         except AvitoAPIError as e:
-            print(f"[OAUTH CALLBACK ERROR] Failed to exchange authorization code for tokens: {e}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Failed to exchange authorization code: {str(e)}"
@@ -1442,7 +2223,6 @@ async def avito_oauth_callback(
                 detail="Failed to obtain access token from Avito OAuth"
             )
         
-        # Создаем временный клиент для получения информации о пользователе
         temp_client = AvitoClient(
             api_key=oauth_client_id,
             api_secret=oauth_client_secret,
@@ -1458,15 +2238,11 @@ async def avito_oauth_callback(
             user_profile = await temp_client.get_user_profile()
             avito_account_name = user_profile.get('name') or f"Cashbox {cashbox_id}"
         except Exception as e:
-            print(f"[OAUTH CALLBACK WARNING] Could not get user profile: {e}")
             avito_account_name = f"Cashbox {cashbox_id}"
         
-        # Шифруем полученные OAuth токены
         encrypted_access_token = _encrypt_credential(access_token)
         encrypted_refresh_token = _encrypt_credential(refresh_token) if refresh_token else None
         
-        # Обновляем credentials с полученными OAuth токенами
-        # api_key и api_secret остаются без изменений (это OAuth client_id и client_secret)
         update_values = {
             "access_token": encrypted_access_token,
             "is_active": True,
@@ -1480,14 +2256,12 @@ async def avito_oauth_callback(
         if avito_user_id:
             update_values["avito_user_id"] = avito_user_id
         
-        # Обновляем существующие credentials
         await database.execute(
             channel_credentials.update().where(
                 channel_credentials.c.id == credentials['id']
             ).values(**update_values)
         )
         
-        # Регистрируем webhook
         webhook_registered = False
         webhook_error_message = None
         webhook_url = None
@@ -1529,14 +2303,11 @@ async def avito_oauth_callback(
             response_data["webhook_registered"] = False
             response_data["webhook_error"] = webhook_error_message
         
-        print(f"[OAUTH CALLBACK SUCCESS] Avito OAuth connection successful for cashbox {cashbox_id}, channel {channel_id}")
-        
         return AvitoOAuthCallbackResponse(**response_data)
     
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[OAUTH CALLBACK ERROR] Error in OAuth callback: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
@@ -1551,55 +2322,24 @@ async def avito_oauth_callback_hook(
     error_description: str = Query(None, description="Error description from Avito OAuth"),
     token: Optional[str] = Query(None, description="Optional user authentication token")
 ):
-    """
-    OAuth callback эндпоинт на пути /hook для совместимости с зарегистрированным redirect_uri.
-    Обрабатывает OAuth callback используя ту же логику, что и /oauth/callback.
-    """
-    # Детальное логирование всех параметров запроса
-    print("=" * 80)
-    print("[OAUTH HOOK] OAuth callback received on /hook")
-    print(f"[OAUTH HOOK] Full URL: {request.url}")
-    print(f"[OAUTH HOOK] Path: {request.url.path}")
-    print(f"[OAUTH HOOK] Query params: {dict(request.query_params)}")
-    print(f"[OAUTH HOOK] Headers: {dict(request.headers)}")
-    print(f"[OAUTH HOOK] code present: {code is not None}")
-    print(f"[OAUTH HOOK] state present: {state is not None}")
-    print(f"[OAUTH HOOK] error: {error}")
-    print(f"[OAUTH HOOK] error_description: {error_description}")
-    print("=" * 80)
-    
-    # Если есть ошибка от Avito
     if error:
-        print(f"[OAUTH HOOK ERROR] OAuth error from Avito: {error}")
-        print(f"[OAUTH HOOK ERROR] OAuth error description: {error_description}")
-        print(f"[OAUTH HOOK ERROR] Full error details - error={error}, error_description={error_description}")
         raise HTTPException(
             status_code=400,
             detail=f"OAuth error: {error}. {error_description or ''}"
         )
     
     if not code or not state:
-        print(f"[OAUTH HOOK ERROR] Missing required OAuth parameters:")
-        print(f"[OAUTH HOOK ERROR]   - code present: {code is not None} (value: {code})")
-        print(f"[OAUTH HOOK ERROR]   - state present: {state is not None} (value: {state})")
-        print(f"[OAUTH HOOK ERROR]   - All query params: {dict(request.query_params)}")
         raise HTTPException(
             status_code=400,
             detail="Missing required OAuth parameters: code and state are required"
         )
     
-    print(f"[OAUTH HOOK] Calling avito_oauth_callback with code={code[:20] if code else None}..., state={state[:20] if state else None}...")
-    
-    # Вызываем существующий обработчик OAuth callback
     try:
         result = await avito_oauth_callback(code=code, state=state, token=token)
-        print("[OAUTH HOOK] OAuth callback processing completed successfully")
         return result
-    except HTTPException as e:
-        print(f"[OAUTH HOOK ERROR] HTTPException in avito_oauth_callback: {e.status_code} - {e.detail}")
+    except HTTPException:
         raise
     except Exception as e:
-        print(f"[OAUTH HOOK ERROR] Error in avito_oauth_callback: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(
@@ -1612,10 +2352,6 @@ async def avito_oauth_callback_hook(
 async def avito_oauth_debug(
     request: Request
 ):
-    """
-    Debug endpoint для проверки OAuth callback параметров.
-    Возвращает все query параметры и заголовки для диагностики.
-    """
     return {
         "url": str(request.url),
         "path": request.url.path,

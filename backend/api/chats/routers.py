@@ -370,7 +370,7 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
     messages_list = []
     if messages:
         channel = await crud.get_channel(chat['channel_id'])
-        client_avatar = chat.get('client_avatar')
+        client_avatar = chat.get('contact_avatar')
         operator_avatar = None
         
         if channel and channel['type'] == 'AVITO':
@@ -425,6 +425,14 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
                                             operator_avatar = avatar_url
                                         elif not client_avatar:
                                             client_avatar = avatar_url
+                                            # Сохраняем аватар в БД
+                                            if chat.get('chat_contact_id'):
+                                                from database.db import chat_contacts
+                                                await database.execute(
+                                                    chat_contacts.update().where(
+                                                        chat_contacts.c.id == chat['chat_contact_id']
+                                                    ).values(avatar=avatar_url)
+                                                )
             except Exception:
                 pass
         
@@ -578,8 +586,6 @@ async def get_managers_in_chat(
     token: str,
     user = Depends(get_current_user)
 ):
-    """Получить список менеджеров, которые сейчас подключены к чату"""
-    # Проверяем существование чата и доступ
     chat = await crud.get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -587,10 +593,8 @@ async def get_managers_in_chat(
     if chat['cashbox_id'] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    # Получаем всех подключенных пользователей
     connected_users = chat_manager.get_connected_users(chat_id)
     
-    # Фильтруем только менеджеров (OPERATOR)
     managers = [
         ManagerInChat(
             user_id=user_info['user_id'],

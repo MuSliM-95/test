@@ -169,6 +169,7 @@ from api.chats.routers import router as chats_router
 from api.chats.websocket import router as chats_ws_router
 from api.chats.rabbitmq_consumer import chat_consumer
 from api.chats.avito.avito_routes import router as avito_router
+from api.health.rabbitmq_check import router as rabbitmq_health_router
 from api.chats.avito.avito_consumer import avito_consumer
 from api.chats.avito.avito_default_webhook import router as avito_default_webhook_router
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
@@ -188,13 +189,13 @@ from api.balances.transactions_routers import tinkoff_callback
 # )
 
 app = FastAPI(
-    # root_path='/api/v1',
+    root_path='/api/v1',
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    # docs_url="/docs",
+    # redoc_url="/redoc",
+    # openapi_url="/openapi.json"
 )
 
 app.add_middleware(GZipMiddleware)
@@ -277,13 +278,14 @@ app.include_router(apple_wallet_card_settings_router)
 app.include_router(feeds_router)
 app.include_router(chats_router)
 app.include_router(chats_ws_router)
+app.include_router(rabbitmq_health_router)
 app.include_router(avito_router)
 app.include_router(avito_default_webhook_router)
 
-@app.get("/api/v1/openapi.json", include_in_schema=False)
-async def get_openapi():
-    """Проксировать openapi.json для Swagger UI"""
-    return app.openapi()
+# @app.get("/api/v1/openapi.json", include_in_schema=False)
+# async def get_openapi():
+#     """Проксировать openapi.json для Swagger UI"""
+#     return app.openapi()
 
 @app.get("/health")
 async def check_health_app():
@@ -295,16 +297,6 @@ async def tinkoff_callback_direct(request: Request):
     return await tinkoff_callback(request)
 
 
-@app.get("/api/v1/hook/chat/123456/test", include_in_schema=False)
-async def avito_oauth_callback_test():
-    """Тестовый endpoint для проверки доступности callback URL"""
-    print("[OAUTH TEST] Test endpoint called - callback URL is accessible!")
-    return {
-        "status": "ok",
-        "message": "OAuth callback endpoint is accessible",
-        "endpoint": "/api/v1/hook/chat/123456"
-    }
-
 @app.get("/api/v1/hook/chat/123456", include_in_schema=False)
 @app.post("/api/v1/hook/chat/123456", include_in_schema=False)
 async def avito_oauth_callback_legacy(
@@ -315,32 +307,10 @@ async def avito_oauth_callback_legacy(
     error_description: str = Query(None, description="Error description from Avito OAuth"),
     token: str = Query(None, description="Optional user authentication token")
 ):
-    """
-    OAuth callback эндпоинт для пути, зарегистрированного в Avito.
-    Обрабатывает OAuth callback используя логику из avito_routes.
-    """
-    print("=" * 80)
-    print("[MAIN OAUTH] ====== OAuth callback received in main.py ======")
-    print(f"[MAIN OAUTH] Method: {request.method}")
-    print(f"[MAIN OAUTH] Full URL: {request.url}")
-    print(f"[MAIN OAUTH] Path: {request.url.path}")
-    print(f"[MAIN OAUTH] Query params: {dict(request.query_params)}")
-    print(f"[MAIN OAUTH] Headers: {dict(request.headers)}")
-    print(f"[MAIN OAUTH] code present: {code is not None}, value: {code}")
-    print(f"[MAIN OAUTH] state present: {state is not None}, value: {state}")
-    print(f"[MAIN OAUTH] error: {error}")
-    print(f"[MAIN OAUTH] error_description: {error_description}")
-    print(f"[MAIN OAUTH] token: {token}")
-    print("=" * 80)
-    
-    # Если запрос пришел без параметров - это может быть проверка доступности
     if not code and not state and not error:
-        print("[MAIN OAUTH] Request received but no OAuth parameters present - might be availability check")
         return {"status": "ok", "message": "OAuth callback endpoint is available"}
     
-    # Если есть ошибка от Avito
     if error:
-        print(f"[MAIN OAUTH ERROR] OAuth error from Avito: {error} - {error_description}")
         from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
@@ -348,7 +318,6 @@ async def avito_oauth_callback_legacy(
         )
     
     if not code or not state:
-        print(f"[MAIN OAUTH ERROR] Missing required OAuth parameters: code={code is not None}, state={state is not None}")
         from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
@@ -357,13 +326,9 @@ async def avito_oauth_callback_legacy(
     
     try:
         from api.chats.avito.avito_routes import avito_oauth_callback
-        print(f"[MAIN OAUTH] Calling avito_oauth_callback with code={code[:20] if code else None}..., state={state[:20] if state else None}...")
-        # Вызываем существующий обработчик OAuth callback
         result = await avito_oauth_callback(code=code, state=state, token=token)
-        print("[MAIN OAUTH] OAuth callback processing completed successfully")
         return result
     except Exception as e:
-        print(f"[MAIN OAUTH ERROR] Error in OAuth callback handler: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise
@@ -490,11 +455,9 @@ async def write_event_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
         await _write_event(request=request, body=body, time_start=time_start, status_code=response.status_code)
-        print(time.time() - time_start)
         return response
     except Exception as e:
         await _write_event(request=request, body=body, time_start=time_start)
-        print(time.time() - time_start)
         raise e
 
 
@@ -567,35 +530,30 @@ async def startup():
         try:
             from api.chats.avito.avito_init import init_avito_credentials
             await init_avito_credentials()
-            print("Avito credentials initialized from env (development mode)")
         except Exception as e:
-            print(f"Warning: failed to initialize Avito credentials from env: {e}")
+            pass
 
     try:
         await chat_consumer.start()
     except Exception as e:
-        print(f"Warning: Failed to start chat consumer: {e}")
         import traceback
         traceback.print_exc()
 
     try:
         await avito_consumer.start()
     except Exception as e:
-        print(f"Warning: Failed to start Avito consumer: {e}")
         import traceback
         traceback.print_exc()
 
     try:
         await DefaultImagesUploader().upload_all()
     except Exception as e:
-        print(f"Warning: Failed to upload default images: {e}")
+        pass
         
     try:
         if not scheduler.running:
             scheduler.start()
-            print("Scheduler started successfully")
     except Exception as e:
-        print(f"Warning: Failed to start scheduler: {e}")
         import traceback
         traceback.print_exc()
 
@@ -609,6 +567,5 @@ async def shutdown():
     try:
         if scheduler.running:
             scheduler.shutdown()
-            print("Scheduler stopped")
     except Exception as e:
-        print(f"Warning: Failed to stop scheduler: {e}")
+        pass

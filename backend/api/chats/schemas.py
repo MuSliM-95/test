@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, validator
 from datetime import datetime
 
@@ -68,16 +68,15 @@ class ChatUpdate(BaseModel):
 class ChatResponse(BaseModel):
     id: int
     channel_id: int
-    contragent_id: Optional[int]
+    chat_contact_id: Optional[int] = None
+    cashbox_id: int
     external_chat_id: str
-    phone: Optional[str]
-    name: Optional[str]
     status: str
-    assigned_operator_id: Optional[int]
-    first_message_time: Optional[datetime]
-    first_response_time_seconds: Optional[int]
-    last_message_time: Optional[datetime]
-    last_response_time_seconds: Optional[int]
+    assigned_operator_id: Optional[int] = None
+    first_message_time: Optional[datetime] = None
+    first_response_time_seconds: Optional[int] = None
+    last_message_time: Optional[datetime] = None
+    last_response_time_seconds: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     last_message_preview: Optional[str] = None
@@ -85,7 +84,13 @@ class ChatResponse(BaseModel):
     channel_name: Optional[str] = None
     channel_icon: Optional[str] = None
     channel_type: Optional[str] = None
-    client_avatar: Optional[str] = None
+    name: Optional[str] = None  # Название объявления из contact_metadata['ad_title']
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_avatar: Optional[str] = None
+    contact_contragent_id: Optional[int] = None
+    contact_metadata: Optional[Dict[str, Any]] = None
 
 
 

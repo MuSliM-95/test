@@ -152,17 +152,15 @@ class AvitoClient:
         client_id: str,
         client_secret: str,
         authorization_code: str,
-        redirect_uri: str
+        redirect_uri: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Обменять authorization code на access_token и refresh_token (OAuth flow)"""
         try:
             async with aiohttp.ClientSession() as session:
                 data = {
                     "grant_type": "authorization_code",
                     "code": authorization_code,
                     "client_id": client_id,
-                    "client_secret": client_secret,
-                    "redirect_uri": redirect_uri
+                    "client_secret": client_secret
                 }
                 
                 async with session.post(
