@@ -31,11 +31,17 @@ async def get_account_info(token: str):
                     .where(users_cboxes_relation.c.cashbox_id == balance.cashbox)
                 )
                 users_quantity = await database.execute(count_query)
-                demo_expiration = int(
-                    (datetime.fromtimestamp(balance.created_at) + timedelta(days=balance_tariff.demo_days))
-                    .timestamp()
-                )
-                demo_left = demo_expiration - datetime.utcnow().timestamp()
+                
+                if balance.tariff_type == DEMO:
+                    demo_expiration = int(
+                        (datetime.fromtimestamp(balance.created_at) + timedelta(days=balance_tariff.demo_days))
+                        .timestamp()
+                    )
+                    demo_left = demo_expiration - datetime.utcnow().timestamp()
+                    demo_left = demo_left if demo_left >= 0 else 0
+                else:
+                    demo_expiration = 0
+                    demo_left = 0
 
                 tg_account_info = await database.fetch_one(
                     users.select().where(users.c.id == user.user)
@@ -48,7 +54,7 @@ async def get_account_info(token: str):
                     is_owner=user.get('is_owner'),
                     type=balance.tariff_type,
                     demo_expiration=demo_expiration,
-                    demo_left=demo_left if demo_left >= 0 else 0,
+                    demo_left=demo_left,
                     balance=balance.balance,
                     users=users_quantity,
                     price=balance_tariff.price,

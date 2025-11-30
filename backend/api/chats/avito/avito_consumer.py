@@ -45,52 +45,55 @@ class AvitoMessageConsumer:
         logger.info("Avito consumer stopped")
     
     async def _consume_messages(self):
-        try:
-            self.connection = await aio_pika.connect_robust(
-                host=os.getenv("RABBITMQ_HOST", "localhost"),
-                port=int(os.getenv("RABBITMQ_PORT", "5672")),
-                login=os.getenv("RABBITMQ_USER", "guest"),
-                password=os.getenv("RABBITMQ_PASS", "guest"),
-                virtualhost=os.getenv("RABBITMQ_VHOST", "/"),
-                timeout=10,
-            )
-            
-            async with self.connection:
-                channel = await self.connection.channel()
-                await channel.set_qos(prefetch_count=10)
+        """Основной цикл обработки сообщений с автоматическим переподключением"""
+        while self.is_running:
+            try:
+                if self.connection and not self.connection.is_closed:
+                    await self.connection.close()
                 
-                exchange = await channel.declare_exchange(
-                    name=AVITO_MESSAGES_EXCHANGE,
-                    type="topic",
-                    durable=True
+                self.connection = await aio_pika.connect_robust(
+                    host=os.getenv("RABBITMQ_HOST", "localhost"),
+                    port=int(os.getenv("RABBITMQ_PORT", "5672")),
+                    login=os.getenv("RABBITMQ_USER", "guest"),
+                    password=os.getenv("RABBITMQ_PASS", "guest"),
+                    virtualhost=os.getenv("RABBITMQ_VHOST", "/"),
+                    timeout=10,
                 )
                 
-                queue = await channel.declare_queue(
-                    name=AVITO_MESSAGES_QUEUE,
-                    durable=True
-                )
-                
-                await queue.bind(exchange, routing_key=AVITO_MESSAGES_ROUTING_KEY)
-                
-                logger.info(f"Queue {AVITO_MESSAGES_QUEUE} declared and bound to exchange {AVITO_MESSAGES_EXCHANGE}")
-                
-                async with queue.iterator() as queue_iter:
-                    async for message in queue_iter:
-                        if not self.is_running:
-                            break
-                        async with message.process():
-                            try:
+                async with self.connection:
+                    channel = await self.connection.channel()
+                    await channel.set_qos(prefetch_count=10)
+                    
+                    exchange = await channel.declare_exchange(
+                        name=AVITO_MESSAGES_EXCHANGE,
+                        type="topic",
+                        durable=True
+                    )
+                    
+                    queue = await channel.declare_queue(
+                        name=AVITO_MESSAGES_QUEUE,
+                        durable=True
+                    )
+                    
+                    await queue.bind(exchange, routing_key=AVITO_MESSAGES_ROUTING_KEY)
+                    
+                    logger.info(f"Queue {AVITO_MESSAGES_QUEUE} declared and bound to exchange {AVITO_MESSAGES_EXCHANGE}")
+                    
+                    async with queue.iterator() as queue_iter:
+                        async for message in queue_iter:
+                            if not self.is_running:
+                                break
+                            async with message.process():
                                 await self._process_message(message)
-                            except Exception as e:
-                                logger.error(f"Error processing message: {e}", exc_info=True)
-        
-        except Exception as e:
-            logger.error(f"Error in message consumer loop: {e}", exc_info=True)
-            if self.is_running:
-                await asyncio.sleep(5)
-                await self._consume_messages()
+            
+            except Exception as e:
+                logger.error(f"Error in message consumer loop: {e}", exc_info=True)
+                if self.is_running:
+                    logger.info("Attempting to reconnect in 5 seconds...")
+                    await asyncio.sleep(5)
     
     async def _process_message(self, message):
+        """Обработка одного сообщения из очереди"""
         try:
             payload = json.loads(message.body.decode())
             
@@ -110,8 +113,11 @@ class AvitoMessageConsumer:
         
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse message JSON: {e}")
+            # Для некорректного JSON не нужно повторять обработку
+            raise
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
+            # Пробрасываем исключение, чтобы сообщение было возвращено в очередь
             raise
     
     async def _handle_message_received(self, payload: Dict[str, Any]):

@@ -9,8 +9,10 @@ from api.chats.schemas import (
     ChannelCreate, ChannelUpdate, ChannelResponse,
     ChatCreate, ChatUpdate, ChatResponse,
     MessageCreate, MessageResponse, MessagesList,
-    ChainClientRequest
+    ChainClientRequest,
+    ManagersInChatResponse, ManagerInChat
 )
+from api.chats.websocket import chat_manager
 from database.db import pictures, database
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -60,10 +62,10 @@ async def create_chat(token: str, chat: ChatCreate, user = Depends(get_current_u
     """Create a new chat (cashbox_id from token)"""
     return await crud.create_chat(
         channel_id=chat.channel_id,
-        contragent_id=chat.contragent_id,
         cashbox_id=user.cashbox_id,
         external_chat_id=chat.external_chat_id,
         assigned_operator_id=chat.assigned_operator_id,
+        external_contact_id=chat.external_chat_id,
         phone=chat.phone,
         name=chat.name
     )
@@ -368,7 +370,7 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
     messages_list = []
     if messages:
         channel = await crud.get_channel(chat['channel_id'])
-        client_avatar = chat.get('client_avatar')
+        client_avatar = chat.get('contact_avatar')
         operator_avatar = None
         
         if channel and channel['type'] == 'AVITO':
@@ -423,6 +425,14 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
                                             operator_avatar = avatar_url
                                         elif not client_avatar:
                                             client_avatar = avatar_url
+                                            # Сохраняем аватар в БД
+                                            if chat.get('chat_contact_id'):
+                                                from database.db import chat_contacts
+                                                await database.execute(
+                                                    chat_contacts.update().where(
+                                                        chat_contacts.c.id == chat['chat_contact_id']
+                                                    ).values(avatar=avatar_url)
+                                                )
             except Exception:
                 pass
         
@@ -567,4 +577,36 @@ async def chain_client_endpoint(
         message_id=message_id,
         phone=request.phone,
         name=request.name
+    )
+
+
+@router.get("/chats/{chat_id}/managers/", response_model=ManagersInChatResponse)
+async def get_managers_in_chat(
+    chat_id: int,
+    token: str,
+    user = Depends(get_current_user)
+):
+    chat = await crud.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
+    if chat['cashbox_id'] != user.cashbox_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    connected_users = chat_manager.get_connected_users(chat_id)
+    
+    managers = [
+        ManagerInChat(
+            user_id=user_info['user_id'],
+            user_type=user_info['user_type'],
+            connected_at=user_info['connected_at']
+        )
+        for user_info in connected_users
+        if user_info['user_type'] == "OPERATOR"
+    ]
+    
+    return ManagersInChatResponse(
+        chat_id=chat_id,
+        managers=managers,
+        total=len(managers)
     )

@@ -3,8 +3,18 @@ from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from common.amqp_messaging.common.impl.models.QueueSettingsModel import QueueSettingsModel
 from common.utils.ioc.ioc import ioc
-from api.chats.producer import ChatMessageModel
-from api.chats.handlers import ChatMessageHandler
+from api.chats.producer import (
+    ChatMessageModel,
+    ChatTypingEventModel,
+    ChatUserConnectedEventModel,
+    ChatUserDisconnectedEventModel
+)
+from api.chats.handlers import (
+    ChatMessageHandler,
+    ChatTypingEventHandler,
+    ChatUserConnectedEventHandler,
+    ChatUserDisconnectedEventHandler
+)
 
 
 class ChatRabbitMQConsumer:
@@ -27,14 +37,43 @@ class ChatRabbitMQConsumer:
             rabbit_factory: IRabbitFactory = ioc.get(IRabbitFactory)
             self.rabbitmq_messaging = await rabbit_factory()
             
+            # Подписываемся на различные типы событий
             await self.rabbitmq_messaging.subscribe(
                 ChatMessageModel,
                 ChatMessageHandler()
             )
             
+            await self.rabbitmq_messaging.subscribe(
+                ChatTypingEventModel,
+                ChatTypingEventHandler()
+            )
+            
+            await self.rabbitmq_messaging.subscribe(
+                ChatUserConnectedEventModel,
+                ChatUserConnectedEventHandler()
+            )
+            
+            await self.rabbitmq_messaging.subscribe(
+                ChatUserDisconnectedEventModel,
+                ChatUserDisconnectedEventHandler()
+            )
+            
+            # Устанавливаем очереди для всех типов событий
             await self.rabbitmq_messaging.install([
                 QueueSettingsModel(
                     queue_name="chat.messages",
+                    prefetch_count=10
+                ),
+                QueueSettingsModel(
+                    queue_name="chat.events.typing",
+                    prefetch_count=10
+                ),
+                QueueSettingsModel(
+                    queue_name="chat.events.user_connected",
+                    prefetch_count=10
+                ),
+                QueueSettingsModel(
+                    queue_name="chat.events.user_disconnected",
                     prefetch_count=10
                 )
             ])
