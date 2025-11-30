@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, func
 
 import texts
+from api.payments.schemas import PaymentType
 from bot import bot
 from const import PAID, SUCCESS, BLOCKED
 from database.db import accounts_balances, database, transactions, tariffs, users_cboxes_relation, users
@@ -32,6 +33,7 @@ async def make_transaction(balance: accounts_balances, price: int, users_quantit
             "status": SUCCESS,
             "created_at": int(datetime.utcnow().timestamp()),
             "updated_at": int(datetime.utcnow().timestamp()),
+            "type": PaymentType.incoming
         }
     )
     result = await database.execute(query)
