@@ -204,10 +204,10 @@ async def get_global_categories(
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
     start = time.perf_counter()
-    categories = await service.get_global_categories(limit=limit, offset=offset)
+    data = await service.get_global_categories(limit=limit, offset=offset)
     end_ms = int((time.perf_counter() - start) * 1000)
 
-    return categories.copy(update={"processing_time_ms": end_ms})
+    return GlobalCategoryList(**data, processing_time_ms=end_ms)
 
 
 @router.get("/categories/tree/", response_model=GlobalCategoryTreeList)
@@ -218,7 +218,7 @@ async def get_global_categories_tree(
     data = await service.get_global_categories_tree()
     end_ms = int((time.perf_counter() - start) * 1000)
 
-    return data.copy(update={"processing_time_ms": end_ms})
+    return GlobalCategoryTreeList(**data, processing_time_ms=end_ms)
 
 
 @router.get("/categories/{category_id}/", response_model=GlobalCategoryTree)
@@ -230,7 +230,7 @@ async def get_global_category(
     data = await service.get_global_category(category_id)
     end_ms = int((time.perf_counter() - start) * 1000)
 
-    return data.copy(update={"processing_time_ms": end_ms})
+    return GlobalCategoryTree(**data, processing_time_ms=end_ms)
 
 
 @router.post("/categories/", response_model=GlobalCategoryTree, status_code=201)

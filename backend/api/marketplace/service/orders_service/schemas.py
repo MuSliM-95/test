@@ -28,7 +28,7 @@ class MarketplaceOrderResponse(BaseModel):
     # order_id: str
     # status: str
     message: str
-    processing_time_ms: int
+    processing_time_ms: Optional[int] = None
     # estimated_delivery: Optional[str] = None
     # cashbox_assignments: Optional[List[dict]] = None
 
