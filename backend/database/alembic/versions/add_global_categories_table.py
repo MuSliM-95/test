@@ -13,7 +13,7 @@ import os
 
 
 # revision identifiers, used by Alembic.
-revision = "f0b3d06a3530"
+revision = "add_global_categories"
 down_revision = ("merge_heads_002", "ace9991191d4")
 branch_labels = None
 depends_on = None
