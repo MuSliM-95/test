@@ -65,7 +65,7 @@ async def create_chat(token: str, chat: ChatCreate, user = Depends(get_current_u
         cashbox_id=user.cashbox_id,
         external_chat_id=chat.external_chat_id,
         assigned_operator_id=chat.assigned_operator_id,
-        external_contact_id=chat.external_chat_id,
+        external_chat_id_for_contact=chat.external_chat_id,
         phone=chat.phone,
         name=chat.name
     )
@@ -370,7 +370,7 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
     messages_list = []
     if messages:
         channel = await crud.get_channel(chat['channel_id'])
-        client_avatar = chat.get('contact_avatar')
+        client_avatar = chat.get('contact', {}).get('avatar') if chat.get('contact') else None
         operator_avatar = None
         
         if channel and channel['type'] == 'AVITO':

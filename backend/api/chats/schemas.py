@@ -65,6 +65,15 @@ class ChatUpdate(BaseModel):
         return v
 
 
+class ContactInfo(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    avatar: Optional[str] = None
+    contragent_id: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
 class ChatResponse(BaseModel):
     id: int
     channel_id: int
@@ -84,13 +93,8 @@ class ChatResponse(BaseModel):
     channel_name: Optional[str] = None
     channel_icon: Optional[str] = None
     channel_type: Optional[str] = None
-    name: Optional[str] = None  # Название объявления из contact_metadata['ad_title']
-    contact_name: Optional[str] = None
-    contact_phone: Optional[str] = None
-    contact_email: Optional[str] = None
-    contact_avatar: Optional[str] = None
-    contact_contragent_id: Optional[int] = None
-    contact_metadata: Optional[Dict[str, Any]] = None
+    name: Optional[str] = None  
+    contact: Optional[ContactInfo] = None
 
 
 
