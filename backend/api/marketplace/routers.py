@@ -226,7 +226,11 @@ async def get_global_category(
     category_id: int,
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
-    return await service.get_global_category(category_id)
+    start = time.perf_counter()
+    data = await service.get_global_category(category_id)
+    end_ms = int((time.perf_counter() - start) * 1000)
+
+    return data.copy(update={"processing_time_ms": end_ms})
 
 
 @router.post("/categories/", response_model=GlobalCategoryTree, status_code=201)
