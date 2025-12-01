@@ -296,7 +296,7 @@ class AvitoHandler:
                             channel_id=channel_id,
                             cashbox_id=cashbox_id,
                             external_chat_id=chat_id_external,
-                            external_contact_id=chat_id_external,
+                            external_chat_id_for_contact=chat_id_external,
                             name=chat_name,
                             phone=user_phone,
                             metadata=metadata if metadata else None
@@ -599,7 +599,7 @@ class AvitoHandler:
                 channel_id=channel['id'],
                 cashbox_id=cashbox_id,
                 external_chat_id=external_chat_id,
-                external_contact_id=external_chat_id,
+                external_chat_id_for_contact=external_chat_id,
                 name=chat_name,
                 phone=user_phone,
                 metadata=metadata if metadata else None

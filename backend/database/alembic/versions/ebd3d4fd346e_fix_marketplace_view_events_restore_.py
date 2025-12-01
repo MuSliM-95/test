@@ -17,15 +17,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    try:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns("marketplace_view_events")]
+    
+    if "view_type" in columns:
         op.drop_column("marketplace_view_events", "view_type")
-    except Exception:
-        pass
-
-    op.add_column(
-        "marketplace_view_events",
-        sa.Column("event", sa.String(), nullable=False, server_default="view")
-    )
+        
 
 
 def downgrade():

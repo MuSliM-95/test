@@ -281,13 +281,14 @@ async def sync_avito_chats_and_messages():
                                 from database.db import chat_contacts
                                 contact_update = {}
                                 
-                                if chat_name and chat_name != existing_chat_obj.get('contact_name'):
+                                existing_contact = existing_chat_obj.get('contact', {})
+                                if chat_name and chat_name != existing_contact.get('name'):
                                     contact_update['name'] = chat_name
-                                if user_phone and user_phone != existing_chat_obj.get('contact_phone'):
+                                if user_phone and user_phone != existing_contact.get('phone'):
                                     contact_update['phone'] = user_phone
                                 
                                 if metadata:
-                                    existing_metadata = existing_chat_obj.get('contact_metadata') or {}
+                                    existing_metadata = existing_contact.get('metadata') or {}
                                     if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
                                         existing_metadata.update(metadata)
                                         contact_update['metadata'] = existing_metadata
@@ -344,7 +345,7 @@ async def sync_avito_chats_and_messages():
                                 channel_id=channel_id,
                                 cashbox_id=cashbox_id,
                                 external_chat_id=external_chat_id,
-                                external_contact_id=external_chat_id,
+                                external_chat_id_for_contact=external_chat_id,
                                 name=chat_name,
                                 phone=user_phone,
                                 metadata=metadata if metadata else None

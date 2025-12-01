@@ -544,7 +544,7 @@ async def get_avito_chats(
                                 channel_id=avito_channel['id'],
                                 cashbox_id=cashbox_id,
                                 external_chat_id=external_chat_id,
-                                external_contact_id=external_chat_id,
+                                external_chat_id_for_contact=external_chat_id,
                                 name=user_name or (metadata.get('ad_title') if metadata else None) or f"Avito Chat {external_chat_id[:8]}",
                                 phone=user_phone,
                                 metadata=metadata if metadata else None
@@ -1141,13 +1141,19 @@ async def get_avito_chat_metadata(
         
         metadata = {}
         
-        if chat.get('contact_metadata'):
-            if isinstance(chat['contact_metadata'], dict):
-                metadata.update(chat['contact_metadata'])
-            elif isinstance(chat['contact_metadata'], str):
+        contact_metadata = None
+        if chat.get('contact'):
+            contact_metadata = chat['contact'].get('metadata')
+        elif chat.get('contact_metadata'):  # Обратная совместимость
+            contact_metadata = chat['contact_metadata']
+        
+        if contact_metadata:
+            if isinstance(contact_metadata, dict):
+                metadata.update(contact_metadata)
+            elif isinstance(contact_metadata, str):
                 try:
                     import json
-                    db_metadata = json.loads(chat['contact_metadata'])
+                    db_metadata = json.loads(contact_metadata)
                     if isinstance(db_metadata, dict):
                         metadata.update(db_metadata)
                 except:
@@ -1679,7 +1685,7 @@ async def load_avito_history(
                         channel_id=channel_id,
                         cashbox_id=cashbox_id,
                         external_chat_id=external_chat_id,
-                        external_contact_id=external_chat_id,
+                        external_chat_id_for_contact=external_chat_id,
                         name=chat_name,
                         phone=user_phone,
                         metadata=metadata if metadata else None
