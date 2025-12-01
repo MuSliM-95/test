@@ -33,13 +33,11 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
         ))
     )
     install = await database.fetch_one(query)
-
     install_group = None
 
-    if install and install.install_group_id:
+    if install:
         install_group = install.install_group_id
     else:
-        # group by referrer
         query = (
             select(
                 amo_install_groups
@@ -52,20 +50,6 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
         if install_group_info:
             install_group = install_group_info.id
 
-    # create new group if None
-    if not install_group:
-        query = (
-            amo_install_groups.insert()
-            .values(
-                referrer=referer,
-                pair_token=gen_token(),
-            )
-            .returning(amo_install_groups.c.id)
-        )
-        amo_install_group_return = await database.fetch_one(query)
-        install_group = amo_install_group_return.id
-
-    # install_group not None
     async with aiohttp.ClientSession() as session:
 
         amocrm_auth = AmoCRMAuthenticator(session, client_id, setting_info.client_secret,
@@ -89,8 +73,18 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
             "expires_in": int(amo_crm_install.expires_in),
             "active": True,
             "from_widget": setting_info.id,
-            "install_group_id": install_group  # Гарантированно не None
         }
+        if not install_group:
+            query = (
+                amo_install_groups.insert()
+                .values(
+                    referrer=referer,
+                    pair_token=gen_token(),
+                )
+                .returning(amo_install_groups.c.id))
+            amo_install_group_return = await database.fetch_one(query)
+            amo_install_group = amo_install_group_return.id
+            values_dict["install_group_id"] = amo_install_group
 
         if install:
             query = amo_install.update().where(and_(
@@ -101,33 +95,37 @@ async def sc_l(code: str, referer: str, platform: int, client_id: str, from_widg
             query = amo_install.insert()
         query = query.values(values_dict)
         await database.execute(query)
-        # Работа с кассами
+
         if install:
             query = (
                 amo_install_table_cashboxes.select()
                 .where(amo_install_table_cashboxes.c.amo_install_group_id == install_group)
             )
-            pair_info = await database.fetch_one(query)
+        else:
+            query = (
+                amo_install_table_cashboxes.select()
+                .where(amo_install_table_cashboxes.c.amo_install_group_id == amo_install_group)
+            )
+        pair_info = await database.fetch_one(query)
+        if pair_info:
+            await create_custom_fields_contacts(
+                cashbox_id=pair_info.cashbox_id,
+                referer=referer,
+                access_token=amo_crm_install.access_token
+            )
 
-            if pair_info:
-                await create_custom_fields_contacts(
-                    cashbox_id=pair_info.cashbox_id,
-                    referer=referer,
-                    access_token=amo_crm_install.access_token
-                )
+            await create_custom_fields_leads(
+                cashbox_id=pair_info.cashbox_id,
+                referer=referer,
+                access_token=amo_crm_install.access_token
+            )
 
-                await create_custom_fields_leads(
-                    cashbox_id=pair_info.cashbox_id,
-                    referer=referer,
-                    access_token=amo_crm_install.access_token
-                )
-
-                query = (
-                    amo_install_table_cashboxes.update()
-                    .where(amo_install_table_cashboxes.c.amo_install_group_id == install_group)
-                    .values({"status": True})
-                )
-                await database.execute(query)
+            query = (
+                amo_install_table_cashboxes.update()
+                .where(amo_install_table_cashboxes.c.amo_install_group_id == install_group)
+                .values({"status": True})
+            )
+            await database.execute(query)
 
 
 @router.get("/amo_disconnect")
