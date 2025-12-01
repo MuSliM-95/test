@@ -46,7 +46,6 @@ class MarketplaceViewEventService(BaseMarketplaceService):
         return CreateViewEventResponse(success=True, message="Событие просмотра успешно сохранено")
 
     async def get_view_events(self, request: GetViewEventsRequest) -> GetViewEventsList:
-        query = select(marketplace_view_events)
         conditions = [marketplace_view_events.c.cashbox_id == request.cashbox_id]
 
         if request.entity_type:
@@ -61,7 +60,7 @@ class MarketplaceViewEventService(BaseMarketplaceService):
         if request.to_time:
             conditions.append(marketplace_view_events.c.created_at <= request.to_time)
 
-        query = query.where(and_(*conditions))
+        query = select(marketplace_view_events).where(and_(*conditions))
         count_query = select(func.count(marketplace_view_events.c.id)).where(and_(*conditions))
 
         result = await database.fetch_all(query)
