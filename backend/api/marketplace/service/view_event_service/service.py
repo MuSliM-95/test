@@ -46,11 +46,11 @@ class MarketplaceViewEventService(BaseMarketplaceService):
         return CreateViewEventResponse(success=True, message="Событие просмотра успешно сохранено")
 
     async def get_view_events(self, request: GetViewEventsRequest) -> GetViewEventsList:
-        query = select(marketplace_view_events).where()
+        query = select(marketplace_view_events)
         conditions = [marketplace_view_events.c.cashbox_id == request.cashbox_id]
 
         if request.entity_type:
-            conditions.append(marketplace_view_events.c.entity_type == request.entity_type)
+            conditions.append(marketplace_view_events.c.entity_type == str(request.entity_type))
         if request.event:
             conditions.append(marketplace_view_events.c.event == request.event.value)
         if request.contragent_phone:
