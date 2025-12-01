@@ -25,6 +25,7 @@ class MarketplaceViewEventService(BaseMarketplaceService):
             entity_id=request.entity_id,
             listing_pos=request.listing_pos,
             listing_page=request.listing_page,
+            event=request.event.value,
             contragent_id=contragent_id,
         )
         view_event_id = await database.execute(query)
@@ -40,6 +41,8 @@ class MarketplaceViewEventService(BaseMarketplaceService):
 
         if request.entity_type:
             conditions.append(marketplace_view_events.c.entity_type == request.entity_type)
+        if request.event:
+            conditions.append(marketplace_view_events.c.event == request.event.value)
         if request.contragent_phone:
             contragent_id = await self._get_contragent_id_by_phone(request.contragent_phone)
             conditions.append(marketplace_view_events.c.contragent_id == contragent_id)

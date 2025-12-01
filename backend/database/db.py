@@ -3175,28 +3175,6 @@ chats = sqlalchemy.Table(
         ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"),
         nullable=True,
     ),
-    sqlalchemy.Column(
-        "chat_contact_id",
-        Integer,
-        ForeignKey("chat_contacts.id", ondelete="SET NULL"),
-        nullable=True,
-    ),
-    sqlalchemy.Column(
-        "cashbox_id",
-        Integer,
-        ForeignKey("cashboxes.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sqlalchemy.Column("external_chat_id", String(255), nullable=False),
-    sqlalchemy.Column(
-        "status", Enum(ChatStatus), nullable=False, server_default="ACTIVE"
-    ),
-    sqlalchemy.Column(
-        "assigned_operator_id",
-        Integer,
-        ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"),
-        nullable=True,
-    ),
     sqlalchemy.Column("first_message_time", DateTime, nullable=True),
     sqlalchemy.Column("first_response_time_seconds", Integer, nullable=True),
     sqlalchemy.Column("last_message_time", DateTime, nullable=True),
@@ -3358,6 +3336,7 @@ marketplace_view_events = sqlalchemy.Table(
     sqlalchemy.Column(
         "contragent_id", Integer, ForeignKey("contragents.id"), nullable=True
     ),
+    sqlalchemy.Column("event", String, nullable=False, server_default="view"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
 

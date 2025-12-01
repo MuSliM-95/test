@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
+from enum import Enum
 
 from pydantic import BaseModel
 
@@ -9,6 +10,9 @@ from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
 class ViewEventEntityType(str):
     pass
 
+class Event(str, Enum):
+    view = 'view'
+    click = 'click'
 
 class GetViewEventsRequest(BaseModel):
     cashbox_id: int
@@ -16,10 +20,12 @@ class GetViewEventsRequest(BaseModel):
     to_time: Optional[datetime] = None
     contragent_phone: Optional[str] = None
     entity_type: Optional[ViewEventEntityType] = None
+    event: Optional[Event] = None
 
 class ViewEvent(BaseModel):
     id: int
     entity_type: ViewEventEntityType
+    event: Event
     entity_id: int
     listing_pos: int
     listing_page: int
@@ -39,6 +45,7 @@ class CreateViewEventRequest(BaseModel):
     entity_id: int
     listing_pos: Optional[int] = None  # Позиция в выдаче
     listing_page: Optional[int] = None  # Страница выдачи
+    event: Event = Event.view # Событие просмотра
     # utm: Optional[Dict[str, Any]] = None
     contragent_phone: Optional[str] = None  # Для аналитики
 
