@@ -13,11 +13,21 @@ class MarketplaceViewEventService(BaseMarketplaceService):
         contragent_id = await self._get_contragent_id_by_phone(request.contragent_phone)
 
         if request.entity_type == 'warehouse':
-            cashbox_id = select(warehouses.c.cashbox).where(warehouses.c.id == request.entity_id)
+            cashbox_id = await database.fetch_val(
+                select(warehouses.c.cashbox).where(warehouses.c.id == request.entity_id)
+            )
         elif request.entity_type == 'nomenclature':
-            cashbox_id = select(nomenclature.c.cashbox).where(nomenclature.c.id == request.entity_id)
+            cashbox_id = await database.fetch_val(
+                select(nomenclature.c.cashbox).where(nomenclature.c.id == request.entity_id)
+            )
         else:
             raise HTTPException(status_code=422, detail='Неизвестный entity_type')
+
+        if cashbox_id is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f'{request.entity_type} с ID {request.entity_id} не найден'
+            )
 
         query = marketplace_view_events.insert().values(
             cashbox_id=cashbox_id,
