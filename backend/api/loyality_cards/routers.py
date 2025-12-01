@@ -278,6 +278,7 @@ async def new_loyality_card(
                         0, 9_223_372_036_854_775
                     )
         else:
+            loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
             phone_code = None
             is_phone_formatted = False
             try:
@@ -342,8 +343,6 @@ async def new_loyality_card(
                 loyality_cards_values["card_number"] = clear_phone_number(
                     phone_number=loyality_card_contr.phone
                 )
-            else:
-                loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
 
         loyality_cards_values["created_by_id"] = user.id
         if user_by_phone:
