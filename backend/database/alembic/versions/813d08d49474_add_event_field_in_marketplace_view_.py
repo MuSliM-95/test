@@ -19,9 +19,9 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "marketplace_view_events",
-        sa.Column("view_type", sa.String(), nullable=False, server_default="catalog")
+        sa.Column("event", sa.String(), nullable=False, server_default="view")
     )
 
 
 def downgrade() -> None:
-    pass
+    op.drop_column("marketplace_view_events", "event")
