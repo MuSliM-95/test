@@ -446,6 +446,7 @@ class SegmentActions:
         cards = await database.fetch_all(query)
         for card in cards:
             insert_data["loyality_card_id"] = card.id
+            insert_data["loyality_card_number"] = card.card_number
             await database.execute(
                 loyality_transactions.insert().values(insert_data)
             )
