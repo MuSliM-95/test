@@ -38,13 +38,14 @@ class GlobalCategory(GlobalCategoryBase):
 
 class GlobalCategoryTree(GlobalCategory):
     children: Optional[List['GlobalCategoryTree']] = []  # noqa: E501
-
+    processing_time_ms: int
 
 class GlobalCategoryList(BaseModel):
     result: List[GlobalCategory]
     count: int
-
+    processing_time_ms: int
 
 class GlobalCategoryTreeList(BaseModel):
     result: List[GlobalCategoryTree]
     count: int
+    processing_time_ms: int

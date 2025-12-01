@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Query, Depends, File, UploadFile
 
 from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse, \
@@ -36,7 +38,11 @@ async def get_marketplace_product(
     Получить один товар маркетплейса с SEO, атрибутами и остатками по складам
     """
 
-    return await service.get_product(product_id)
+    start = time.perf_counter()
+    product = await service.get_product(product_id)
+    end_ms = int((time.perf_counter() - start) * 1000)
+
+    return product.copy(update={"processing_time_ms": end_ms})
 
 
 @router.get("/products", response_model=MarketplaceProductList)
@@ -50,8 +56,11 @@ async def get_marketplace_products(
     Фильтрует только товары с:
     - price_type = 'chatting'
     """
+    start = time.perf_counter()
+    products = await service.get_products(request)
+    end_ms = int((time.perf_counter() - start) * 1000)
 
-    return await service.get_products(request)
+    return products.copy(update={"processing_time_ms": end_ms})
 
 
 @router.get("/locations", response_model=LocationsListResponse)
@@ -70,7 +79,11 @@ async def create_marketplace_order(order_request: MarketplaceOrderRequest, utm: 
     """
     Создать заказ маркетплейса с автоматическим распределением по кешбоксам
     """
-    return await service.create_order(order_request, utm)
+    start = time.perf_counter()
+    order = await service.create_order(order_request, utm)
+    end_ms = int((time.perf_counter() - start) * 1000)
+
+    return order.copy(update={"processing_time_ms": end_ms})
 
 
 @router.get("/qr/{qr_hash}", response_model=QRResolveResponse)
@@ -190,14 +203,22 @@ async def get_global_categories(
     offset: int = 0,
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
-    return await service.get_global_categories(limit=limit, offset=offset)
+    start = time.perf_counter()
+    categories = await service.get_global_categories(limit=limit, offset=offset)
+    end_ms = int((time.perf_counter() - start) * 1000)
+
+    return categories.copy(update={"processing_time_ms": end_ms})
 
 
 @router.get("/categories/tree/", response_model=GlobalCategoryTreeList)
 async def get_global_categories_tree(
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
-    return await service.get_global_categories_tree()
+    start = time.perf_counter()
+    data = await service.get_global_categories_tree()
+    end_ms = int((time.perf_counter() - start) * 1000)
+
+    return data.copy(update={"processing_time_ms": end_ms})
 
 
 @router.get("/categories/{category_id}/", response_model=GlobalCategoryTree)
@@ -205,7 +226,11 @@ async def get_global_category(
     category_id: int,
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
-    return await service.get_global_category(category_id)
+    start = time.perf_counter()
+    data = await service.get_global_category(category_id)
+    end_ms = int((time.perf_counter() - start) * 1000)
+
+    return data.copy(update={"processing_time_ms": end_ms})
 
 
 @router.post("/categories/", response_model=GlobalCategoryTree, status_code=201)
