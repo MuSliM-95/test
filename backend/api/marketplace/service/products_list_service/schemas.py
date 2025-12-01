@@ -73,6 +73,7 @@ class MarketplaceProductDetail(MarketplaceProduct):
     seo_keywords: Optional[List[str]] = None
     attributes: Optional[List[MarketplaceProductAttribute]] = None
     nomenclatures: Optional[List[dict]] = None
+    processing_time_ms: int
 
     class Config:
         orm_mode = True
@@ -83,6 +84,7 @@ class MarketplaceProductList(BaseModel):
     count: int
     page: int
     size: int
+    processing_time_ms: int
 
 
 class MarketplaceSort(Enum):
