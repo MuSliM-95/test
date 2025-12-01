@@ -339,15 +339,15 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
 
     logger = logging.getLogger("main")
     logger.info(f"Webhook received: cashbox_id={cashbox_id}, method={request.method}, path={request.url.path}")
-    
+ 
     try:
         from api.chats.avito.avito_handler import AvitoHandler
         from api.chats.avito.avito_types import AvitoWebhook
         from api.chats.avito.avito_webhook import verify_webhook_signature
-        
+      
         body = await request.body()
         signature_header = request.headers.get("X-Avito-Signature")
-        
+      
         if signature_header:
             if not verify_webhook_signature(body, signature_header):
                 logger.error("Webhook signature verification failed")
@@ -355,7 +355,7 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
                     "success": False,
                     "message": "Invalid webhook signature"
                 }
-        
+      
         try:
             webhook_data = json.loads(body.decode())
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
@@ -364,24 +364,24 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
                 "success": False,
                 "message": f"Invalid webhook JSON: {str(e)}"
             }
-        
+
         logger.debug(f"Webhook data: {json.dumps(webhook_data, default=str)}")
-        
+
         if not webhook_data:
             logger.error("Empty webhook data")
             return {
                 "success": False,
                 "message": "Empty webhook data"
             }
-        
+
         has_id = 'id' in webhook_data
         has_payload = 'payload' in webhook_data
         has_timestamp = 'timestamp' in webhook_data
-        
+
         if not (has_id or has_payload):
             logger.warning(f"Webhook missing required fields. Has id: {has_id}, has payload: {has_payload}, has timestamp: {has_timestamp}")
             logger.warning(f"Webhook keys: {list(webhook_data.keys())}")
-        
+
         try:
             webhook = AvitoWebhook(**webhook_data)
         except Exception as e:
@@ -390,16 +390,16 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
                 "success": False,
                 "message": f"Invalid webhook structure: {str(e)}"
             }
-        
+
         result = await AvitoHandler.handle_webhook_event(webhook, cashbox_id)
-        
+
         return {
             "success": result.get("success", False),
             "message": result.get("message", "Event processed"),
             "chat_id": result.get("chat_id"),
             "message_id": result.get("message_id")
         }
-    
+
     except Exception as e:
         logger.error(f"Error processing Avito webhook: {e}", exc_info=True)
         return {
