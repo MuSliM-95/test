@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, HTTPException
 
 from database.db import database, price_types
 
@@ -9,6 +9,8 @@ from functions.helpers import get_user_by_token, raise_bad_request
 
 from ws_manager import manager
 from sqlalchemy import select, func
+
+from typing import Optional
 
 router = APIRouter(tags=["price_types"])
 
@@ -23,23 +25,41 @@ async def get_price_type_by_id(token: str, idx: int):
 
 
 @router.get("/price_types/", response_model=schemas.PriceTypeListGet)
-async def get_price_types(token: str, limit: int = 100, offset: int = 0):
+async def get_price_types(
+        token: str,
+        limit: int = 100,
+        offset: int = 0,
+        tags: Optional[str] = Query(None),
+        mode: Optional[str] = Query("or"),
+):
     """Получение списка типов цен"""
     user = await get_user_by_token(token)
+
+    tag_list = [tag.strip() for tag in tags.split(",")] if tags else None
+
+    if mode not in ("and", "or"):
+        raise HTTPException(400, "mode must be 'and' or 'or'")
+
     query = (
         price_types.select()
         .where(
             price_types.c.cashbox == user.cashbox_id,
             price_types.c.is_deleted.is_not(True),
         )
-        .limit(limit)
-        .offset(offset)
     )
+
+    if tag_list:
+        if mode == "and":
+            query = query.where(price_types.c.tags.contains(tag_list))
+        else:
+            query = query.where(price_types.c.tags.overlap(tag_list))
+
+    query = query.limit(limit).offset(offset)
 
     price_types_db = await database.fetch_all(query)
     price_types_db = [*map(datetime_to_timestamp, price_types_db)]
 
-    query = (
+    count_query = (
         select(func.count(price_types.c.id))
         .where(
             price_types.c.cashbox == user.cashbox_id,
@@ -47,7 +67,13 @@ async def get_price_types(token: str, limit: int = 100, offset: int = 0):
         )
     )
 
-    price_types_db_count = await database.fetch_one(query)
+    if tag_list:
+        if mode == "and":
+            count_query = count_query.where(price_types.c.tags.contains(tag_list))
+        else:
+            count_query = count_query.where(price_types.c.tags.overlap(tag_list))
+
+    price_types_db_count = await database.fetch_one(count_query)
     
     return {"result": price_types_db, "count": price_types_db_count.count_1}
 

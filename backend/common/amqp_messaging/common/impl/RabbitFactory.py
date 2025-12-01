@@ -28,15 +28,17 @@ class RabbitFactory(IRabbitFactory):
         )
 
         retries = 3
+        last_error = None
         for i in range(retries):
             try:
                 await amqp_connection.install()
+                break
             except Exception as e:
-                if retries == 0:
-                    raise Exception(f'ошибка в инсталл {e}')
-                print('retry', retries)
-                retries -= 1
-                await asyncio.sleep(1 * retries)
+                last_error = e
+                if i == retries - 1:
+                    raise Exception(f'ошибка в инсталл после {retries} попыток: {last_error}')
+                print(f'retry {i + 1}/{retries}: {e}')
+                await asyncio.sleep(1 * (i + 1))
 
         channels: Dict[str, AbstractRobustChannel] = {}
         channels[f"publication"] = await amqp_connection.get_channel()

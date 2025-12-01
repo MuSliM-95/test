@@ -84,7 +84,7 @@ class GetDocSaleByIdQuery:
     @staticmethod
     def _enrich_doc_sale(item, results_map: Dict[str, Any]):
         delivery_info = results_map["delivery_map"]
-        item.update(delivery_info)
+        item["delivery_info"] = delivery_info
 
         goods = results_map["goods_map"]
         item["goods"] = goods

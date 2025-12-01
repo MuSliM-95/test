@@ -2,7 +2,8 @@ import json
 import os
 import time
 import logging
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -102,6 +103,7 @@ from starlette.types import Message
 from api.cashboxes.routers import router as cboxes_router
 from api.contragents.routers import router as contragents_router
 from api.payments.routers import create_payment, router as payments_router
+from api.balances.transactions_routers import router as transactions_router, tinkoff_router
 from api.pboxes.routers import router as pboxes_router
 from api.projects.routers import router as projects_router
 from api.users.routers import router as users_router
@@ -167,11 +169,15 @@ from api.chats.routers import router as chats_router
 from api.chats.websocket import router as chats_ws_router
 from api.chats.rabbitmq_consumer import chat_consumer
 from api.chats.avito.avito_routes import router as avito_router
+# from api.health.rabbitmq_check import router as rabbitmq_health_router
 from api.chats.avito.avito_consumer import avito_consumer
 from api.chats.avito.avito_default_webhook import router as avito_default_webhook_router
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 
 from jobs.jobs import scheduler
+
+from fastapi import Request
+from api.balances.transactions_routers import tinkoff_callback
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
@@ -210,6 +216,8 @@ app.include_router(analytics_router)
 app.include_router(cboxes_router)
 app.include_router(contragents_router)
 app.include_router(payments_router)
+app.include_router(transactions_router)
+app.include_router(tinkoff_router)
 app.include_router(pboxes_router)
 app.include_router(projects_router)
 app.include_router(articles_router)
@@ -270,6 +278,7 @@ app.include_router(apple_wallet_card_settings_router)
 app.include_router(feeds_router)
 app.include_router(chats_router)
 app.include_router(chats_ws_router)
+# app.include_router(rabbitmq_health_router)
 app.include_router(avito_router)
 app.include_router(avito_default_webhook_router)
 
@@ -281,6 +290,48 @@ app.include_router(avito_default_webhook_router)
 @app.get("/health")
 async def check_health_app():
     return {"status": "ok"}
+
+@app.post("/api/v1/payments/tinkoff/callback")
+@app.get("/api/v1/payments/tinkoff/callback")
+async def tinkoff_callback_direct(request: Request):
+    return await tinkoff_callback(request)
+
+
+@app.get("/api/v1/hook/chat/123456", include_in_schema=False)
+@app.post("/api/v1/hook/chat/123456", include_in_schema=False)
+async def avito_oauth_callback_legacy(
+    request: Request,
+    code: str = Query(None, description="Authorization code from Avito"),
+    state: str = Query(None, description="State parameter for CSRF protection"),
+    error: str = Query(None, description="Error from Avito OAuth"),
+    error_description: str = Query(None, description="Error description from Avito OAuth"),
+    token: str = Query(None, description="Optional user authentication token")
+):
+    if not code and not state and not error:
+        return {"status": "ok", "message": "OAuth callback endpoint is available"}
+    
+    if error:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"OAuth error: {error}. {error_description or ''}"
+        )
+    
+    if not code or not state:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required OAuth parameters: code and state are required"
+        )
+    
+    try:
+        from api.chats.avito.avito_routes import avito_oauth_callback
+        result = await avito_oauth_callback(code=code, state=state, token=token)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @app.post("/api/v1/hook/chat/{cashbox_id}", include_in_schema=False)
@@ -404,11 +455,9 @@ async def write_event_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
         await _write_event(request=request, body=body, time_start=time_start, status_code=response.status_code)
-        print(time.time() - time_start)
         return response
     except Exception as e:
         await _write_event(request=request, body=body, time_start=time_start)
-        print(time.time() - time_start)
         raise e
 
 
@@ -481,35 +530,30 @@ async def startup():
         try:
             from api.chats.avito.avito_init import init_avito_credentials
             await init_avito_credentials()
-            print("Avito credentials initialized from env (development mode)")
         except Exception as e:
-            print(f"Warning: failed to initialize Avito credentials from env: {e}")
+            pass
 
     try:
         await chat_consumer.start()
     except Exception as e:
-        print(f"Warning: Failed to start chat consumer: {e}")
         import traceback
         traceback.print_exc()
 
     try:
         await avito_consumer.start()
     except Exception as e:
-        print(f"Warning: Failed to start Avito consumer: {e}")
         import traceback
         traceback.print_exc()
 
     try:
         await DefaultImagesUploader().upload_all()
     except Exception as e:
-        print(f"Warning: Failed to upload default images: {e}")
+        pass
         
     try:
         if not scheduler.running:
             scheduler.start()
-            print("Scheduler started successfully")
     except Exception as e:
-        print(f"Warning: Failed to start scheduler: {e}")
         import traceback
         traceback.print_exc()
 
@@ -523,6 +567,5 @@ async def shutdown():
     try:
         if scheduler.running:
             scheduler.shutdown()
-            print("Scheduler stopped")
     except Exception as e:
-        print(f"Warning: Failed to stop scheduler: {e}")
+        pass

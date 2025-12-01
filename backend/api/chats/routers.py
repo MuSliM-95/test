@@ -9,8 +9,10 @@ from api.chats.schemas import (
     ChannelCreate, ChannelUpdate, ChannelResponse,
     ChatCreate, ChatUpdate, ChatResponse,
     MessageCreate, MessageResponse, MessagesList,
-    ChainClientRequest
+    ChainClientRequest,
+    ManagersInChatResponse, ManagerInChat
 )
+from api.chats.websocket import chat_manager
 from database.db import pictures, database
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -32,17 +34,15 @@ async def create_channel(token: str, channel: ChannelCreate, user = Depends(get_
 
 @router.get("/channels/{channel_id}", response_model=ChannelResponse)
 async def get_channel(channel_id: int, token: str, user = Depends(get_current_user)):
-    """Get channel by ID"""
-    channel = await crud.get_channel(channel_id)
+    channel = await crud.get_channel_by_id_and_cashbox(channel_id, user.cashbox_id)
     if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found")
+        raise HTTPException(status_code=404, detail="Channel not found or access denied")
     return channel
 
 
 @router.get("/channels/", response_model=list)
 async def get_channels(token: str, skip: int = 0, limit: int = 100, user = Depends(get_current_user)):
-    """Get all channels"""
-    return await crud.get_channels(skip, limit)
+    return await crud.get_all_channels_by_cashbox(user.cashbox_id)
 
 
 @router.put("/channels/{channel_id}", response_model=ChannelResponse)
@@ -62,10 +62,10 @@ async def create_chat(token: str, chat: ChatCreate, user = Depends(get_current_u
     """Create a new chat (cashbox_id from token)"""
     return await crud.create_chat(
         channel_id=chat.channel_id,
-        contragent_id=chat.contragent_id,
         cashbox_id=user.cashbox_id,
         external_chat_id=chat.external_chat_id,
         assigned_operator_id=chat.assigned_operator_id,
+        external_contact_id=chat.external_chat_id,
         phone=chat.phone,
         name=chat.name
     )
@@ -223,6 +223,7 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                 import aiohttp
                                 
                                 image_url = message.image_url
+                                
                                 if 'google.com/imgres' in image_url or 'imgurl=' in image_url:
                                     from urllib.parse import unquote, parse_qs, urlparse
                                     try:
@@ -238,7 +239,8 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                 if 'avito' in image_url.lower():
                                     headers['Authorization'] = f"Bearer {client.access_token}"
                                 
-                                async with aiohttp.ClientSession() as session:
+                                connector = aiohttp.TCPConnector(ssl=False)
+                                async with aiohttp.ClientSession(connector=connector) as session:
                                     async with session.get(image_url, headers=headers) as img_response:
                                         if img_response.status == 200:
                                             content_type = img_response.headers.get('Content-Type', '')
@@ -265,6 +267,7 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                                             filename = "image.jpg"
                                                     
                                                     upload_result = await client.upload_image(image_data, filename)
+                                                    
                                                     if upload_result:
                                                         if isinstance(upload_result, tuple):
                                                             image_id, image_url = upload_result
@@ -281,11 +284,20 @@ async def create_message(token: str, message: MessageCreate, user = Depends(get_
                                 image_id = None
                                 image_url = None
                         
-                        if image_id or (message.message_type != "IMAGE" and message.content):
+                        if message.message_type == "IMAGE":
+                            if not image_id:
+                                logger.warning(f"Cannot send IMAGE message: image upload failed. image_url: {message.image_url}")
+                                raise Exception("Cannot send IMAGE message: image upload failed")
                             avito_message = await client.send_message(
                                 chat_id=chat['external_chat_id'],
-                                text=message.content if message.message_type != "IMAGE" else None,
+                                text=None,
                                 image_id=image_id
+                            )
+                        elif message.content:
+                            avito_message = await client.send_message(
+                                chat_id=chat['external_chat_id'],
+                                text=message.content,
+                                image_id=None
                             )
                         else:
                             logger.warning("Cannot send message: no image_id and no text content")
@@ -358,7 +370,7 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
     messages_list = []
     if messages:
         channel = await crud.get_channel(chat['channel_id'])
-        client_avatar = chat.get('client_avatar')
+        client_avatar = chat.get('contact_avatar')
         operator_avatar = None
         
         if channel and channel['type'] == 'AVITO':
@@ -413,6 +425,14 @@ async def get_chat_messages(chat_id: int, token: str, skip: int = 0, limit: int 
                                             operator_avatar = avatar_url
                                         elif not client_avatar:
                                             client_avatar = avatar_url
+                                            # Сохраняем аватар в БД
+                                            if chat.get('chat_contact_id'):
+                                                from database.db import chat_contacts
+                                                await database.execute(
+                                                    chat_contacts.update().where(
+                                                        chat_contacts.c.id == chat['chat_contact_id']
+                                                    ).values(avatar=avatar_url)
+                                                )
             except Exception:
                 pass
         
@@ -557,4 +577,36 @@ async def chain_client_endpoint(
         message_id=message_id,
         phone=request.phone,
         name=request.name
+    )
+
+
+@router.get("/chats/{chat_id}/managers/", response_model=ManagersInChatResponse)
+async def get_managers_in_chat(
+    chat_id: int,
+    token: str,
+    user = Depends(get_current_user)
+):
+    chat = await crud.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
+    if chat['cashbox_id'] != user.cashbox_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    connected_users = chat_manager.get_connected_users(chat_id)
+    
+    managers = [
+        ManagerInChat(
+            user_id=user_info['user_id'],
+            user_type=user_info['user_type'],
+            connected_at=user_info['connected_at']
+        )
+        for user_info in connected_users
+        if user_info['user_type'] == "OPERATOR"
+    ]
+    
+    return ManagersInChatResponse(
+        chat_id=chat_id,
+        managers=managers,
+        total=len(managers)
     )

@@ -7,7 +7,8 @@ from api.marketplace.service.orders_service.schemas import MarketplaceOrderRespo
     CreateOrderUtm
 from api.marketplace.service.product_cart_service.schemas import MarketplaceRemoveFromCartRequest, \
     MarketplaceCartResponse, MarketplaceGetCartRequest, MarketplaceAddToCartRequest
-from api.marketplace.service.products_list_service.schemas import MarketplaceProductList, MarketplaceProductsRequest
+from api.marketplace.service.products_list_service.schemas import MarketplaceProduct, MarketplaceProductList, \
+    MarketplaceProductsRequest, MarketplaceProductDetail
 from api.marketplace.service.qr_service.schemas import QRResolveResponse
 from api.marketplace.service.review_service.schemas import UpdateReviewRequest, MarketplaceReview, CreateReviewRequest, \
     ReviewListResponse, ReviewListRequest
@@ -24,6 +25,18 @@ from api.marketplace.service.public_categories.schema import (
 )
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
+
+
+@router.get("/products/{product_id}", response_model=MarketplaceProductDetail)
+async def get_marketplace_product(
+        product_id: int,
+        service: MarketplaceService = Depends(get_marketplace_service)
+):
+    """
+    Получить один товар маркетплейса с SEO, атрибутами и остатками по складам
+    """
+
+    return await service.get_product(product_id)
 
 
 @router.get("/products", response_model=MarketplaceProductList)

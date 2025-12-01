@@ -44,10 +44,19 @@ class AvitoClient:
     
     async def _ensure_token_valid(self) -> None:
         if not self.token_expires_at:
+            # Если токен еще не был получен, получаем его
+            if not self.access_token:
+                await self.get_access_token()
             return
         
         if datetime.utcnow() >= self.token_expires_at - timedelta(minutes=5):
-            await self.refresh_access_token()
+            # Если есть refresh_token, используем его для обновления
+            if self.refresh_token:
+                await self.refresh_access_token()
+            else:
+                # Если refresh_token нет, получаем новый токен через client_credentials
+                logger.warning("No refresh token available, obtaining new token via client_credentials")
+                await self.get_access_token()
     
     async def refresh_access_token(self) -> Dict[str, Any]:
         if not self.refresh_token:
@@ -137,6 +146,52 @@ class AvitoClient:
         except aiohttp.ClientError as e:
             logger.error(f"Token request failed: {str(e)}")
             raise AvitoTokenExpiredError(f"Token request failed: {str(e)}")
+    
+    @staticmethod
+    async def exchange_authorization_code_for_tokens(
+        client_id: str,
+        client_secret: str,
+        authorization_code: str,
+        redirect_uri: Optional[str] = None
+    ) -> Dict[str, Any]:
+        try:
+            async with aiohttp.ClientSession() as session:
+                data = {
+                    "grant_type": "authorization_code",
+                    "code": authorization_code,
+                    "client_id": client_id,
+                    "client_secret": client_secret
+                }
+                
+                async with session.post(
+                    "https://api.avito.ru/token/",
+                    data=data,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.error(f"OAuth token exchange failed: HTTP {response.status}, {error_text}")
+                        raise AvitoAPIError(f"OAuth token exchange failed: HTTP {response.status}")
+                    
+                    result = await response.json()
+                    
+                    access_token = result.get('access_token')
+                    refresh_token = result.get('refresh_token')
+                    expires_in = result.get('expires_in', 3600)
+                    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+                    
+                    logger.info("OAuth tokens obtained successfully")
+                    
+                    return {
+                        'access_token': access_token,
+                        'refresh_token': refresh_token,
+                        'expires_at': expires_at.isoformat(),
+                        'expires_in': expires_in
+                    }
+        
+        except aiohttp.ClientError as e:
+            logger.error(f"OAuth token exchange request failed: {str(e)}")
+            raise AvitoAPIError(f"OAuth token exchange request failed: {str(e)}")
     
     async def _get_user_id(self) -> int:
         if self._user_id:
@@ -498,6 +553,68 @@ class AvitoClient:
         except AvitoAPIError as e:
             logger.error(f"Token validation failed: {e}")
             return False
+    
+    async def check_status(self) -> Dict[str, Any]:
+        """
+        Проверяет статус аккаунта Avito и возвращает статус-код и информацию о подключении.
+        Возвращает: {'status_code': int, 'connection_status': str, 'success': bool}
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    "Authorization": f"Bearer {self.access_token}",
+                    "Content-Type": "application/json",
+                }
+                async with session.get(
+                    f"{self.BASE_URL}/core/v1/accounts/self",
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    status_code = response.status
+                    
+                    if status_code == 200:
+                        user_data = await response.json()
+                        logger.info(f"Status check successful for user {user_data.get('id')}")
+                        return {
+                            'status_code': status_code,
+                            'connection_status': 'connected',
+                            'success': True
+                        }
+                    else:
+                        error_text = await response.text()
+                        logger.warning(f"Status check failed: HTTP {status_code}, {error_text}")
+                        
+                        if status_code == 401:
+                            connection_status = 'unauthorized'
+                        elif status_code == 403:
+                            connection_status = 'forbidden'
+                        elif status_code == 404:
+                            connection_status = 'not_found'
+                        else:
+                            connection_status = 'error'
+                        
+                        return {
+                            'status_code': status_code,
+                            'connection_status': connection_status,
+                            'success': False,
+                            'error': error_text
+                        }
+        except aiohttp.ClientError as e:
+            logger.error(f"Status check error: {str(e)}")
+            return {
+                'status_code': 0,
+                'connection_status': 'error',
+                'success': False,
+                'error': str(e)
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error during status check: {str(e)}")
+            return {
+                'status_code': 0,
+                'connection_status': 'error',
+                'success': False,
+                'error': str(e)
+            }
     
     async def sync_messages(
         self,

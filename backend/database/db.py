@@ -988,9 +988,8 @@ price_types = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False),
-    sqlalchemy.Column(
-        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
-    ),
+    sqlalchemy.Column("tags", ARRAY(item_type=String), nullable=True),
+    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("is_system", Boolean),
@@ -1288,6 +1287,8 @@ tariffs = sqlalchemy.Table(
     sqlalchemy.Column("archived", Boolean, default=False, nullable=False),
     sqlalchemy.Column("actual", Boolean, default=True, nullable=False),
     sqlalchemy.Column("demo_days", Integer, nullable=False),
+    sqlalchemy.Column("offer_hours", Integer, nullable=True, server_default="0"),
+    sqlalchemy.Column("discount_percent", Float, nullable=True, server_default="0"),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
@@ -1301,6 +1302,9 @@ transactions = sqlalchemy.Table(
     sqlalchemy.Column("users", Integer),
     sqlalchemy.Column("amount", Float),
     sqlalchemy.Column("status", String),
+    sqlalchemy.Column("type", String, nullable=False),  
+    sqlalchemy.Column("is_manual_deposit", Boolean, nullable=False, server_default=sqlalchemy.false()),
+    sqlalchemy.Column("external_id", String, nullable=True),  
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
 )
@@ -3102,40 +3106,38 @@ channels = sqlalchemy.Table(
     ),
 )
 
+chat_contacts = sqlalchemy.Table(
+    "chat_contacts",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("external_contact_id", String(255), nullable=True),
+    sqlalchemy.Column("name", String(100), nullable=True),
+    sqlalchemy.Column("phone", String(20), nullable=True),
+    sqlalchemy.Column("email", String(255), nullable=True),
+    sqlalchemy.Column("avatar", String(500), nullable=True),
+    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id", ondelete="SET NULL"), nullable=True),
+    sqlalchemy.Column("metadata", JSON, nullable=True),
+    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
+    UniqueConstraint("channel_id", "external_contact_id", name="uq_chat_contacts_channel_external"),
+)
+
 chats = sqlalchemy.Table(
     "chats",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column(
-        "channel_id",
-        Integer,
-        ForeignKey("channels.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sqlalchemy.Column(
-        "contragent_id",
-        Integer,
-        ForeignKey("contragents.id", ondelete="SET NULL"),
-        nullable=True,
-    ),
-    sqlalchemy.Column(
-        "cashbox_id",
-        Integer,
-        ForeignKey("cashboxes.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
+    sqlalchemy.Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("chat_contact_id", Integer, ForeignKey("chat_contacts.id", ondelete="SET NULL"), nullable=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("external_chat_id", String(255), nullable=False),
-    sqlalchemy.Column("phone", String(20), nullable=True),
-    sqlalchemy.Column("name", String(100), nullable=True),
-    sqlalchemy.Column(
-        "status", Enum(ChatStatus), nullable=False, server_default="ACTIVE"
-    ),
-    sqlalchemy.Column(
-        "assigned_operator_id",
-        Integer,
-        ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"),
-        nullable=True,
-    ),
+    sqlalchemy.Column("status", Enum(ChatStatus), nullable=False, server_default="ACTIVE"),
+    sqlalchemy.Column("assigned_operator_id", Integer, ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"), nullable=True),
+    sqlalchemy.Column("chat_contact_id", Integer, ForeignKey("chat_contacts.id", ondelete="SET NULL"), nullable=True),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("external_chat_id", String(255), nullable=False),
+    sqlalchemy.Column("status", Enum(ChatStatus), nullable=False, server_default="ACTIVE"),
+    sqlalchemy.Column("assigned_operator_id", Integer, ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"), nullable=True),
     sqlalchemy.Column("first_message_time", DateTime, nullable=True),
     sqlalchemy.Column("first_response_time_seconds", Integer, nullable=True),
     sqlalchemy.Column("last_message_time", DateTime, nullable=True),
@@ -3207,15 +3209,13 @@ channel_credentials = sqlalchemy.Table(
     sqlalchemy.Column("token_expires_at", DateTime, nullable=True),
     sqlalchemy.Column("avito_user_id", Integer, nullable=True),
     sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
-    sqlalchemy.Column(
-        "created_at", DateTime, nullable=False, server_default=func.now()
-    ),
-    sqlalchemy.Column(
-        "updated_at", DateTime, nullable=False, server_default=func.now()
-    ),
-    UniqueConstraint(
-        "channel_id", "cashbox_id", name="uq_channel_credentials_channel_cashbox"
-    ),
+    sqlalchemy.Column("auto_sync_chats_enabled", Boolean, nullable=False, server_default="false"),
+    sqlalchemy.Column("last_status_code", Integer, nullable=True),
+    sqlalchemy.Column("last_status_check_at", DateTime, nullable=True),
+    sqlalchemy.Column("connection_status", String(50), nullable=True),
+    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
+    UniqueConstraint("channel_id", "cashbox_id", name="uq_channel_credentials_channel_cashbox"),
 )
 
 marketplace_rating_aggregates = sqlalchemy.Table(

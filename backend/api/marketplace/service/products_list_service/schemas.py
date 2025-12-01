@@ -13,6 +13,7 @@ class AvailableWarehouse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     distance_to_client: Optional[float] = None
+    current_amount: Optional[float] = None
 
     class Config:
         orm_mode = True
@@ -56,6 +57,22 @@ class MarketplaceProduct(BaseModel):
     reviews_count: Optional[int] = None  # Количество отзывов
 
     available_warehouses: Optional[List[AvailableWarehouse]] = None
+
+    class Config:
+        orm_mode = True
+
+class MarketplaceProductAttribute(BaseModel):
+    """Атрибуты товара"""
+    name: str
+    value: str
+
+class MarketplaceProductDetail(MarketplaceProduct):
+    """Дополненная модель товара для маркетплейса"""
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    seo_keywords: Optional[List[str]] = None
+    attributes: Optional[List[MarketplaceProductAttribute]] = None
+    nomenclatures: Optional[List[dict]] = None
 
     class Config:
         orm_mode = True

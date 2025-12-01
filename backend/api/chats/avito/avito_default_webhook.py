@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Request
+import logging
 from api.chats.avito.avito_webhook import process_avito_webhook
 from api.chats.avito.avito_handler import AvitoHandler
 from api.chats.avito.schemas import AvitoWebhookResponse
-import logging
+from database.db import channel_credentials, channels, database
+from sqlalchemy import select, and_
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/avito", tags=["avito-webhook"])
+router = APIRouter(prefix="/avito", tags=["avito-webhook"])
 
 @router.post("/hook", response_model=AvitoWebhookResponse)
 async def receive_avito_webhook_default(request: Request):
@@ -21,14 +23,14 @@ async def receive_avito_webhook_default(request: Request):
         )
         
         if not is_valid:
-            logger.error("Invalid webhook received")
+            logger.warning("Invalid webhook received")
             return {
                 "success": False,
                 "message": "Invalid webhook signature or structure"
             }
         
         if not cashbox_id:
-            logger.error("Could not determine cashbox_id from webhook")
+            logger.warning("Could not determine cashbox_id from webhook")
             return {
                 "success": False,
                 "message": "Could not determine cashbox_id"
@@ -49,10 +51,6 @@ async def receive_avito_webhook_default(request: Request):
             user_id = getattr(webhook.payload.value, 'user_id', None)
         
         if user_id:
-            from database.db import channel_credentials, channels, database
-            from sqlalchemy import select, and_
-            from api.chats import crud
-            
             channels_query = select([
                 channel_credentials.c.channel_id
             ]).select_from(
