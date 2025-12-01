@@ -1,4 +1,3 @@
-
 from database.db import database, global_categories
 from sqlalchemy import select, func
 from fastapi import HTTPException, UploadFile
@@ -9,10 +8,10 @@ from common.s3_service.models.S3SettingsModel import S3SettingsModel
 import uuid
 from datetime import datetime
 from api.marketplace.service.public_categories.schema import (
-    GlobalCategoryCreate, GlobalCategoryUpdate
+    GlobalCategoryCreate,
+    GlobalCategoryUpdate,
 )
-from api.marketplace.service.base_marketplace_service import \
-    BaseMarketplaceService
+from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 
 S3_BUCKET_NAME = "5075293c-docs_generated"
 S3_FOLDER = "photos"
@@ -22,7 +21,7 @@ AWS_SECRET_ACCESS_KEY = os.getenv("S3_SECRET")
 S3_SETTINGS = S3SettingsModel(
     aws_access_key_id=AWS_ACCESS_KEY_ID,
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    endpoint_url=S3_URL
+    endpoint_url=S3_URL,
 )
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
@@ -56,23 +55,12 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             .limit(limit)
             .offset(offset)
         )
-        try:
-            categories_db = await database.fetch_all(query)
-            print("[DEBUG] after fetch_all categories")
-        except Exception as e:
-            print(f"[ERROR] fetch_all categories: {e}")
-            raise
+        categories_db = await database.fetch_all(query)
         categories_db = [*map(serialize_datetime_fields, categories_db)]
-        print("[DEBUG] before fetch_one count_query")
         count_query = select(func.count(global_categories.c.id)).where(
             global_categories.c.is_active.is_(True)
         )
-        try:
-            categories_count = await database.fetch_one(count_query)
-            print("[DEBUG] after fetch_one count_query")
-        except Exception as e:
-            print(f"[ERROR] fetch_one count_query: {e}")
-            raise
+        categories_count = await database.fetch_one(count_query)
         return {"result": categories_db, "count": categories_count.count_1}
 
     async def build_global_hierarchy(self, categories_data, parent_id=None):
@@ -117,8 +105,7 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         )
         children = await database.fetch_all(children_query)
         category_dict["children"] = [
-            dict(serialize_datetime_fields(child))
-            for child in children
+            dict(serialize_datetime_fields(child)) for child in children
         ]
         return category_dict
 
@@ -131,9 +118,7 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             global_categories.c.id == new_category_id
         )
         created_category = await database.fetch_one(created_category_query)
-        created_category_dict = dict(
-            serialize_datetime_fields(created_category)
-        )
+        created_category_dict = dict(serialize_datetime_fields(created_category))
         created_category_dict["children"] = []
         return created_category_dict
 
@@ -147,34 +132,29 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
             raise HTTPException(
-                status_code=404,
-                detail=f"Категория с ID {category_id} не найдена"
+                status_code=404, detail=f"Категория с ID {category_id} не найдена"
             )
         update_data = category_update.dict(exclude_unset=True)
         if not update_data:
-            raise HTTPException(
-                status_code=400,
-                detail="Нет данных для обновления"
-            )
-        update_query = global_categories.update().where(
-            global_categories.c.id == category_id
-        ).values(**update_data)
+            raise HTTPException(status_code=400, detail="Нет данных для обновления")
+        update_query = (
+            global_categories.update()
+            .where(global_categories.c.id == category_id)
+            .values(**update_data)
+        )
         await database.execute(update_query)
         updated_category_query = select(global_categories).where(
             global_categories.c.id == category_id
         )
         updated_category = await database.fetch_one(updated_category_query)
-        updated_category_dict = dict(
-            serialize_datetime_fields(updated_category)
-        )
+        updated_category_dict = dict(serialize_datetime_fields(updated_category))
         children_query = select(global_categories).where(
             global_categories.c.parent_id == category_id,
             global_categories.c.is_active.is_(True),
         )
         children = await database.fetch_all(children_query)
         updated_category_dict["children"] = [
-            dict(serialize_datetime_fields(child))
-            for child in children
+            dict(serialize_datetime_fields(child)) for child in children
         ]
         return updated_category_dict
 
@@ -186,17 +166,15 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
             raise HTTPException(
-                status_code=404,
-                detail=f"Категория с ID {category_id} не найдена"
+                status_code=404, detail=f"Категория с ID {category_id} не найдена"
             )
-        delete_query = global_categories.update().where(
-            global_categories.c.id == category_id
-        ).values(is_active=False)
+        delete_query = (
+            global_categories.update()
+            .where(global_categories.c.id == category_id)
+            .values(is_active=False)
+        )
         await database.execute(delete_query)
-        return {
-            "success": True,
-            "message": f"Категория {category_id} успешно удалена"
-        }
+        return {"success": True, "message": f"Категория {category_id} успешно удалена"}
 
     async def upload_category_image(self, category_id: int, file: UploadFile):
         check_query = select(global_categories).where(
@@ -206,28 +184,12 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
             raise HTTPException(
-                status_code=404,
-                detail=f"Категория с ID {category_id} не найдена"
+                status_code=404, detail=f"Категория с ID {category_id} не найдена"
             )
         file_extension = Path(file.filename).suffix.lower()
 
-        ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-        MAX_UPLOAD_SIZE = 5 * 1024 * 1024
-
-        def serialize_datetime_fields(record):
-            """
-            Преобразует поля created_at и updated_at в isoformat,
-            если они есть в record.
-            Поддерживает record как dict или sqlalchemy Row.
-            """
-            result = dict(record)
-            for field in ("created_at", "updated_at"):
-                value = result.get(field)
-                if value is not None and isinstance(value, datetime):
-                    result[field] = value.isoformat()
-            return result
         if file_extension not in ALLOWED_EXTENSIONS:
-            allowed = ', '.join(ALLOWED_EXTENSIONS)
+            allowed = ", ".join(ALLOWED_EXTENSIONS)
             raise HTTPException(
                 status_code=400,
                 detail=f"Недопустимый формат файла. Разрешены: {allowed}",
@@ -242,11 +204,12 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
                     status_code=413,
                     detail=f"Файл слишком большой. Максимум: {max_mb:.1f}MB",
                 )
-            await self.__s3_client.upload_file_object(self.__bucket_name, s3_key, contents)
+            await self.__s3_client.upload_file_object(
+                self.__bucket_name, s3_key, contents
+            )
         except Exception as e:
             raise HTTPException(
-                status_code=500,
-                detail=f"Ошибка при загрузке файла в S3: {str(e)}"
+                status_code=500, detail=f"Ошибка при загрузке файла в S3: {str(e)}"
             )
         # Сохраняем только ключ (key) файла, а не полный URL
         update_query = (
@@ -259,8 +222,5 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             "success": True,
             "image_key": s3_key,
             "filename": unique_filename,
-            "message": (
-                f"Изображение успешно загружено "
-                f"для категории {category_id}"
-            ),
+            "message": (f"Изображение успешно загружено для категории {category_id}"),
         }

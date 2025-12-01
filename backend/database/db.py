@@ -77,6 +77,7 @@ class TypeCustomField(str, ENUM):
     Contact = "Контакт"
     Lead = "Сделка"
 
+
 class BookingStatus(str, ENUM):
     new = "Новый"
     confirmed = "Подтвержден"
@@ -115,17 +116,20 @@ class TgBillStatus(str, ENUM):
     PAID = "PAID"
     ERROR = "ERROR"
 
+
 class TgBillApproveStatus(str, ENUM):
     NEW = "NEW"
     APPROVED = "APPROVED"
     CANCELED = "CANCELED"
+
 
 class NomenclatureCashbackType(str, ENUM):
     percent = "percent"
     const = "const"
     no_cashback = "no_cashback"
     lcard_cashback = "lcard_cashback"
-    
+
+
 class OrderStatus(str, ENUM):
     received = "received"
     processed = "processed"
@@ -188,11 +192,25 @@ Base = declarative_base(metadata=metadata)
 cashbox_settings = sqlalchemy.Table(
     "cashbox_settings",
     metadata,
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False),
-    sqlalchemy.Column("require_photo_for_writeoff", Boolean, nullable=False, server_default=sqlalchemy.false()),
+    sqlalchemy.Column(
+        "cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "require_photo_for_writeoff",
+        Boolean,
+        nullable=False,
+        server_default=sqlalchemy.false(),
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.Column("is_deleted", Boolean, nullable=False, server_default=sqlalchemy.false()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.Column(
+        "is_deleted", Boolean, nullable=False, server_default=sqlalchemy.false()
+    ),
 )
 
 yookassa_install = sqlalchemy.Table(
@@ -204,7 +222,12 @@ yookassa_install = sqlalchemy.Table(
     sqlalchemy.Column("expires_in", String),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("is_deleted", Boolean),
 )
 
@@ -224,7 +247,12 @@ yookassa_payments = sqlalchemy.Table(
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 
@@ -233,8 +261,7 @@ booking_tags = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
     sqlalchemy.Column("booking_id", Integer, ForeignKey("bookikng.id")),
-    sqlalchemy.Column("name", String, nullable=False)
-
+    sqlalchemy.Column("name", String, nullable=False),
 )
 
 booking = sqlalchemy.Table(
@@ -249,16 +276,23 @@ booking = sqlalchemy.Table(
     sqlalchemy.Column("start_booking", Integer, index=True),
     sqlalchemy.Column("end_booking", Integer, index=True),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
-    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=True),
+    sqlalchemy.Column(
+        "docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=True
+    ),
     sqlalchemy.Column("booking_user_id", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("booking_driver_id", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("status_doc_sales", Enum(DocSalesStatus), nullable=False),
     sqlalchemy.Column("status_booking", Enum(BookingStatus), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("comment", String),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("sale_payload", JSON)
+    sqlalchemy.Column("sale_payload", JSON),
 )
 
 booking_nomenclature = sqlalchemy.Table(
@@ -269,7 +303,12 @@ booking_nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
     sqlalchemy.Column("tariff", Enum(Tariff), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("is_deleted", Boolean),
 )
 
@@ -277,13 +316,20 @@ booking_events = sqlalchemy.Table(
     "booking_events",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("booking_nomenclature_id", Integer, ForeignKey("booking_nomenclature.id")),
+    sqlalchemy.Column(
+        "booking_nomenclature_id", Integer, ForeignKey("booking_nomenclature.id")
+    ),
     sqlalchemy.Column("type", Enum(BookingEventStatus), index=True, nullable=False),
     sqlalchemy.Column("value", String),
     sqlalchemy.Column("latitude", String),
     sqlalchemy.Column("longitude", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("is_deleted", Boolean),
 )
 
@@ -291,19 +337,28 @@ booking_events_photo = sqlalchemy.Table(
     "booking_events_photo",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("booking_event_id", Integer, ForeignKey("booking_events.id"), nullable=False),
+    sqlalchemy.Column(
+        "booking_event_id", Integer, ForeignKey("booking_events.id"), nullable=False
+    ),
     sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), nullable=False),
-    sqlalchemy.UniqueConstraint('booking_event_id', 'photo_id'),
+    sqlalchemy.UniqueConstraint("booking_event_id", "photo_id"),
 )
 
 module_bank_credentials = sqlalchemy.Table(
     "module_bank_credentials",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id")),
-    sqlalchemy.Column('access_token', String),
+    sqlalchemy.Column(
+        "integration_cashboxes", ForeignKey("integrations_to_cashbox.id")
+    ),
+    sqlalchemy.Column("access_token", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 module_bank_accounts = sqlalchemy.Table(
@@ -311,7 +366,11 @@ module_bank_accounts = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("payboxes_id", ForeignKey("payboxes.id"), index=True),
-    sqlalchemy.Column("module_bank_credential_id", ForeignKey("module_bank_credentials.id"), index=True),
+    sqlalchemy.Column(
+        "module_bank_credential_id",
+        ForeignKey("module_bank_credentials.id"),
+        index=True,
+    ),
     sqlalchemy.Column("accountName", String),
     sqlalchemy.Column("bankBic", String),
     sqlalchemy.Column("bankInn", String),
@@ -325,7 +384,12 @@ module_bank_accounts = sqlalchemy.Table(
     sqlalchemy.Column("number", String),
     sqlalchemy.Column("status", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("is_active", Boolean, default=False),
 )
@@ -337,58 +401,77 @@ module_bank_operations = sqlalchemy.Table(
     sqlalchemy.Column("accountId", String),
     sqlalchemy.Column("payment_crm_id", ForeignKey("payments.id"), index=True),
     sqlalchemy.Column("contragent_crm_id", ForeignKey("contragents.id")),
-    sqlalchemy.Column('operationId', String),
-    sqlalchemy.Column('cardId', String),
-    sqlalchemy.Column('companyId', String),
-    sqlalchemy.Column('status', String),
-    sqlalchemy.Column('category', String),
-    sqlalchemy.Column('contragentName', String),
-    sqlalchemy.Column('contragentInn', String),
-    sqlalchemy.Column('contragentKpp', String),
-    sqlalchemy.Column('contragentBankAccountNumber', String),
-    sqlalchemy.Column('contragentBankName', String),
-    sqlalchemy.Column('contragentBankBic', String),
-    sqlalchemy.Column('amount', Float),
-    sqlalchemy.Column('bankAccountNumber', String),
-    sqlalchemy.Column('paymentPurpose', String),
-    sqlalchemy.Column('executed', String),
-    sqlalchemy.Column('created', String),
-    sqlalchemy.Column('absId', String),
-    sqlalchemy.Column('ibsoId', String),
-    sqlalchemy.Column('kbk', String),
-    sqlalchemy.Column('oktmo', String),
-    sqlalchemy.Column('paymentBasis', String),
-    sqlalchemy.Column('taxCode', String),
-    sqlalchemy.Column('taxDocNum', String),
-    sqlalchemy.Column('taxDocDate', String),
-    sqlalchemy.Column('payerStatus', String),
-    sqlalchemy.Column('uin', String),
+    sqlalchemy.Column("operationId", String),
+    sqlalchemy.Column("cardId", String),
+    sqlalchemy.Column("companyId", String),
+    sqlalchemy.Column("status", String),
+    sqlalchemy.Column("category", String),
+    sqlalchemy.Column("contragentName", String),
+    sqlalchemy.Column("contragentInn", String),
+    sqlalchemy.Column("contragentKpp", String),
+    sqlalchemy.Column("contragentBankAccountNumber", String),
+    sqlalchemy.Column("contragentBankName", String),
+    sqlalchemy.Column("contragentBankBic", String),
+    sqlalchemy.Column("amount", Float),
+    sqlalchemy.Column("bankAccountNumber", String),
+    sqlalchemy.Column("paymentPurpose", String),
+    sqlalchemy.Column("executed", String),
+    sqlalchemy.Column("created", String),
+    sqlalchemy.Column("absId", String),
+    sqlalchemy.Column("ibsoId", String),
+    sqlalchemy.Column("kbk", String),
+    sqlalchemy.Column("oktmo", String),
+    sqlalchemy.Column("paymentBasis", String),
+    sqlalchemy.Column("taxCode", String),
+    sqlalchemy.Column("taxDocNum", String),
+    sqlalchemy.Column("taxDocDate", String),
+    sqlalchemy.Column("payerStatus", String),
+    sqlalchemy.Column("uin", String),
     sqlalchemy.Column("currency", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 evotor_credentials = sqlalchemy.Table(
     "evotor_credentials",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id"), nullable=True),
-    sqlalchemy.Column('evotor_token', String),
+    sqlalchemy.Column(
+        "integration_cashboxes", ForeignKey("integrations_to_cashbox.id"), nullable=True
+    ),
+    sqlalchemy.Column("evotor_token", String),
     sqlalchemy.Column("userId", String),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 tochka_bank_credentials = sqlalchemy.Table(
     "tochka_bank_credentials",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("integration_cashboxes", ForeignKey("integrations_to_cashbox.id")),
-    sqlalchemy.Column('access_token', String),
-    sqlalchemy.Column('refresh_token', String),
+    sqlalchemy.Column(
+        "integration_cashboxes", ForeignKey("integrations_to_cashbox.id")
+    ),
+    sqlalchemy.Column("access_token", String),
+    sqlalchemy.Column("refresh_token", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 tochka_bank_payments = sqlalchemy.Table(
@@ -398,39 +481,44 @@ tochka_bank_payments = sqlalchemy.Table(
     sqlalchemy.Column("accountId", String),
     sqlalchemy.Column("payment_crm_id", ForeignKey("payments.id"), index=True),
     sqlalchemy.Column("contragent_crm_id", ForeignKey("contragents.id")),
-    sqlalchemy.Column('statementId', String),
-    sqlalchemy.Column('statement_creation_datetime', String),
-    sqlalchemy.Column('transactionTypeCode', String),
-    sqlalchemy.Column('transactionId', String),
-    sqlalchemy.Column('status', String),
-    sqlalchemy.Column('payment_id', String, index=True),
-    sqlalchemy.Column('documentProcessDate', String),
-    sqlalchemy.Column('documentNumber', String),
-    sqlalchemy.Column('description', String),
-    sqlalchemy.Column('creditDebitIndicator', String),
-    sqlalchemy.Column('amount', Float),
-    sqlalchemy.Column('amountNat', Float),
-    sqlalchemy.Column('currency', String),
-    sqlalchemy.Column('creditor_party_inn', String),
-    sqlalchemy.Column('creditor_party_name', String),
-    sqlalchemy.Column('creditor_party_kpp', String),
-    sqlalchemy.Column('creditor_account_identification', String),
-    sqlalchemy.Column('creditor_account_schemeName', String),
-    sqlalchemy.Column('creditor_agent_schemeName', String),
-    sqlalchemy.Column('creditor_agent_name', String),
-    sqlalchemy.Column('creditor_agent_identification', String),
-    sqlalchemy.Column('creditor_agent_accountIdentification', String),
-    sqlalchemy.Column('debitor_party_inn', String),
-    sqlalchemy.Column('debitor_party_name', String),
-    sqlalchemy.Column('debitor_party_kpp', String),
-    sqlalchemy.Column('debitor_account_identification', String),
-    sqlalchemy.Column('debitor_account_schemeName', String),
-    sqlalchemy.Column('debitor_agent_schemeName', String),
-    sqlalchemy.Column('debitor_agent_name', String),
-    sqlalchemy.Column('debitor_agent_identification', String),
-    sqlalchemy.Column('debitor_agent_accountIdentification', String),
+    sqlalchemy.Column("statementId", String),
+    sqlalchemy.Column("statement_creation_datetime", String),
+    sqlalchemy.Column("transactionTypeCode", String),
+    sqlalchemy.Column("transactionId", String),
+    sqlalchemy.Column("status", String),
+    sqlalchemy.Column("payment_id", String, index=True),
+    sqlalchemy.Column("documentProcessDate", String),
+    sqlalchemy.Column("documentNumber", String),
+    sqlalchemy.Column("description", String),
+    sqlalchemy.Column("creditDebitIndicator", String),
+    sqlalchemy.Column("amount", Float),
+    sqlalchemy.Column("amountNat", Float),
+    sqlalchemy.Column("currency", String),
+    sqlalchemy.Column("creditor_party_inn", String),
+    sqlalchemy.Column("creditor_party_name", String),
+    sqlalchemy.Column("creditor_party_kpp", String),
+    sqlalchemy.Column("creditor_account_identification", String),
+    sqlalchemy.Column("creditor_account_schemeName", String),
+    sqlalchemy.Column("creditor_agent_schemeName", String),
+    sqlalchemy.Column("creditor_agent_name", String),
+    sqlalchemy.Column("creditor_agent_identification", String),
+    sqlalchemy.Column("creditor_agent_accountIdentification", String),
+    sqlalchemy.Column("debitor_party_inn", String),
+    sqlalchemy.Column("debitor_party_name", String),
+    sqlalchemy.Column("debitor_party_kpp", String),
+    sqlalchemy.Column("debitor_account_identification", String),
+    sqlalchemy.Column("debitor_account_schemeName", String),
+    sqlalchemy.Column("debitor_agent_schemeName", String),
+    sqlalchemy.Column("debitor_agent_name", String),
+    sqlalchemy.Column("debitor_agent_identification", String),
+    sqlalchemy.Column("debitor_agent_accountIdentification", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 tochka_bank_accounts = sqlalchemy.Table(
@@ -438,7 +526,11 @@ tochka_bank_accounts = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("payboxes_id", ForeignKey("payboxes.id"), index=True),
-    sqlalchemy.Column("tochka_bank_credential_id", ForeignKey("tochka_bank_credentials.id"), index=True),
+    sqlalchemy.Column(
+        "tochka_bank_credential_id",
+        ForeignKey("tochka_bank_credentials.id"),
+        index=True,
+    ),
     sqlalchemy.Column("customerCode", String),
     sqlalchemy.Column("accountId", String, nullable=False, unique=True),
     sqlalchemy.Column("transitAccount", String),
@@ -449,7 +541,12 @@ tochka_bank_accounts = sqlalchemy.Table(
     sqlalchemy.Column("accountSubType", String),
     sqlalchemy.Column("registrationDate", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("is_active", Boolean, default=False),
 )
@@ -461,7 +558,12 @@ entity_type = sqlalchemy.Table(
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 tasks = sqlalchemy.Table(
@@ -475,7 +577,12 @@ tasks = sqlalchemy.Table(
     sqlalchemy.Column("status", String),
     sqlalchemy.Column("creator", Integer),  # 0 - robot
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 jwt_scopes = sqlalchemy.Table(
@@ -492,7 +599,12 @@ integrations_type = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 integrations_to_cashbox = sqlalchemy.Table(
@@ -500,11 +612,20 @@ integrations_to_cashbox = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("integration_id", ForeignKey("integrations.id"), nullable=False),
-    sqlalchemy.Column("installed_by", ForeignKey("relation_tg_cashboxes.id"), nullable=False),
-    sqlalchemy.Column("deactivated_by", ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "installed_by", ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "deactivated_by", ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 integrations = sqlalchemy.Table(
@@ -527,10 +648,15 @@ integrations = sqlalchemy.Table(
     sqlalchemy.Column("cost_percent", Float),
     sqlalchemy.Column("payed_to", Date),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("is_payed", Boolean),
     sqlalchemy.Column("trial", String),
-    sqlalchemy.Column('client_app_id', String),
+    sqlalchemy.Column("client_app_id", String),
     sqlalchemy.Column("client_secret", String),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("scopes", Text),
@@ -570,11 +696,18 @@ organizations = sqlalchemy.Table(
     sqlalchemy.Column("org_type", String),
     sqlalchemy.Column("tax_type", String),
     sqlalchemy.Column("tax_percent", Float),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 contracts = sqlalchemy.Table(
@@ -592,11 +725,18 @@ contracts = sqlalchemy.Table(
     sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id")),
     sqlalchemy.Column("payment_type", String),
     sqlalchemy.Column("payment_time", String),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 nomenclature = sqlalchemy.Table(
@@ -608,22 +748,34 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("type", String),
     sqlalchemy.Column("description_short", String),
     sqlalchemy.Column("description_long", String),
-    sqlalchemy.Column("cashback_type", Enum(NomenclatureCashbackType), nullable=False, server_default="lcard_cashback"),
+    sqlalchemy.Column(
+        "cashback_type",
+        Enum(NomenclatureCashbackType),
+        nullable=False,
+        server_default="lcard_cashback",
+    ),
     sqlalchemy.Column("cashback_value", Integer),
     sqlalchemy.Column("code", String),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
     sqlalchemy.Column("category", Integer, ForeignKey("categories.id")),
     sqlalchemy.Column("tags", ARRAY(item_type=String), nullable=True),
     sqlalchemy.Column("manufacturer", Integer, ForeignKey("manufacturers.id")),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("chatting_percent", Integer, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("seo_title", String),
     sqlalchemy.Column("seo_description", String),
-    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String))
+    sqlalchemy.Column("seo_keywords", ARRAY(item_type=String)),
 )
 
 nomenclature_attributes = sqlalchemy.Table(
@@ -634,40 +786,71 @@ nomenclature_attributes = sqlalchemy.Table(
     sqlalchemy.Column("alias", String, nullable=True),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("name", "cashbox", name="uq_nomenclature_attributes_name_cashbox")
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint(
+        "name", "cashbox", name="uq_nomenclature_attributes_name_cashbox"
+    ),
 )
 
 nomenclature_attributes_value = sqlalchemy.Table(
     "nomenclature_attributes_value",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("attribute_id", Integer, ForeignKey("nomenclature_attributes.id"), nullable=False),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column(
+        "attribute_id",
+        Integer,
+        ForeignKey("nomenclature_attributes.id"),
+        nullable=False,
+    ),
+    sqlalchemy.Column(
+        "nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("value", String, nullable=False),
     sqlalchemy.UniqueConstraint(
-        "attribute_id", "nomenclature_id",
-        name="uq_nomenclature_attributes_value_attribute_id_nomenclature_id"
-    )
+        "attribute_id",
+        "nomenclature_id",
+        name="uq_nomenclature_attributes_value_attribute_id_nomenclature_id",
+    ),
 )
 
 nomenclature_groups_value = sqlalchemy.Table(
     "nomenclature_groups_value",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
-    sqlalchemy.Column("group_id", Integer, ForeignKey("nomenclature_groups.id"), nullable=False),
+    sqlalchemy.Column(
+        "nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "group_id", Integer, ForeignKey("nomenclature_groups.id"), nullable=False
+    ),
     sqlalchemy.Column("is_main", Boolean, nullable=False, server_default="false"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("nomenclature_id", name="uq_nomenclature_groups_value_nomenclature_id"),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint(
+        "nomenclature_id", name="uq_nomenclature_groups_value_nomenclature_id"
+    ),
     sqlalchemy.Index(
         "uq_nomenclature_groups_value_group_id_is_main",
         "group_id",
         unique=True,
-        postgresql_where=text("is_main IS TRUE")
+        postgresql_where=text("is_main IS TRUE"),
     ),
 )
 
@@ -676,7 +859,7 @@ nomenclature_groups = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=False),
-    sqlalchemy.Column("name", String, nullable=True)
+    sqlalchemy.Column("name", String, nullable=True),
 )
 
 nomenclature_barcodes = sqlalchemy.Table(
@@ -697,12 +880,19 @@ categories = sqlalchemy.Table(
     sqlalchemy.Column("code", Integer),
     sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), nullable=True),
     sqlalchemy.Column("parent", Integer, ForeignKey("categories.id")),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("status", Boolean, nullable=False),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 units = sqlalchemy.Table(
@@ -731,13 +921,20 @@ warehouses = sqlalchemy.Table(
     sqlalchemy.Column("longitude", Float),
     sqlalchemy.Column("phone", String),
     sqlalchemy.Column("parent", Integer, ForeignKey("warehouses.id")),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("status", Boolean, nullable=False),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("is_public", Boolean, server_default="false"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 manufacturers = sqlalchemy.Table(
@@ -745,13 +942,20 @@ manufacturers = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("photo_id", Integer, ForeignKey("pictures.id"), nullable=True),
     sqlalchemy.Column("external_id", String, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 prices = sqlalchemy.Table(
@@ -760,14 +964,23 @@ prices = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("price_type", Integer, ForeignKey("price_types.id")),
     sqlalchemy.Column("price", Float, nullable=False),
-    sqlalchemy.Column("nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column(
+        "nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
     sqlalchemy.Column("date_from", Integer),
     sqlalchemy.Column("date_to", Integer),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 price_types = sqlalchemy.Table(
@@ -775,12 +988,19 @@ price_types = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("is_system", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 pictures = sqlalchemy.Table(
@@ -793,10 +1013,17 @@ pictures = sqlalchemy.Table(
     sqlalchemy.Column("size", Integer),
     sqlalchemy.Column("is_main", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 entity_or_function = sqlalchemy.Table(
@@ -805,7 +1032,12 @@ entity_or_function = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("name", String, nullable=False, unique=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 status_entity_function = sqlalchemy.Table(
@@ -821,7 +1053,12 @@ status_entity_function = sqlalchemy.Table(
     sqlalchemy.Column("status", Boolean, nullable=False),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     UniqueConstraint("entity_or_function", "cashbox", name="function_cashbox_unique"),
 )
 
@@ -948,7 +1185,9 @@ contragents = sqlalchemy.Table(
     sqlalchemy.Column("gender", Enum(Gender), nullable=True),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column("is_phone_formatted", Boolean, server_default="false", nullable=False),
+    sqlalchemy.Column(
+        "is_phone_formatted", Boolean, server_default="false", nullable=False
+    ),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
     sqlalchemy.Column("email", String),
@@ -989,7 +1228,9 @@ payments = sqlalchemy.Table(
     sqlalchemy.Column("date", Integer),
     sqlalchemy.Column("repeat_freq", Integer, nullable=True),
     sqlalchemy.Column("parent_id", Integer, nullable=True),
-    sqlalchemy.Column("repeat_parent_id", Integer, ForeignKey("payments.id"), nullable=True),
+    sqlalchemy.Column(
+        "repeat_parent_id", Integer, ForeignKey("payments.id"), nullable=True
+    ),
     sqlalchemy.Column("repeat_period", String, nullable=True),
     sqlalchemy.Column("repeat_first", Integer, nullable=True),
     sqlalchemy.Column("repeat_last", Integer, nullable=True),
@@ -1004,7 +1245,9 @@ payments = sqlalchemy.Table(
     sqlalchemy.Column("tax_type", String, nullable=True),
     sqlalchemy.Column("deb_cred", Boolean, default=False),
     sqlalchemy.Column("raspilen", Boolean, default=False),
-    sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id"), nullable=True),
+    sqlalchemy.Column(
+        "contragent", Integer, ForeignKey("contragents.id"), nullable=True
+    ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), index=True),
     sqlalchemy.Column("paybox", Integer, ForeignKey("payboxes.id"), index=True),
     sqlalchemy.Column("paybox_to", Integer, ForeignKey("payboxes.id"), nullable=True),
@@ -1068,7 +1311,9 @@ accounts_balances = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("tariff", Integer, ForeignKey("pay_tariffs.id"), nullable=False),
-    sqlalchemy.Column("last_transaction", Integer, ForeignKey("pay_transactions.id"), nullable=True),
+    sqlalchemy.Column(
+        "last_transaction", Integer, ForeignKey("pay_transactions.id"), nullable=True
+    ),
     sqlalchemy.Column("balance", Float),
     sqlalchemy.Column("tariff_type", String),
     sqlalchemy.Column("created_at", Integer),
@@ -1090,15 +1335,22 @@ amo_bots = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("ext_id", Integer, index=True),
-    sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True),
+    sqlalchemy.Column(
+        "install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True
+    ),
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("type_functionality", String),
     sqlalchemy.Column("type", Integer),
     sqlalchemy.Column("amo_bot_handler_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint('install_group_id', 'ext_id'),
-    extend_existing=True
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint("install_group_id", "ext_id"),
+    extend_existing=True,
 )
 
 amo_bots_settings = sqlalchemy.Table(
@@ -1111,7 +1363,12 @@ amo_bots_settings = sqlalchemy.Table(
     sqlalchemy.Column("type_functionality", Integer),
     sqlalchemy.Column("amo_bots_id", Integer, ForeignKey("amo_bots.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 table_triggers = sqlalchemy.Table(
@@ -1128,7 +1385,12 @@ table_triggers = sqlalchemy.Table(
     sqlalchemy.Column("active", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 table_triggers_events = sqlalchemy.Table(
@@ -1136,7 +1398,9 @@ table_triggers_events = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
-    sqlalchemy.Column("table_triggers_id", Integer, ForeignKey("table_triggers.id"), index=True),
+    sqlalchemy.Column(
+        "table_triggers_id", Integer, ForeignKey("table_triggers.id"), index=True
+    ),
     sqlalchemy.Column("install_group_id", Integer, ForeignKey("amo_install_groups.id")),
     sqlalchemy.Column("loyality_transactions_id", Integer, index=True),
     sqlalchemy.Column("event", String),
@@ -1145,10 +1409,14 @@ table_triggers_events = sqlalchemy.Table(
     sqlalchemy.Column("body", JSON),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint('table_triggers_id', 'loyality_transactions_id'),
-    extend_existing=True
-
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint("table_triggers_id", "loyality_transactions_id"),
+    extend_existing=True,
 )
 
 amo_install = sqlalchemy.Table(
@@ -1166,7 +1434,12 @@ amo_install = sqlalchemy.Table(
     sqlalchemy.Column("expires_in", Integer),
     sqlalchemy.Column("active", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("field_id", Integer),
     sqlalchemy.Column("from_widget", Integer, ForeignKey("amo_settings.id")),
     sqlalchemy.Column("is_refresh", Boolean, server_default="false"),
@@ -1179,7 +1452,7 @@ amo_install_groups = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("referrer", String, unique=True),
     sqlalchemy.Column("pair_token", String),
-    sqlalchemy.Column("setup_custom_fields", Boolean, server_default="false")
+    sqlalchemy.Column("setup_custom_fields", Boolean, server_default="false"),
 )
 
 amo_integrations = sqlalchemy.Table(
@@ -1198,7 +1471,9 @@ amo_install_table_cashboxes = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
     sqlalchemy.Column("last_token", String),
     sqlalchemy.Column("status", Boolean),
     sqlalchemy.Column("additional_info", String),
@@ -1249,7 +1524,9 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), index=True),
     sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("contract", Integer, ForeignKey("contracts.id")),
-    sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
+    sqlalchemy.Column(
+        "organization", Integer, ForeignKey("organizations.id"), nullable=False
+    ),
     sqlalchemy.Column("warehouse", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("parent_docs_sales", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("settings", Integer, ForeignKey("docs_sales_settings.id")),
@@ -1261,28 +1538,43 @@ docs_sales = sqlalchemy.Table(
     sqlalchemy.Column("sum", Float),
     sqlalchemy.Column("created_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean, index=True),
-
-    sqlalchemy.Column("order_status", Enum(OrderStatus), nullable=True, server_default="received"),
-    sqlalchemy.Column("assigned_picker", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=True),
+    sqlalchemy.Column(
+        "order_status", Enum(OrderStatus), nullable=True, server_default="received"
+    ),
+    sqlalchemy.Column(
+        "assigned_picker",
+        Integer,
+        ForeignKey("relation_tg_cashboxes.id"),
+        nullable=True,
+    ),
     sqlalchemy.Column("picker_started_at", DateTime(timezone=True), nullable=True),
     sqlalchemy.Column("picker_finished_at", DateTime(timezone=True), nullable=True),
-    sqlalchemy.Column("assigned_courier", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=True),
+    sqlalchemy.Column(
+        "assigned_courier",
+        Integer,
+        ForeignKey("relation_tg_cashboxes.id"),
+        nullable=True,
+    ),
     sqlalchemy.Column("courier_picked_at", DateTime(timezone=True), nullable=True),
     sqlalchemy.Column("courier_delivered_at", DateTime(timezone=True), nullable=True),
-
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.Column("priority", Integer, nullable=True),
-
-    sqlalchemy.Column("is_marketplace_order", Boolean, server_default="false")
+    sqlalchemy.Column("is_marketplace_order", Boolean, server_default="false"),
 )
 
 docs_sales_tags = sqlalchemy.Table(
     "docs_sales_tags",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column(
+        "docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False
+    ),
     sqlalchemy.Column("name", String, index=True),
 )
 
@@ -1302,8 +1594,12 @@ docs_sales_goods = sqlalchemy.Table(
     "docs_sales_goods",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
-    sqlalchemy.Column("nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column(
+        "docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
     sqlalchemy.Column("price_type", Integer, ForeignKey("price_types.id")),
     sqlalchemy.Column("price", Float, nullable=False),
     sqlalchemy.Column("quantity", Float, nullable=False),
@@ -1313,7 +1609,12 @@ docs_sales_goods = sqlalchemy.Table(
     sqlalchemy.Column("sum_discounted", Float),
     sqlalchemy.Column("status", String),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 docs_purchases = sqlalchemy.Table(
@@ -1329,7 +1630,9 @@ docs_purchases = sqlalchemy.Table(
     sqlalchemy.Column("client", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("contract", Integer, ForeignKey("contracts.id")),
-    sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
+    sqlalchemy.Column(
+        "organization", Integer, ForeignKey("organizations.id"), nullable=False
+    ),
     sqlalchemy.Column("warehouse", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("purchased_by", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
@@ -1338,21 +1641,35 @@ docs_purchases = sqlalchemy.Table(
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 docs_purchases_goods = sqlalchemy.Table(
     "docs_purchases_goods",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("docs_purchases_id", Integer, ForeignKey("docs_purchases.id"), nullable=False),
-    sqlalchemy.Column("nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column(
+        "docs_purchases_id", Integer, ForeignKey("docs_purchases.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
     sqlalchemy.Column("price_type", Integer, ForeignKey("price_types.id")),
     sqlalchemy.Column("price", Float, nullable=False),
     sqlalchemy.Column("quantity", Float, nullable=False),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 docs_warehouse = sqlalchemy.Table(
@@ -1369,7 +1686,9 @@ docs_warehouse = sqlalchemy.Table(
     sqlalchemy.Column("contract", Integer, ForeignKey("contracts.id")),
     sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("docs_purchases", Integer, ForeignKey("docs_purchases.id")),
-    sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
+    sqlalchemy.Column(
+        "organization", Integer, ForeignKey("organizations.id"), nullable=False
+    ),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("warehouse", Integer, ForeignKey("warehouses.id")),
     sqlalchemy.Column("to_warehouse", Integer, ForeignKey("warehouses.id")),
@@ -1377,21 +1696,35 @@ docs_warehouse = sqlalchemy.Table(
     sqlalchemy.Column("created_by", Integer, ForeignKey("tg_accounts.id")),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 docs_warehouse_goods = sqlalchemy.Table(
     "docs_warehouse_goods",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("docs_warehouse_id", Integer, ForeignKey("docs_warehouse.id"), nullable=False),
-    sqlalchemy.Column("nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column(
+        "docs_warehouse_id", Integer, ForeignKey("docs_warehouse.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "nomenclature", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
     sqlalchemy.Column("price_type", Integer, ForeignKey("price_types.id")),
     sqlalchemy.Column("price", Float, nullable=False),
     sqlalchemy.Column("quantity", Float, nullable=False),
     sqlalchemy.Column("unit", Integer, ForeignKey("units.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 warehouse_register_movement = sqlalchemy.Table(
@@ -1404,11 +1737,18 @@ warehouse_register_movement = sqlalchemy.Table(
     sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
     sqlalchemy.Column("document_sale_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("document_purchase_id", Integer, ForeignKey("docs_purchases.id")),
-    sqlalchemy.Column("document_warehouse_id", Integer, ForeignKey("docs_warehouse.id")),
+    sqlalchemy.Column(
+        "document_warehouse_id", Integer, ForeignKey("docs_warehouse.id")
+    ),
     sqlalchemy.Column("amount", Float, nullable=False),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 docs_reconciliation = sqlalchemy.Table(
@@ -1417,8 +1757,12 @@ docs_reconciliation = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("number", String),
     sqlalchemy.Column("dated", Integer),
-    sqlalchemy.Column("organization", Integer, ForeignKey("organizations.id"), nullable=False),
-    sqlalchemy.Column("contragent", Integer, ForeignKey("contragents.id"), nullable=False),
+    sqlalchemy.Column(
+        "organization", Integer, ForeignKey("organizations.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "contragent", Integer, ForeignKey("contragents.id"), nullable=False
+    ),
     sqlalchemy.Column("contract", Integer, ForeignKey("contracts.id")),
     sqlalchemy.Column("organization_name", String),
     sqlalchemy.Column("contragent_name", String),
@@ -1438,7 +1782,12 @@ docs_reconciliation = sqlalchemy.Table(
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 entity_to_entity = sqlalchemy.Table(
@@ -1446,15 +1795,26 @@ entity_to_entity = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("type", String, nullable=False),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False),
-    sqlalchemy.Column("from_entity", Integer, ForeignKey("entity_or_function.id"), nullable=False),
+    sqlalchemy.Column(
+        "cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "from_entity", Integer, ForeignKey("entity_or_function.id"), nullable=False
+    ),
     sqlalchemy.Column("from_id", Integer, nullable=False),
-    sqlalchemy.Column("to_entity", Integer, ForeignKey("entity_or_function.id"), nullable=False),
+    sqlalchemy.Column(
+        "to_entity", Integer, ForeignKey("entity_or_function.id"), nullable=False
+    ),
     sqlalchemy.Column("to_id", Integer, nullable=False),
     sqlalchemy.Column("status", Boolean, default=sqlalchemy.true),
     sqlalchemy.Column("delinked", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 distribution_docs = sqlalchemy.Table(
@@ -1468,14 +1828,23 @@ distribution_docs = sqlalchemy.Table(
     sqlalchemy.Column("is_preview", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 distribution_docs_operations = sqlalchemy.Table(
     "distribution_fifo_operations",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("distribution_fifo", Integer, ForeignKey("distribution_docs.id", ondelete="CASCADE")),
+    sqlalchemy.Column(
+        "distribution_fifo",
+        Integer,
+        ForeignKey("distribution_docs.id", ondelete="CASCADE"),
+    ),
     sqlalchemy.Column("document_sale", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("document_purchase", Integer, ForeignKey("docs_purchases.id")),
     sqlalchemy.Column("document_warehouse", Integer, ForeignKey("docs_warehouse.id")),
@@ -1490,7 +1859,12 @@ distribution_docs_operations = sqlalchemy.Table(
     sqlalchemy.Column("end_amount", Integer, nullable=False),
     sqlalchemy.Column("end_price", Float, nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 gross_profit_docs = sqlalchemy.Table(
@@ -1503,7 +1877,12 @@ gross_profit_docs = sqlalchemy.Table(
     sqlalchemy.Column("period_end", Integer, nullable=False),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 gross_profit_docs_operations = sqlalchemy.Table(
@@ -1511,9 +1890,14 @@ gross_profit_docs_operations = sqlalchemy.Table(
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column(
-        "gross_profit_doc_id", Integer, ForeignKey("gross_profit_docs.id", ondelete="CASCADE"), nullable=False
+        "gross_profit_doc_id",
+        Integer,
+        ForeignKey("gross_profit_docs.id", ondelete="CASCADE"),
+        nullable=False,
     ),
-    sqlalchemy.Column("document_sale", Integer, ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column(
+        "document_sale", Integer, ForeignKey("docs_sales.id"), nullable=False
+    ),
     sqlalchemy.Column("net_cost", Float, nullable=False),
     sqlalchemy.Column("sum", Float, nullable=False),
     sqlalchemy.Column("actual_revenue", Float, nullable=False),
@@ -1523,7 +1907,12 @@ gross_profit_docs_operations = sqlalchemy.Table(
     sqlalchemy.Column("rentability", Float, nullable=False),
     sqlalchemy.Column("sales_manager", Integer, ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 fifo_settings = sqlalchemy.Table(
@@ -1535,10 +1924,21 @@ fifo_settings = sqlalchemy.Table(
     sqlalchemy.Column("blocked_date", Integer),
     sqlalchemy.Column("month_closing_delay_days", Integer),
     sqlalchemy.Column("preview_close_period_seconds", Integer, nullable=False),
-    sqlalchemy.Column("organization_id", Integer, ForeignKey("organizations.id"), nullable=False, unique=True),
+    sqlalchemy.Column(
+        "organization_id",
+        Integer,
+        ForeignKey("organizations.id"),
+        nullable=False,
+        unique=True,
+    ),
     sqlalchemy.Column("in_progress", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 warehouse_balances = sqlalchemy.Table(
@@ -1550,13 +1950,20 @@ warehouse_balances = sqlalchemy.Table(
     sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id")),
     sqlalchemy.Column("document_sale_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("document_purchase_id", Integer, ForeignKey("docs_purchases.id")),
-    sqlalchemy.Column("document_warehouse_id", Integer, ForeignKey("docs_warehouse.id")),
+    sqlalchemy.Column(
+        "document_warehouse_id", Integer, ForeignKey("docs_warehouse.id")
+    ),
     sqlalchemy.Column("incoming_amount", Integer),
     sqlalchemy.Column("outgoing_amount", Integer),
     sqlalchemy.Column("current_amount", Integer, nullable=False),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 messages = sqlalchemy.Table(
@@ -1592,10 +1999,21 @@ loyality_cards = sqlalchemy.Table(
     sqlalchemy.Column("created_by_id", ForeignKey("relation_tg_cashboxes.id")),
     sqlalchemy.Column("status_card", Boolean),
     sqlalchemy.Column("is_deleted", Boolean),
-    sqlalchemy.Column('apple_wallet_advertisement', String, nullable=False, default='TableCRM', server_default='TableCRM'),
+    sqlalchemy.Column(
+        "apple_wallet_advertisement",
+        String,
+        nullable=False,
+        default="TableCRM",
+        server_default="TableCRM",
+    ),
     sqlalchemy.Column("lifetime", BigInteger, index=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 loyality_transactions = sqlalchemy.Table(
@@ -1621,7 +2039,12 @@ loyality_transactions = sqlalchemy.Table(
     sqlalchemy.Column("autoburned", Boolean, index=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 loyality_settings = sqlalchemy.Table(
@@ -1639,7 +2062,12 @@ loyality_settings = sqlalchemy.Table(
     sqlalchemy.Column("max_percentage", Integer),
     sqlalchemy.Column("lifetime", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 doc_generated = sqlalchemy.Table(
@@ -1696,7 +2124,12 @@ areas = sqlalchemy.Table(
     sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 pages = sqlalchemy.Table(
@@ -1708,7 +2141,12 @@ pages = sqlalchemy.Table(
     sqlalchemy.Column("cashbox", ForeignKey("cashboxes.id")),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 amo_settings = sqlalchemy.Table(
@@ -1719,10 +2157,17 @@ amo_settings = sqlalchemy.Table(
     sqlalchemy.Column("redirect_uri", String),
     sqlalchemy.Column("client_secret", String),
     sqlalchemy.Column("integration_id", String),
-    sqlalchemy.Column("load_type_id", Integer, ForeignKey("amo_settings_load_types.id")),
+    sqlalchemy.Column(
+        "load_type_id", Integer, ForeignKey("amo_settings_load_types.id")
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    extend_existing=True
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    extend_existing=True,
 )
 
 amo_settings_load_types = sqlalchemy.Table(
@@ -1731,7 +2176,7 @@ amo_settings_load_types = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("contacts", Boolean, server_default="false"),
     sqlalchemy.Column("leads", Boolean, server_default="false"),
-    extend_existing=True
+    extend_existing=True,
 )
 
 amo_contacts = sqlalchemy.Table(
@@ -1741,13 +2186,15 @@ amo_contacts = sqlalchemy.Table(
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("phone", String),
     sqlalchemy.Column("phone_code", String),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True
+    ),
     sqlalchemy.Column("formatted_phone", String),
     sqlalchemy.Column("ext_id", Integer, index=True),
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
-    sqlalchemy.UniqueConstraint('amo_install_group_id', 'ext_id'),
-    extend_existing=True
+    sqlalchemy.UniqueConstraint("amo_install_group_id", "ext_id"),
+    extend_existing=True,
 )
 
 amo_contacts_double = sqlalchemy.Table(
@@ -1757,12 +2204,14 @@ amo_contacts_double = sqlalchemy.Table(
     sqlalchemy.Column("orig_id", Integer, ForeignKey("amo_contacts.id")),
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("phone", String),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
     sqlalchemy.Column("formatted_phone", String),
     sqlalchemy.Column("ext_id", Integer),
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
-    extend_existing=True
+    extend_existing=True,
 )
 
 amo_table_contacts = sqlalchemy.Table(
@@ -1772,25 +2221,34 @@ amo_table_contacts = sqlalchemy.Table(
     sqlalchemy.Column("amo_id", Integer, ForeignKey("amo_contacts.id")),
     sqlalchemy.Column("table_id", Integer, ForeignKey("contragents.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
-    sqlalchemy.Column("is_main", Boolean, server_default="true", nullable=False),
-    UniqueConstraint('amo_id'),
-    sqlalchemy.Index(
-        'uq_table_id_main',
-        'table_id',
-        unique=True,
-        postgresql_where=sqlalchemy.Column('is_main') == True
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
     ),
-    extend_existing=True
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
+    sqlalchemy.Column("is_main", Boolean, server_default="true", nullable=False),
+    UniqueConstraint("amo_id"),
+    sqlalchemy.Index(
+        "uq_table_id_main",
+        "table_id",
+        unique=True,
+        postgresql_where=sqlalchemy.Column("is_main") == True,
+    ),
+    extend_existing=True,
 )
 
 amo_lead_pipelines = sqlalchemy.Table(
     "amo_lead_pipelines",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
     sqlalchemy.Column("amo_id", Integer),
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("sort", Integer),
@@ -1799,9 +2257,14 @@ amo_lead_pipelines = sqlalchemy.Table(
     sqlalchemy.Column("is_archive", Boolean),
     sqlalchemy.Column("account_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint('amo_install_group_id', 'amo_id'),
-    extend_existing=True
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint("amo_install_group_id", "amo_id"),
+    extend_existing=True,
 )
 
 amo_lead_statuses = sqlalchemy.Table(
@@ -1817,16 +2280,23 @@ amo_lead_statuses = sqlalchemy.Table(
     sqlalchemy.Column("type", Integer),
     sqlalchemy.Column("account_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint('pipeline_id', 'amo_id'),
-    extend_existing=True
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint("pipeline_id", "amo_id"),
+    extend_existing=True,
 )
 
 amo_leads = sqlalchemy.Table(
     "amo_leads",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id"), index=True
+    ),
     sqlalchemy.Column("name", String),
     sqlalchemy.Column("price", BigInteger),
     sqlalchemy.Column("status_id", BigInteger),
@@ -1841,19 +2311,25 @@ amo_leads = sqlalchemy.Table(
     sqlalchemy.Column("created_at", BigInteger),
     sqlalchemy.Column("updated_at", BigInteger),
     sqlalchemy.Column("is_edit", Boolean, server_default="false"),
-    sqlalchemy.UniqueConstraint('amo_install_group_id', 'amo_id'),
-    extend_existing=True
+    sqlalchemy.UniqueConstraint("amo_install_group_id", "amo_id"),
+    extend_existing=True,
 )
 
 amo_leads_docs_sales_mapping = sqlalchemy.Table(
     "amo_leads_docs_sales_mapping",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False),
-    sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False, index=True),
+    sqlalchemy.Column(
+        "docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "lead_id", Integer, ForeignKey("amo_leads.id"), nullable=False, index=True
+    ),
     sqlalchemy.Column("table_status", SmallInteger),
     sqlalchemy.Column("is_sync", Boolean),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     extend_existing=True,
 )
@@ -1872,7 +2348,12 @@ docs_sales_settings = sqlalchemy.Table(
     sqlalchemy.Column("repeatability_tags", Boolean, default=False),
     sqlalchemy.Column("repeatability_status", Boolean, default=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 amo_users = sqlalchemy.Table(
@@ -1883,12 +2364,19 @@ amo_users = sqlalchemy.Table(
     sqlalchemy.Column("email", String),
     sqlalchemy.Column("is_admin", Boolean),
     sqlalchemy.Column("is_active", Boolean),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
     sqlalchemy.Column("ext_id", Integer),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint('amo_install_group_id', 'ext_id'),
-    extend_existing=True
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint("amo_install_group_id", "ext_id"),
+    extend_existing=True,
 )
 
 amo_custom_fields_comparison = sqlalchemy.Table(
@@ -1898,7 +2386,7 @@ amo_custom_fields_comparison = sqlalchemy.Table(
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("field_amo_id", BIGINT),
     sqlalchemy.Column("field_detection_name", String),
-    extend_existing=True
+    extend_existing=True,
 )
 
 amo_install_widget_installer = sqlalchemy.Table(
@@ -1919,7 +2407,9 @@ amo_install_widget_installer = sqlalchemy.Table(
 tbank_accounts = sqlalchemy.Table(
     "tbank_accounts",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True)),
     sqlalchemy.Column("updated_at", DateTime(timezone=True)),
     sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
@@ -1931,7 +2421,9 @@ tbank_accounts = sqlalchemy.Table(
 tbank_orders = sqlalchemy.Table(
     "tbank_orders",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True)),
     sqlalchemy.Column("updated_at", DateTime(timezone=True)),
     sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
@@ -1942,53 +2434,78 @@ tbank_orders = sqlalchemy.Table(
     sqlalchemy.Column("payment_id", BigInteger),
     sqlalchemy.Column("tbank_payment_id", Text),
     sqlalchemy.Column("payment_url", Text),
-    sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=True),
+    sqlalchemy.Column(
+        "docs_sales_id", Integer, ForeignKey("docs_sales.id"), nullable=True
+    ),
 )
 
 amo_custom_fields = sqlalchemy.Table(
     "amo_custom_fields",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("type_entity", Enum(TypeCustomField), nullable=False),
     sqlalchemy.Column("code", String, nullable=False),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("type", String, nullable=False),
-    extend_existing=True
+    extend_existing=True,
 )
 
 amo_install_custom_fields = sqlalchemy.Table(
     "amo_install_custom_fields",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("custom_field_id", Integer, ForeignKey("amo_custom_fields.id"), nullable=False),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "custom_field_id", Integer, ForeignKey("amo_custom_fields.id"), nullable=False
+    ),
     sqlalchemy.Column("cashbox_id", Integer, nullable=False),
     sqlalchemy.Column("active", Boolean, server_default="true"),
-    sqlalchemy.UniqueConstraint('custom_field_id', 'cashbox_id'),
-    extend_existing=True
+    sqlalchemy.UniqueConstraint("custom_field_id", "cashbox_id"),
+    extend_existing=True,
 )
 
 amo_entity_custom_fields = sqlalchemy.Table(
     "amo_entity_custom_fields",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("custom_field_id", Integer, ForeignKey("amo_custom_fields.id"), nullable=False),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "custom_field_id", Integer, ForeignKey("amo_custom_fields.id"), nullable=False
+    ),
     sqlalchemy.Column("value", String, nullable=False),
-    sqlalchemy.Column("lead_id", Integer, ForeignKey("amo_leads.id"), nullable=True, index=True),
-    sqlalchemy.Column("contact_id", Integer, ForeignKey("amo_contacts.id"), nullable=True, index=True),
-    sqlalchemy.UniqueConstraint('custom_field_id', 'lead_id', 'contact_id'),
-    extend_existing=True
+    sqlalchemy.Column(
+        "lead_id", Integer, ForeignKey("amo_leads.id"), nullable=True, index=True
+    ),
+    sqlalchemy.Column(
+        "contact_id", Integer, ForeignKey("amo_contacts.id"), nullable=True, index=True
+    ),
+    sqlalchemy.UniqueConstraint("custom_field_id", "lead_id", "contact_id"),
+    extend_existing=True,
 )
 
 tg_bot_bills = sqlalchemy.Table(
     "tg_bot_bills",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("payment_date", Date),
-    sqlalchemy.Column("created_by", Integer, ForeignKey("tg_accounts.id"), nullable=False),
+    sqlalchemy.Column(
+        "created_by", Integer, ForeignKey("tg_accounts.id"), nullable=False
+    ),
     sqlalchemy.Column("s3_url", String, nullable=False),
     sqlalchemy.Column("plain_text", String, nullable=False),
     sqlalchemy.Column("file_name", String, nullable=False),
-    sqlalchemy.Column("tochka_bank_account_id", Integer, ForeignKey("tochka_bank_accounts.id"), nullable=True),
+    sqlalchemy.Column(
+        "tochka_bank_account_id",
+        Integer,
+        ForeignKey("tochka_bank_accounts.id"),
+        nullable=True,
+    ),
     sqlalchemy.Column("payment_amount", Float, nullable=True),
     sqlalchemy.Column("counterparty_account_number", String, nullable=True),
     sqlalchemy.Column("payment_purpose", String, nullable=True),
@@ -1998,27 +2515,39 @@ tg_bot_bills = sqlalchemy.Table(
     sqlalchemy.Column("status", Enum(TgBillStatus), nullable=False),
     sqlalchemy.Column("request_id", String, nullable=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at", DateTime(timezone=True), default=func.now(), onupdate=func.now()
+    ),
     sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
-    extend_existing=True
+    extend_existing=True,
 )
 tg_bot_bill_approvers = sqlalchemy.Table(
     "tg_bot_bill_approvers",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("approver_id", Integer, ForeignKey("tg_accounts.id"), nullable=False),
-    sqlalchemy.Column("bill_id", Integer, ForeignKey("tg_bot_bills.id"), nullable=False),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "approver_id", Integer, ForeignKey("tg_accounts.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "bill_id", Integer, ForeignKey("tg_bot_bills.id"), nullable=False
+    ),
     sqlalchemy.Column("status", Enum(TgBillApproveStatus), nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at", DateTime(timezone=True), default=func.now(), onupdate=func.now()
+    ),
     sqlalchemy.Column("deleted_at", DateTime(timezone=True)),
-    extend_existing=True
+    extend_existing=True,
 )
 
 docs_sales_utm_tags = sqlalchemy.Table(
     "docs_sales_utm_tags",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("docs_sales_id", Integer, ForeignKey("docs_sales.id")),
     sqlalchemy.Column("utm_source", String),
     sqlalchemy.Column("utm_medium", String),
@@ -2036,7 +2565,9 @@ docs_sales_utm_tags = sqlalchemy.Table(
 segments = sqlalchemy.Table(
     "segments",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("criteria", JSON, nullable=False),
     sqlalchemy.Column("actions", JSON, nullable=True),
@@ -2046,9 +2577,14 @@ segments = sqlalchemy.Table(
     sqlalchemy.Column("type_of_update", String, nullable=False),
     sqlalchemy.Column("update_settings", JSON, nullable=True),
     sqlalchemy.Column("previous_update_at", DateTime(timezone=True)),
-    sqlalchemy.Column("status", Enum(SegmentStatus), nullable=False, server_default=SegmentStatus.created.value),
-    sqlalchemy.Column("is_archived", Boolean, server_default='false', nullable=False),
-    sqlalchemy.Column("is_deleted", Boolean, server_default='false', nullable=False),
+    sqlalchemy.Column(
+        "status",
+        Enum(SegmentStatus),
+        nullable=False,
+        server_default=SegmentStatus.created.value,
+    ),
+    sqlalchemy.Column("is_archived", Boolean, server_default="false", nullable=False),
+    sqlalchemy.Column("is_deleted", Boolean, server_default="false", nullable=False),
 )
 
 
@@ -2061,98 +2597,173 @@ class SegmentObjectType(enum.Enum):
 segment_objects = sqlalchemy.Table(
     "segment_objects",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("segment_id", BigInteger, ForeignKey("segments.id"), nullable=False),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "segment_id", BigInteger, ForeignKey("segments.id"), nullable=False
+    ),
     sqlalchemy.Column("object_id", BigInteger, nullable=False, index=True),
-    sqlalchemy.Column("object_type", Enum(SegmentObjectType, name="segment_object_type"), nullable=False, index=True),
+    sqlalchemy.Column(
+        "object_type",
+        Enum(SegmentObjectType, name="segment_object_type"),
+        nullable=False,
+        index=True,
+    ),
     sqlalchemy.Column("valid_from", DateTime(timezone=True), nullable=False),
     sqlalchemy.Column("valid_to", DateTime(timezone=True), nullable=True),
-    sqlalchemy.UniqueConstraint("segment_id", "object_id", "object_type", "valid_from", "valid_to",
-                                name="uq_svo_unique_object_per_move"),
+    sqlalchemy.UniqueConstraint(
+        "segment_id",
+        "object_id",
+        "object_type",
+        "valid_from",
+        "valid_to",
+        name="uq_svo_unique_object_per_move",
+    ),
 )
 
-Index("ix_svo_segment_valid_from", segment_objects.c.segment_id, segment_objects.c.valid_from)
-Index("ix_svo_segment_valid_to", segment_objects.c.segment_id, segment_objects.c.valid_to)
+Index(
+    "ix_svo_segment_valid_from",
+    segment_objects.c.segment_id,
+    segment_objects.c.valid_from,
+)
+Index(
+    "ix_svo_segment_valid_to", segment_objects.c.segment_id, segment_objects.c.valid_to
+)
 
 user_permissions = sqlalchemy.Table(
     "user_permissions",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
     sqlalchemy.Column("user_id", Integer, ForeignKey("relation_tg_cashboxes.id")),
-    sqlalchemy.Column("section", String, nullable=False),  # Название раздела (payments, payboxes)
+    sqlalchemy.Column(
+        "section", String, nullable=False
+    ),  # Название раздела (payments, payboxes)
     sqlalchemy.Column("can_view", Boolean, default=True),
     sqlalchemy.Column("can_edit", Boolean, default=False),
-    sqlalchemy.Column("paybox_id", Integer, ForeignKey("payboxes.id"), nullable=True),  # Доступ к конкретному счету
+    sqlalchemy.Column(
+        "paybox_id", Integer, ForeignKey("payboxes.id"), nullable=True
+    ),  # Доступ к конкретному счету
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 amo_docs_sales_delivery_contragents = sqlalchemy.Table(
-    'amo_docs_sales_delivery_contragents',
+    "amo_docs_sales_delivery_contragents",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column("delivery_info_id", Integer, ForeignKey('docs_sales_delivery_info.id'), nullable=False),
-    sqlalchemy.Column("contragent_id", Integer, ForeignKey('contragents.id'), nullable=False),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey('amo_install_groups.id')),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
+    sqlalchemy.Column(
+        "delivery_info_id",
+        Integer,
+        ForeignKey("docs_sales_delivery_info.id"),
+        nullable=False,
+    ),
+    sqlalchemy.Column(
+        "contragent_id", Integer, ForeignKey("contragents.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 tags = sqlalchemy.Table(
     "tags",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("emoji", String, nullable=True),
     sqlalchemy.Column("color", String, nullable=True),
     sqlalchemy.Column("description", String, nullable=True),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("name", "cashbox_id", name="unique_name_cashbox_id_tags"),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint(
+        "name", "cashbox_id", name="unique_name_cashbox_id_tags"
+    ),
 )
 
 contragents_tags = sqlalchemy.Table(
     "contragents_tags",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
-    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id"), nullable=False),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
-    sqlalchemy.Column("created_at", DateTime(timezone=True),
-                      server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True),
-                      server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("tag_id", "contragent_id", name="unique_tag_id_contragent_id"),
+    sqlalchemy.Column(
+        "contragent_id", Integer, ForeignKey("contragents.id"), nullable=False
+    ),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint(
+        "tag_id", "contragent_id", name="unique_tag_id_contragent_id"
+    ),
 )
 
 segments_tags = sqlalchemy.Table(
     "segments_tags",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
     sqlalchemy.Column("segment_id", Integer, ForeignKey("segments.id"), nullable=False),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
-    sqlalchemy.Column("created_at", DateTime(timezone=True),
-                      server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True),
-                      server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint("tag_id", "segment_id", name="unique_tag_id_segment_id"),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint(
+        "tag_id", "segment_id", name="unique_tag_id_segment_id"
+    ),
 )
 
 amo_lead_contacts = sqlalchemy.Table(
     "amo_lead_contacts",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
     sqlalchemy.Column("lead_id", BigInteger),
     sqlalchemy.Column("contact_id", BigInteger),
     sqlalchemy.Column("is_main", Boolean, server_default="true"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
-
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     UniqueConstraint(
         "amo_install_group_id",
         "lead_id",
@@ -2165,7 +2776,9 @@ amo_webhooks = sqlalchemy.Table(
     "amo_webhooks",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")),
+    sqlalchemy.Column(
+        "amo_install_group_id", Integer, ForeignKey("amo_install_groups.id")
+    ),
     sqlalchemy.Column("amo_id", BigInteger),
     sqlalchemy.Column("created_by", BigInteger),
     sqlalchemy.Column("created_at", Integer),
@@ -2180,7 +2793,6 @@ amo_webhooks = sqlalchemy.Table(
         default=list,
         server_default=text("'{}'::text[]"),
     ),
-
     UniqueConstraint(
         "amo_install_group_id",
         "amo_id",
@@ -2200,8 +2812,12 @@ database = databases.Database(
 engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL)
 engine_job_store = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URL_JOB_STORE)
 
-async_engine = create_async_engine(SQLALCHEMY_DATABASE_URL_ASYNC, pool_pre_ping=True, poolclass=NullPool)
-async_session_maker = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+async_engine = create_async_engine(
+    SQLALCHEMY_DATABASE_URL_ASYNC, pool_pre_ping=True, poolclass=NullPool
+)
+async_session_maker = sessionmaker(
+    async_engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 class Role(enum.Enum):
@@ -2214,38 +2830,78 @@ docs_sales_links = sqlalchemy.Table(
     "docs_sales_links",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("docs_sales_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("docs_sales.id"), nullable=False),
+    sqlalchemy.Column(
+        "docs_sales_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("docs_sales.id"),
+        nullable=False,
+    ),
     sqlalchemy.Column("role", sqlalchemy.Enum(Role), nullable=False),
     sqlalchemy.Column("hash", sqlalchemy.String, nullable=False),
     sqlalchemy.Column("url", sqlalchemy.String, nullable=False),
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
-    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now),
-    sqlalchemy.UniqueConstraint("docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"),
+    sqlalchemy.Column(
+        "updated_at",
+        sqlalchemy.DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now,
+    ),
+    sqlalchemy.UniqueConstraint(
+        "docs_sales_id", "role", name="uix_docs_sales_links_docs_sales_id_role"
+    ),
 )
 
 employee_shifts = sqlalchemy.Table(
     "employee_shifts",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, index=True),
-    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("relation_tg_cashboxes.id"), nullable=False),
-    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "user_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("relation_tg_cashboxes.id"),
+        nullable=False,
+    ),
+    sqlalchemy.Column(
+        "cashbox_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("cashboxes.id"),
+        nullable=False,
+    ),
     sqlalchemy.Column("shift_start", sqlalchemy.DateTime, nullable=False),
     sqlalchemy.Column("shift_end", sqlalchemy.DateTime, nullable=True),
-    sqlalchemy.Column("status", Enum("on_shift", "off_shift", "on_break", name="shiftstatus"), nullable=False,
-                      server_default="off_shift"),
+    sqlalchemy.Column(
+        "status",
+        Enum("on_shift", "off_shift", "on_break", name="shiftstatus"),
+        nullable=False,
+        server_default="off_shift",
+    ),
     sqlalchemy.Column("break_start", sqlalchemy.DateTime, nullable=True),
     sqlalchemy.Column("break_duration", sqlalchemy.Integer, nullable=True),  # в минутах
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, server_default=func.now()),
-    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        sqlalchemy.DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 employee_shifts_events = sqlalchemy.Table(
     "employee_shifts_events",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, index=True),
-    sqlalchemy.Column("relation_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("relation_tg_cashboxes.id"),
-                      nullable=False),
-    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "relation_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("relation_tg_cashboxes.id"),
+        nullable=False,
+    ),
+    sqlalchemy.Column(
+        "cashbox_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("cashboxes.id"),
+        nullable=False,
+    ),
     sqlalchemy.Column("shift_status", sqlalchemy.String, nullable=False),
     sqlalchemy.Column("event_start", sqlalchemy.DateTime, nullable=False),
     sqlalchemy.Column("event_end", sqlalchemy.DateTime, nullable=True),
@@ -2255,27 +2911,46 @@ nomenclature_hash = sqlalchemy.Table(
     "nomenclature_hash",
     metadata,
     sqlalchemy.Column("id", BigInteger, primary_key=True),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
+    sqlalchemy.Column(
+        "nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
     sqlalchemy.Column("hash", String, nullable=False),
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
-    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    sqlalchemy.Column(
+        "updated_at",
+        sqlalchemy.DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now,
+    ),
 )
 
 warehouse_hash = sqlalchemy.Table(
     "warehouse_hash",
     metadata,
     sqlalchemy.Column("id", BigInteger, primary_key=True),
-    sqlalchemy.Column("warehouses_id", Integer, ForeignKey("warehouses.id"), nullable=False),
+    sqlalchemy.Column(
+        "warehouses_id", Integer, ForeignKey("warehouses.id"), nullable=False
+    ),
     sqlalchemy.Column("hash", String, nullable=False),
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
-    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    sqlalchemy.Column(
+        "updated_at",
+        sqlalchemy.DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now,
+    ),
 )
 
 apple_push_tokens = sqlalchemy.Table(
     "apple_push_tokens",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("card_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("loyality_cards.id"), nullable=False),
+    sqlalchemy.Column(
+        "card_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("loyality_cards.id"),
+        nullable=False,
+    ),
     sqlalchemy.Column("device_library_identifier", sqlalchemy.String, nullable=False),
     sqlalchemy.Column("pass_type_id", String, nullable=False),
     sqlalchemy.Column("serial_number", String, nullable=False),
@@ -2287,14 +2962,22 @@ apple_wallet_card_settings = sqlalchemy.Table(
     "apple_wallet_card_settings",
     metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("cashbox_id", sqlalchemy.Integer, sqlalchemy.ForeignKey('cashboxes.id'), nullable=False, unique=True),
+    sqlalchemy.Column(
+        "cashbox_id",
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey("cashboxes.id"),
+        nullable=False,
+        unique=True,
+    ),
     sqlalchemy.Column("data", sqlalchemy.JSON, nullable=True),
 )
 
 feeds = sqlalchemy.Table(
     "feeds",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("url_token", String, unique=True, nullable=False, index=True),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("description", String, nullable=True),
@@ -2304,46 +2987,82 @@ feeds = sqlalchemy.Table(
     sqlalchemy.Column("criteria", JSON, nullable=True),
     sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), index=True),
     sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=datetime.datetime.now),
-    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    sqlalchemy.Column(
+        "updated_at",
+        sqlalchemy.DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now,
+    ),
 )
 
 feeds_tags = sqlalchemy.Table(
     "feeds_tags",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("tag_id", Integer, ForeignKey("tags.id"), nullable=False),
     sqlalchemy.Column("feed_id", Integer, ForeignKey("feeds.id"), nullable=False),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey('cashboxes.id')),
-    sqlalchemy.Column("created_at", DateTime(timezone=True),
-                      server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True),
-                      server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id")),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
     sqlalchemy.UniqueConstraint("tag_id", "feed_id", name="unique_tag_id_feed_id"),
 )
 
 marketplace_contragent_cart = sqlalchemy.Table(
     "marketplace_contragent_cart",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column('contragent_id', Integer, ForeignKey('contragents.id'), nullable=False, unique=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "contragent_id",
+        Integer,
+        ForeignKey("contragents.id"),
+        nullable=False,
+        unique=True,
+    ),
 )
 
 marketplace_cart_goods = sqlalchemy.Table(
     "marketplace_cart_goods",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
-    sqlalchemy.Column('nomenclature_id', Integer, ForeignKey('nomenclature.id'), nullable=False),
-    sqlalchemy.Column('warehouse_id', Integer, ForeignKey('warehouses.id'), nullable=True),
-    sqlalchemy.Column('quantity', Integer, nullable=False),
-    sqlalchemy.Column('cart_id', BigInteger, ForeignKey('marketplace_contragent_cart.id'), nullable=False),
-    sqlalchemy.Column("created_at", DateTime(timezone=True),
-                      server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True),
-                      server_default=func.now(), onupdate=func.now()),
-    sqlalchemy.UniqueConstraint('nomenclature_id', 'warehouse_id', 'cart_id', name='ux_marketplace_cart_goods_nomenclature_id_warehouse_id_cart_id')
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "warehouse_id", Integer, ForeignKey("warehouses.id"), nullable=True
+    ),
+    sqlalchemy.Column("quantity", Integer, nullable=False),
+    sqlalchemy.Column(
+        "cart_id",
+        BigInteger,
+        ForeignKey("marketplace_contragent_cart.id"),
+        nullable=False,
+    ),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    sqlalchemy.UniqueConstraint(
+        "nomenclature_id",
+        "warehouse_id",
+        "cart_id",
+        name="ux_marketplace_cart_goods_nomenclature_id_warehouse_id_cart_id",
+    ),
 )
 
-<<<<<<< HEAD
 global_categories = sqlalchemy.Table(
     "global_categories",
     metadata,
@@ -2356,9 +3075,13 @@ global_categories = sqlalchemy.Table(
     sqlalchemy.Column("image_url", String),
     sqlalchemy.Column("is_active", Boolean, default=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
-=======
 
 channels = sqlalchemy.Table(
     "channels",
@@ -2371,52 +3094,112 @@ channels = sqlalchemy.Table(
     sqlalchemy.Column("tags", JSON, nullable=True),
     sqlalchemy.Column("api_config_name", String(100), nullable=True),
     sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
-    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column(
+        "created_at", DateTime, nullable=False, server_default=func.now()
+    ),
+    sqlalchemy.Column(
+        "updated_at", DateTime, nullable=False, server_default=func.now()
+    ),
 )
 
 chats = sqlalchemy.Table(
     "chats",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False),
-    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id", ondelete="SET NULL"), nullable=True),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column(
+        "channel_id",
+        Integer,
+        ForeignKey("channels.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sqlalchemy.Column(
+        "contragent_id",
+        Integer,
+        ForeignKey("contragents.id", ondelete="SET NULL"),
+        nullable=True,
+    ),
+    sqlalchemy.Column(
+        "cashbox_id",
+        Integer,
+        ForeignKey("cashboxes.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
     sqlalchemy.Column("external_chat_id", String(255), nullable=False),
     sqlalchemy.Column("phone", String(20), nullable=True),
     sqlalchemy.Column("name", String(100), nullable=True),
-    sqlalchemy.Column("status", Enum(ChatStatus), nullable=False, server_default="ACTIVE"),
-    sqlalchemy.Column("assigned_operator_id", Integer, ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"), nullable=True),
+    sqlalchemy.Column(
+        "status", Enum(ChatStatus), nullable=False, server_default="ACTIVE"
+    ),
+    sqlalchemy.Column(
+        "assigned_operator_id",
+        Integer,
+        ForeignKey("relation_tg_cashboxes.id", ondelete="SET NULL"),
+        nullable=True,
+    ),
     sqlalchemy.Column("first_message_time", DateTime, nullable=True),
     sqlalchemy.Column("first_response_time_seconds", Integer, nullable=True),
     sqlalchemy.Column("last_message_time", DateTime, nullable=True),
     sqlalchemy.Column("last_response_time_seconds", Integer, nullable=True),
-    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
-    UniqueConstraint("channel_id", "external_chat_id", "cashbox_id", name="uq_chats_channel_external_cashbox"),
+    sqlalchemy.Column(
+        "created_at", DateTime, nullable=False, server_default=func.now()
+    ),
+    sqlalchemy.Column(
+        "updated_at", DateTime, nullable=False, server_default=func.now()
+    ),
+    UniqueConstraint(
+        "channel_id",
+        "external_chat_id",
+        "cashbox_id",
+        name="uq_chats_channel_external_cashbox",
+    ),
 )
 
 chat_messages = sqlalchemy.Table(
     "chat_messages",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("chat_id", Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column(
+        "chat_id", Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False
+    ),
     sqlalchemy.Column("sender_type", Enum(MessageSenderType), nullable=False),
-    sqlalchemy.Column("message_type", Enum(MessageType), nullable=False, server_default="TEXT"),
+    sqlalchemy.Column(
+        "message_type", Enum(MessageType), nullable=False, server_default="TEXT"
+    ),
     sqlalchemy.Column("content", Text, nullable=False),
     sqlalchemy.Column("external_message_id", String(255), nullable=True),
-    sqlalchemy.Column("status", Enum(MessageStatus), nullable=False, server_default="SENT"),
-    sqlalchemy.Column("source", String(50), nullable=True, comment="Источник отправки сообщения: ios, android, api, web, avito, etc."),
-    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
+    sqlalchemy.Column(
+        "status", Enum(MessageStatus), nullable=False, server_default="SENT"
+    ),
+    sqlalchemy.Column(
+        "source",
+        String(50),
+        nullable=True,
+        comment="Источник отправки сообщения: ios, android, api, web, avito, etc.",
+    ),
+    sqlalchemy.Column(
+        "created_at", DateTime, nullable=False, server_default=func.now()
+    ),
+    sqlalchemy.Column(
+        "updated_at", DateTime, nullable=False, server_default=func.now()
+    ),
 )
 
 channel_credentials = sqlalchemy.Table(
     "channel_credentials",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column(
+        "channel_id",
+        Integer,
+        ForeignKey("channels.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sqlalchemy.Column(
+        "cashbox_id",
+        Integer,
+        ForeignKey("cashboxes.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
     sqlalchemy.Column("api_key", String(500), nullable=False),
     sqlalchemy.Column("api_secret", String(500), nullable=False),
     sqlalchemy.Column("access_token", String(1000), nullable=True),
@@ -2424,9 +3207,15 @@ channel_credentials = sqlalchemy.Table(
     sqlalchemy.Column("token_expires_at", DateTime, nullable=True),
     sqlalchemy.Column("avito_user_id", Integer, nullable=True),
     sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
-    sqlalchemy.Column("created_at", DateTime, nullable=False, server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime, nullable=False, server_default=func.now()),
-    UniqueConstraint("channel_id", "cashbox_id", name="uq_channel_credentials_channel_cashbox"),
+    sqlalchemy.Column(
+        "created_at", DateTime, nullable=False, server_default=func.now()
+    ),
+    sqlalchemy.Column(
+        "updated_at", DateTime, nullable=False, server_default=func.now()
+    ),
+    UniqueConstraint(
+        "channel_id", "cashbox_id", name="uq_channel_credentials_channel_cashbox"
+    ),
 )
 
 marketplace_rating_aggregates = sqlalchemy.Table(
@@ -2438,13 +3227,20 @@ marketplace_rating_aggregates = sqlalchemy.Table(
     sqlalchemy.Column("avg_rating", Float, nullable=False),
     sqlalchemy.Column("reviews_count", Integer, nullable=False),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 marketplace_utm_tags = sqlalchemy.Table(
     "marketplace_utm_tags",
     metadata,
-    sqlalchemy.Column("id", BigInteger, primary_key=True, index=True, autoincrement=True),
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
     sqlalchemy.Column("entity_type", String, nullable=True),
     sqlalchemy.Column("entity_id", Integer, nullable=False),
     sqlalchemy.Column("utm_source", String, nullable=True),
@@ -2466,24 +3262,35 @@ marketplace_reviews = sqlalchemy.Table(
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
     sqlalchemy.Column("entity_id", Integer, nullable=False),
     sqlalchemy.Column("entity_type", String, nullable=False),
-    sqlalchemy.Column("contagent_id", Integer, ForeignKey("contragents.id"), nullable=False),
+    sqlalchemy.Column(
+        "contagent_id", Integer, ForeignKey("contragents.id"), nullable=False
+    ),
     sqlalchemy.Column("rating", Integer, nullable=False),
     sqlalchemy.Column("text", Text, nullable=False),
     sqlalchemy.Column("status", String, nullable=False, server_default="visible"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 marketplace_view_events = sqlalchemy.Table(
     "marketplace_view_events",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False),
+    sqlalchemy.Column(
+        "cashbox_id", Integer, ForeignKey("cashboxes.id"), nullable=False
+    ),
     sqlalchemy.Column("entity_type", String, nullable=False),
     sqlalchemy.Column("entity_id", Integer, nullable=False),
     sqlalchemy.Column("listing_pos", Integer, nullable=True),
     sqlalchemy.Column("listing_page", Integer, nullable=True),
-    sqlalchemy.Column("contragent_id", Integer, ForeignKey("contragents.id"), nullable=True),
+    sqlalchemy.Column(
+        "contragent_id", Integer, ForeignKey("contragents.id"), nullable=True
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
 
@@ -2491,9 +3298,17 @@ favorites_nomenclatures = sqlalchemy.Table(
     "favorites_nomenclatures",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column("nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False),
-    sqlalchemy.Column("contagent_id", Integer, ForeignKey("contragents.id"), nullable=False),
+    sqlalchemy.Column(
+        "nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "contagent_id", Integer, ForeignKey("contragents.id"), nullable=False
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
->>>>>>> b7edbd05d4298f3ffb493805621a497b0fe85b24
