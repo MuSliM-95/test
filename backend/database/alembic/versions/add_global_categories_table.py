@@ -8,6 +8,8 @@ Create Date: 2025-12-01 00:00:00.000000
 
 from alembic import op
 import sqlalchemy as sa
+import json
+import os
 
 
 # revision identifiers, used by Alembic.
@@ -60,6 +62,32 @@ def upgrade():
     op.create_index(
         "idx_global_categories_external_id", "global_categories", ["external_id"]
     )
+
+    # Load initial data from fixtures
+    fixtures_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "initial_data", "global_categories.json"
+    )
+
+    if os.path.exists(fixtures_path):
+        with open(fixtures_path, "r", encoding="UTF-8") as file:
+            categories = json.load(file)
+
+        if categories:
+            op.bulk_insert(
+                sa.table(
+                    "global_categories",
+                    sa.column("id", sa.Integer()),
+                    sa.column("name", sa.String()),
+                    sa.column("parent_id", sa.Integer()),
+                    sa.column("external_id", sa.String()),
+                    sa.column("description", sa.String()),
+                    sa.column("is_active", sa.Boolean()),
+                ),
+                categories,
+            )
+            print(f"Loaded {len(categories)} categories from fixtures")
+    else:
+        print(f"Warning: fixtures file not found at {fixtures_path}")
 
 
 def downgrade():
