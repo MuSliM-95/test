@@ -127,7 +127,6 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
     ):
         check_query = select(global_categories).where(
             global_categories.c.id == category_id,
-            global_categories.c.is_active.is_(True),
         )
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
@@ -161,7 +160,6 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
     async def delete_global_category(self, category_id: int):
         check_query = select(global_categories).where(
             global_categories.c.id == category_id,
-            global_categories.c.is_active.is_(True),
         )
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
@@ -179,7 +177,6 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
     async def upload_category_image(self, category_id: int, file: UploadFile):
         check_query = select(global_categories).where(
             global_categories.c.id == category_id,
-            global_categories.c.is_active.is_(True),
         )
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
