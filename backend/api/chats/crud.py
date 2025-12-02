@@ -351,6 +351,7 @@ async def get_chat(chat_id: int):
         chats.c.first_response_time_seconds,
         chats.c.last_message_time,
         chats.c.last_response_time_seconds,
+        chats.c.metadata,
         chats.c.created_at,
         chats.c.updated_at,
         channels.c.name.label('channel_name'),
@@ -360,8 +361,7 @@ async def get_chat(chat_id: int):
         chat_contacts.c.phone.label('contact_phone'),
         chat_contacts.c.email.label('contact_email'),
         chat_contacts.c.avatar.label('contact_avatar'),
-        chat_contacts.c.contragent_id.label('contact_contragent_id'),
-        chat_contacts.c.metadata.label('contact_metadata')
+        chat_contacts.c.contragent_id.label('contact_contragent_id')
     ]).select_from(
         chats.join(channels, chats.c.channel_id == channels.c.id)
         .outerjoin(chat_contacts, chats.c.chat_contact_id == chat_contacts.c.id)
@@ -379,24 +379,14 @@ async def get_chat(chat_id: int):
         chat_dict.get('contact_phone'),
         chat_dict.get('contact_email'),
         chat_dict.get('contact_avatar'),
-        chat_dict.get('contact_contragent_id'),
-        chat_dict.get('contact_metadata')
+        chat_dict.get('contact_contragent_id')
     ]):
-        contact_metadata = chat_dict.get('contact_metadata')
-        if contact_metadata:
-            if isinstance(contact_metadata, str):
-                try:
-                    contact_metadata = json.loads(contact_metadata)
-                except:
-                    contact_metadata = None
-        
         contact_info = {
             'name': chat_dict.get('contact_name'),
             'phone': chat_dict.get('contact_phone'),
             'email': chat_dict.get('contact_email'),
             'avatar': chat_dict.get('contact_avatar'),
-            'contragent_id': chat_dict.get('contact_contragent_id'),
-            'metadata': contact_metadata if isinstance(contact_metadata, dict) else None
+            'contragent_id': chat_dict.get('contact_contragent_id')
         }
     
     chat_dict.pop('contact_name', None)
@@ -404,25 +394,31 @@ async def get_chat(chat_id: int):
     chat_dict.pop('contact_email', None)
     chat_dict.pop('contact_avatar', None)
     chat_dict.pop('contact_contragent_id', None)
-    chat_dict.pop('contact_metadata', None)
     
     chat_dict['contact'] = contact_info
     
     name = None
-    if contact_info and contact_info.get('metadata'):
-        metadata = contact_info['metadata']
-        name = metadata.get('ad_title')
-        if not name:
-            context = metadata.get('context', {})
-            if isinstance(context, dict):
-                value = context.get('value', {})
+    metadata = chat_dict.get('metadata')
+    if metadata:
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except:
+                metadata = None
+        if isinstance(metadata, dict):
+            name = metadata.get('ad_title')
+            if not name:
+                context = metadata.get('context', {})
+                if isinstance(context, dict):
+                    value = context.get('value', {})
+                    if isinstance(value, dict):
+                        name = value.get('title')
+            if not name:
+                value = metadata.get('value', {})
                 if isinstance(value, dict):
                     name = value.get('title')
-        if not name:
-            value = metadata.get('value', {})
-            if isinstance(value, dict):
-                name = value.get('title')
-    chat_dict['name'] = name
+    if not chat_dict.get('name') and name:
+        chat_dict['name'] = name
     
     last_message_query = select([chat_messages.c.content]).where(
         chat_messages.c.chat_id == chat_id
@@ -632,6 +628,7 @@ async def get_chats(
         chats.c.first_response_time_seconds,
         chats.c.last_message_time,
         chats.c.last_response_time_seconds,
+        chats.c.metadata,
         chats.c.created_at,
         chats.c.updated_at,
         channels.c.name.label('channel_name'),
@@ -642,7 +639,6 @@ async def get_chats(
         chat_contacts.c.email.label('contact_email'),
         chat_contacts.c.avatar.label('contact_avatar'),
         chat_contacts.c.contragent_id.label('contact_contragent_id'),
-        chat_contacts.c.metadata.label('contact_metadata'),
         last_msg_correlated.label('last_message_preview'),
         func.coalesce(unread_count_subquery.c.unread_count, 0).label('unread_count')
     ]).select_from(
@@ -787,24 +783,14 @@ async def get_chats(
             chat_dict.get('contact_phone'),
             chat_dict.get('contact_email'),
             chat_dict.get('contact_avatar'),
-            chat_dict.get('contact_contragent_id'),
-            chat_dict.get('contact_metadata')
+            chat_dict.get('contact_contragent_id')
         ]):
-            contact_metadata = chat_dict.get('contact_metadata')
-            if contact_metadata:
-                if isinstance(contact_metadata, str):
-                    try:
-                        contact_metadata = json.loads(contact_metadata)
-                    except:
-                        contact_metadata = None
-            
             contact_info = {
                 'name': chat_dict.get('contact_name'),
                 'phone': chat_dict.get('contact_phone'),
                 'email': chat_dict.get('contact_email'),
                 'avatar': chat_dict.get('contact_avatar'),
-                'contragent_id': chat_dict.get('contact_contragent_id'),
-                'metadata': contact_metadata if isinstance(contact_metadata, dict) else None
+                'contragent_id': chat_dict.get('contact_contragent_id')
             }
         
         # Удаляем старые поля контакта
@@ -813,26 +799,30 @@ async def get_chats(
         chat_dict.pop('contact_email', None)
         chat_dict.pop('contact_avatar', None)
         chat_dict.pop('contact_contragent_id', None)
-        chat_dict.pop('contact_metadata', None)
         
         # Добавляем объект contact
         chat_dict['contact'] = contact_info
         
-        # Извлекаем name из contact_metadata для обратной совместимости
         name = None
-        if contact_info and contact_info.get('metadata'):
-            metadata = contact_info['metadata']
-            name = metadata.get('ad_title')
-            if not name:
-                context = metadata.get('context', {})
-                if isinstance(context, dict):
-                    value = context.get('value', {})
+        metadata = chat_dict.get('metadata')
+        if metadata:
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except:
+                    metadata = None
+            if isinstance(metadata, dict):
+                name = metadata.get('ad_title')
+                if not name:
+                    context = metadata.get('context', {})
+                    if isinstance(context, dict):
+                        value = context.get('value', {})
+                        if isinstance(value, dict):
+                            name = value.get('title')
+                if not name:
+                    value = metadata.get('value', {})
                     if isinstance(value, dict):
                         name = value.get('title')
-            if not name:
-                value = metadata.get('value', {})
-                if isinstance(value, dict):
-                    name = value.get('title')
         chat_dict['name'] = name
         
         is_avito_chat = (

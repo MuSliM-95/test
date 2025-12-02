@@ -1170,19 +1170,14 @@ async def get_avito_chat_metadata(
         
         metadata = {}
         
-        contact_metadata = None
-        if chat.get('contact'):
-            contact_metadata = chat['contact'].get('metadata')
-        elif chat.get('contact_metadata'):  # Обратная совместимость
-            contact_metadata = chat['contact_metadata']
-        
-        if contact_metadata:
-            if isinstance(contact_metadata, dict):
-                metadata.update(contact_metadata)
-            elif isinstance(contact_metadata, str):
+        chat_metadata = chat.get('metadata')
+        if chat_metadata:
+            if isinstance(chat_metadata, dict):
+                metadata.update(chat_metadata)
+            elif isinstance(chat_metadata, str):
                 try:
                     import json
-                    db_metadata = json.loads(contact_metadata)
+                    db_metadata = json.loads(chat_metadata)
                     if isinstance(db_metadata, dict):
                         metadata.update(db_metadata)
                 except:
