@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional
 from sqlalchemy import select, and_
 
 from database.db import database, channel_credentials, channels, chats, chat_messages
@@ -88,7 +88,6 @@ async def sync_avito_chats_and_messages():
             try:
                 channel_id = cred['channel_id']
                 cashbox_id = cred['cashbox_id']
-                cred_id = cred['id']
                 
                 logger.info(f"Processing auto-sync for channel {channel_id}, cashbox {cashbox_id}")
                 
@@ -161,11 +160,13 @@ async def sync_avito_chats_and_messages():
                         user_name = None
                         user_phone = None
                         user_avatar = None
+                        client_user_id = None
                         
                         if users and avito_user_id:
                             for user in users:
                                 user_id_in_chat = user.get('user_id') or user.get('id')
                                 if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                    client_user_id = user_id_in_chat
                                     user_name = user.get('name') or user.get('profile_name')
                                     user_phone = (
                                         user.get('phone') or
@@ -212,82 +213,20 @@ async def sync_avito_chats_and_messages():
                         )
                         
                         chat_id = None
-                        is_new_chat = False
                         
                         if existing_chat:
-                            # Обновляем существующий чат
                             chat_id = existing_chat['id']
                             
-                            try:
-                                # Пытаемся получить полную информацию о чате
-                                try:
-                                    chat_info = await client.get_chat_info(external_chat_id)
-                                except Exception as chat_error:
-                                    error_str = str(chat_error)
-                                    if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
-                                        chat_info = {}
-                                    else:
-                                        raise
-                                
-                                # Обновляем информацию о пользователе из chat_info
-                                users = chat_info.get('users', [])
-                                if users and avito_user_id:
-                                    for user in users:
-                                        user_id_in_chat = user.get('user_id') or user.get('id')
-                                        if user_id_in_chat and user_id_in_chat != avito_user_id:
-                                            user_name = user.get('name') or user.get('profile_name') or user_name
-                                            user_phone_from_api = (
-                                                user.get('phone') or
-                                                user.get('phone_number') or
-                                                user.get('public_user_profile', {}).get('phone') or
-                                                user.get('public_user_profile', {}).get('phone_number')
-                                            )
-                                            if user_phone_from_api:
-                                                user_phone = user_phone_from_api
-                                            public_profile = user.get('public_user_profile', {})
-                                            if public_profile:
-                                                avatar_data = public_profile.get('avatar', {})
-                                                if isinstance(avatar_data, dict):
-                                                    user_avatar = (
-                                                        avatar_data.get('default') or
-                                                        avatar_data.get('images', {}).get('256x256') or
-                                                        avatar_data.get('images', {}).get('128x128') or
-                                                        (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
-                                                    )
-                                                elif isinstance(avatar_data, str):
-                                                    user_avatar = avatar_data
-                                            break
-                                
-                                # Пытаемся найти телефон в сообщениях
-                                if not user_phone:
-                                    try:
-                                        messages = await client.get_messages(external_chat_id, limit=50)
-                                        for msg in messages:
-                                            msg_content = msg.get('content', {})
-                                            msg_text = msg_content.get('text', '') if isinstance(msg_content, dict) else str(msg_content)
-                                            if msg_text:
-                                                extracted_phone = extract_phone_from_text(msg_text)
-                                                if extracted_phone:
-                                                    user_phone = extracted_phone
-                                                    break
-                                    except Exception:
-                                        pass
-                                
-                            except Exception as e:
-                                logger.warning(f"Failed to get chat info for {external_chat_id}: {e}")
-                            
-                            # Извлекаем название объявления из context
                             context = avito_chat.get('context', {})
                             ad_title = None
                             ad_id = None
+                            ad_url = None
                             if isinstance(context, dict):
                                 item = context.get('item', {})
                                 if isinstance(item, dict):
                                     ad_title = item.get('title')
                                     ad_id = item.get('id')
-                            
-                            # Используем название объявления как название чата
-                            chat_name = ad_title or user_name
+                                    ad_url = item.get('url')
                             
                             # Формируем metadata
                             metadata = {}
@@ -295,39 +234,74 @@ async def sync_avito_chats_and_messages():
                                 metadata['ad_title'] = ad_title
                             if ad_id:
                                 metadata['ad_id'] = ad_id
+                            if ad_url:
+                                metadata['ad_url'] = ad_url
                             if context:
                                 metadata['context'] = context
+                            if client_user_id:
+                                metadata['avito_user_id'] = client_user_id
                             
-                            # Обновляем chat_contact
-                            existing_chat_obj = await crud.get_chat(chat_id)
-                            chat_contact_id = existing_chat_obj.get('chat_contact_id') if existing_chat_obj else None
+                            chat_contact_id = existing_chat.get('chat_contact_id')
                             
                             if chat_contact_id:
                                 from database.db import chat_contacts
                                 contact_update = {}
                                 
-                                existing_contact = existing_chat_obj.get('contact', {})
-                                if chat_name and chat_name != existing_contact.get('name'):
-                                    contact_update['name'] = chat_name
-                                if user_phone and user_phone != existing_contact.get('phone'):
+                                if user_name:
+                                    contact_update['name'] = user_name
+                                if user_phone:
                                     contact_update['phone'] = user_phone
-                                if user_avatar and user_avatar != existing_contact.get('avatar'):
+                                if user_avatar:
                                     contact_update['avatar'] = user_avatar
                                 
                                 if metadata:
-                                    existing_metadata = existing_contact.get('metadata') or {}
+                                    existing_contact = await database.fetch_one(
+                                        chat_contacts.select().where(chat_contacts.c.id == chat_contact_id)
+                                    )
+                                    existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
                                     if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
                                         existing_metadata.update(metadata)
+                                        if client_user_id and 'avito_user_id' not in existing_metadata:
+                                            existing_metadata['avito_user_id'] = client_user_id
                                         contact_update['metadata'] = existing_metadata
-                                    else:
+                                    elif not existing_metadata:
                                         contact_update['metadata'] = metadata
+                                elif client_user_id:
+                                    # Если metadata пустой, но есть client_user_id, сохраняем его
+                                    existing_contact = await database.fetch_one(
+                                        chat_contacts.select().where(chat_contacts.c.id == chat_contact_id)
+                                    )
+                                    existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
+                                    if isinstance(existing_metadata, dict):
+                                        if 'avito_user_id' not in existing_metadata:
+                                            existing_metadata['avito_user_id'] = client_user_id
+                                            contact_update['metadata'] = existing_metadata
+                                    else:
+                                        contact_update['metadata'] = {'avito_user_id': client_user_id}
                                 
                                 if contact_update:
-                                    contact_update['updated_at'] = datetime.utcnow()
                                     await database.execute(
                                         chat_contacts.update().where(
                                             chat_contacts.c.id == chat_contact_id
                                         ).values(**contact_update)
+                                    )
+                            elif (user_name or user_phone) and existing_chat['id']:
+                                from database.db import chat_contacts
+                                contact_data = {
+                                    "channel_id": channel_id,
+                                    "name": user_name,
+                                    "phone": user_phone,
+                                    "avatar": user_avatar,
+                                    "metadata": metadata if metadata else None
+                                }
+                                contact_result = await database.fetch_one(
+                                    chat_contacts.insert().values(**contact_data).returning(chat_contacts.c.id)
+                                )
+                                if contact_result:
+                                    await database.execute(
+                                        chats.update().where(
+                                            chats.c.id == existing_chat['id']
+                                        ).values(chat_contact_id=contact_result['id'])
                                     )
                             
                             # Обновляем время последнего сообщения
@@ -342,30 +316,34 @@ async def sync_avito_chats_and_messages():
                                         updated_at=last_message_time
                                     )
                                 )
-                                chats_updated += 1
-                                logger.debug(f"Updated chat {chat_id} (external: {external_chat_id})")
+                            
+                            chats_updated += 1
+                            logger.debug(f"Updated chat {chat_id} (external: {external_chat_id})")
                         else:
-                            # Извлекаем название объявления из context
                             context = avito_chat.get('context', {})
                             ad_title = None
                             ad_id = None
+                            ad_url = None
                             if isinstance(context, dict):
                                 item = context.get('item', {})
                                 if isinstance(item, dict):
                                     ad_title = item.get('title')
                                     ad_id = item.get('id')
+                                    ad_url = item.get('url')
                             
-                            # Используем название объявления как название чата
-                            chat_name = ad_title or user_name
-                            
-                            # Формируем metadata
                             metadata = {}
                             if ad_title:
                                 metadata['ad_title'] = ad_title
                             if ad_id:
                                 metadata['ad_id'] = ad_id
+                            if ad_url:
+                                metadata['ad_url'] = ad_url
                             if context:
                                 metadata['context'] = context
+                            if client_user_id:
+                                metadata['avito_user_id'] = client_user_id
+                            
+                            chat_name = user_name or (metadata.get('ad_title') if metadata else None) or f"Avito Chat {external_chat_id[:8]}"
                             
                             # Создаем новый чат через crud.create_chat
                             new_chat = await crud.create_chat(
@@ -379,12 +357,14 @@ async def sync_avito_chats_and_messages():
                                 metadata=metadata if metadata else None
                             )
                             
+                            if not new_chat or not new_chat.get('id'):
+                                logger.error(f"Failed to create chat with external_id {external_chat_id}")
+                                continue
+                            
                             chat_id = new_chat['id']
                             chats_created += 1
-                            is_new_chat = True
                             logger.info(f"Created new chat {chat_id} (external: {external_chat_id})")
                             
-                            # Обновляем время первого сообщения
                             if avito_chat.get('created'):
                                 first_message_time = datetime.fromtimestamp(avito_chat['created'])
                                 await database.execute(

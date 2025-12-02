@@ -208,7 +208,7 @@ async def delete_channel(channel_id: int):
 
 async def get_or_create_chat_contact(
     channel_id: int,
-    external_chat_id: Optional[str] = None,
+    external_contact_id: Optional[str] = None,
     name: Optional[str] = None,
     phone: Optional[str] = None,
     email: Optional[str] = None,
@@ -219,47 +219,94 @@ async def get_or_create_chat_contact(
     Получить или создать chat_contact.
     Возвращает ID chat_contact.
     """
-    if external_chat_id:
+    existing = None
+    
+    avito_user_id = None
+    if metadata and isinstance(metadata, dict):
+        avito_user_id = metadata.get('avito_user_id') or metadata.get('user_id')
+    
+    if external_contact_id:
         existing = await database.fetch_one(
             chat_contacts.select().where(
                 (chat_contacts.c.channel_id == channel_id) &
-                (chat_contacts.c.external_chat_id == external_chat_id)
+                (chat_contacts.c.external_contact_id == external_contact_id)
             )
         )
         
-        if existing:
-            # Обновляем существующий контакт, если есть новые данные
-            update_data = {"updated_at": datetime.utcnow()}
-            if name and name != existing.get('name'):
-                update_data['name'] = name
-            if phone and phone != existing.get('phone'):
-                update_data['phone'] = phone
-            if email and email != existing.get('email'):
-                update_data['email'] = email
-            if avatar and avatar != existing.get('avatar'):
-                update_data['avatar'] = avatar
-            if metadata:
-                existing_metadata = existing.get('metadata') or {}
-                if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
-                    existing_metadata.update(metadata)
-                    update_data['metadata'] = existing_metadata
-                else:
-                    update_data['metadata'] = metadata
-            
-            if len(update_data) > 1:  # Больше чем только updated_at
-                await database.execute(
-                    chat_contacts.update().where(
-                        chat_contacts.c.id == existing['id']
-                    ).values(**update_data)
-                )
-            
-            return existing['id']
+    if not existing and phone:
+        existing = await database.fetch_one(
+            chat_contacts.select().where(
+                (chat_contacts.c.channel_id == channel_id) &
+                (chat_contacts.c.phone == phone) &
+                (chat_contacts.c.phone.is_not(None))
+            )
+        )
+    
+    if not existing and avito_user_id:
+        all_contacts = await database.fetch_all(
+            chat_contacts.select().where(
+                (chat_contacts.c.channel_id == channel_id) &
+                (chat_contacts.c.metadata.is_not(None))
+            )
+        )
+        
+        for contact in all_contacts:
+            contact_metadata = contact.get('metadata')
+            if isinstance(contact_metadata, dict):
+                contact_avito_user_id = contact_metadata.get('avito_user_id') or contact_metadata.get('user_id')
+                if contact_avito_user_id and str(contact_avito_user_id) == str(avito_user_id):
+                    existing = contact
+                    break
+    
+    if not existing and name and not phone:
+        existing = await database.fetch_one(
+            chat_contacts.select().where(
+                (chat_contacts.c.channel_id == channel_id) &
+                (chat_contacts.c.name == name) &
+                (chat_contacts.c.name.is_not(None)) &
+                (chat_contacts.c.phone.is_(None))  # Только если phone тоже null
+            )
+        )
+    
+    if existing:
+        update_data = {"updated_at": datetime.utcnow()}
+        
+        if external_contact_id and not existing.get('external_contact_id'):
+            update_data['external_contact_id'] = external_contact_id
+        
+        if name and name != existing.get('name'):
+            update_data['name'] = name
+        if phone and phone != existing.get('phone'):
+            update_data['phone'] = phone
+        if email and email != existing.get('email'):
+            update_data['email'] = email
+        if avatar and avatar != existing.get('avatar'):
+            update_data['avatar'] = avatar
+        if metadata:
+            existing_metadata = existing.get('metadata') or {}
+            if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
+                existing_metadata.update(metadata)
+                avito_user_id_from_metadata = metadata.get('avito_user_id') or metadata.get('user_id')
+                if avito_user_id_from_metadata and 'avito_user_id' not in existing_metadata:
+                    existing_metadata['avito_user_id'] = avito_user_id_from_metadata
+                update_data['metadata'] = existing_metadata
+            else:
+                update_data['metadata'] = metadata
+        
+        if len(update_data) > 1:
+            await database.execute(
+                chat_contacts.update().where(
+                    chat_contacts.c.id == existing['id']
+                ).values(**update_data)
+            )
+        
+        return existing['id']
     
     # Создаем новый контакт
     contact_id = await database.execute(
         chat_contacts.insert().values(
             channel_id=channel_id,
-            external_chat_id=external_chat_id,
+            external_contact_id=external_contact_id,
             name=name,
             phone=phone,
             email=email,
@@ -301,7 +348,7 @@ async def create_chat(
         contact_external_id = external_chat_id_for_contact if external_chat_id_for_contact is not None else external_chat_id
         chat_contact_id = await get_or_create_chat_contact(
             channel_id=channel_id,
-            external_chat_id=contact_external_id,
+            external_contact_id=contact_external_id,
             name=name,
             phone=phone,
             email=email,

@@ -3120,7 +3120,7 @@ chat_contacts = sqlalchemy.Table(
         ForeignKey("channels.id", ondelete="CASCADE"),
         nullable=False,
     ),
-    sqlalchemy.Column("external_chat_id", String(255), nullable=True),
+    sqlalchemy.Column("external_contact_id", String(255), nullable=True),
     sqlalchemy.Column("name", String(100), nullable=True),
     sqlalchemy.Column("phone", String(20), nullable=True),
     sqlalchemy.Column("email", String(255), nullable=True),
@@ -3139,7 +3139,7 @@ chat_contacts = sqlalchemy.Table(
         "updated_at", DateTime, nullable=False, server_default=func.now()
     ),
     UniqueConstraint(
-        "channel_id", "external_chat_id", name="uq_chat_contacts_channel_external"
+        "channel_id", "external_contact_id", name="uq_chat_contacts_channel_external"
     ),
 )
 
