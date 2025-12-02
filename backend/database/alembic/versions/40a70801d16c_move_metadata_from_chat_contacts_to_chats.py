@@ -43,10 +43,14 @@ def upgrade() -> None:
             if contact_metadata:
                 # Обновляем метадату в чате
                 # Преобразуем dict в JSON строку для PostgreSQL
-                metadata_json = json.dumps(contact_metadata) if isinstance(contact_metadata, dict) else contact_metadata
+                if isinstance(contact_metadata, dict):
+                    metadata_json = json.dumps(contact_metadata)
+                else:
+                    metadata_json = contact_metadata
+                # Используем cast для преобразования в jsonb
                 conn.execute(sa.text("""
                     UPDATE chats
-                    SET metadata = :metadata::jsonb
+                    SET metadata = CAST(:metadata AS jsonb)
                     WHERE id = :chat_id
                 """), {
                     'metadata': metadata_json,
@@ -81,10 +85,14 @@ def downgrade() -> None:
             if chat_metadata:
                 # Обновляем метадату в контакте
                 # Преобразуем dict в JSON строку для PostgreSQL
-                metadata_json = json.dumps(chat_metadata) if isinstance(chat_metadata, dict) else chat_metadata
+                if isinstance(chat_metadata, dict):
+                    metadata_json = json.dumps(chat_metadata)
+                else:
+                    metadata_json = chat_metadata
+                # Используем cast для преобразования в jsonb
                 conn.execute(sa.text("""
                     UPDATE chat_contacts
-                    SET metadata = :metadata::jsonb
+                    SET metadata = CAST(:metadata AS jsonb)
                     WHERE id = :contact_id
                 """), {
                     'metadata': metadata_json,
