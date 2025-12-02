@@ -57,7 +57,6 @@ scheduler = AsyncIOScheduler(
 )
 jobstore = SQLAlchemyJobStore(engine=engine_job_store)
 
-# Добавляем jobstore ПЕРЕД добавлением джобов
 scheduler.add_jobstore(jobstore)
 
 try:
