@@ -92,6 +92,127 @@ class ChatConnectionManager:
 
 chat_manager = ChatConnectionManager()
 
+
+@dataclass
+class CashboxConnectionInfo:
+    websocket: WebSocket
+    user_id: int
+    cashbox_id: int
+    connected_at: datetime
+
+
+class CashboxConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[int, List[CashboxConnectionInfo]] = {}
+    
+    async def connect(self, cashbox_id: int, websocket: WebSocket, user_id: int):
+        if cashbox_id not in self.active_connections:
+            self.active_connections[cashbox_id] = []
+        
+        connection_info = CashboxConnectionInfo(
+            websocket=websocket,
+            user_id=user_id,
+            cashbox_id=cashbox_id,
+            connected_at=datetime.utcnow()
+        )
+        
+        self.active_connections[cashbox_id].append(connection_info)
+    
+    async def disconnect(self, cashbox_id: int, websocket: WebSocket) -> Optional[CashboxConnectionInfo]:
+        if cashbox_id in self.active_connections:
+            connection_info = None
+            for conn_info in self.active_connections[cashbox_id]:
+                if conn_info.websocket == websocket:
+                    connection_info = conn_info
+                    self.active_connections[cashbox_id].remove(conn_info)
+                    break
+            
+            if not self.active_connections[cashbox_id]:
+                del self.active_connections[cashbox_id]
+            
+            return connection_info
+        return None
+    
+    async def broadcast_to_cashbox(self, cashbox_id: int, message: dict):
+        if cashbox_id in self.active_connections:
+            disconnected_clients = []
+            for i, conn_info in enumerate(self.active_connections[cashbox_id]):
+                try:
+                    await conn_info.websocket.send_json(message)
+                except Exception as e:
+                    disconnected_clients.append(i)
+            
+            for i in reversed(disconnected_clients):
+                try:
+                    self.active_connections[cashbox_id].pop(i)
+                except Exception:
+                    pass
+
+cashbox_manager = CashboxConnectionManager()
+
+@router.websocket("/ws/all/")
+async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
+    await websocket.accept()
+    
+    cashbox_id = None
+    try:
+        try:
+            user = await get_current_user(token)
+        except HTTPException as e:
+            error_detail = e.detail if hasattr(e, 'detail') else str(e)
+            await websocket.send_json({
+                "error": "Unauthorized",
+                "detail": error_detail,
+                "status_code": e.status_code
+            })
+            await websocket.close(code=1008)
+            return
+        except Exception as e:
+            await websocket.send_json({"error": "Unauthorized", "detail": str(e)})
+            await websocket.close(code=1008)
+            import traceback
+            traceback.print_exc()
+            return
+        
+        cashbox_id = user.cashbox_id
+        await cashbox_manager.connect(cashbox_id, websocket, user.user)
+        
+        try:
+            await websocket.send_json({
+                "type": "connected",
+                "cashbox_id": cashbox_id,
+                "user_id": user.user,
+                "message": "Successfully connected to all chats",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        except Exception as e:
+            pass
+            
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message_data = json.loads(data)
+            except WebSocketDisconnect:
+                raise
+            except json.JSONDecodeError:
+                continue
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                continue
+    
+    except WebSocketDisconnect:
+        if cashbox_id is not None:
+            await cashbox_manager.disconnect(cashbox_id, websocket)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        if cashbox_id is not None:
+            try:
+                await cashbox_manager.disconnect(cashbox_id, websocket)
+            except:
+                pass
+
 @router.websocket("/ws/{chat_id}/")
 async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(...)):
     """WebSocket для чатов с аутентификацией и RabbitMQ"""
