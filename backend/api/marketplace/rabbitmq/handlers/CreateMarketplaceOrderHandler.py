@@ -1,4 +1,5 @@
 import datetime
+import json
 from typing import Mapping, Any, Optional
 
 from aio_pika import IncomingMessage
@@ -32,6 +33,7 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
         data = CreateMarketplaceOrderMessage(**event)
         token_query = select(users_cboxes_relation.c.token).where(users_cboxes_relation.c.cashbox_id == data.cashbox_id)
         token = (await database.fetch_one(token_query)).token
+        comment = json.dumps(data.additional_data, ensure_ascii=False) if data.additional_data else ""
 
         # разделить по warehouses
         warehouses_dict: dict[tuple[int, int], list[MarketplaceOrderGood]] = {}
@@ -65,6 +67,7 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
                             dated=datetime.datetime.now().timestamp(),
                             status=True,
                             is_marketplace_order=True,
+                            comment=comment,
                             # loyality_card_id=,
                         )
                     ]

@@ -78,6 +78,7 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
                     goods=goods,
                     delivery_info=order_request.delivery,
                     utm=utm,
+                    additional_data=order_request.additional_data,
                 ),
                 routing_key='create_marketplace_order',
             )
