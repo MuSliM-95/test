@@ -188,6 +188,11 @@ class AvitoHandler:
             
             user_name = None
             user_phone = None
+            context = None
+            ad_title = None
+            ad_id = None
+            ad_url = None
+            client_user_id = None  
             
             if sender_type == "CLIENT":
                 if message_text:
@@ -222,6 +227,7 @@ class AvitoHandler:
                                 for user in users:
                                     user_id_in_chat = user.get('user_id') or user.get('id')
                                     if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                        client_user_id = str(user_id_in_chat)
                                         user_name = user.get('name') or user.get('profile_name')
                                         user_phone_from_api = (
                                             user.get('phone') or
@@ -249,6 +255,17 @@ class AvitoHandler:
                                     logger.warning(f"Could not get messages to extract phone: {e}")
                             else:
                                 logger.warning(f"No users found in chat info for {chat_id_external}")
+
+                            context = chat_info.get('context', {})
+                            ad_title = None
+                            ad_id = None
+                            ad_url = None
+                            if isinstance(context, dict):
+                                item = context.get('item', {})
+                                if isinstance(item, dict):
+                                    ad_title = item.get('title')
+                                    ad_id = item.get('id')
+                                    ad_url = item.get('url')
                         else:
                             logger.warning("Could not create Avito client to get chat info")
                 except Exception as e:
@@ -334,17 +351,76 @@ class AvitoHandler:
                 if user_phone and chat.get('phone') != user_phone:
                     update_data['phone'] = user_phone
                 
+                current_metadata = chat.get('metadata') or {}
+                if not isinstance(current_metadata, dict):
+                    current_metadata = {}
+                
+                metadata_updated = False
+                new_metadata = current_metadata.copy()
+                
+                if ad_title and not new_metadata.get('ad_title'):
+                    new_metadata['ad_title'] = ad_title
+                    metadata_updated = True
+                if ad_id and not new_metadata.get('ad_id'):
+                    new_metadata['ad_id'] = ad_id
+                    metadata_updated = True
+                if ad_url and not new_metadata.get('ad_url'):
+                    new_metadata['ad_url'] = ad_url
+                    metadata_updated = True
+                if context and not new_metadata.get('context'):
+                    new_metadata['context'] = context
+                    metadata_updated = True
+                
+                if client_user_id and not new_metadata.get('avito_user_id'):
+                    new_metadata['avito_user_id'] = client_user_id
+                    metadata_updated = True
+                
+                if not chat.get('metadata') or metadata_updated:
+                    update_data['metadata'] = new_metadata if new_metadata else None
+                
+                if not chat.get('name'):
+                    if ad_title:
+                        update_data['name'] = ad_title
+                    elif user_name:
+                        update_data['name'] = user_name
+                
                 if update_data:
                     try:
-                        from database.db import database, chats
+                        from database.db import database, chats, chat_contacts
                         from datetime import datetime
                         update_data['updated_at'] = datetime.utcnow()
                         await database.execute(
                             chats.update().where(chats.c.id == chat_id).values(**update_data)
                         )
                         chat.update(update_data)
+                        
+                        from sqlalchemy import select
+                        contact_query = select([chat_contacts]).where(
+                            chat_contacts.c.channel_id == chat['channel_id']
+                        ).where(
+                            chat_contacts.c.external_contact_id == str(chat_id_external)
+                        ).limit(1)
+                        contact = await database.fetch_one(contact_query)
+                        
+                        if contact:
+                            contact_dict = dict(contact) if contact else {}
+                            contact_update = {}
+                            if user_name and not contact_dict.get('name'):
+                                contact_update['name'] = user_name
+                            if user_phone and not contact_dict.get('phone'):
+                                contact_update['phone'] = user_phone
+                            if new_metadata and not contact_dict.get('metadata'):
+                                contact_update['metadata'] = new_metadata
+                            
+                            if contact_update:
+                                contact_update['updated_at'] = datetime.utcnow()
+                                await database.execute(
+                                    chat_contacts.update().where(
+                                        chat_contacts.c.id == contact_dict['id']
+                                    ).values(**contact_update)
+                                )
                     except Exception as e:
-                        logger.warning(f"Failed to update chat info: {e}")
+                        logger.warning(f"Failed to update chat info: {e}", exc_info=True)
             
             from database.db import chat_messages
             existing_message = await database.fetch_one(
