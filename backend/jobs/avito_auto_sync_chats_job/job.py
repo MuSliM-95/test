@@ -160,6 +160,7 @@ async def sync_avito_chats_and_messages():
                         users = avito_chat.get('users', [])
                         user_name = None
                         user_phone = None
+                        user_avatar = None
                         
                         if users and avito_user_id:
                             for user in users:
@@ -172,6 +173,18 @@ async def sync_avito_chats_and_messages():
                                         user.get('public_user_profile', {}).get('phone') or
                                         user.get('public_user_profile', {}).get('phone_number')
                                     )
+                                    public_profile = user.get('public_user_profile', {})
+                                    if public_profile:
+                                        avatar_data = public_profile.get('avatar', {})
+                                        if isinstance(avatar_data, dict):
+                                            user_avatar = (
+                                                avatar_data.get('default') or
+                                                avatar_data.get('images', {}).get('256x256') or
+                                                avatar_data.get('images', {}).get('128x128') or
+                                                (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                            )
+                                        elif isinstance(avatar_data, str):
+                                            user_avatar = avatar_data
                                     if user_name or user_phone:
                                         break
                         
@@ -231,6 +244,18 @@ async def sync_avito_chats_and_messages():
                                             )
                                             if user_phone_from_api:
                                                 user_phone = user_phone_from_api
+                                            public_profile = user.get('public_user_profile', {})
+                                            if public_profile:
+                                                avatar_data = public_profile.get('avatar', {})
+                                                if isinstance(avatar_data, dict):
+                                                    user_avatar = (
+                                                        avatar_data.get('default') or
+                                                        avatar_data.get('images', {}).get('256x256') or
+                                                        avatar_data.get('images', {}).get('128x128') or
+                                                        (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                                    )
+                                                elif isinstance(avatar_data, str):
+                                                    user_avatar = avatar_data
                                             break
                                 
                                 # Пытаемся найти телефон в сообщениях
@@ -286,6 +311,8 @@ async def sync_avito_chats_and_messages():
                                     contact_update['name'] = chat_name
                                 if user_phone and user_phone != existing_contact.get('phone'):
                                     contact_update['phone'] = user_phone
+                                if user_avatar and user_avatar != existing_contact.get('avatar'):
+                                    contact_update['avatar'] = user_avatar
                                 
                                 if metadata:
                                     existing_metadata = existing_contact.get('metadata') or {}
@@ -348,6 +375,7 @@ async def sync_avito_chats_and_messages():
                                 external_chat_id_for_contact=external_chat_id,
                                 name=chat_name,
                                 phone=user_phone,
+                                avatar=user_avatar,
                                 metadata=metadata if metadata else None
                             )
                             

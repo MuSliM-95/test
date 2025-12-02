@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import json
+import asyncio
 
 
 
@@ -572,8 +573,35 @@ async def get_chats(
     sort_by: Optional[str] = None,
     sort_order: Optional[str] = "desc",
     skip: int = 0, 
-    limit: int = 100
+    limit: int = 100,
+    with_avito_info: bool = False 
 ) -> List[Dict[str, Any]]:
+    last_msg_correlated = (
+        select([
+            func.substring(chat_messages.c.content, 1, 100)
+        ])
+        .where(chat_messages.c.chat_id == chats.c.id)
+        .order_by(desc(chat_messages.c.created_at))
+        .limit(1)
+        .correlate(chats)
+        .scalar_subquery()
+    )
+    
+    unread_count_subquery = (
+        select([
+            chat_messages.c.chat_id,
+            func.count(chat_messages.c.id).label('unread_count')
+        ])
+        .where(
+            and_(
+                chat_messages.c.sender_type == "CLIENT",
+                chat_messages.c.status != "READ"
+            )
+        )
+        .group_by(chat_messages.c.chat_id)
+        .subquery('unread')
+    )
+    
     query = select([
         chats.c.id,
         chats.c.channel_id,
@@ -595,10 +623,13 @@ async def get_chats(
         chat_contacts.c.email.label('contact_email'),
         chat_contacts.c.avatar.label('contact_avatar'),
         chat_contacts.c.contragent_id.label('contact_contragent_id'),
-        chat_contacts.c.metadata.label('contact_metadata')
+        chat_contacts.c.metadata.label('contact_metadata'),
+        last_msg_correlated.label('last_message_preview'),
+        func.coalesce(unread_count_subquery.c.unread_count, 0).label('unread_count')
     ]).select_from(
         chats.join(channels, chats.c.channel_id == channels.c.id)
         .outerjoin(chat_contacts, chats.c.chat_contact_id == chat_contacts.c.id)
+        .outerjoin(unread_count_subquery, unread_count_subquery.c.chat_id == chats.c.id)
     )
     
     conditions = [chats.c.cashbox_id == cashbox_id] 
@@ -654,10 +685,82 @@ async def get_chats(
     
     chats_data = await database.fetch_all(query)
     
+    avito_chats_to_fetch = []
+    if with_avito_info:
+        for chat_row in chats_data:
+            chat_dict = dict(chat_row)
+            is_avito_chat = (
+                chat_dict.get('channel_type') == 'AVITO' or 
+                (chat_dict.get('external_chat_id') and chat_dict.get('external_chat_id', '').startswith('u2'))
+            )
+            if is_avito_chat:
+                avito_chats_to_fetch.append(chat_dict)
+    
+    channel_creds_cache = {}
+    if with_avito_info and avito_chats_to_fetch:
+        from database.db import channel_credentials
+        unique_channel_ids = list(set(chat['channel_id'] for chat in avito_chats_to_fetch))
+        if unique_channel_ids:
+            creds_query = channel_credentials.select().where(
+                and_(
+                    channel_credentials.c.channel_id.in_(unique_channel_ids),
+                    channel_credentials.c.cashbox_id == cashbox_id,
+                    channel_credentials.c.is_active.is_(True)
+                )
+            )
+            all_creds = await database.fetch_all(creds_query)
+            channel_creds_cache = {cred['channel_id']: cred for cred in all_creds}
+    
+    avito_info_cache = {}
+    if with_avito_info and avito_chats_to_fetch:
+        async def fetch_avito_chat_info(chat_dict):
+            try:
+                from api.chats.avito.avito_factory import create_avito_client, save_token_callback
+                
+                channel_id = chat_dict['channel_id']
+                creds = channel_creds_cache.get(channel_id)
+                
+                if not creds:
+                    return None
+                
+                client = await create_avito_client(
+                    channel_id=channel_id,
+                    cashbox_id=cashbox_id,
+                    on_token_refresh=lambda token_data: save_token_callback(
+                        channel_id,
+                        cashbox_id,
+                        token_data
+                    )
+                )
+                
+                if not client:
+                    return None
+                
+                chat_info = await client.get_chat_info(chat_dict['external_chat_id'])
+                return (chat_dict['id'], chat_info, creds)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to fetch Avito info for chat {chat_dict.get('id')}: {e}")
+                return None
+        
+        avito_tasks = [fetch_avito_chat_info(chat) for chat in avito_chats_to_fetch]
+        avito_results = await asyncio.gather(*avito_tasks, return_exceptions=True)
+        
+        for result in avito_results:
+            if result and not isinstance(result, Exception):
+                chat_id, chat_info, creds = result
+                avito_info_cache[chat_id] = (chat_info, creds)
+    
     result = []
     for chat_row in chats_data:
         chat_dict = dict(chat_row)
         chat_id = chat_dict['id']
+        
+        if chat_dict.get('unread_count') is not None:
+            chat_dict['unread_count'] = int(chat_dict['unread_count'])
+        else:
+            chat_dict['unread_count'] = 0
         
         contact_info = None
         if any([
@@ -713,140 +816,87 @@ async def get_chats(
                     name = value.get('title')
         chat_dict['name'] = name
         
-        last_message_query = select([chat_messages.c.content]).where(
-            chat_messages.c.chat_id == chat_id
-        ).order_by(desc(chat_messages.c.created_at)).limit(1)
-        last_message = await database.fetch_one(last_message_query)
-        
-        if last_message and last_message['content']:
-            preview = last_message['content'][:100]
-            chat_dict['last_message_preview'] = preview
-        else:
-            chat_dict['last_message_preview'] = None
-        
-        unread_query = select([func.count(chat_messages.c.id)]).where(
-            and_(
-                chat_messages.c.chat_id == chat_id,
-                chat_messages.c.sender_type == "CLIENT",
-                chat_messages.c.status != "READ"
-            )
-        )
-        unread_count = await database.fetch_val(unread_query) or 0
-        chat_dict['unread_count'] = unread_count
-        
         is_avito_chat = (
             chat_dict.get('channel_type') == 'AVITO' or 
             (chat_dict.get('external_chat_id') and chat_dict.get('external_chat_id', '').startswith('u2'))
         )
         
-        if is_avito_chat:
+        if is_avito_chat and with_avito_info:
             try:
-                from database.db import channel_credentials
-                from api.chats.avito.avito_factory import create_avito_client, save_token_callback
-                
-                if not chat_dict.get('channel_type'):
-                    channel = await get_channel(chat_dict['channel_id'])
-                    if channel and channel.get('type') == 'AVITO':
-                        chat_dict['channel_type'] = 'AVITO'
-                        chat_dict['channel_name'] = channel.get('name')
-                        chat_dict['channel_icon'] = channel.get('svg_icon')
-                
-                if chat_dict.get('channel_type') == 'AVITO':
-                    creds = await database.fetch_one(
-                        channel_credentials.select().where(
-                            (channel_credentials.c.channel_id == chat_dict['channel_id']) &
-                            (channel_credentials.c.cashbox_id == cashbox_id) &
-                            (channel_credentials.c.is_active.is_(True))
-                        )
-                    )
+                avito_data = avito_info_cache.get(chat_id)
+                if avito_data:
+                    chat_info, creds = avito_data
+                    users = chat_info.get('users', [])
+                    avito_user_id = creds.get('avito_user_id')
                     
-                    if creds:
-                        client = await create_avito_client(
-                            channel_id=chat_dict['channel_id'],
-                            cashbox_id=cashbox_id,
-                            on_token_refresh=lambda token_data: save_token_callback(
-                                chat_dict['channel_id'],
-                                cashbox_id,
-                                token_data
-                            )
-                        )
-                        
-                        if client:
-                            chat_info = await client.get_chat_info(chat_dict['external_chat_id'])
-                            users = chat_info.get('users', [])
-                            avito_user_id = creds.get('avito_user_id')
-                            
-                            # Если name еще не заполнен, пытаемся получить из chat_info
-                            if not chat_dict.get('name'):
-                                context = chat_info.get('context', {})
-                                if isinstance(context, dict):
-                                    value = context.get('value', {})
-                                    if isinstance(value, dict):
-                                        title = value.get('title')
-                                        if title:
-                                            chat_dict['name'] = title
-                            
-                            if users:
-                                for user in users:
-                                    user_id_in_chat = user.get('user_id') or user.get('id')
-                                    if avito_user_id:
-                                        if user_id_in_chat and user_id_in_chat != avito_user_id:
-                                            avatar_url = None
-                                            public_profile = user.get('public_user_profile', {})
-                                            if public_profile:
-                                                avatar_data = public_profile.get('avatar', {})
-                                                if isinstance(avatar_data, dict):
-                                                    avatar_url = (
-                                                        avatar_data.get('default') or
-                                                        avatar_data.get('images', {}).get('256x256') or
-                                                        avatar_data.get('images', {}).get('128x128') or
-                                                        (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
-                                                    )
-                                                elif isinstance(avatar_data, str):
-                                                    avatar_url = avatar_data
-                                            
-                                            if avatar_url:
-                                                if chat_dict.get('contact'):
-                                                    chat_dict['contact']['avatar'] = avatar_url
-                                                else:
-                                                    chat_dict['contact'] = {'avatar': avatar_url}
-                                                
-                                                # Сохраняем в БД, если есть chat_contact_id
-                                                if chat_dict.get('chat_contact_id'):
-                                                    await database.execute(
-                                                        chat_contacts.update().where(
-                                                            chat_contacts.c.id == chat_dict['chat_contact_id']
-                                                        ).values(avatar=avatar_url)
-                                                    )
-                                                break
-                                    else:
-                                        public_profile = user.get('public_user_profile', {})
-                                        if public_profile:
-                                            avatar_data = public_profile.get('avatar', {})
-                                            if isinstance(avatar_data, dict):
-                                                avatar_url = (
-                                                    avatar_data.get('default') or
-                                                    avatar_data.get('images', {}).get('256x256') or
-                                                    avatar_data.get('images', {}).get('128x128') or
-                                                    (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
-                                                )
-                                            elif isinstance(avatar_data, str):
-                                                avatar_url = avatar_data
-                                            
-                                            if avatar_url:
-                                                if chat_dict.get('contact'):
-                                                    chat_dict['contact']['avatar'] = avatar_url
-                                                else:
-                                                    chat_dict['contact'] = {'avatar': avatar_url}
-                                                
-                                                # Сохраняем в БД, если есть chat_contact_id
-                                                if chat_dict.get('chat_contact_id'):
-                                                    await database.execute(
-                                                        chat_contacts.update().where(
-                                                            chat_contacts.c.id == chat_dict['chat_contact_id']
-                                                        ).values(avatar=avatar_url)
-                                                    )
-                                                break
+                    if not chat_dict.get('name'):
+                        context = chat_info.get('context', {})
+                        if isinstance(context, dict):
+                            value = context.get('value', {})
+                            if isinstance(value, dict):
+                                title = value.get('title')
+                                if title:
+                                    chat_dict['name'] = title
+                    
+                    if users:
+                        for user in users:
+                            user_id_in_chat = user.get('user_id') or user.get('id')
+                            if avito_user_id:
+                                if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                    avatar_url = None
+                                    public_profile = user.get('public_user_profile', {})
+                                    if public_profile:
+                                        avatar_data = public_profile.get('avatar', {})
+                                        if isinstance(avatar_data, dict):
+                                            avatar_url = (
+                                                avatar_data.get('default') or
+                                                avatar_data.get('images', {}).get('256x256') or
+                                                avatar_data.get('images', {}).get('128x128') or
+                                                (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                            )
+                                        elif isinstance(avatar_data, str):
+                                            avatar_url = avatar_data
+                                    
+                                    if avatar_url:
+                                        if chat_dict.get('contact'):
+                                            chat_dict['contact']['avatar'] = avatar_url
+                                        else:
+                                            chat_dict['contact'] = {'avatar': avatar_url}
+                                        
+                                        if chat_dict.get('chat_contact_id'):
+                                            await database.execute(
+                                                chat_contacts.update().where(
+                                                    chat_contacts.c.id == chat_dict['chat_contact_id']
+                                                ).values(avatar=avatar_url)
+                                            )
+                                        break
+                            else:
+                                public_profile = user.get('public_user_profile', {})
+                                if public_profile:
+                                    avatar_data = public_profile.get('avatar', {})
+                                    if isinstance(avatar_data, dict):
+                                        avatar_url = (
+                                            avatar_data.get('default') or
+                                            avatar_data.get('images', {}).get('256x256') or
+                                            avatar_data.get('images', {}).get('128x128') or
+                                            (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
+                                        )
+                                    elif isinstance(avatar_data, str):
+                                        avatar_url = avatar_data
+                                    
+                                    if avatar_url:
+                                        if chat_dict.get('contact'):
+                                            chat_dict['contact']['avatar'] = avatar_url
+                                        else:
+                                            chat_dict['contact'] = {'avatar': avatar_url}
+                                        
+                                        if chat_dict.get('chat_contact_id'):
+                                            await database.execute(
+                                                chat_contacts.update().where(
+                                                    chat_contacts.c.id == chat_dict['chat_contact_id']
+                                                ).values(avatar=avatar_url)
+                                            )
+                                        break
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
