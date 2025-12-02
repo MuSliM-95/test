@@ -364,6 +364,7 @@ async def get_avito_chats(
                         user_name = None
                         user_phone = None
                         user_avatar = None
+                        client_user_id = None
                         
                         from database.db import channel_credentials
                         creds = await database.fetch_one(
@@ -379,6 +380,7 @@ async def get_avito_chats(
                             for user in users:
                                 user_id_in_chat = user.get('user_id') or user.get('id')
                                 if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                    client_user_id = user_id_in_chat
                                     user_name = user.get('name') or user.get('profile_name')
                                     user_phone = (
                                         user.get('phone') or
@@ -445,10 +447,12 @@ async def get_avito_chats(
                                 )
                                 avito_user_id = creds.get('avito_user_id') if creds else None
                                 
+                                client_user_id = None
                                 if users and avito_user_id:
                                     for user in users:
                                         user_id_in_chat = user.get('user_id') or user.get('id')
                                         if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                            client_user_id = user_id_in_chat
                                             user_name = user.get('name') or user.get('profile_name') or user_name
                                             user_phone_from_api = (
                                                 user.get('phone') or
@@ -518,16 +522,13 @@ async def get_avito_chats(
                                     contact_update['phone'] = user_phone
                                 if user_avatar:
                                     contact_update['avatar'] = user_avatar
-                                if metadata:
+                                
+                                if client_user_id:
                                     existing_contact = await database.fetch_one(
                                         chat_contacts.select().where(chat_contacts.c.id == existing_chat['chat_contact_id'])
                                     )
-                                    existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
-                                    if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
-                                        existing_metadata.update(metadata)
-                                        contact_update['metadata'] = existing_metadata
-                                    elif not existing_metadata:
-                                        contact_update['metadata'] = metadata
+                                    if existing_contact and not existing_contact.get('external_contact_id'):
+                                        contact_update['external_contact_id'] = str(client_user_id)
                                 
                                 if contact_update:
                                     await database.execute(
@@ -571,7 +572,7 @@ async def get_avito_chats(
                                 channel_id=avito_channel['id'],
                                 cashbox_id=cashbox_id,
                                 external_chat_id=external_chat_id,
-                                external_chat_id_for_contact=external_chat_id,
+                                external_chat_id_for_contact=str(client_user_id) if client_user_id else None,
                                 name=user_name or (metadata.get('ad_title') if metadata else None) or f"Avito Chat {external_chat_id[:8]}",
                                 phone=user_phone,
                                 avatar=user_avatar,
@@ -1559,6 +1560,7 @@ async def load_avito_history(
                 user_name = None
                 user_phone = None
                 user_avatar = None
+                client_user_id = None
                 
                 from database.db import channel_credentials as cc
                 creds = await database.fetch_one(
@@ -1574,6 +1576,7 @@ async def load_avito_history(
                     for user in users:
                         user_id_in_chat = user.get('user_id') or user.get('id')
                         if user_id_in_chat and user_id_in_chat != avito_user_id:
+                            client_user_id = user_id_in_chat
                             user_name = user.get('name') or user.get('profile_name')
                             user_phone = (
                                 user.get('phone') or
@@ -1650,22 +1653,21 @@ async def load_avito_history(
                     if existing_chat.get('chat_contact_id'):
                         from database.db import chat_contacts
                         contact_update = {}
+                        existing_contact = None
+                        
                         if user_name:
                             contact_update['name'] = user_name
                         if user_phone:
                             contact_update['phone'] = user_phone
                         if user_avatar:
                             contact_update['avatar'] = user_avatar
-                        if metadata:
+
+                        if client_user_id:
                             existing_contact = await database.fetch_one(
                                 chat_contacts.select().where(chat_contacts.c.id == existing_chat['chat_contact_id'])
                             )
-                            existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
-                            if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
-                                existing_metadata.update(metadata)
-                                contact_update['metadata'] = existing_metadata
-                            elif not existing_metadata:
-                                contact_update['metadata'] = metadata
+                            if existing_contact and not existing_contact.get('external_contact_id'):
+                                contact_update['external_contact_id'] = str(client_user_id)
                         
                         if contact_update:
                             await database.execute(
@@ -1677,10 +1679,10 @@ async def load_avito_history(
                         from database.db import chat_contacts
                         contact_data = {
                             "channel_id": channel_id,
+                            "external_contact_id": str(client_user_id) if client_user_id else None,
                             "name": user_name,
                             "phone": user_phone,
-                            "avatar": user_avatar,
-                            "metadata": metadata if metadata else None
+                            "avatar": user_avatar
                         }
                         contact_result = await database.fetch_one(
                             chat_contacts.insert().values(**contact_data).returning(chat_contacts.c.id)
@@ -1692,16 +1694,21 @@ async def load_avito_history(
                                 ).values(chat_contact_id=contact_result['id'])
                             )
                     
+                    chat_update = {}
+                    if metadata:
+                        chat_update['metadata'] = metadata
+                    
                     last_message = avito_chat.get('last_message')
                     if last_message and last_message.get('created'):
                         last_message_time = datetime.fromtimestamp(last_message['created'])
+                        chat_update['last_message_time'] = last_message_time
+                        chat_update['updated_at'] = last_message_time
+                    
+                    if chat_update:
                         await database.execute(
                             chats.update().where(
                                 chats.c.id == existing_chat['id']
-                            ).values(
-                                last_message_time=last_message_time,
-                                updated_at=last_message_time
-                            )
+                            ).values(**chat_update)
                         )
                     
                     chats_updated += 1
@@ -1729,7 +1736,7 @@ async def load_avito_history(
                         channel_id=channel_id,
                         cashbox_id=cashbox_id,
                         external_chat_id=external_chat_id,
-                        external_chat_id_for_contact=external_chat_id,
+                        external_chat_id_for_contact=str(client_user_id) if client_user_id else None,
                         name=chat_name,
                         phone=user_phone,
                         avatar=user_avatar,

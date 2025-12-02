@@ -3131,7 +3131,6 @@ chat_contacts = sqlalchemy.Table(
         ForeignKey("contragents.id", ondelete="SET NULL"),
         nullable=True,
     ),
-    sqlalchemy.Column("metadata", JSON, nullable=True),
     sqlalchemy.Column(
         "created_at", DateTime, nullable=False, server_default=func.now()
     ),
@@ -3179,6 +3178,7 @@ chats = sqlalchemy.Table(
     sqlalchemy.Column("first_response_time_seconds", Integer, nullable=True),
     sqlalchemy.Column("last_message_time", DateTime, nullable=True),
     sqlalchemy.Column("last_response_time_seconds", Integer, nullable=True),
+    sqlalchemy.Column("metadata", JSON, nullable=True),
     sqlalchemy.Column(
         "created_at", DateTime, nullable=False, server_default=func.now()
     ),
