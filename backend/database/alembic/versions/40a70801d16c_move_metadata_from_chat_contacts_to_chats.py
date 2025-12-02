@@ -8,6 +8,7 @@ Create Date: 2025-12-02 20:30:00.000000
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+import json
 
 
 # revision identifiers, used by Alembic.
@@ -41,12 +42,14 @@ def upgrade() -> None:
             chat_id, contact_metadata = chat_row
             if contact_metadata:
                 # Обновляем метадату в чате
+                # Преобразуем dict в JSON строку для PostgreSQL
+                metadata_json = json.dumps(contact_metadata) if isinstance(contact_metadata, dict) else contact_metadata
                 conn.execute(sa.text("""
                     UPDATE chats
-                    SET metadata = :metadata
+                    SET metadata = :metadata::jsonb
                     WHERE id = :chat_id
                 """), {
-                    'metadata': contact_metadata,
+                    'metadata': metadata_json,
                     'chat_id': chat_id
                 })
     
@@ -77,12 +80,14 @@ def downgrade() -> None:
             chat_id, chat_metadata, contact_id = chat_row
             if chat_metadata:
                 # Обновляем метадату в контакте
+                # Преобразуем dict в JSON строку для PostgreSQL
+                metadata_json = json.dumps(chat_metadata) if isinstance(chat_metadata, dict) else chat_metadata
                 conn.execute(sa.text("""
                     UPDATE chat_contacts
-                    SET metadata = :metadata
+                    SET metadata = :metadata::jsonb
                     WHERE id = :contact_id
                 """), {
-                    'metadata': chat_metadata,
+                    'metadata': metadata_json,
                     'contact_id': contact_id
                 })
     
