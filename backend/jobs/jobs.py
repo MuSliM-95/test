@@ -57,6 +57,9 @@ scheduler = AsyncIOScheduler(
 )
 jobstore = SQLAlchemyJobStore(engine=engine_job_store)
 
+# Добавляем jobstore ПЕРЕД добавлением джобов
+scheduler.add_jobstore(jobstore)
+
 try:
     try:
         jobstore.remove_job("check_account")
@@ -98,8 +101,6 @@ scheduler.add_job(func=check_avito_accounts_status, trigger="interval", minutes=
 
 # Добавляем джоб для автоматической выгрузки чатов и сообщений из Avito каждые 5 минут
 scheduler.add_job(func=sync_avito_chats_and_messages, trigger="interval", minutes=5, id="avito_auto_sync_chats", max_instances=1, replace_existing=True)
-
-scheduler.add_jobstore(jobstore)
 
 # accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 # amo_interval = int(os.getenv("AMO_CONTACTS_IMPORT_FREQUENCY_SECONDS", default=120))
