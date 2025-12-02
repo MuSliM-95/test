@@ -668,7 +668,7 @@ class AvitoHandler:
                 channel_id=channel['id'],
                 cashbox_id=cashbox_id,
                 external_chat_id=external_chat_id,
-                external_chat_id_for_contact=external_chat_id,
+                external_chat_id_for_contact=None,  # client_user_id будет обновлен позже в handle_message_event
                 name=chat_name,
                 phone=user_phone,
                 metadata=metadata if metadata else None
