@@ -1,4 +1,4 @@
-from sqlalchemy import desc, and_, or_, func, select
+from sqlalchemy import desc, and_, or_, func, select, cast, String
 from database.db import database, channels, chats, chat_messages, contragents, channel_credentials, chat_contacts
 from fastapi import HTTPException
 from typing import Optional, List, Dict, Any
@@ -578,7 +578,10 @@ async def get_chats(
 ) -> List[Dict[str, Any]]:
     last_msg_correlated = (
         select([
-            func.substring(chat_messages.c.content, 1, 100)
+            func.left(
+                func.coalesce(cast(chat_messages.c.content, String), ''),
+                100
+            )
         ])
         .where(chat_messages.c.chat_id == chats.c.id)
         .order_by(desc(chat_messages.c.created_at))
