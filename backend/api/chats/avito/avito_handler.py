@@ -313,7 +313,7 @@ class AvitoHandler:
                             channel_id=channel_id,
                             cashbox_id=cashbox_id,
                             external_chat_id=chat_id_external,
-                            external_chat_id_for_contact=chat_id_external,
+                            external_chat_id_for_contact=client_user_id if client_user_id else None,
                             name=chat_name,
                             phone=user_phone,
                             metadata=metadata if metadata else None
@@ -371,10 +371,6 @@ class AvitoHandler:
                     new_metadata['context'] = context
                     metadata_updated = True
                 
-                if client_user_id and not new_metadata.get('avito_user_id'):
-                    new_metadata['avito_user_id'] = client_user_id
-                    metadata_updated = True
-                
                 if not chat.get('metadata') or metadata_updated:
                     update_data['metadata'] = new_metadata if new_metadata else None
                 
@@ -394,31 +390,28 @@ class AvitoHandler:
                         )
                         chat.update(update_data)
                         
-                        from sqlalchemy import select
-                        contact_query = select([chat_contacts]).where(
-                            chat_contacts.c.channel_id == chat['channel_id']
-                        ).where(
-                            chat_contacts.c.external_contact_id == str(chat_id_external)
-                        ).limit(1)
-                        contact = await database.fetch_one(contact_query)
-                        
-                        if contact:
-                            contact_dict = dict(contact) if contact else {}
-                            contact_update = {}
-                            if user_name and not contact_dict.get('name'):
-                                contact_update['name'] = user_name
-                            if user_phone and not contact_dict.get('phone'):
-                                contact_update['phone'] = user_phone
-                            if new_metadata and not contact_dict.get('metadata'):
-                                contact_update['metadata'] = new_metadata
+                        if chat.get('chat_contact_id'):
+                            contact = await database.fetch_one(
+                                chat_contacts.select().where(chat_contacts.c.id == chat['chat_contact_id'])
+                            )
                             
-                            if contact_update:
-                                contact_update['updated_at'] = datetime.utcnow()
-                                await database.execute(
-                                    chat_contacts.update().where(
-                                        chat_contacts.c.id == contact_dict['id']
-                                    ).values(**contact_update)
-                                )
+                            if contact:
+                                contact_dict = dict(contact) if contact else {}
+                                contact_update = {}
+                                if user_name and not contact_dict.get('name'):
+                                    contact_update['name'] = user_name
+                                if user_phone and not contact_dict.get('phone'):
+                                    contact_update['phone'] = user_phone
+                                if client_user_id and not contact_dict.get('external_contact_id'):
+                                    contact_update['external_contact_id'] = str(client_user_id)
+                                
+                                if contact_update:
+                                    contact_update['updated_at'] = datetime.utcnow()
+                                    await database.execute(
+                                        chat_contacts.update().where(
+                                            chat_contacts.c.id == contact_dict['id']
+                                        ).values(**contact_update)
+                                    )
                     except Exception as e:
                         logger.warning(f"Failed to update chat info: {e}", exc_info=True)
             

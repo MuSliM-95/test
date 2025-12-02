@@ -228,7 +228,6 @@ async def sync_avito_chats_and_messages():
                                     ad_id = item.get('id')
                                     ad_url = item.get('url')
                             
-                            # Формируем metadata
                             metadata = {}
                             if ad_title:
                                 metadata['ad_title'] = ad_title
@@ -238,8 +237,6 @@ async def sync_avito_chats_and_messages():
                                 metadata['ad_url'] = ad_url
                             if context:
                                 metadata['context'] = context
-                            if client_user_id:
-                                metadata['avito_user_id'] = client_user_id
                             
                             chat_contact_id = existing_chat.get('chat_contact_id')
                             
@@ -254,30 +251,12 @@ async def sync_avito_chats_and_messages():
                                 if user_avatar:
                                     contact_update['avatar'] = user_avatar
                                 
-                                if metadata:
+                                if client_user_id:
                                     existing_contact = await database.fetch_one(
                                         chat_contacts.select().where(chat_contacts.c.id == chat_contact_id)
                                     )
-                                    existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
-                                    if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
-                                        existing_metadata.update(metadata)
-                                        if client_user_id and 'avito_user_id' not in existing_metadata:
-                                            existing_metadata['avito_user_id'] = client_user_id
-                                        contact_update['metadata'] = existing_metadata
-                                    elif not existing_metadata:
-                                        contact_update['metadata'] = metadata
-                                elif client_user_id:
-                                    # Если metadata пустой, но есть client_user_id, сохраняем его
-                                    existing_contact = await database.fetch_one(
-                                        chat_contacts.select().where(chat_contacts.c.id == chat_contact_id)
-                                    )
-                                    existing_metadata = existing_contact.get('metadata') or {} if existing_contact else {}
-                                    if isinstance(existing_metadata, dict):
-                                        if 'avito_user_id' not in existing_metadata:
-                                            existing_metadata['avito_user_id'] = client_user_id
-                                            contact_update['metadata'] = existing_metadata
-                                    else:
-                                        contact_update['metadata'] = {'avito_user_id': client_user_id}
+                                    if existing_contact and not existing_contact.get('external_contact_id'):
+                                        contact_update['external_contact_id'] = str(client_user_id)
                                 
                                 if contact_update:
                                     await database.execute(
@@ -289,10 +268,10 @@ async def sync_avito_chats_and_messages():
                                 from database.db import chat_contacts
                                 contact_data = {
                                     "channel_id": channel_id,
+                                    "external_contact_id": str(client_user_id) if client_user_id else None,
                                     "name": user_name,
                                     "phone": user_phone,
-                                    "avatar": user_avatar,
-                                    "metadata": metadata if metadata else None
+                                    "avatar": user_avatar
                                 }
                                 contact_result = await database.fetch_one(
                                     chat_contacts.insert().values(**contact_data).returning(chat_contacts.c.id)
@@ -304,17 +283,21 @@ async def sync_avito_chats_and_messages():
                                         ).values(chat_contact_id=contact_result['id'])
                                     )
                             
-                            # Обновляем время последнего сообщения
+                            chat_update = {}
+                            if metadata:
+                                chat_update['metadata'] = metadata
+                            
                             last_message = avito_chat.get('last_message')
                             if last_message and last_message.get('created'):
                                 last_message_time = datetime.fromtimestamp(last_message['created'])
+                                chat_update['last_message_time'] = last_message_time
+                                chat_update['updated_at'] = last_message_time
+                            
+                            if chat_update:
                                 await database.execute(
                                     chats.update().where(
                                         chats.c.id == chat_id
-                                    ).values(
-                                        last_message_time=last_message_time,
-                                        updated_at=last_message_time
-                                    )
+                                    ).values(**chat_update)
                                 )
                             
                             chats_updated += 1
@@ -340,8 +323,6 @@ async def sync_avito_chats_and_messages():
                                 metadata['ad_url'] = ad_url
                             if context:
                                 metadata['context'] = context
-                            if client_user_id:
-                                metadata['avito_user_id'] = client_user_id
                             
                             chat_name = user_name or (metadata.get('ad_title') if metadata else None) or f"Avito Chat {external_chat_id[:8]}"
                             
@@ -350,7 +331,7 @@ async def sync_avito_chats_and_messages():
                                 channel_id=channel_id,
                                 cashbox_id=cashbox_id,
                                 external_chat_id=external_chat_id,
-                                external_chat_id_for_contact=external_chat_id,
+                                external_chat_id_for_contact=str(client_user_id) if client_user_id else None,
                                 name=chat_name,
                                 phone=user_phone,
                                 avatar=user_avatar,

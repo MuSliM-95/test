@@ -221,10 +221,6 @@ async def get_or_create_chat_contact(
     """
     existing = None
     
-    avito_user_id = None
-    if metadata and isinstance(metadata, dict):
-        avito_user_id = metadata.get('avito_user_id') or metadata.get('user_id')
-    
     if external_contact_id:
         existing = await database.fetch_one(
             chat_contacts.select().where(
@@ -241,22 +237,6 @@ async def get_or_create_chat_contact(
                 (chat_contacts.c.phone.is_not(None))
             )
         )
-    
-    if not existing and avito_user_id:
-        all_contacts = await database.fetch_all(
-            chat_contacts.select().where(
-                (chat_contacts.c.channel_id == channel_id) &
-                (chat_contacts.c.metadata.is_not(None))
-            )
-        )
-        
-        for contact in all_contacts:
-            contact_metadata = contact.get('metadata')
-            if isinstance(contact_metadata, dict):
-                contact_avito_user_id = contact_metadata.get('avito_user_id') or contact_metadata.get('user_id')
-                if contact_avito_user_id and str(contact_avito_user_id) == str(avito_user_id):
-                    existing = contact
-                    break
     
     if not existing and name and not phone:
         existing = await database.fetch_one(
@@ -282,16 +262,6 @@ async def get_or_create_chat_contact(
             update_data['email'] = email
         if avatar and avatar != existing.get('avatar'):
             update_data['avatar'] = avatar
-        if metadata:
-            existing_metadata = existing.get('metadata') or {}
-            if isinstance(existing_metadata, dict) and isinstance(metadata, dict):
-                existing_metadata.update(metadata)
-                avito_user_id_from_metadata = metadata.get('avito_user_id') or metadata.get('user_id')
-                if avito_user_id_from_metadata and 'avito_user_id' not in existing_metadata:
-                    existing_metadata['avito_user_id'] = avito_user_id_from_metadata
-                update_data['metadata'] = existing_metadata
-            else:
-                update_data['metadata'] = metadata
         
         if len(update_data) > 1:
             await database.execute(
@@ -311,7 +281,6 @@ async def get_or_create_chat_contact(
             phone=phone,
             email=email,
             avatar=avatar,
-            metadata=metadata,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
@@ -352,8 +321,7 @@ async def create_chat(
             name=name,
             phone=phone,
             email=email,
-            avatar=avatar,
-            metadata=metadata
+            avatar=avatar
         )
     
     query = chats.insert().values(
@@ -362,7 +330,8 @@ async def create_chat(
         cashbox_id=cashbox_id,
         external_chat_id=external_chat_id or "",
         assigned_operator_id=assigned_operator_id,
-        status="ACTIVE"
+        status="ACTIVE",
+        metadata=metadata
     )
     chat_id = await database.execute(query)
     return await get_chat(chat_id)
