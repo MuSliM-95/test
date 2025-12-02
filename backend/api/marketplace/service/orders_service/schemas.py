@@ -1,6 +1,6 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.docs_sales.schemas import DeliveryInfoSchema
 from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
@@ -21,7 +21,7 @@ class MarketplaceOrderRequest(BaseModel):
     # order_type: str = "self"  # Тип заказа: self, other, corporate, gift, proxy
     client_lat: Optional[float] = None
     client_lon: Optional[float] = None
-
+    additional_data: List[Dict[str, Any]] = Field(default_factory=list)
 
 class MarketplaceOrderResponse(BaseModel):
     """Ответ на создание заказа маркетплейса"""
