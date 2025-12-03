@@ -398,7 +398,7 @@ async def get_chat(chat_id: int):
     
     name = None
     metadata = chat_dict.get('metadata')
-    if metadata:
+    if metadata is not None:
         if isinstance(metadata, str):
             try:
                 metadata = json.loads(metadata)
@@ -416,6 +416,7 @@ async def get_chat(chat_id: int):
                 value = metadata.get('value', {})
                 if isinstance(value, dict):
                     name = value.get('title')
+    chat_dict['metadata'] = metadata
     if not chat_dict.get('name') and name:
         chat_dict['name'] = name
     
@@ -804,7 +805,7 @@ async def get_chats(
         
         name = None
         metadata = chat_dict.get('metadata')
-        if metadata:
+        if metadata is not None:
             if isinstance(metadata, str):
                 try:
                     metadata = json.loads(metadata)
@@ -822,6 +823,7 @@ async def get_chats(
                     value = metadata.get('value', {})
                     if isinstance(value, dict):
                         name = value.get('title')
+        chat_dict['metadata'] = metadata
         chat_dict['name'] = name
         
         is_avito_chat = (
