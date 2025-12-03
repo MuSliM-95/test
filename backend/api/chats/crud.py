@@ -417,7 +417,7 @@ async def get_chat(chat_id: int):
                 if isinstance(value, dict):
                     name = value.get('title')
     chat_dict['metadata'] = metadata
-    if not chat_dict.get('name') and name:
+    if not chat_dict.get('name'):
         chat_dict['name'] = name
     
     last_message_query = select([chat_messages.c.content]).where(
@@ -621,6 +621,7 @@ async def get_chats(
         chats.c.id,
         chats.c.channel_id,
         chats.c.chat_contact_id,
+        chats.c.cashbox_id,
         chats.c.external_chat_id,
         chats.c.status,
         chats.c.assigned_operator_id,
