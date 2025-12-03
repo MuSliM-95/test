@@ -50,6 +50,7 @@ class MarketplaceProduct(BaseModel):
 
     seller_name: Optional[str] = None  # Имя селлера
     seller_photo: Optional[str] = None  # Фото селлера
+    seller_description: Optional[str] = None # Описание селлера
 
     total_sold: Optional[int] = None
 

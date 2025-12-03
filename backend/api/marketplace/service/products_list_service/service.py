@@ -91,6 +91,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
                 cboxes.c.name.label("seller_name"),
                 users.c.photo.label("seller_photo"),
+                cboxes.c.description.label("seller_description"),
 
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
                 marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
@@ -142,6 +143,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 price_types.c.name,
                 cboxes.c.name,
                 users.c.photo,
+                cboxes.c.description,
                 marketplace_rating_aggregates.c.avg_rating,
                 marketplace_rating_aggregates.c.reviews_count,
                 total_sold_subquery.c.total_sold
@@ -467,6 +469,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 price_types.c.name.label("price_type"),
                 cboxes.c.name.label("seller_name"),
                 users.c.photo.label("seller_photo"),
+                cboxes.c.description.label("seller_description"),
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
                 marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
                 func.array_agg(
@@ -577,6 +580,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             price_types.c.name,
             cboxes.c.name,
             users.c.photo,
+            cboxes.c.description,
             marketplace_rating_aggregates.c.avg_rating,
             marketplace_rating_aggregates.c.reviews_count,
             stock_subquery.c.current_amount,
