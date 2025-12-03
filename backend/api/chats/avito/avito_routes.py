@@ -1661,7 +1661,7 @@ async def load_avito_history(
                             existing_contact = await database.fetch_one(
                                 chat_contacts.select().where(chat_contacts.c.id == existing_chat['chat_contact_id'])
                             )
-                            if existing_contact and not existing_contact.get('external_contact_id'):
+                            if existing_contact and (not existing_contact.get('external_contact_id') or existing_contact.get('external_contact_id') != str(client_user_id)):
                                 contact_update['external_contact_id'] = str(client_user_id)
                         
                         if contact_update:
