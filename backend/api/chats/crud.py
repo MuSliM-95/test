@@ -314,10 +314,9 @@ async def create_chat(
     Если chat_contact_id не указан, создается или находится chat_contact на основе переданных данных.
     """
     if not chat_contact_id:
-        contact_external_id = external_chat_id_for_contact if external_chat_id_for_contact is not None else external_chat_id
         chat_contact_id = await get_or_create_chat_contact(
             channel_id=channel_id,
-            external_contact_id=contact_external_id,
+            external_contact_id=external_chat_id_for_contact,  
             name=name,
             phone=phone,
             email=email,

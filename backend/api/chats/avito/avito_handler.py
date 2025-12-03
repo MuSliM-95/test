@@ -415,6 +415,28 @@ class AvitoHandler:
                     except Exception as e:
                         logger.warning(f"Failed to update chat info: {e}", exc_info=True)
             
+            if client_user_id and chat.get('chat_contact_id'):
+                try:
+                    from database.db import database, chat_contacts
+                    from datetime import datetime
+                    contact = await database.fetch_one(
+                        chat_contacts.select().where(chat_contacts.c.id == chat['chat_contact_id'])
+                    )
+                    if contact:
+                        contact_dict = dict(contact) if contact else {}
+                        if not contact_dict.get('external_contact_id') or contact_dict.get('external_contact_id') != str(client_user_id):
+                            await database.execute(
+                                chat_contacts.update().where(
+                                    chat_contacts.c.id == contact_dict['id']
+                                ).values(
+                                    external_contact_id=str(client_user_id),
+                                    updated_at=datetime.utcnow()
+                                )
+                            )
+                            logger.info(f"Updated external_contact_id to {client_user_id} for contact {contact_dict['id']}")
+                except Exception as e:
+                    logger.warning(f"Failed to update external_contact_id: {e}", exc_info=True)
+            
             from database.db import chat_messages
             existing_message = await database.fetch_one(
                 chat_messages.select().where(
@@ -640,37 +662,110 @@ class AvitoHandler:
             if existing_chat:
                 logger.info(f"Found existing chat: {existing_chat['id']}")
                 return existing_chat
-            
-            # Извлекаем название объявления из webhook_data, если есть
             ad_title = None
             metadata = {}
+            client_user_id = None
+            final_user_name = user_name
+            final_user_phone = user_phone
             
-            # Пытаемся получить context из webhook_data
-            if isinstance(webhook_data, dict):
-                context = webhook_data.get('context', {})
-                if isinstance(context, dict):
-                    item = context.get('item', {})
-                    if isinstance(item, dict):
-                        ad_title = item.get('title')
-                        ad_id = item.get('id')
-                        if ad_title:
-                            metadata['ad_title'] = ad_title
-                        if ad_id:
-                            metadata['ad_id'] = ad_id
-                    if context:
-                        metadata['context'] = context
+            if channel_type == "AVITO" and channel:
+                try:
+                    from api.chats.avito.avito_factory import create_avito_client, save_token_callback
+                    client = await create_avito_client(
+                        channel_id=channel['id'],
+                        cashbox_id=cashbox_id,
+                        on_token_refresh=lambda token_data: save_token_callback(
+                            channel['id'],
+                            cashbox_id,
+                            token_data
+                        )
+                    )
+                    if client:
+                        chat_info = await client.get_chat_info(external_chat_id)
+                        if chat_info:
+                            users = chat_info.get('users', [])
+                            if users:
+                                from database.db import channel_credentials
+                                creds = await database.fetch_one(
+                                    channel_credentials.select().where(
+                                        (channel_credentials.c.channel_id == channel['id']) &
+                                        (channel_credentials.c.cashbox_id == cashbox_id) &
+                                        (channel_credentials.c.is_active.is_(True))
+                                    )
+                                )
+                                avito_user_id = creds.get('avito_user_id') if creds else None
+                                
+                                for user in users:
+                                    user_id_in_chat = user.get('user_id') or user.get('id')
+                                    if user_id_in_chat and user_id_in_chat != avito_user_id:
+                                        client_user_id = str(user_id_in_chat)
+                                        if not final_user_name:
+                                            final_user_name = user.get('name') or user.get('profile_name')
+                                        if not final_user_phone:
+                                            user_phone_from_api = (
+                                                user.get('phone') or
+                                                user.get('phone_number') or
+                                                user.get('public_user_profile', {}).get('phone') or
+                                                user.get('public_user_profile', {}).get('phone_number')
+                                            )
+                                            if user_phone_from_api:
+                                                final_user_phone = user_phone_from_api
+                                        if final_user_name or final_user_phone:
+                                            break
+                            
+                            context = chat_info.get('context', {})
+                            if isinstance(context, dict):
+                                item = context.get('item', {})
+                                if isinstance(item, dict):
+                                    ad_title = item.get('title')
+                                    ad_id = item.get('id')
+                                    ad_url = item.get('url')
+                                    if ad_title:
+                                        metadata['ad_title'] = ad_title
+                                    if ad_id:
+                                        metadata['ad_id'] = ad_id
+                                    if ad_url:
+                                        metadata['ad_url'] = ad_url
+                                if context:
+                                    metadata['context'] = context
+                except Exception as e:
+                    logger.warning(f"Could not get chat info from API in _find_or_create_chat: {e}", exc_info=True)
             
-            # Используем название объявления как название чата
-            chat_name = ad_title or user_name or f"Avito Chat {external_chat_id[:8]}"
+            if not metadata and webhook_data:
+                try:
+                    if hasattr(webhook_data, '__dict__'):
+                        webhook_dict = webhook_data.__dict__
+                    elif isinstance(webhook_data, dict):
+                        webhook_dict = webhook_data
+                    else:
+                        webhook_dict = {}
+                    
+                    context = webhook_dict.get('context', {})
+                    if isinstance(context, dict):
+                        item = context.get('item', {})
+                        if isinstance(item, dict):
+                            if not ad_title:
+                                ad_title = item.get('title')
+                            ad_id = item.get('id')
+                            if ad_title and not metadata.get('ad_title'):
+                                metadata['ad_title'] = ad_title
+                            if ad_id and not metadata.get('ad_id'):
+                                metadata['ad_id'] = ad_id
+                        if context and not metadata.get('context'):
+                            metadata['context'] = context
+                except Exception as e:
+                    logger.debug(f"Could not extract context from webhook_data: {e}")
+            
+            chat_name = ad_title or final_user_name or f"Avito Chat {external_chat_id[:8]}"
             
             logger.info(f"Creating new chat for Avito chat {external_chat_id} with name: {chat_name} in channel {channel['id']}")
             new_chat = await crud.create_chat(
                 channel_id=channel['id'],
                 cashbox_id=cashbox_id,
                 external_chat_id=external_chat_id,
-                external_chat_id_for_contact=None,  # client_user_id будет обновлен позже в handle_message_event
+                external_chat_id_for_contact=str(client_user_id) if client_user_id else None,
                 name=chat_name,
-                phone=user_phone,
+                phone=final_user_phone,
                 metadata=metadata if metadata else None
             )
             
