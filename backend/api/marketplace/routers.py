@@ -25,6 +25,7 @@ from api.marketplace.service.public_categories.schema import (
     GlobalCategoryUpdate,
     GlobalCategoryList,
 )
+from api.marketplace.service.seller_service.schemas import SellerUpdateRequest, SellerResponse
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
 
@@ -265,3 +266,12 @@ async def upload_category_image(
     service: MarketplaceService = Depends(get_marketplace_service)
 ):
     return await service.upload_category_image(category_id, file)
+
+
+@router.patch("/sellers/{cashbox_id}/", response_model=SellerResponse)
+async def update_seller_profile(
+    cashbox_id: int,
+    request: SellerUpdateRequest,
+    service: MarketplaceService = Depends(get_marketplace_service),
+):
+    return await service.update_seller_profile(cashbox_id=cashbox_id, payload=request)
