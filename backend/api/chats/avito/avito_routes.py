@@ -425,77 +425,6 @@ async def get_avito_chats(
                         )
                         
                         if existing_chat:
-                            try:
-                                try:
-                                    chat_info = await client.get_chat_info(external_chat_id)
-                                except Exception as chat_error:
-                                    error_str = str(chat_error)
-                                    if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
-                                        chat_info = {}
-                                    else:
-                                        raise
-                                
-                                users = chat_info.get('users', [])
-                                
-                                from database.db import channel_credentials
-                                creds = await database.fetch_one(
-                                    channel_credentials.select().where(
-                                        (channel_credentials.c.channel_id == avito_channel['id']) &
-                                        (channel_credentials.c.cashbox_id == cashbox_id) &
-                                        (channel_credentials.c.is_active.is_(True))
-                                    )
-                                )
-                                avito_user_id = creds.get('avito_user_id') if creds else None
-                                
-                                client_user_id = None
-                                if users and avito_user_id:
-                                    for user in users:
-                                        user_id_in_chat = user.get('user_id') or user.get('id')
-                                        if user_id_in_chat and user_id_in_chat != avito_user_id:
-                                            client_user_id = user_id_in_chat
-                                            user_name = user.get('name') or user.get('profile_name') or user_name
-                                            user_phone_from_api = (
-                                                user.get('phone') or
-                                                user.get('phone_number') or
-                                                user.get('public_user_profile', {}).get('phone') or
-                                                user.get('public_user_profile', {}).get('phone_number')
-                                            )
-                                            if user_phone_from_api:
-                                                user_phone = user_phone_from_api
-                                            public_profile = user.get('public_user_profile', {})
-                                            if public_profile:
-                                                avatar_data = public_profile.get('avatar', {})
-                                                if isinstance(avatar_data, dict):
-                                                    user_avatar = (
-                                                        avatar_data.get('default') or
-                                                        avatar_data.get('images', {}).get('256x256') or
-                                                        avatar_data.get('images', {}).get('128x128') or
-                                                        (list(avatar_data.get('images', {}).values())[0] if avatar_data.get('images') else None)
-                                                    )
-                                                elif isinstance(avatar_data, str):
-                                                    user_avatar = avatar_data
-                                            break
-                                
-                                if not user_phone:
-                                    try:
-                                        messages = await client.get_messages(external_chat_id, limit=50)
-                                        for msg in messages:
-                                            msg_content = msg.get('content', {})
-                                            msg_text = msg_content.get('text', '') if isinstance(msg_content, dict) else str(msg_content)
-                                            if msg_text:
-                                                extracted_phone = extract_phone_from_text(msg_text)
-                                                if extracted_phone:
-                                                    user_phone = extracted_phone
-                                                    break
-                                    except Exception as e:
-                                        error_str = str(e)
-                                        if "402" in error_str or "подписку" in error_str.lower() or "subscription" in error_str.lower():
-                                            pass
-                                        else:
-                                            pass
-                            except Exception as e:
-                                pass
-                            
                             metadata = {}
                             context = avito_chat.get('context', {})
                             if isinstance(context, dict):
@@ -537,16 +466,21 @@ async def get_avito_chats(
                                         ).values(**contact_update)
                                     )
                             
+                            chat_update = {}
+                            if metadata:
+                                chat_update['metadata'] = metadata
+                            
                             last_message = avito_chat.get('last_message')
                             if last_message and last_message.get('created'):
                                 last_message_time = datetime.fromtimestamp(last_message['created'])
+                                chat_update['last_message_time'] = last_message_time
+                                chat_update['updated_at'] = last_message_time
+                            
+                            if chat_update:
                                 await database.execute(
                                     chats.update().where(
                                         chats.c.id == existing_chat['id']
-                                    ).values(
-                                        last_message_time=last_message_time,
-                                        updated_at=last_message_time
-                                    )
+                                    ).values(**chat_update)
                                 )
                             
                             updated_count += 1
@@ -1325,7 +1259,9 @@ async def sync_avito_messages(
                 chats = await crud.get_chats(
                     cashbox_id=cashbox_id,
                     channel_id=avito_channel['id'],
-                    limit=100
+                    sort_by="updated_at",
+                    sort_order="desc",
+                    limit=1000  
                 )
                 
                 for chat in chats:

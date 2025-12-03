@@ -71,7 +71,6 @@ class ContactInfo(BaseModel):
     email: Optional[str] = None
     avatar: Optional[str] = None
     contragent_id: Optional[int] = None
-    metadata: Optional[Dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
@@ -93,7 +92,8 @@ class ChatResponse(BaseModel):
     channel_name: Optional[str] = None
     channel_icon: Optional[str] = None
     channel_type: Optional[str] = None
-    name: Optional[str] = None  
+    name: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     contact: Optional[ContactInfo] = None
 
 
