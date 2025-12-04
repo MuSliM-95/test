@@ -1,8 +1,12 @@
 import os
 
-from typing import Optional
+import aioboto3
+import io
 
-from fastapi import HTTPException, status
+from uuid import uuid4
+from os import environ
+
+from fastapi import HTTPException, status, UploadFile
 from sqlalchemy import select, update
 from databases import Database
 
@@ -12,6 +16,18 @@ from api.marketplace.service.seller_service.schemas import (
     SellerResponse,
 )
 from database.db import database, cboxes, users
+from functions.helpers import get_user_by_token
+
+
+s3_session = aioboto3.Session()
+s3_data = {
+    "service_name": "s3",
+    "endpoint_url": environ.get("S3_URL"),
+    "aws_access_key_id": environ.get("S3_ACCESS"),
+    "aws_secret_access_key": environ.get("S3_SECRET"),
+}
+
+bucket_name = "5075293c-docs_generated"
 
 
 class MarketplaceSellerService(BaseMarketplaceService):
@@ -31,19 +47,16 @@ class MarketplaceSellerService(BaseMarketplaceService):
         self,
         cashbox_id: int,
         payload: SellerUpdateRequest,
+        file: UploadFile,
+        token: str,
         *,
         db: Database = database,
     ) -> SellerResponse:
-        # 1. Нечего обновлять — сразу 400
-        if (
-            payload.name is None
-            and payload.description is None
-            and payload.photo is None
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не передано ни одного поля для обновления",
-            )
+        # 1. Авторизация по токену
+        user = await get_user_by_token(token)
+        if user.cashbox_id != cashbox_id:
+            raise HTTPException(403, "У вас нет доступа к этому селлеру")
+
 
         # 2. Проверяем, что селлер существует и вытаскиваем admin_id
         cashbox = await db.fetch_one(
@@ -56,67 +69,55 @@ class MarketplaceSellerService(BaseMarketplaceService):
         )
 
         if cashbox is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Селлер не найден",
-            )
+            raise HTTPException(404, "Селлер не найден")
 
-        admin_id: Optional[int] = cashbox["admin"]
+        # 3. Если нужно обновить фото — проверяем файл
+        new_photo_path = None
+        if file:
+            if "image" not in file.content_type:
+                raise HTTPException(422, "Вы загрузили не картинку")
 
-        if admin_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="У селлера не назначен администратор",
-            )
+            file_bytes = await file.read()
+            file_ext = file.filename.split(".")[-1]
 
-        # 3. Делаем апдейты в одной транзакции
+            new_photo_path = f"photos/seller_{cashbox_id}_{uuid4().hex[:8]}.{file_ext}"
+
+            async with s3_session.client(**s3_data) as s3:
+                await s3.upload_fileobj(io.BytesIO(file_bytes), bucket_name, new_photo_path)
+
+        # 4. Обновляем БД (имя/описание/фото)
         async with db.transaction():
-            # Обновляем cashboxes
-            cashbox_update_values = {}
+            update_values = {}
 
             if payload.name is not None:
-                cashbox_update_values["name"] = payload.name
+                update_values["name"] = payload.name
 
             if payload.description is not None:
-                cashbox_update_values["description"] = payload.description
+                update_values["description"] = payload.description
 
-            if cashbox_update_values:
+            if update_values:
                 await db.execute(
-                    cboxes.update()
-                    .where(cboxes.c.id == cashbox_id)
-                    .values(**cashbox_update_values)
+                    cboxes.update().where(cboxes.c.id == cashbox_id).values(update_values)
                 )
 
-            user_update_values = {}
-            if payload.photo is not None:
-                user_update_values["photo"] = payload.photo
-
-            if user_update_values:
+            if new_photo_path:
                 await db.execute(
                     users.update()
-                    .where(users.c.id == admin_id)
-                    .values(**user_update_values)
+                    .where(users.c.id == user.id)
+                    .values(photo=new_photo_path)
                 )
 
-        # 4. Читаем актуальное состояние профиля
+        # 5. Возвращаем обновлённые данные
         row = await db.fetch_one(
             select(
-                cboxes.c.id.label("id"),
-                cboxes.c.name.label("name"),
-                cboxes.c.description.label("description"),
-                users.c.photo.label("photo"),
+                cboxes.c.id,
+                cboxes.c.name,
+                cboxes.c.description,
+                users.c.photo,
             )
-            .select_from(
-                cboxes.join(users, cboxes.c.admin == users.c.id)
-            )
+            .select_from(cboxes.join(users, cboxes.c.admin == users.c.id))
             .where(cboxes.c.id == cashbox_id)
         )
-
-        if row is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Профиль селлера не найден после обновления",
-            )
 
         data = dict(row)
 
