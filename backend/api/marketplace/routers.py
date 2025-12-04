@@ -1,6 +1,7 @@
 import time
+from typing import Optional
 
-from fastapi import APIRouter, Query, Depends, File, UploadFile
+from fastapi import APIRouter, Query, Depends, File, UploadFile, Form
 
 from api.marketplace.service.favorites_service.schemas import FavoriteRequest, FavoriteResponse, FavoriteListResponse, \
     CreateFavoritesUtm
@@ -271,8 +272,14 @@ async def upload_category_image(
 @router.patch("/sellers/profile/", response_model=SellerResponse)
 async def update_seller_profile(
     token: str = Query(...),
-    request: SellerUpdateRequest = Depends(),
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
     file: UploadFile = File(None),
     service: MarketplaceService = Depends(get_marketplace_service),
 ):
+    request = SellerUpdateRequest(
+        name=name,
+        description=description,
+    )
+
     return await service.update_seller_profile(payload=request, file=file, token=token)
