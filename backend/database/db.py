@@ -675,7 +675,9 @@ cboxes = sqlalchemy.Table(
     sqlalchemy.Column("invite_token", String, unique=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
-    sqlalchemy.Column("description", Text),
+    sqlalchemy.Column("seller_name", String, nullable=True),
+    sqlalchemy.Column("seller_description", Text, nullable=True),
+    sqlalchemy.Column("seller_photo", String, nullable=True),
 )
 
 organizations = sqlalchemy.Table(
