@@ -268,12 +268,11 @@ async def upload_category_image(
     return await service.upload_category_image(category_id, file)
 
 
-@router.patch("/sellers/{cashbox_id}/", response_model=SellerResponse)
+@router.patch("/sellers/profile/", response_model=SellerResponse)
 async def update_seller_profile(
-    cashbox_id: int,
     token: str = Query(...),
     request: SellerUpdateRequest = Depends(),
     file: UploadFile = File(None),
     service: MarketplaceService = Depends(get_marketplace_service),
 ):
-    return await service.update_seller_profile(cashbox_id=cashbox_id, payload=request, file=file, token=token)
+    return await service.update_seller_profile(payload=request, file=file, token=token)
