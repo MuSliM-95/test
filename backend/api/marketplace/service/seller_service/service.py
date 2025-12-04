@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import aioboto3
 import io
@@ -45,17 +46,15 @@ class MarketplaceSellerService(BaseMarketplaceService):
 
     async def update_seller_profile(
         self,
-        cashbox_id: int,
         payload: SellerUpdateRequest,
-        file: UploadFile,
+        file: Optional[UploadFile],
         token: str,
         *,
         db: Database = database,
     ) -> SellerResponse:
         # 1. Авторизация по токену
         user = await get_user_by_token(token)
-        if user.cashbox_id != cashbox_id:
-            raise HTTPException(403, "У вас нет доступа к этому селлеру")
+        cashbox_id = user.cashbox_id
 
 
         # 2. Проверяем, что селлер существует и вытаскиваем admin_id
