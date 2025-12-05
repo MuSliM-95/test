@@ -223,7 +223,7 @@ def get_filters_transactions(table, filters):
                 filters_list.append(table.c.type == value)
         if filter == "loyality_card_number":
             if value:
-                filters_list.append(cast(table.c.loyality_card_number, String).ilike(f"%{value[1:]}%"))
+                filters_list.append(cast(table.c.loyality_card_number, String).ilike(f"%{str(value)[1:]}%"))
         if filter == "amount":
             if value:
                 filters_list.append(table.c.amount == value)
