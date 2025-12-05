@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import List, Union, Any, Dict
 from databases.backends.postgres import Record
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, text
 from database.db import database, loyality_transactions, loyality_cards
 from api.loyality_transactions.routers import raschet_bonuses
 
@@ -19,23 +19,30 @@ class AutoBurn:
     async def get_cards() -> List[Record]:
         """Получаем только те карты, у которых есть истёкшие начисления"""
 
-        # Подзапрос: найти все карты с истёкшими начислениями
+        # Подзапрос для нахождения карт с истёкшими начислениями
         expired_subquery = (
             select(loyality_transactions.c.loyality_card_id)
+            .select_from(
+                loyality_transactions.join(
+                    loyality_cards,
+                    loyality_cards.c.id == loyality_transactions.c.loyality_card_id
+                )
+            )
             .where(
                 and_(
                     loyality_transactions.c.type == "accrual",
                     loyality_transactions.c.amount > 0,
                     loyality_transactions.c.autoburned == False,
-                    # Истёк срок жизни
+                    # Сравниваем created_at + lifetime с текущим временем
+                    # Используем выражение INTERVAL
                     loyality_transactions.c.created_at +
-                    timedelta(seconds=loyality_cards.c.lifetime) < datetime.utcnow()
+                    text("INTERVAL '1 second' * loyality_cards.lifetime") < datetime.utcnow()
                 )
             )
             .distinct()
         )
 
-        # Основной запрос: выбрать карты с истёкшими начислениями
+        # Основной запрос
         cards_query = (
             loyality_cards
             .select()
