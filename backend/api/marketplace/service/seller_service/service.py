@@ -8,7 +8,7 @@ from uuid import uuid4
 from os import environ
 
 from fastapi import HTTPException, status, UploadFile
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from databases import Database
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
@@ -61,8 +61,6 @@ class MarketplaceSellerService(BaseMarketplaceService):
         cashbox = await db.fetch_one(
             select(
                 cboxes.c.id,
-                cboxes.c.name,
-                cboxes.c.description,
                 cboxes.c.admin,
             ).where(cboxes.c.id == cashbox_id)
         )
@@ -89,30 +87,34 @@ class MarketplaceSellerService(BaseMarketplaceService):
             update_values = {}
 
             if payload.name is not None:
-                update_values["name"] = payload.name
+                update_values["seller_name"] = payload.name
 
             if payload.description is not None:
-                update_values["description"] = payload.description
+                update_values["seller_description"] = payload.description
+
+            if new_photo_path:
+                update_values["seller_photo"] = new_photo_path
 
             if update_values:
                 await db.execute(
-                    cboxes.update().where(cboxes.c.id == cashbox_id).values(update_values)
-                )
-
-            if new_photo_path:
-                await db.execute(
-                    users.update()
-                    .where(users.c.id == user.id)
-                    .values(photo=new_photo_path)
+                    cboxes.update()
+                    .where(cboxes.c.id == cashbox_id)
+                    .values(update_values)
                 )
 
         # 5. Возвращаем обновлённые данные
         row = await db.fetch_one(
             select(
                 cboxes.c.id,
-                cboxes.c.name,
-                cboxes.c.description,
-                users.c.photo,
+                func.coalesce(
+                    func.nullif(cboxes.c.seller_name, ""),
+                    cboxes.c.name,
+                ).label("name"),
+                cboxes.c.seller_description.label("description"),
+                func.coalesce(
+                    func.nullif(cboxes.c.seller_photo, ""),
+                    users.c.photo,
+                ).label("photo"),
             )
             .select_from(cboxes.join(users, cboxes.c.admin == users.c.id))
             .where(cboxes.c.id == cashbox_id)
