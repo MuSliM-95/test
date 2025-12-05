@@ -67,7 +67,6 @@ class LoyalityCardCreate(BaseModel):
     class Config:
         orm_mode = True
 
-class LoyalityCardCreateMass(LoyalityCardCreate):
 
 class LoyalityCard(LoyalityCardCreate):
     id: int
