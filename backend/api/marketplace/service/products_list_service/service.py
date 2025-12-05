@@ -19,7 +19,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
         base_url = os.getenv("APP_URL")
-        return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+        photo_url = photo_path.lstrip("/")
+
+        if "seller" in photo_url:
+            return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+        else:
+            return f'https://{base_url}/{photo_path.lstrip("/")}'
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
 
