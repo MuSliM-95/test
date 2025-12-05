@@ -2,17 +2,16 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import List, Union, Any, Dict
 from databases.backends.postgres import Record
-from sqlalchemy import select, asc
+from sqlalchemy import select, and_
 from database.db import database, loyality_transactions, loyality_cards
+from api.loyality_transactions.routers import raschet_bonuses
 
 
 class AutoBurn:
     def __init__(self, card: Record) -> None:
         self.card: Record = card
         self.card_balance: float = card.balance
-        self.first_operation_burned: Union[int, None] = None
-        self.accrual_list: List[dict] = []
-        self.withdraw_list: List[dict] = []
+        self.expired_accruals: List[dict] = []
         self.burned_list: List[int] = []
         self.autoburn_operation_list: List[dict] = []
 
@@ -30,98 +29,54 @@ class AutoBurn:
         )
         return await database.fetch_all(cards_query)
 
-    async def _get_first_operation_burned(self) -> None:
-        q_first = (
-            select(loyality_transactions.c.id)
-            .where(
+    async def _get_expired_accruals(self) -> None:
+        """Получаем все истёкшие начисления по карте"""
+        expiry_threshold = datetime.utcnow() - timedelta(seconds=self.card.lifetime)
+
+        query = loyality_transactions.select().where(
+            and_(
                 loyality_transactions.c.loyality_card_id == self.card.id,
                 loyality_transactions.c.type == "accrual",
                 loyality_transactions.c.amount > 0,
-                loyality_transactions.c.autoburned.is_not(True),
-                loyality_transactions.c.created_at + timedelta(seconds=self.card.lifetime) < datetime.utcnow(),
-                loyality_transactions.c.card_balance == 0
+                loyality_transactions.c.autoburned == False,
+                loyality_transactions.c.created_at <= expiry_threshold
             )
-            .order_by(asc(loyality_transactions.c.id))
-            .limit(1)
-        )
-        self.first_operation_burned = await database.fetch_val(q_first)
+        ).order_by(loyality_transactions.c.created_at)
 
-    async def _get_transaction(self) -> None:
-        if self.first_operation_burned is not None:
-            q = (
-                loyality_transactions
-                .select()
-                .where(
-                    loyality_transactions.c.loyality_card_id == self.card.id,
-                    loyality_transactions.c.type.in_(["accrual", "withdraw"]),
-                    loyality_transactions.c.amount > 0,
-                    loyality_transactions.c.autoburned.is_not(True),
-                    loyality_transactions.c.id >= self.first_operation_burned
-                )
-            )
-            transaction_list = await database.fetch_all(q)
-
-            minus_index = 0
-            self.accrual_list.extend(
-                [dict(i, start_amount=i.amount) for i in transaction_list if i.type == "accrual"]
-            )
-            for transaction in transaction_list:
-                transaction: Dict[str, Any] = dict(transaction, start_amount=transaction["amount"])
-                self.burned_list.append(transaction["id"])
-                if transaction["type"] == "withdraw":
-                    if self.accrual_list[minus_index]["amount"] > 0:
-                        if self.accrual_list[minus_index]["amount"] >= transaction["amount"]:
-                            self.accrual_list[minus_index]["amount"] -= transaction["amount"]
-                        else:
-                            transaction["amount"] = transaction["amount"] - self.accrual_list[minus_index]["amount"]
-                            self.accrual_list[minus_index]["amount"] = 0
-                        if self.accrual_list[minus_index]["amount"] == 0:
-                            minus_index += 1
-
-                    self.withdraw_list.append(transaction)
+        expired_transactions = await database.fetch_all(query)
+        self.expired_accruals = [dict(tx) for tx in expired_transactions]
 
     @database.transaction()
     async def _burn(self) -> None:
-        update_transaction_status_query = (
+        """Выполняем автосгорание"""
+        if not self.burned_list:
+            return
+
+        # Помечаем транзакции как сожженные
+        update_query = (
             loyality_transactions
             .update()
-            .where(
-                loyality_transactions.c.id.in_(self.burned_list)
-            )
+            .where(loyality_transactions.c.id.in_(self.burned_list))
             .values({"autoburned": True})
         )
-        await database.execute(update_transaction_status_query)
+        await database.execute(update_query)
 
-        update_balance_query = (
-            loyality_cards
-            .update()
-            .where(loyality_cards.c.id == self.card.id)
-            .values({"balance": self.card_balance})
-        )
-        await database.execute(update_balance_query)
+        # Создаем транзакции автосгорания
+        if self.autoburn_operation_list:
+            insert_query = loyality_transactions.insert()
+            await database.execute_many(insert_query, self.autoburn_operation_list)
 
-        create_transaction_query = (
-            loyality_transactions
-            .insert()
-            .values()
-        )
-        await database.execute_many(query=create_transaction_query, values=self.autoburn_operation_list)
 
-    def _get_autoburned_operation_dict(
-            self,
-            update_balance_sum: float,
-            start_amount: float,
-            created_at: datetime
-    ) -> dict:
+    def _get_autoburned_operation_dict(self, amount: float, original_tx: dict) -> dict:
         return {
             "type": "withdraw",
-            "amount": update_balance_sum,
+            "amount": amount,
             "loyality_card_id": self.card.id,
             "loyality_card_number": self.card.card_number,
             "created_by_id": self.card.created_by_id,
             "cashbox": self.card.cashbox_id,
             "tags": "",
-            "name": f"Автосгорание от {created_at.strftime('%d.%m.%Y')} по сумме {start_amount}",
+            "name": f"Автосгорание от {original_tx['created_at'].strftime('%d.%m.%Y')} по сумме {original_tx['amount']}",
             "description": None,
             "status": True,
             "external_id": None,
@@ -132,31 +87,35 @@ class AutoBurn:
             "card_balance": self.card_balance
         }
 
+    @database.transaction()
     async def start(self) -> None:
-        await self._get_first_operation_burned()
-        await self._get_transaction()
-        for a in self.accrual_list:
-            amount = a["amount"]
-            if amount == 0:
-                continue
-
-            update_balance_sum = min(self.card_balance, amount)
-
-            if update_balance_sum > 0:
-                self.card_balance -= update_balance_sum
-                self.autoburn_operation_list.append(
-                    self._get_autoburned_operation_dict(
-                        update_balance_sum=update_balance_sum, start_amount=a["start_amount"],
-                        created_at=a["created_at"]
-                    )
-                )
-
+        """Выполняем автосгорание в одной транзакции"""
+        print(f"[AutoBurn] Обрабатываю карту {self.card.id}, баланс: {self.card_balance}")
+        await self._get_expired_accruals()
+        total_burned: float = 0.0
+        for accrual in self.expired_accruals:
+            self.burned_list.append(accrual['id'])
+            total_burned += accrual['amount']
+            # Создаем запись об автосгорании
+            self.autoburn_operation_list.append(
+                self._get_autoburned_operation_dict(accrual['amount'], accrual)
+            )
+        # Уменьшаем баланс карты
+        self.card_balance = max(0.0, self.card_balance - total_burned)
+        # Выполняем сжигание
         await self._burn()
+        print(f"[AutoBurn] Сожжено {len(self.burned_list)} транзакций, новый баланс: {self.card_balance}")
+
 
 async def autoburn():
     await database.connect()
-
+    print(f"Запуск AutoBurn")
     card_list = await AutoBurn.get_cards()
     for card in card_list:
-        await AutoBurn(card=card).start()
-
+        try:
+            auto_burn = AutoBurn(card=card)
+            await auto_burn.start()
+            await raschet_bonuses(card.id)
+        except Exception as e:
+            print(f"Ошибка при обработке карты {card.id}: {e}")
+            # Можно добавить логирование в БД
