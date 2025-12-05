@@ -63,14 +63,18 @@ async def tochkaoauth(code: str, state: int):
     if not user_integration:
         raise HTTPException( status_code = 432, detail = f"user not found with integration")
 
-    async with aiohttp.ClientSession(trust_env = True) as session:
-        async with session.post(f'https://enter.tochka.com/connect/token', data = {
-            'client_id': user_integration.get('client_app_id'),
-            'client_secret': user_integration.get('client_secret'),
-            'grant_type': 'authorization_code',
-            'code': code,
-            'scope': user_integration.get('scopes'),
-        }, headers = {'Content-Type': 'application/x-www-form-urlencoded'}) as resp:
+    async with aiohttp.ClientSession(trust_env=True) as session:
+        async with session.post(
+                'https://enter.tochka.com/connect/token',
+                data={
+                    'client_id': user_integration.get('client_app_id'),
+                    'client_secret': user_integration.get('client_secret'),
+                    'grant_type': 'authorization_code',
+                    'code': code,
+                    'redirect_uri': user_integration.get('redirect_uri'),
+                },
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+        ) as resp:
             token_json = await resp.json()
         await session.close()
     if token_json.get('error'):
