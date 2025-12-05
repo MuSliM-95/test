@@ -166,7 +166,6 @@ services:
     command: bash -c "python3 start_jobs.py"
     volumes:
       - ./backend:/backend
-      - /certs:/certs
     depends_on:
       - db
     environment:
