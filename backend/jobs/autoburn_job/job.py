@@ -17,16 +17,39 @@ class AutoBurn:
 
     @staticmethod
     async def get_cards() -> List[Record]:
+        """Получаем только те карты, у которых есть истёкшие начисления"""
+
+        # Подзапрос: найти все карты с истёкшими начислениями
+        expired_subquery = (
+            select(loyality_transactions.c.loyality_card_id)
+            .where(
+                and_(
+                    loyality_transactions.c.type == "accrual",
+                    loyality_transactions.c.amount > 0,
+                    loyality_transactions.c.autoburned == False,
+                    # Истёк срок жизни
+                    loyality_transactions.c.created_at +
+                    timedelta(seconds=loyality_cards.c.lifetime) < datetime.utcnow()
+                )
+            )
+            .distinct()
+        )
+
+        # Основной запрос: выбрать карты с истёкшими начислениями
         cards_query = (
             loyality_cards
             .select()
             .where(
-                loyality_cards.c.balance > 0,
-                loyality_cards.c.lifetime.is_not(None),
-                loyality_cards.c.lifetime > 0,
-                loyality_cards.c.is_deleted == False
+                and_(
+                    loyality_cards.c.balance > 0,
+                    loyality_cards.c.lifetime.is_not(None),
+                    loyality_cards.c.lifetime > 0,
+                    loyality_cards.c.is_deleted == False,
+                    loyality_cards.c.id.in_(expired_subquery)
+                )
             )
         )
+
         return await database.fetch_all(cards_query)
 
     async def _get_expired_accruals(self) -> None:
