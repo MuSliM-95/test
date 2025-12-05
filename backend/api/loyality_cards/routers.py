@@ -278,7 +278,7 @@ async def new_loyality_card(
                         0, 9_223_372_036_854_775
                     )
         else:
-            loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
+
             phone_code = None
             is_phone_formatted = False
             try:
@@ -460,6 +460,8 @@ async def new_loyality_card(
         if card:
             inserted_ids.add(card.id)
         else:
+            if not loyality_cards_values["card_number"]:
+                loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
             query = loyality_cards.insert().values(loyality_cards_values)
             loyality_card_id = await database.execute(query)
             inserted_ids.add(loyality_card_id)
