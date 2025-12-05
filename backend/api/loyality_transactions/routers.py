@@ -1,49 +1,84 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.sql.functions import coalesce
-
-from database.db import database, loyality_transactions, loyality_cards
+from database.db import database, loyality_transactions, loyality_cards, async_session_maker
 import api.loyality_transactions.schemas as schemas
-from typing import Optional, Dict, Any
-from sqlalchemy import desc, func, select, case, and_
-
+from sqlalchemy import desc, func, select, case, update
 from functions.helpers import datetime_to_timestamp, get_filters_transactions, \
     get_entity_by_id_cashbox, clear_phone_number, get_entity_by_id_and_created_by
-
 from ws_manager import manager
 from functions.helpers import get_user_by_token
-
 from datetime import datetime
 import asyncio
 
 router = APIRouter(tags=["loyality_transactions"])
 
-
+# Асинхронная функция подсчёта баланса бонусов по ID карты
 async def raschet_bonuses(card_id: int) -> None:
-    a_q = (
-        coalesce(
-            func.sum(loyality_transactions.c.amount)
-            .filter(loyality_transactions.c.type == "accrual"), 0
+    # Открываем асинхронную сессию SQLAlchemy
+    async with async_session_maker() as session:
+        # -----------------------------------------------
+        # Шаг 1. Формируем подзапрос для доходов (accrual)
+        # select SUM(amount) where type='accrual'
+        a_q = func.coalesce(
+            func.sum(
+                case((loyality_transactions.c.type == "accrual", loyality_transactions.c.amount))
+            ),
+            0
         ).label("income")
-    )
-    w_q = (
-        coalesce(
-            func.sum(loyality_transactions.c.amount)
-            .filter(loyality_transactions.c.type == "withdraw"), 0
-        ).label("outcome")
-    )
-    q = (
-        select(
-            a_q, w_q, case((a_q > w_q, a_q - w_q), (a_q < w_q, 0), else_=0).label("balance")
-        )
-        .filter(
-            loyality_transactions.c.loyality_card_id == card_id,
-            loyality_transactions.c.status.is_(True),
-            loyality_transactions.c.is_deleted.is_(False)
-        )
-    )
-    edit_dict: Dict[str, Any] = dict(await database.fetch_one(q))
 
-    await database.execute(loyality_cards.update().where(loyality_cards.c.id == card_id).values(edit_dict))
+        # -----------------------------------------------
+        # Шаг 2. Формируем подзапрос для расходов (withdraw)
+        # select SUM(amount) where type='withdraw'
+        w_q = func.coalesce(
+            func.sum(
+                case((loyality_transactions.c.type == "withdraw", loyality_transactions.c.amount))
+            ),
+            0
+        ).label("outcome")
+
+        # -----------------------------------------------
+        # Шаг 3. Основной запрос для вычисления баланса
+        # CASE WHEN income > outcome THEN income - outcome ELSE 0 END
+        balance_q = case(
+            (a_q > w_q, a_q - w_q),
+            else_=0
+        ).label("balance")
+
+        # -----------------------------------------------
+        # Шаг 4. Объединяем всё в SELECT и фильтруем по условиям
+        query = (
+            select(a_q, w_q, balance_q)
+            .where(
+                loyality_transactions.c.loyality_card_id == card_id,
+                loyality_transactions.c.status.is_(True),
+                loyality_transactions.c.is_deleted.is_(False)
+            )
+        )
+
+        # Выполняем запрос и получаем объект результата
+        result = await session.execute(query)
+        res = result.first()
+        if not res:
+            # Если нет транзакций — выходим
+            return
+
+        # Преобразуем результат в словарь
+        edit_dict = dict(res._mapping)
+
+        # -----------------------------------------------
+        # Шаг 5. Обновляем таблицу loyality_cards на основании расчёта
+        update_stmt = (
+            update(loyality_cards)
+            .where(loyality_cards.c.id == card_id)
+            .values(
+                income=edit_dict["income"],
+                outcome=edit_dict["outcome"],
+                balance=edit_dict["balance"]
+            )
+        )
+
+        # Выполняем UPDATE и фиксируем изменения
+        await session.execute(update_stmt)
+        await session.commit()
 
 
 @router.get("/loyality_transactions/{idx}/", response_model=schemas.LoyalityTransaction)
