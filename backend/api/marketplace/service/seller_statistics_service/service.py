@@ -27,123 +27,177 @@ class MarketplaceSellerStatisticsService:
         else:
             return f'https://{base_url}/{photo_path.lstrip("/")}'
 
-
     async def get_sellers_statistics(self) -> SellerStatisticsResponse:
         # 1. Получаем всех актуальных селлеров (balance > 0)
-        sellers_rows = await database.fetch_all(
+        sellers_query = (
             select(
-                cboxes.c.id,
-
+                cboxes.c.id.label("id"),
                 func.coalesce(
                     func.nullif(cboxes.c.seller_name, ""),
                     cboxes.c.name,
                 ).label("seller_name"),
-
-                cboxes.c.seller_description,
-
+                cboxes.c.seller_description.label("seller_description"),
                 func.coalesce(
                     func.nullif(cboxes.c.seller_photo, ""),
                     users.c.photo,
                 ).label("seller_photo"),
-
-                cboxes.c.created_at
-            ).where(cboxes.c.balance > 0)
+                cboxes.c.created_at.label("created_at"),
+            )
+            .select_from(
+                cboxes.outerjoin(users, users.c.id == cboxes.c.admin)
+            )
+            .where(cboxes.c.balance > 0)
         )
 
+        seller_rows = await database.fetch_all(sellers_query)
+
+        # Если активных селлеров нет — сразу пустой ответ
+        if not seller_rows:
+            return SellerStatisticsResponse(sellers=[])
+
+        seller_ids = [row["id"] for row in seller_rows]
+
+        # 2. Кол-во активных складов по каждому селлеру
+        warehouses_query = (
+            select(
+                warehouses.c.cashbox.label("seller_id"),
+                func.count(warehouses.c.id).label("active_warehouses"),
+            )
+            .where(
+                and_(
+                    warehouses.c.cashbox.in_(seller_ids),
+                    warehouses.c.status.is_(True),
+                    warehouses.c.is_deleted.is_not(True),
+                )
+            )
+            .group_by(warehouses.c.cashbox)
+        )
+        warehouses_rows = await database.fetch_all(warehouses_query)
+        warehouses_map = {
+            row["seller_id"]: row["active_warehouses"] or 0
+            for row in warehouses_rows
+        }
+
+        # 3. Кол-во товаров на складах селлера
+        total_products_query = (
+            select(
+                nomenclature.c.cashbox.label("seller_id"),
+                func.coalesce(
+                    func.sum(warehouse_balances.c.current_amount),
+                    0,
+                ).label("total_products"),
+            )
+            .select_from(
+                warehouse_balances.join(
+                    nomenclature,
+                    nomenclature.c.id == warehouse_balances.c.nomenclature_id,
+                )
+            )
+            .where(nomenclature.c.cashbox.in_(seller_ids))
+            .group_by(nomenclature.c.cashbox)
+        )
+        total_products_rows = await database.fetch_all(total_products_query)
+        total_products_map = {
+            row["seller_id"]: row["total_products"] or 0
+            for row in total_products_rows
+        }
+
+        # 4. Рейтинг селлера
+        ratings_query = (
+            select(
+                nomenclature.c.cashbox.label("seller_id"),
+                func.avg(marketplace_rating_aggregates.c.avg_rating).label("rating"),
+                func.sum(marketplace_rating_aggregates.c.reviews_count).label("reviews"),
+            )
+            .select_from(
+                marketplace_rating_aggregates.join(
+                    nomenclature,
+                    nomenclature.c.id == marketplace_rating_aggregates.c.entity_id,
+                )
+            )
+            .where(
+                and_(
+                    marketplace_rating_aggregates.c.entity_type == "nomenclature",
+                    nomenclature.c.cashbox.in_(seller_ids),
+                )
+            )
+            .group_by(nomenclature.c.cashbox)
+        )
+        ratings_rows = await database.fetch_all(ratings_query)
+        ratings_map = {}
+        for row in ratings_rows:
+            seller_id = row["seller_id"]
+            rating_value = row["rating"]
+            reviews_value = row["reviews"]
+            ratings_map[seller_id] = {
+                "rating": float(rating_value) if rating_value is not None else None,
+                "reviews_count": int(reviews_value) if reviews_value is not None else 0,
+            }
+
+        # 5. Заказы селлера
+        orders_query = (
+            select(
+                docs_sales.c.cashbox.label("seller_id"),
+                func.count(docs_sales.c.id).label("total"),
+                func.sum(
+                    cast(
+                        docs_sales.c.order_status.in_(["delivered", "success"]),
+                        Integer,
+                    )
+                ).label("completed"),
+                func.max(docs_sales.c.created_at).label("last_order"),
+            )
+            .where(docs_sales.c.cashbox.in_(seller_ids))
+            .group_by(docs_sales.c.cashbox)
+        )
+        orders_rows = await database.fetch_all(orders_query)
+        orders_map = {}
+        for row in orders_rows:
+            seller_id = row["seller_id"]
+            orders_map[seller_id] = {
+                "orders_total": row["total"] or 0,
+                "orders_completed": row["completed"] or 0,
+                "last_order_date": row["last_order"],
+            }
+
+        # 6. Сбор финального ответа
         sellers = []
 
-        for row in sellers_rows:
+        for row in seller_rows:
             seller_id = row["id"]
-            # 2. Кол-во активных складов
-            active_warehouses_row = await database.fetch_one(
-                select(func.count(warehouses.c.id)).where(
-                    and_(
-                        warehouses.c.cashbox == seller_id,
-                        warehouses.c.status.is_(True),
-                        warehouses.c.is_deleted.is_not(True)
-                    )
-                )
+
+            rating_data = ratings_map.get(
+                seller_id,
+                {"rating": None, "reviews_count": 0},
             )
-            active_warehouses = active_warehouses_row[0] or 0
-            # 3. Кол-во товаров на складах селлера
-            total_products_row = await database.fetch_one(
-                select(
-                    func.coalesce(
-                        func.sum(warehouse_balances.c.current_amount),
-                        0
-                    ).label("total_products")
-                )
-                .select_from(warehouse_balances)
-                .join(
-                    nomenclature,
-                    nomenclature.c.id == warehouse_balances.c.nomenclature_id
-                )
-                .where(nomenclature.c.cashbox == seller_id)
-            )
-            total_products = total_products_row[0] or 0
-            # 4. Рейтинг селлера
-            rating_row = await database.fetch_one(
-                select(
-                    func.avg(marketplace_rating_aggregates.c.avg_rating).label("rating"),
-                    func.sum(marketplace_rating_aggregates.c.reviews_count).label("reviews")
-                )
-                .select_from(marketplace_rating_aggregates)
-                .join(
-                    nomenclature,
-                    nomenclature.c.id == marketplace_rating_aggregates.c.entity_id
-                )
-                .where(
-                    and_(
-                        marketplace_rating_aggregates.c.entity_type == "nomenclature",
-                        nomenclature.c.cashbox == seller_id
-                    )
-                )
+            order_data = orders_map.get(
+                seller_id,
+                {"orders_total": 0, "orders_completed": 0, "last_order_date": None},
             )
 
-            rating = float(rating_row["rating"]) if rating_row["rating"] is not None else None
-            reviews_count = int(rating_row["reviews"]) if rating_row["reviews"] is not None else 0
-            # 5. Заказы селлера
-            orders_row = await database.fetch_one(
-                select(
-                    func.count(docs_sales.c.id).label("total"),
-                    func.sum(
-                        cast(
-                            case(
-                                [(docs_sales.c.order_status.in_(["delivered", "success"]), 1)],
-                                else_=0,
-                            ),
-                            Integer,
-                        )
-                    ).label("completed"),
-                    func.max(docs_sales.c.created_at).label("last_order")
-                )
-                .where(docs_sales.c.cashbox == seller_id)
+            active_warehouses = int(warehouses_map.get(seller_id, 0) or 0)
+            total_products = int(total_products_map.get(seller_id, 0) or 0)
+
+            seller_photo = row["seller_photo"]
+            if seller_photo:
+                seller_photo = self.__transform_photo_route(seller_photo)
+
+            sellers.append(
+                {
+                    "id": seller_id,
+                    "seller_name": row["seller_name"],
+                    "seller_description": row["seller_description"],
+                    "seller_photo": seller_photo,
+                    "rating": rating_data["rating"],
+                    "reviews_count": rating_data["reviews_count"],
+                    "orders_total": order_data["orders_total"],
+                    "orders_completed": order_data["orders_completed"],
+                    "registration_date": row["created_at"],
+                    "last_order_date": order_data["last_order_date"],
+                    "active_warehouses": active_warehouses,
+                    "total_products": total_products,
+                }
             )
-
-            orders_total = orders_row["total"] or 0
-            orders_completed = orders_row["completed"] or 0
-            last_order_date = orders_row["last_order"]
-
-            if row["seller_photo"]:
-                row["seller_photo"] = self.__transform_photo_route(row["seller_photo"])
-
-            sellers.append({
-                "id": seller_id,
-                "seller_name": row["seller_name"],
-                "seller_description": row["seller_description"],
-                "seller_photo": row["seller_photo"],
-
-                "rating": rating,
-                "reviews_count": reviews_count,
-
-                "orders_total": orders_total,
-                "orders_completed": orders_completed,
-                "registration_date": row["created_at"],
-                "last_order_date": last_order_date,
-
-                "active_warehouses": active_warehouses,
-                "total_products": total_products
-            })
 
         return SellerStatisticsResponse(
             sellers=[SellerStatisticsItem(**s) for s in sellers]
