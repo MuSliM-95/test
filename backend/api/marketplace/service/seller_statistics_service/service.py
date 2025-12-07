@@ -67,7 +67,12 @@ class MarketplaceSellerStatisticsService:
             active_warehouses = active_warehouses_row[0] or 0
             # 3. Кол-во товаров на складах селлера
             total_products_row = await database.fetch_one(
-                select(func.sum(cast(warehouse_balances.c.current_amount, Integer)))
+                select(
+                    func.coalesce(
+                        func.sum(warehouse_balances.c.current_amount),
+                        0
+                    ).label("total_products")
+                )
                 .select_from(warehouse_balances)
                 .join(
                     nomenclature,
@@ -102,11 +107,12 @@ class MarketplaceSellerStatisticsService:
                 select(
                     func.count(docs_sales.c.id).label("total"),
                     func.sum(
-                        case(
-                            [
-                                (docs_sales.c.order_status.in_(["delivered", "success"]), 1)
-                            ],
-                            else_=0
+                        cast(
+                            case(
+                                [(docs_sales.c.order_status.in_(["delivered", "success"]), 1)],
+                                else_=0,
+                            ),
+                            Integer,
                         )
                     ).label("completed"),
                     func.max(docs_sales.c.created_at).label("last_order")
