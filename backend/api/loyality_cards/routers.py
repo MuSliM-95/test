@@ -463,7 +463,14 @@ async def new_loyality_card(
             if not loyality_cards_values["card_number"]:
                 loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
             query = loyality_cards.insert().values(loyality_cards_values)
-            loyality_card_id = await database.execute(query)
+            try:
+                loyality_card_id = await database.execute(query)
+            except Exception as e:
+                print('ошибка при создании loyality_cards {}'.format(e))
+                raise HTTPException(
+                    status_code=403,
+                    detail="запись существует",
+                )
             inserted_ids.add(loyality_card_id)
     print(inserted_ids)
     query = loyality_cards.select().where(
