@@ -8,7 +8,7 @@ from api.marketplace.service.review_service.service import MarketplaceReviewServ
 from api.marketplace.service.view_event_service.service import MarketplaceViewEventService
 from api.marketplace.service.public_categories.public_categories_service import MarketplacePublicCategoriesService
 from api.marketplace.service.seller_service.service import MarketplaceSellerService
-from api.marketplace.service.seller_statistics_service import MarketplaceSellerStatisticsService
+from api.marketplace.service.seller_statistics_service.service import MarketplaceSellerStatisticsService
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.utils.ioc.ioc import ioc
 
