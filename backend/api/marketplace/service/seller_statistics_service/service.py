@@ -1,6 +1,6 @@
 import os
 
-from sqlalchemy import select, func, and_, desc, case
+from sqlalchemy import select, func, and_, desc, case, cast, Integer
 
 from database.db import (
     database,
@@ -67,7 +67,7 @@ class MarketplaceSellerStatisticsService:
             active_warehouses = active_warehouses_row[0] or 0
             # 3. Кол-во товаров на складах селлера
             total_products_row = await database.fetch_one(
-                select(func.sum(warehouse_balances.c.current_amount))
+                select(func.sum(cast(warehouse_balances.c.current_amount, Integer)))
                 .select_from(warehouse_balances)
                 .join(
                     nomenclature,
