@@ -103,7 +103,9 @@ class MarketplaceSellerStatisticsService:
                     func.count(docs_sales.c.id).label("total"),
                     func.sum(
                         case(
-                            (docs_sales.c.order_status.in_(["delivered", "success"]), 1),
+                            [
+                                (docs_sales.c.order_status.in_(["delivered", "success"]), 1)
+                            ],
                             else_=0
                         )
                     ).label("completed"),
