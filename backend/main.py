@@ -282,6 +282,7 @@ app.include_router(chats_ws_router)
 app.include_router(avito_router)
 app.include_router(avito_default_webhook_router)
 
+
 # @app.get("/api/v1/openapi.json", include_in_schema=False)
 # async def get_openapi():
 #     """Проксировать openapi.json для Swagger UI"""
@@ -290,6 +291,7 @@ app.include_router(avito_default_webhook_router)
 @app.get("/health")
 async def check_health_app():
     return {"status": "ok"}
+
 
 @app.post("/api/v1/payments/tinkoff/callback")
 @app.get("/api/v1/payments/tinkoff/callback")
@@ -300,30 +302,30 @@ async def tinkoff_callback_direct(request: Request):
 @app.get("/api/v1/hook/chat/123456", include_in_schema=False)
 @app.post("/api/v1/hook/chat/123456", include_in_schema=False)
 async def avito_oauth_callback_legacy(
-    request: Request,
-    code: str = Query(None, description="Authorization code from Avito"),
-    state: str = Query(None, description="State parameter for CSRF protection"),
-    error: str = Query(None, description="Error from Avito OAuth"),
-    error_description: str = Query(None, description="Error description from Avito OAuth"),
-    token: str = Query(None, description="Optional user authentication token")
+        request: Request,
+        code: str = Query(None, description="Authorization code from Avito"),
+        state: str = Query(None, description="State parameter for CSRF protection"),
+        error: str = Query(None, description="Error from Avito OAuth"),
+        error_description: str = Query(None, description="Error description from Avito OAuth"),
+        token: str = Query(None, description="Optional user authentication token")
 ):
     if not code and not state and not error:
         return {"status": "ok", "message": "OAuth callback endpoint is available"}
-    
+
     if error:
         from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
             detail=f"OAuth error: {error}. {error_description or ''}"
         )
-    
+
     if not code or not state:
         from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
             detail="Missing required OAuth parameters: code and state are required"
         )
-    
+
     try:
         from api.chats.avito.avito_routes import avito_oauth_callback
         result = await avito_oauth_callback(code=code, state=state, token=token)
@@ -336,18 +338,17 @@ async def avito_oauth_callback_legacy(
 
 @app.post("/api/v1/hook/chat/{cashbox_id}", include_in_schema=False)
 async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
-
     logger = logging.getLogger("main")
     logger.info(f"Webhook received: cashbox_id={cashbox_id}, method={request.method}, path={request.url.path}")
- 
+
     try:
         from api.chats.avito.avito_handler import AvitoHandler
         from api.chats.avito.avito_types import AvitoWebhook
         from api.chats.avito.avito_webhook import verify_webhook_signature
-      
+
         body = await request.body()
         signature_header = request.headers.get("X-Avito-Signature")
-      
+
         if signature_header:
             if not verify_webhook_signature(body, signature_header):
                 logger.error("Webhook signature verification failed")
@@ -355,7 +356,7 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
                     "success": False,
                     "message": "Invalid webhook signature"
                 }
-      
+
         try:
             webhook_data = json.loads(body.decode())
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
@@ -379,7 +380,8 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
         has_timestamp = 'timestamp' in webhook_data
 
         if not (has_id or has_payload):
-            logger.warning(f"Webhook missing required fields. Has id: {has_id}, has payload: {has_payload}, has timestamp: {has_timestamp}")
+            logger.warning(
+                f"Webhook missing required fields. Has id: {has_id}, has payload: {has_payload}, has timestamp: {has_timestamp}")
             logger.warning(f"Webhook keys: {list(webhook_data.keys())}")
 
         try:
@@ -549,7 +551,7 @@ async def startup():
         await DefaultImagesUploader().upload_all()
     except Exception as e:
         pass
-        
+
     try:
         if not scheduler.running:
             scheduler.start()
@@ -563,7 +565,7 @@ async def shutdown():
     await database.disconnect()
     await chat_consumer.stop()
     await avito_consumer.stop()
-    
+
     try:
         if scheduler.running:
             scheduler.shutdown()
