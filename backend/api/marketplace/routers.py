@@ -27,6 +27,7 @@ from api.marketplace.service.public_categories.schema import (
     GlobalCategoryList,
 )
 from api.marketplace.service.seller_service.schemas import SellerUpdateRequest, SellerResponse
+from api.marketplace.service.seller_statistics_service.schemas import SellerStatisticsResponse
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
 
@@ -283,3 +284,13 @@ async def update_seller_profile(
     )
 
     return await service.update_seller_profile(payload=request, file=file, token=token)
+
+
+@router.get("/sellers/statistics", response_model=SellerStatisticsResponse)
+async def get_sellers_statistics(
+        service: MarketplaceService = Depends(get_marketplace_service)
+):
+    """
+    Получить статистику по актуальным селлерам
+    """
+    return await service.get_sellers_statistics()
