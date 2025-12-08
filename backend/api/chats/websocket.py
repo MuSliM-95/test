@@ -152,12 +152,9 @@ cashbox_manager = CashboxConnectionManager()
 
 @router.websocket("/ws/all/")
 async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
-    print(f"[WEBSOCKET] WebSocket connection attempt to /ws/all/ with token: {token[:20]}...")
     try:
         await websocket.accept()
-        print("[WEBSOCKET] WebSocket accepted successfully")
     except Exception as e:
-        print(f"[WEBSOCKET ERROR] Error accepting WebSocket: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -165,12 +162,9 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
     cashbox_id = None
     try:
         try:
-            print("[WEBSOCKET] Attempting to authenticate user...")
             user = await get_current_user(token)
-            print(f"[WEBSOCKET] User authenticated: user_id={user.user}, cashbox_id={user.cashbox_id}")
         except HTTPException as e:
             error_detail = e.detail if hasattr(e, 'detail') else str(e)
-            print(f"[WEBSOCKET ERROR] HTTPException during authentication: {error_detail}")
             try:
                 await websocket.send_json({
                     "error": "Unauthorized",
@@ -178,27 +172,23 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
                     "status_code": e.status_code
                 })
                 await websocket.close(code=1008)
-            except Exception as send_error:
-                print(f"[WEBSOCKET ERROR] Error sending error message: {send_error}")
+            except Exception:
+                pass
             return
         except Exception as e:
-            print(f"[WEBSOCKET ERROR] Exception during authentication: {e}")
             import traceback
             traceback.print_exc()
             try:
                 await websocket.send_json({"error": "Unauthorized", "detail": str(e)})
                 await websocket.close(code=1008)
-            except Exception as send_error:
-                print(f"[WEBSOCKET ERROR] Error sending error message: {send_error}")
+            except Exception:
+                pass
             return
         
         cashbox_id = user.cashbox_id
-        print(f"[WEBSOCKET] Connecting to cashbox_manager for cashbox_id={cashbox_id}")
         await cashbox_manager.connect(cashbox_id, websocket, user.user)
-        print("[WEBSOCKET] Connected to cashbox_manager")
         
         try:
-            print("[WEBSOCKET] Sending connection confirmation message...")
             await websocket.send_json({
                 "type": "connected",
                 "cashbox_id": cashbox_id,
@@ -206,9 +196,7 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
                 "message": "Successfully connected to all chats",
                 "timestamp": datetime.utcnow().isoformat()
             })
-            print("[WEBSOCKET] Connection confirmation message sent successfully")
         except Exception as e:
-            print(f"[WEBSOCKET ERROR] Error sending connection confirmation: {e}")
             import traceback
             traceback.print_exc()
             
@@ -226,21 +214,19 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
                 continue
     
     except WebSocketDisconnect:
-        print("[WEBSOCKET] WebSocket disconnected normally")
         if cashbox_id is not None:
             try:
                 await cashbox_manager.disconnect(cashbox_id, websocket)
-            except Exception as e:
-                print(f"[WEBSOCKET ERROR] Error disconnecting from cashbox_manager: {e}")
+            except Exception:
+                pass
     except Exception as e:
-        print(f"[WEBSOCKET ERROR] Unexpected error in websocket_all_chats: {e}")
         import traceback
         traceback.print_exc()
         if cashbox_id is not None:
             try:
                 await cashbox_manager.disconnect(cashbox_id, websocket)
-            except Exception as disconnect_error:
-                print(f"[WEBSOCKET ERROR] Error disconnecting from cashbox_manager: {disconnect_error}")
+            except Exception:
+                pass
 
 @router.websocket("/ws/{chat_id}/")
 async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(...)):
