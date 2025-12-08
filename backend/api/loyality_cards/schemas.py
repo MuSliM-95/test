@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
-
-from datetime import date
+from common.schemas import RuPhone
 
 class LoyalityCardFilters(BaseModel):
     card_number: Optional[int]
@@ -40,13 +39,9 @@ class LoyalityCardFilters(BaseModel):
 
 
 class LoyalityCardCreate(BaseModel):
-    # id: int
     card_number: Optional[int]
     tags: Optional[str]
-    # balance: Optional[float]
-    # income: Optional[int]
-    # outcome: Optional[int]
-    phone_number: Optional[str]
+    phone_number: Optional[RuPhone]
     contragent_id: Optional[int]
     contragent_name: Optional[str]
     organization_id: Optional[int]
@@ -56,12 +51,9 @@ class LoyalityCardCreate(BaseModel):
     start_period: Optional[int] = None
     end_period: Optional[int] = None
     max_percentage: Optional[int] = None
-
     lifetime: Optional[int] # lifetime in seconds
-
     status_card: bool = True
     is_deleted: bool = False
-
     apple_wallet_advertisement: str = 'TableCRM'
 
     class Config:

@@ -1,3 +1,4 @@
+pydantic-extra-types
 acres==0.2.0
 aio-pika==9.0.2
 aioboto3==11.1.0

@@ -279,40 +279,10 @@ async def new_loyality_card(
                         0, 9_223_372_036_854_775
                     )
         else:
-
-            phone_code = None
-            is_phone_formatted = False
-            try:
-                phone_number_with_plus = (
-                    f"+{phone_number}"
-                    if not phone_number.startswith("+")
-                    else phone_number
-                )
-                number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
-                phone_number = phonenumbers.format_number(
-                    number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
-                )
-                phone_code = geocoder.description_for_number(number_phone_parsed, "en")
-                is_phone_formatted = True
-                if not phone_code:
-                    phone_number = loyality_cards_values.get("phone_number")
-                    is_phone_formatted = False
-            except Exception:
-                try:
-                    number_phone_parsed = phonenumbers.parse(phone_number, "RU")
-                    phone_number = phonenumbers.format_number(
-                        number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
-                    )
-                    phone_code = geocoder.description_for_number(
-                        number_phone_parsed, "en"
-                    )
-                    is_phone_formatted = True
-                    if not phone_code:
-                        phone_number = loyality_cards_values.get("phone_number")
-                        is_phone_formatted = False
-                except Exception:
-                    phone_number = loyality_cards_values.get("phone_number")
-                    is_phone_formatted = False
+            phone_code = geocoder.description_for_number(phone_number, "en")
+            is_phone_formatted = True
+            if not phone_code:
+                is_phone_formatted = False
 
             q = contragents.select().where(
                 contragents.c.phone == phone_number,
