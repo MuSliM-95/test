@@ -776,8 +776,7 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
 
 
 def clear_phone_number(phone_number: str) -> Union[int, None]:
-    if not phone_number:
-        return None
+    phone_number = phone_number[1:] if phone_number.startswith('+') else phone_number
     try:
         return int(''.join(i for i in phone_number if i in string.digits))
     except ValueError: # если телефон состоит из букв, а не цифр
