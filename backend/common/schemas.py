@@ -1,5 +1,6 @@
-from typing import Union
-import phonenumbers
+from typing import Union, Optional
+from pydantic import BaseModel, validator
+from phonenumbers import NumberParseException, parse, is_valid_number, format_number, PhoneNumberFormat
 
 
 class RuPhone(str):
@@ -10,26 +11,28 @@ class RuPhone(str):
         yield cls.validate
 
     @classmethod
-    def validate(cls, value: Union[str, 'RuPhone', None]) -> Union[str, None]:
-        # Обработка None
-        if value is None:
+    def validate(cls, value) -> Union[str, None]:
+        # Обработка различных типов None-значений
+        if value is None or value == "" or (isinstance(value, str) and value.strip() == ""):
             return None
 
         # Если уже RuPhone, возвращаем как строку
         if isinstance(value, RuPhone):
             return str(value)
 
-        # Проверка типа
-        if not isinstance(value, str):
+        # Конвертируем в строку
+        try:
+            value_str = str(value)
+        except Exception:
             raise TypeError('string required')
 
-        # Пустая строка
-        if not value:
+        # Пустая строка после конвертации
+        if not value_str or value_str.strip() == "":
             return None
 
         try:
             # Очистка номера от лишних символов
-            cleaned = ''.join(filter(str.isdigit, value))
+            cleaned = ''.join(filter(str.isdigit, value_str))
 
             # Если пусто после очистки
             if not cleaned:
@@ -50,19 +53,19 @@ class RuPhone(str):
 
             # Парсим номер
             try:
-                parsed = phonenumbers.parse(formatted, "RU")
-            except phonenumbers.NumberParseException:
+                parsed = parse(formatted, "RU")
+            except NumberParseException:
                 # Попробуем автоопределение региона
-                parsed = phonenumbers.parse(formatted, None)
+                parsed = parse(formatted, None)
 
             # Проверяем валидность
-            if not phonenumbers.is_valid_number(parsed):
-                raise ValueError("Invalid phone number")
+            if not is_valid_number(parsed):
+                # Не валидный номер - возвращаем None вместо ошибки
+                return None
 
             # Возвращаем в формате E164
-            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+            return format_number(parsed, PhoneNumberFormat.E164)
 
-        except phonenumbers.NumberParseException:
-            raise ValueError("Invalid phone number format")
         except Exception:
-            raise ValueError("Invalid phone number format")
+            # Любые ошибки - возвращаем None
+            return None

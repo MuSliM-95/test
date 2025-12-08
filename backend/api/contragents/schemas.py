@@ -22,6 +22,9 @@ class Contragent(BaseModel):
     type: Optional[ContragentType] = None
     additional_phones: Optional[RuPhone]
 
+    class Config:
+        arbitrary_types_allowed = True
+
 
 class ContragentEdit(Contragent):
     name: Optional[str]
@@ -34,6 +37,9 @@ class ContragentCreate(Contragent):
     phone: Optional[RuPhone]
     inn: Optional[str]
     description: Optional[str]
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class ContragentResponse(Contragent):
