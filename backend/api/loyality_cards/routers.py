@@ -6,6 +6,7 @@ import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException
 from fuzzywuzzy import fuzz
 from phonenumbers import geocoder
+from sentry_sdk.utils import exceptions_from_error
 from sqlalchemy import func, select
 from sqlalchemy import or_
 
@@ -496,9 +497,13 @@ async def new_loyality_card(
     )
 
     apple_wallet_service = WalletPassGeneratorService()
+    from botocore.exceptions import ClientError
 
     for card in loyality_cards_db:
-        await apple_wallet_service.update_pass(card['id'])
+        try:
+            await apple_wallet_service.update_pass(card['id'])
+        except ClientError as e:
+            print(e)
 
     return loyality_cards_db
 
