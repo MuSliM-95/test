@@ -81,45 +81,67 @@ class MarketplaceSellerStatisticsService:
         # 3. Кол-во товаров на складах селлера
         wb = warehouse_balances
 
-        last_balance_subq = (
+        wb_ranked = (
             select(
-                wb.c.cashbox_id.label("seller_id"),
-                wb.c.warehouse_id,
-                wb.c.nomenclature_id,
-                wb.c.current_amount,
+                wb.c.organization_id.label("organization_id"),
+                wb.c.warehouse_id.label("warehouse_id"),
+                wb.c.nomenclature_id.label("nomenclature_id"),
+                wb.c.current_amount.label("current_amount"),
                 func.row_number()
                 .over(
-                    partition_by=(
-                        wb.c.cashbox_id,
+                    partition_by=[
+                        wb.c.organization_id,
                         wb.c.warehouse_id,
                         wb.c.nomenclature_id,
-                    ),
-                    order_by=wb.c.created_at.desc(),
+                    ],
+                    order_by=[
+                        desc(wb.c.created_at),
+                        desc(wb.c.id),
+                    ],
                 )
                 .label("rn"),
             )
+            .subquery("wb_ranked")
+        )
+
+        wb_latest = (
+            select(
+                wb_ranked.c.organization_id,
+                wb_ranked.c.warehouse_id,
+                wb_ranked.c.nomenclature_id,
+                wb_ranked.c.current_amount,
+            )
+            .where(wb_ranked.c.rn == 1)
+            .subquery("wb_latest")
+        )
+
+        total_products_query = (
+            select(
+                nomenclature.c.cashbox.label("seller_id"),
+                func.coalesce(
+                    func.sum(
+                        func.greatest(wb_latest.c.current_amount, 0)
+                    ),
+                    0,
+                ).label("total_products"),
+            )
             .select_from(
-                wb.join(warehouses, warehouses.c.id == wb.c.warehouse_id)
+                wb_latest.join(
+                    nomenclature,
+                    nomenclature.c.id == wb_latest.c.nomenclature_id,
+                ).join(
+                    warehouses,
+                    warehouses.c.id == wb_latest.c.warehouse_id,
+                )
             )
             .where(
                 and_(
-                    wb.c.cashbox_id.in_(seller_ids),
+                    nomenclature.c.cashbox.in_(seller_ids),
                     warehouses.c.status.is_(True),
                     warehouses.c.is_deleted.is_not(True),
                 )
             )
-        ).subquery("last_balances")
-
-        total_products_query = (
-            select(
-                last_balance_subq.c.seller_id,
-                func.coalesce(
-                    func.sum(last_balance_subq.c.current_amount),
-                    0,
-                ).label("total_products"),
-            )
-            .where(last_balance_subq.c.rn == 1)
-            .group_by(last_balance_subq.c.seller_id)
+            .group_by(nomenclature.c.cashbox)
         )
 
         total_products_rows = await database.fetch_all(total_products_query)
@@ -176,7 +198,6 @@ class MarketplaceSellerStatisticsService:
             .where(
                 and_(
                     docs_sales.c.cashbox.in_(seller_ids),
-                    docs_sales.c.is_marketplace_order.is_(True),
                     docs_sales.c.is_deleted.is_not(True),
                 )
             )
