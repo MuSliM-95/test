@@ -497,12 +497,11 @@ async def new_loyality_card(
     )
 
     apple_wallet_service = WalletPassGeneratorService()
-    from botocore.exceptions import ClientError
 
     for card in loyality_cards_db:
         try:
             await apple_wallet_service.update_pass(card['id'])
-        except ClientError as e:
+        except Exception as e:
             print(e)
 
     return loyality_cards_db
