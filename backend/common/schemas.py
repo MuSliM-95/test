@@ -10,6 +10,9 @@ class RuPhone(str):
     def __get_validators__(cls):
         yield cls.validate
 
+    def __str__(self):
+        return super().__str__()
+
     @classmethod
     def validate(cls, value) -> Union[str, None]:
         # Обработка различных типов None-значений
