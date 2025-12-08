@@ -775,11 +775,39 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
     return True
 
 
-def clear_phone_number(phone_number: str) -> Union[int, None]:
-    phone_number = phone_number[1:] if phone_number.startswith('+') else phone_number
+def clear_phone_number(phone_number) -> Union[int, None]:
+    """Универсальная очистка телефонного номера"""
+    # Защита от None и пустых значений
+    if phone_number is None:
+        return None
+
+    # Если уже int - возвращаем как есть
+    if isinstance(phone_number, int):
+        return phone_number
+
+    # Конвертируем в строку
+    if not isinstance(phone_number, str):
+        phone_number = str(phone_number)
+
+    # Защита от пустой строки
+    if not phone_number or phone_number.strip() == "":
+        return None
+
+    # Убираем + в начале
+    if phone_number.startswith('+'):
+        phone_number = phone_number[1:]
+
     try:
-        return int(''.join(i for i in phone_number if i in string.digits))
-    except ValueError: # если телефон состоит из букв, а не цифр
+        # Оставляем только цифры
+        cleaned = ''.join(filter(str.isdigit, phone_number))
+
+        # Если пусто после очистки
+        if not cleaned:
+            return None
+
+        # Конвертируем в int
+        return int(cleaned)
+    except (ValueError, TypeError):
         return None
 
 async def get_statement(statement_id: str, account_id: str, access_token: str):
