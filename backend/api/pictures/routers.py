@@ -1,3 +1,7 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import re
+
 import aiofiles
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from fastapi.responses import Response
@@ -19,11 +23,18 @@ from functions.helpers import get_user_by_token
 from ws_manager import manager
 from sqlalchemy import select, func
 
+# Поддерживаемые MIME-типы и соответствующие расширения
+ALLOWED_CONTENT_TYPES = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "application/pdf": "pdf",
+}
+
 router = APIRouter(tags=["pictures"])
 
-
 s3_session = aioboto3.Session()
-
 
 s3_data = {
     "service_name": "s3",
@@ -33,6 +44,17 @@ s3_data = {
 }
 
 bucket_name = "5075293c-docs_generated"
+
+
+async def get_picture_by_filename(filename: str, cashbox_id: int):
+    """Найти картинку по имени файла и cashbox_id"""
+    safe_filename = filename.replace("%", "\\%").replace("_", "\\_")
+    query = pictures.select().where(
+        pictures.c.url.like(f"%/{safe_filename}", escape="\\"),
+        pictures.c.cashbox == cashbox_id,
+        pictures.c.is_deleted.is_not(True)
+    )
+    return await database.fetch_one(query)
 
 
 @router.get("/pictures/{idx}/", response_model=schemas.Picture)
@@ -45,53 +67,70 @@ async def get_picture_by_id(token: str, idx: int):
 
 
 @router.get("/photos/{filename}/")
-async def get_picture_by_id(filename: str):
-    """Получение картинки по ID"""
+async def get_picture_by_filename_endpoint(filename: str, token: str):
+    """Получение файла по имени (безопасно, с проверкой прав)"""
+    if not re.match(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+
+    user = await get_user_by_token(token)
+    picture = await get_picture_by_filename(filename, user.cashbox_id)
+
+    if not picture:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
     async with s3_session.client(**s3_data) as s3:
         try:
+            s3_obj = await s3.get_object(Bucket=bucket_name, Key=picture.url)
+            body = await s3_obj['Body'].read()
+        except Exception as e:
+            print(f"S3 error: {e}")
+            raise HTTPException(status_code=500, detail="Ошибка при загрузке файла")
 
+    # Определяем media_type
+    if filename.lower().endswith('.png'):
+        media_type = "image/png"
+    elif filename.lower().endswith('.gif'):
+        media_type = "image/gif"
+    elif filename.lower().endswith('.pdf'):
+        media_type = "application/pdf"
+    else:
+        media_type = "image/jpeg"
 
-            file_key = f"photos/{filename}"
-            s3_ob = await s3.get_object(Bucket=bucket_name, Key=file_key)
-            body = await s3_ob['Body'].read()
-
-            return Response(content=body, media_type="image/jpg")
-
-        except Exception as err:
-            print(err)
-            raise HTTPException(status_code=404, detail="Такой картинки не существует")
+    return Response(content=body, media_type=media_type)
 
 
 @router.get("/photos/link/{filename}/")
-async def get_picture_link_by_id(filename: str):
-    """Получение картинки по ID"""
+async def get_picture_link_by_filename_endpoint(filename: str, token: str):
+    """Получение пресайгнутой ссылки по имени файла"""
+    if not re.match(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+
+    user = await get_user_by_token(token)
+    picture = await get_picture_by_filename(filename, user.cashbox_id)
+
+    if not picture:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
     async with s3_session.client(**s3_data) as s3:
         try:
-            file_key = f"photos/{filename}"
             url = await s3.generate_presigned_url(
                 'get_object',
-                Params={
-                    'Bucket': bucket_name,
-                    'Key': file_key
-                },
-                ExpiresIn=None
+                Params={'Bucket': bucket_name, 'Key': picture.url},
+                ExpiresIn=3600  # 1 час
             )
-            return {
-                "data": {
-                    "url": url
-                }
-            }
-        except Exception as err:
-            print(err)
-            raise HTTPException(status_code=404, detail="Такой картинки не существует")
+        except Exception as e:
+            print(f"S3 presign error: {e}")
+            raise HTTPException(status_code=500, detail="Не удалось сгенерировать ссылку")
+
+    return {"data": {"url": url}}
 
 
 @router.get("/pictures/", response_model=schemas.PictureListGet)
 async def get_pictures(
-    token: str,
-    limit: int = 100,
-    offset: int = 0,
-    filters: PicturesFiltersQuery = Depends(),
+        token: str,
+        limit: int = 100,
+        offset: int = 0,
+        filters: PicturesFiltersQuery = Depends(),
 ):
     """Получение списка картинок"""
     user = await get_user_by_token(token)
@@ -132,81 +171,115 @@ async def get_pictures(
 
 @router.post("/pictures/", response_model=schemas.Picture)
 async def new_picture(
-    token: str,
-    entity: str,
-    entity_id: int,
-    is_main: bool = False,
-    file: UploadFile = File(None),
+        token: str,
+        entity: str,
+        entity_id: int,
+        is_main: bool = False,
+        file: UploadFile = File(None),
 ):
-    """Создание картинки"""
+    """Создание картинки с организацией по дате и cashbox_id"""
     if not file:
         raise HTTPException(status_code=422, detail="Вы не загрузили картинку.")
-    if "image" not in file.content_type:
-        raise HTTPException(status_code=422, detail="Вы загрузили не картинку.")
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail="Неподдерживаемый тип файла. Разрешены: JPEG, PNG, GIF, PDF."
+        )
+
     if entity not in dir(db):
         raise HTTPException(status_code=422, detail="Такой entity не существует")
 
     user = await get_user_by_token(token)
 
-    file_link = (
-        f"photos/{entity}_{entity_id}_{uuid4().hex[:8]}.{file.filename.split('.')[-1]}"
-    )
+    # Получаем текущую дату
+    moscow_tz = ZoneInfo("Europe/Moscow")
+    now = datetime.now(moscow_tz)
+    year = now.strftime("%Y")
+    month = now.strftime("%m")
+    day = now.strftime("%d")
+    cashbox_id = str(user.cashbox_id)
+
+    ext = ALLOWED_CONTENT_TYPES[file.content_type]
+
+    filename = f"{uuid4().hex}.{ext}"
+    file_key = f"photos/{year}/{month}/{day}/{cashbox_id}/{filename}"
 
     file_bytes = await file.read()
     file_size = len(file_bytes)
 
-    async with s3_session.client(**s3_data) as s3:
-        await s3.upload_fileobj(io.BytesIO(file_bytes), bucket_name, file_link)
+    # Загружаем в S3
+    try:
+        async with s3_session.client(**s3_data) as s3:
+            await s3.upload_fileobj(io.BytesIO(file_bytes), bucket_name, file_key)
+    except Exception as e:
+        # Если S3 недоступен или вернул ошибку — НЕ сохраняем в БД
+        print(f"Ошибка загрузки в S3: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Не удалось сохранить изображение на сервере. Повторите попытку позже."
+        )
 
-    # async with aiofiles.open(file_link, "wb") as file_out:
-    #     await file_out.write(file_bytes)
-    # await file.close()
-
+    # === Только после успешной загрузки — записываем в БД ===
     picture_values = {
         "entity": entity,
         "entity_id": entity_id,
         "is_main": is_main,
         "owner": user.id,
-        "url": file_link,
+        "url": file_key,  # полный путь в S3
         "size": file_size,
         "cashbox": user.cashbox_id,
         "is_deleted": False
     }
 
-    query = pictures.insert().values(picture_values)
-    picture_id = await database.execute(query)
-    
-    query = pictures.select().where(
-        pictures.c.id == picture_id,
-        pictures.c.owner == user.id,
-        pictures.c.is_deleted.is_not(True),
-    )
-    picture_db = await database.fetch_one(query)
+    try:
+        query = pictures.insert().values(picture_values)
+        picture_id = await database.execute(query)
 
-    if not picture_db:
-        raise HTTPException(
-            status_code=404, detail=f"У вас нет {pictures.name.rstrip('s')} с таким id."
+        query = pictures.select().where(
+            pictures.c.id == picture_id,
+            pictures.c.owner == user.id,
+            pictures.c.is_deleted.is_not(True),
+        )
+        picture_db = await database.fetch_one(query)
+
+        if not picture_db:
+            # Теоретически не должно происходить, но на всякий случай
+            raise HTTPException(
+                status_code=500,
+                detail="Ошибка при сохранении метаданных изображения."
+            )
+
+        picture_db = datetime_to_timestamp(picture_db)
+
+        await manager.send_message(
+            token,
+            {
+                "action": "create",
+                "target": "pictures",
+                "result": picture_db,
+            },
         )
 
-    picture_db = datetime_to_timestamp(picture_db)
+        return picture_db
 
-    await manager.send_message(
-        token,
-        {
-            "action": "create",
-            "target": "pictures",
-            "result": picture_db,
-        },
-    )
-
-    return picture_db
+    except Exception as db_err:
+        # попытка удалить файл из S3 при ошибке БД (желательно)
+        try:
+            async with s3_session.client(**s3_data) as s3:
+                await s3.delete_object(Bucket=bucket_name, Key=file_key)
+        except Exception as cleanup_err:
+            print(f"Не удалось удалить файл после ошибки БД: {cleanup_err}")
+        raise HTTPException(
+            status_code=500,
+            detail="Ошибка при сохранении данных изображения. Файл отменён."
+        )
 
 
 @router.patch("/pictures/{idx}/", response_model=schemas.Picture)
 async def edit_picture(
-    token: str,
-    idx: int,
-    picture: schemas.PictureEdit,
+        token: str,
+        idx: int,
+        picture: schemas.PictureEdit,
 ):
     """Редактирование картинки"""
     user = await get_user_by_token(token)
