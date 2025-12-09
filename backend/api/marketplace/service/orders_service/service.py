@@ -11,11 +11,11 @@ from api.marketplace.service.base_marketplace_service import BaseMarketplaceServ
 from api.marketplace.service.orders_service.schemas import MarketplaceOrderResponse, MarketplaceOrderGood, \
     MarketplaceOrderRequest, CreateOrderUtm
 from api.marketplace.service.products_list_service.schemas import AvailableWarehouse
-from database.db import nomenclature, database, warehouse_balances
+from database.db import nomenclature, database, warehouse_balances, warehouses
 
 
 class MarketplaceOrdersService(BaseMarketplaceService, ABC):
-    async def _fetch_available_warehouses(
+    async def _fetch_available_warehousess(
             self,
             nomenclature_id: int,
             client_lat: Optional[float] = None,
@@ -24,28 +24,35 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
         """
         Заглушка: возвращает первый попавшийся склад с положительным остатком для указанной номенклатуры
         """
-        # query = select(
-        #     warehouse_balances.c.warehouse_id,
-        #     warehouse_balances.c.organization_id,
-        #     warehouse_balances.c.current_amount,
-        # ).where(
-        #     warehouse_balances.c.nomenclature_id == nomenclature_id,
-        #     warehouse_balances.c.current_amount > 0,
-        # ).limit(1)
-        #
-        # result = await database.fetch_one(query)
-        #
-        # if not result:
-        #     raise HTTPException(
-        #         status_code=404,
-        #         detail=f"Нет доступных складов с товаром nomenclature_id={nomenclature_id}"
-        #     )
+        query = select(
+            warehouse_balances.c.warehouse_id,
+            warehouse_balances.c.organization_id,
+            warehouse_balances.c.current_amount,
+            warehouses.c.name.label("warehouse_name"),
+        ).select_from(
+            warehouse_balances.join(
+                warehouses,
+                warehouses.c.id == warehouse_balances.c.warehouse_id,
+            )
+        ).where(
+            warehouse_balances.c.nomenclature_id == nomenclature_id,
+            warehouse_balances.c.current_amount > 0,
+        ).limit(1)
+
+        result = await database.fetch_one(query)
+
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Нет доступных складов с товаром nomenclature_id={nomenclature_id}"
+            )
 
         return [
             AvailableWarehouse(
-                warehouse_id=69,
-                organization_id=223,
-                current_amount=9,
+                warehouse_id=result.warehouse_id,
+                organization_id=result.organization_id,
+                warehouse_name=result.warehouse_name,
+                current_amount=result.current_amount,
             )
         ]
 
@@ -76,7 +83,7 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
 
             if good.warehouse_id is None:
                 if all([order_request.client_lat, order_request.client_lon]):
-                    warehouses = await self._fetch_available_warehouses(
+                    warehouses = await self._fetch_available_warehousess(
                         nomenclature_id=good.nomenclature_id,
                         client_lat=order_request.client_lat,
                         client_lon=order_request.client_lon
