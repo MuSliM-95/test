@@ -39,7 +39,7 @@ class LoyalityCardFilters(BaseModel):
 
 
 class LoyalityCardCreate(BaseModel):
-    card_number: Optional[int]
+    card_number: Optional[str]
     tags: Optional[str]
     phone_number: Optional[RuPhone]
     contragent_id: Optional[int]
