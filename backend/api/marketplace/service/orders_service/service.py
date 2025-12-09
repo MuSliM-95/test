@@ -22,7 +22,33 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
             client_lat: Optional[float] = None,
             client_lon: Optional[float] = None
     ) -> List[AvailableWarehouse]:
-        ...
+        """
+        Заглушка: возвращает первый попавшийся склад с положительным остатком для указанной номенклатуры
+        """
+        query = select(
+            warehouse_balances.c.warehouse_id,
+            warehouse_balances.c.organization_id,
+            warehouse_balances.c.current_amount
+        ).where(
+            warehouse_balances.c.nomenclature_id == nomenclature_id,
+            warehouse_balances.c.current_amount > 0
+        ).limit(1)
+
+        result = await database.fetch_one(query)
+
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Нет доступных складов с товаром nomenclature_id={nomenclature_id}"
+            )
+
+        return [
+            AvailableWarehouse(
+                warehouse_id=result.warehouse_id,
+                organization_id=result.organization_id,
+                available_quantity=result.current_amount
+            )
+        ]
 
     @staticmethod
     async def __transform_good(good: OrderGoodMessage) -> OrderGoodMessage:
