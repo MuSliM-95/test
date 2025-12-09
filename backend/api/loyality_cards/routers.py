@@ -214,6 +214,7 @@ async def new_loyality_card(
     for loyality_cards_values in loyality_card_data.dict()["__root__"]:
         tag_phone = None
         user_by_phone = None
+        loyality_cards_values["card_number"] = int(''.join(filter(str.isdigit, loyality_cards_values["card_number"]))) if loyality_cards_values["card_number"] else None
         if loyality_cards_values.get("tags"):
             tags_arr = loyality_cards_values["tags"].split(",")
 
