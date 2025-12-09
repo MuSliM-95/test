@@ -24,28 +24,28 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
         """
         Заглушка: возвращает первый попавшийся склад с положительным остатком для указанной номенклатуры
         """
-        query = select(
-            warehouse_balances.c.warehouse_id,
-            warehouse_balances.c.organization_id,
-            warehouse_balances.c.current_amount,
-        ).where(
-            warehouse_balances.c.nomenclature_id == nomenclature_id,
-            warehouse_balances.c.current_amount > 0,
-        ).limit(1)
-
-        result = await database.fetch_one(query)
-
-        if not result:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Нет доступных складов с товаром nomenclature_id={nomenclature_id}"
-            )
+        # query = select(
+        #     warehouse_balances.c.warehouse_id,
+        #     warehouse_balances.c.organization_id,
+        #     warehouse_balances.c.current_amount,
+        # ).where(
+        #     warehouse_balances.c.nomenclature_id == nomenclature_id,
+        #     warehouse_balances.c.current_amount > 0,
+        # ).limit(1)
+        #
+        # result = await database.fetch_one(query)
+        #
+        # if not result:
+        #     raise HTTPException(
+        #         status_code=404,
+        #         detail=f"Нет доступных складов с товаром nomenclature_id={nomenclature_id}"
+        #     )
 
         return [
             AvailableWarehouse(
-                warehouse_id=result.warehouse_id,
-                organization_id=result.organization_id,
-                current_amount=result.current_amount,
+                warehouse_id=69,
+                organization_id=223,
+                current_amount=9,
             )
         ]
 
