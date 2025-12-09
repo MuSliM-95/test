@@ -27,10 +27,10 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
         query = select(
             warehouse_balances.c.warehouse_id,
             warehouse_balances.c.organization_id,
-            warehouse_balances.c.current_amount
+            warehouse_balances.c.current_amount,
         ).where(
             warehouse_balances.c.nomenclature_id == nomenclature_id,
-            warehouse_balances.c.current_amount > 0
+            warehouse_balances.c.current_amount > 0,
         ).limit(1)
 
         result = await database.fetch_one(query)
@@ -45,7 +45,7 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
             AvailableWarehouse(
                 warehouse_id=result.warehouse_id,
                 organization_id=result.organization_id,
-                available_quantity=result.current_amount
+                current_amount=result.current_amount,
             )
         ]
 
