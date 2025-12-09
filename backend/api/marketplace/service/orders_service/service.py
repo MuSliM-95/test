@@ -15,7 +15,6 @@ from database.db import nomenclature, database, warehouse_balances
 
 
 class MarketplaceOrdersService(BaseMarketplaceService, ABC):
-    @abstractmethod
     async def _fetch_available_warehouses(
             self,
             nomenclature_id: int,
