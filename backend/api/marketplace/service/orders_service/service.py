@@ -77,11 +77,19 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
 
             if good.warehouse_id is None:
                 if all([order_request.client_lat, order_request.client_lon]):
-                    warehouse = (await self._fetch_available_warehouses(
+                    warehouses = await self._fetch_available_warehouses(
                         nomenclature_id=good.nomenclature_id,
                         client_lat=order_request.client_lat,
                         client_lon=order_request.client_lon
-                    ))[0]
+                    )
+
+                    if not warehouses:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f'Нет доступных складов для товара nomenclature_id={good.nomenclature_id}'
+                        )
+
+                    warehouse = warehouses[0]
                     good.warehouse_id = warehouse.warehouse_id
                     good.organization_id = warehouse.organization_id
                 else:
