@@ -31,7 +31,6 @@ lint-backend:
   tags:
     - docker
   variables:
-    GIT_STRATEGY: clone
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   cache:
     key: "${CI_COMMIT_REF_SLUG}-lint"
@@ -50,7 +49,6 @@ smoke-test-job:
   tags:
     - dev_runner
   variables:
-    GIT_STRATEGY: clone
     COMPOSE_FILEPATH: ".deploy/docker-compose.test.yml"
     COMPOSE_PROJECT_NAME: "ci_test_${CI_JOB_ID}"
     BACKEND_SERVICE_NAME: "backend_test"
