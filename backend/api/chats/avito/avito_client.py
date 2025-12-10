@@ -433,7 +433,35 @@ class AvitoClient:
         
         user_id = await self._get_user_id()
         
-        if image_id:
+        # Если есть и изображение, и текст, отправляем изображение с текстом
+        if image_id and text:
+            # Сначала отправляем изображение
+            image_payload = {
+                "image_id": image_id
+            }
+            image_response = await self._make_request(
+                "POST",
+                f"/v1/accounts/{user_id}/chats/{chat_id}/messages/image",
+                data=image_payload
+            )
+            
+            # Затем отправляем текст как отдельное сообщение
+            text_payload = {
+                "message": {
+                    "text": text
+                },
+                "type": "text"
+            }
+            text_response = await self._make_request(
+                "POST",
+                f"/v1/accounts/{user_id}/chats/{chat_id}/messages",
+                data=text_payload
+            )
+            
+            # Возвращаем ответ с изображением (основной)
+            return image_response
+        elif image_id:
+            # Только изображение
             payload = {
                 "image_id": image_id
             }
@@ -443,6 +471,7 @@ class AvitoClient:
                 data=payload
             )
         else:
+            # Только текст
             payload = {
                 "message": {
                     "text": text

@@ -706,11 +706,11 @@ async def get_avito_chat_messages(
                             sizes = image_data.get('sizes', {})
                             if isinstance(sizes, dict):
                                 image_url = sizes.get('1280x960') or sizes.get('640x480') or (list(sizes.values())[0] if sizes else None)
-                                message_text = f"[Image: {image_url if image_url else 'No URL'}]"
+                                message_text = ""
                             else:
-                                message_text = "[Image message]"
+                                message_text = ""
                         else:
-                            message_text = "[Image message]"
+                            message_text = ""
                     elif message_type_str == 'item':
                         item_data = content.get('item', {})
                         message_text = f"Объявление: {item_data.get('title', '[Объявление]')}"
@@ -1313,7 +1313,7 @@ async def sync_avito_messages(
                                     elif message_type_str == 'system':
                                         message_text = content.get('text', '[Системное сообщение]')
                                     elif message_type_str == 'image':
-                                        message_text = '[Изображение]'
+                                        message_text = ''
                                     elif message_type_str == 'item':
                                         item_data = content.get('item', {})
                                         message_text = f"Объявление: {item_data.get('title', '[Объявление]')}"

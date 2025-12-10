@@ -475,20 +475,55 @@ class AvitoHandler:
                 source="avito"
             )
             
-            if message_type in ['image', 'voice'] and message_content:
+            if message_type == 'image':
                 try:
                     from database.db import pictures, chats
                     file_url = None
                     
-                    if message_type == 'image':
-                        if isinstance(message_content, dict):
-                            sizes = message_content.get('sizes', {})
-                            if isinstance(sizes, dict):
-                                file_url = sizes.get('1280x960') or sizes.get('640x480') or (list(sizes.values())[0] if sizes else None)
-                            elif isinstance(sizes, str):
-                                file_url = sizes
+                    image_data = None
+                    if isinstance(payload.content, dict) and 'image' in payload.content:
+                        image_data = payload.content['image']
+                    elif hasattr(payload.content, 'image'):
+                        image_data = payload.content.image
                     
-                    elif message_type == 'voice':
+                    if image_data:
+                        sizes = None
+                        if isinstance(image_data, dict):
+                            sizes = image_data.get('sizes', {})
+                        elif hasattr(image_data, 'sizes'):
+                            sizes = image_data.sizes
+                        
+                        if isinstance(sizes, dict):
+                            file_url = sizes.get('1280x960') or sizes.get('640x480') or (list(sizes.values())[0] if sizes else None)
+                        elif isinstance(sizes, str):
+                            file_url = sizes
+                    
+                    if file_url:
+                        cashbox_id_for_picture = cashbox_id
+                        
+                        await database.execute(
+                            pictures.insert().values(
+                                entity="messages",
+                                entity_id=message['id'],
+                                url=file_url,
+                                is_main=False,
+                                is_deleted=False,
+                                owner=cashbox_id_for_picture,
+                                cashbox=cashbox_id_for_picture
+                            )
+                        )
+                        logger.info(f"Image saved to pictures table: message_id={message['id']}, url={file_url}")
+                    else:
+                        logger.warning(f"No file_url found for image message {message['id']}")
+                except Exception as e:
+                    logger.warning(f"Failed to save image file for message {message['id']}: {e}", exc_info=True)
+            
+            if message_type == 'voice' and message_content:
+                try:
+                    from database.db import pictures, chats
+                    file_url = None
+                    
+                    if message_type == 'voice':
                         if isinstance(message_content, dict):
                             file_url = message_content.get('url') or message_content.get('voice_url')
                             if not file_url:
@@ -792,11 +827,11 @@ class AvitoHandler:
                 sizes = message_content.get('sizes', {}) if isinstance(message_content, dict) else {}
                 if isinstance(sizes, dict):
                     image_url = sizes.get('1280x960') or sizes.get('640x480') or (list(sizes.values())[0] if sizes else None)
-                    message_text = f"[Image: {image_url if image_url else 'No URL'}]"
+                    message_text = ""
                 else:
-                    message_text = "[Image message]"
+                    message_text = ""
             else:
-                message_text = "[Image message]"
+                message_text = ""
         
         elif message_type == 'voice':
             if isinstance(content, dict) and 'voice' in content:

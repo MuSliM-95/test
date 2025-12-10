@@ -8,7 +8,7 @@ from sqlalchemy import select, and_
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/avito", tags=["avito-webhook"])
+router = APIRouter(prefix="/api/v1/avito", tags=["avito-webhook"])
 
 @router.post("/hook", response_model=AvitoWebhookResponse)
 async def receive_avito_webhook_default(request: Request):
@@ -40,7 +40,7 @@ async def receive_avito_webhook_default(request: Request):
             from api.chats.avito.avito_types import AvitoWebhook
             webhook = AvitoWebhook(**webhook_data)
         except Exception as e:
-            logger.error(f"Failed to parse webhook data into AvitoWebhook model: {e}")
+            logger.error(f"Failed to parse webhook data into AvitoWebhook model: {e}", exc_info=True)
             return {
                 "success": False,
                 "message": f"Invalid webhook structure: {str(e)}"
