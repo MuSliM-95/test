@@ -1,13 +1,29 @@
 from datetime import datetime
-from fastapi import APIRouter, Query
-from sqlalchemy import func, select, case, and_
 from typing import Optional
 
 import api.webapp.schemas as schemas
-from database.db import (pictures, price_types, categories, prices, nomenclature, database, warehouse_balances,
-                         warehouses, manufacturers, warehouse_register_movement, units, organizations)
-from functions.helpers import datetime_to_timestamp, get_user_by_token, raise_bad_request, nomenclature_unit_id_to_name
-
+from database.db import (
+    categories,
+    database,
+    manufacturers,
+    nomenclature,
+    organizations,
+    pictures,
+    price_types,
+    prices,
+    units,
+    warehouse_balances,
+    warehouse_register_movement,
+    warehouses,
+)
+from fastapi import APIRouter, Query
+from functions.helpers import (
+    datetime_to_timestamp,
+    get_user_by_token,
+    nomenclature_unit_id_to_name,
+    raise_bad_request,
+)
+from sqlalchemy import case, func, select
 
 router = APIRouter(tags=["webapp"])
 
@@ -15,27 +31,51 @@ router = APIRouter(tags=["webapp"])
 # TODO: refactor warehouses part, split into separate functions for readability, do queries before loop (perf)
 @router.get("/webapp/", response_model=schemas.WebappResponse)
 async def get_nomenclature(
-        token: str = Query(..., description="Токен для аутентификации. "
-                                            "Запрос вернёт только те объекты, которые принадлежат пользователю."),
-        warehouse_id: Optional[int] = None,
-        nomenclature_id: Optional[int] = None,
-        organization_id: Optional[int] = None,
-        name: Optional[str] = Query(None, description="Полное название или его часть."),
-        type: Optional[str] = Query(None, description="Тип полностью (напр., product или service)."),
-        description_short: Optional[str] = Query(None, description="Короткое описание или его часть."),
-        description_long: Optional[str] = Query(None, description="Подробное описание или его часть."),
-        code: Optional[int] = None,
-        unit: Optional[int] = None,
-        category_ids: Optional[str] = Query(None, description="Целочисленные идентификаторы категорий. "
-                                                              "Несколько категорий указываются через запятую."),
-        manufacturer: Optional[str] = Query(None, description="Название производителя или его часть."),
-        date_from: Optional[int] = Query(None, description="Начальная дата для фильтрации по дате создания."),
-        date_to: Optional[int] = Query(None, description="Конечная дата для фильтрации по дате создания."),
-        entity: Optional[str] = Query(None, description="Entity для фильтрации по изображениям."),
-        entity_id: Optional[int] = Query(None, description="Entity ID для фильтрации по изображениям."),
-        price_type_id: Optional[int] = Query(None, description="Price Type ID для фильтрации по ценам."),
-        limit: int = 100,
-        offset: int = 0
+    token: str = Query(
+        ...,
+        description="Токен для аутентификации. "
+        "Запрос вернёт только те объекты, которые принадлежат пользователю.",
+    ),
+    warehouse_id: Optional[int] = None,
+    nomenclature_id: Optional[int] = None,
+    organization_id: Optional[int] = None,
+    name: Optional[str] = Query(None, description="Полное название или его часть."),
+    type: Optional[str] = Query(
+        None, description="Тип полностью (напр., product или service)."
+    ),
+    description_short: Optional[str] = Query(
+        None, description="Короткое описание или его часть."
+    ),
+    description_long: Optional[str] = Query(
+        None, description="Подробное описание или его часть."
+    ),
+    code: Optional[int] = None,
+    unit: Optional[int] = None,
+    category_ids: Optional[str] = Query(
+        None,
+        description="Целочисленные идентификаторы категорий. "
+        "Несколько категорий указываются через запятую.",
+    ),
+    manufacturer: Optional[str] = Query(
+        None, description="Название производителя или его часть."
+    ),
+    date_from: Optional[int] = Query(
+        None, description="Начальная дата для фильтрации по дате создания."
+    ),
+    date_to: Optional[int] = Query(
+        None, description="Конечная дата для фильтрации по дате создания."
+    ),
+    entity: Optional[str] = Query(
+        None, description="Entity для фильтрации по изображениям."
+    ),
+    entity_id: Optional[int] = Query(
+        None, description="Entity ID для фильтрации по изображениям."
+    ),
+    price_type_id: Optional[int] = Query(
+        None, description="Price Type ID для фильтрации по ценам."
+    ),
+    limit: int = 100,
+    offset: int = 0,
 ):
     """Получение номенклатуры по поисковым параметрам. Содержит название,
     тип (Товар или Услуга), описание, код, единицы, названия категорий,
@@ -46,7 +86,7 @@ async def get_nomenclature(
 
     filter_general = [
         nomenclature.c.cashbox == user.cashbox_id,
-        nomenclature.c.is_deleted.is_not(True)
+        nomenclature.c.is_deleted.is_not(True),
     ]
     filter_pics = []
     filter_prices = []
@@ -57,9 +97,13 @@ async def get_nomenclature(
     if type:
         filter_general.append(nomenclature.c.type.ilike(f"{type}"))
     if description_short:
-        filter_general.append(nomenclature.c.description_short.ilike(f"%{description_short}%"))
+        filter_general.append(
+            nomenclature.c.description_short.ilike(f"%{description_short}%")
+        )
     if description_long:
-        filter_general.append(nomenclature.c.description_long.ilike(f"%{description_long}%"))
+        filter_general.append(
+            nomenclature.c.description_long.ilike(f"%{description_long}%")
+        )
     if code:
         filter_general.append(nomenclature.c.code == code)
     if unit:
@@ -95,16 +139,24 @@ async def get_nomenclature(
         if price_type_id:
             filter_prices.append(prices.c.price_type == price_type_id)
 
-    query = (select(nomenclature)
-             .distinct(nomenclature.c.id)
-             .select_from(
-                nomenclature
-                .join(prices, nomenclature.c.id == prices.c.nomenclature, isouter=True)
-                .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
-                .join(warehouse_balances, nomenclature.c.id == warehouse_balances.c.nomenclature_id, isouter=True)
-             )
-             .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
-             .limit(limit).offset(offset))
+    query = (
+        select(nomenclature)
+        .distinct(nomenclature.c.id)
+        .select_from(
+            nomenclature.join(
+                prices, nomenclature.c.id == prices.c.nomenclature, isouter=True
+            )
+            .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
+            .join(
+                warehouse_balances,
+                nomenclature.c.id == warehouse_balances.c.nomenclature_id,
+                isouter=True,
+            )
+        )
+        .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
+        .limit(limit)
+        .offset(offset)
+    )
 
     result_nomenclature = await database.fetch_all(query)
     result_nomenclature = [*map(datetime_to_timestamp, result_nomenclature)]
@@ -112,20 +164,22 @@ async def get_nomenclature(
     result_nomenclature = [*map(nomenclature_unit_id_to_name, result_nomenclature)]
     result_nomenclature = [await d for d in result_nomenclature]
 
-    count_query = (
-        select(func.count())
+    count_query = select(func.count()).select_from(
+        select(nomenclature.c.id)
+        .distinct(nomenclature.c.id)
         .select_from(
-            select(nomenclature.c.id)
-            .distinct(nomenclature.c.id)
-            .select_from(
-                nomenclature
-                .join(prices, nomenclature.c.id == prices.c.nomenclature, isouter=True)
-                .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
-                .join(warehouse_balances, nomenclature.c.id == warehouse_balances.c.nomenclature_id, isouter=True)
+            nomenclature.join(
+                prices, nomenclature.c.id == prices.c.nomenclature, isouter=True
             )
-            .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
-            .alias()
+            .join(pictures, nomenclature.c.id == pictures.c.entity_id, isouter=True)
+            .join(
+                warehouse_balances,
+                nomenclature.c.id == warehouse_balances.c.nomenclature_id,
+                isouter=True,
+            )
         )
+        .where(*filter_general, *filter_pics, *filter_prices, *filter_balance)
+        .alias()
     )
 
     nomenclature_db_c = await database.fetch_one(count_query)
@@ -133,19 +187,22 @@ async def get_nomenclature(
     # post-process:
     for item in result_nomenclature:
         # getting pictures list ([pictures/schemas.py/Picture])
-        query = pictures.select().where(pictures.c.entity_id == item['id'],
-                                        pictures.c.is_deleted.is_not(True))
+        query = pictures.select().where(
+            pictures.c.entity_id == item["id"], pictures.c.is_deleted.is_not(True)
+        )
         pictures_list = await database.fetch_all(query)
         pictures_list = [*map(datetime_to_timestamp, pictures_list)]
-        item['pictures'] = pictures_list
+        item["pictures"] = pictures_list
 
         # getting prices list ([webapp/schemas.py/PriceInList])
-        query = prices.select().where(prices.c.nomenclature == item['id'],
-                                      prices.c.is_deleted.is_not(True),
-                                      prices.c.owner == user.id)
+        query = prices.select().where(
+            prices.c.nomenclature == item["id"],
+            prices.c.is_deleted.is_not(True),
+            prices.c.owner == user.id,
+        )
         prices_list = await database.fetch_all(query)
 
-        item['prices'] = []
+        item["prices"] = []
         for price_item in prices_list:
             price_in_list = {
                 "id": price_item.id,
@@ -155,7 +212,7 @@ async def get_nomenclature(
                 "price": price_item.price,
                 "date_from": price_item.date_from,
                 "date_to": price_item.date_to,
-                "price_types": []
+                "price_types": [],
             }
             if item["unit"]:
                 q = units.select().where(units.c.id == item["unit"])
@@ -170,63 +227,84 @@ async def get_nomenclature(
                     price_in_list["category_name"] = category.name
 
             if item["manufacturer"]:
-                q = manufacturers.select().where(manufacturers.c.id == item["manufacturer"])
+                q = manufacturers.select().where(
+                    manufacturers.c.id == item["manufacturer"]
+                )
                 manufacturer = await database.fetch_one(q)
                 if manufacturer:
                     price_in_list["manufacturer_name"] = manufacturer.name
 
             if price_item["price_type"]:
-                q = price_types.select().where(price_types.c.id == price_item["price_type"])
+                q = price_types.select().where(
+                    price_types.c.id == price_item["price_type"]
+                )
                 price_type = await database.fetch_one(q)
 
                 if price_type:
-                    q = price_types.select().where(price_types.c.name == price_type.name,
-                                                   price_types.c.owner == user.id,
-                                                   price_types.c.is_deleted.is_not(True))
+                    q = price_types.select().where(
+                        price_types.c.name == price_type.name,
+                        price_types.c.owner == user.id,
+                        price_types.c.is_deleted.is_not(True),
+                    )
                     price_types_list = await database.fetch_all(q)
                     price_types_list = [*map(datetime_to_timestamp, price_types_list)]
                     price_in_list["price_types"] = price_types_list.copy()
 
-            item['prices'].append(price_in_list.copy())
+            item["prices"].append(price_in_list.copy())
 
         # getting warehouse balances list ([webapp/schemas.py/ViewAltList])
         # (alsk: just a small refactor of previous code, no real changes)
-        sel_condition = [
-            warehouse_register_movement.c.nomenclature_id == item['id']
-        ]
+        sel_condition = [warehouse_register_movement.c.nomenclature_id == item["id"]]
 
         if warehouse_id:
-            sel_condition.append(warehouse_register_movement.c.warehouse_id == warehouse_id)
+            sel_condition.append(
+                warehouse_register_movement.c.warehouse_id == warehouse_id
+            )
         if nomenclature_id:
-            sel_condition.append(warehouse_register_movement.c.nomenclature_id == nomenclature_id)
+            sel_condition.append(
+                warehouse_register_movement.c.nomenclature_id == nomenclature_id
+            )
         if organization_id:
-            sel_condition.append(warehouse_register_movement.c.organization_id == organization_id)
+            sel_condition.append(
+                warehouse_register_movement.c.organization_id == organization_id
+            )
 
         q = case(
             [
                 (
-                    warehouse_register_movement.c.type_amount == 'minus',
-                    warehouse_register_movement.c.amount * (-1)
+                    warehouse_register_movement.c.type_amount == "minus",
+                    warehouse_register_movement.c.amount * (-1),
                 )
             ],
-            else_=warehouse_register_movement.c.amount
+            else_=warehouse_register_movement.c.amount,
         )
-        query = ((select(
-            nomenclature.c.id,
-            nomenclature.c.name,
-            nomenclature.c.category,
-            warehouse_register_movement.c.organization_id,
-            warehouse_register_movement.c.warehouse_id,
-            func.sum(q).label("current_amount"))
-                  .where(*sel_condition)
-                  .limit(limit)
-                  .offset(offset))
-                 .group_by(nomenclature.c.name,
-                           nomenclature.c.id,
-                           warehouse_register_movement.c.organization_id,
-                           warehouse_register_movement.c.warehouse_id)
-                 .select_from(warehouse_register_movement
-                              .join(nomenclature,  warehouse_register_movement.c.nomenclature_id == nomenclature.c.id)))
+        query = (
+            (
+                select(
+                    nomenclature.c.id,
+                    nomenclature.c.name,
+                    nomenclature.c.category,
+                    warehouse_register_movement.c.organization_id,
+                    warehouse_register_movement.c.warehouse_id,
+                    func.sum(q).label("current_amount"),
+                )
+                .where(*sel_condition)
+                .limit(limit)
+                .offset(offset)
+            )
+            .group_by(
+                nomenclature.c.name,
+                nomenclature.c.id,
+                warehouse_register_movement.c.organization_id,
+                warehouse_register_movement.c.warehouse_id,
+            )
+            .select_from(
+                warehouse_register_movement.join(
+                    nomenclature,
+                    warehouse_register_movement.c.nomenclature_id == nomenclature.c.id,
+                )
+            )
+        )
 
         warehouse_balances_db = await database.fetch_all(query)
 
@@ -235,27 +313,44 @@ async def get_nomenclature(
         # no need to query twice if nor date_to neither date_from is present, just copying previous DB response
         if date_to or date_from:
             if date_to:
-                date_condition.append(warehouse_register_movement.c.created_at <= datetime.fromtimestamp(date_to))
+                date_condition.append(
+                    warehouse_register_movement.c.created_at
+                    <= datetime.fromtimestamp(date_to)
+                )
             if date_from:
-                date_condition.append(warehouse_register_movement.c.created_at >= datetime.fromtimestamp(date_from))
+                date_condition.append(
+                    warehouse_register_movement.c.created_at
+                    >= datetime.fromtimestamp(date_from)
+                )
 
-            query = ((select(
-                nomenclature.c.id,
-                nomenclature.c.name,
-                nomenclature.c.category,
-                warehouse_register_movement.c.organization_id,
-                warehouse_register_movement.c.warehouse_id,
-                func.sum(q).label("current_amount"))
-                      .where(*sel_condition, *date_condition)
-                      .limit(limit)
-                      .offset(offset))
-                     .group_by(nomenclature.c.name,
-                               nomenclature.c.id,
-                               warehouse_register_movement.c.organization_id,
-                               warehouse_register_movement.c.warehouse_id)
-                     .select_from(warehouse_register_movement
-                                  .join(nomenclature,
-                                        warehouse_register_movement.c.nomenclature_id == nomenclature.c.id)))
+            query = (
+                (
+                    select(
+                        nomenclature.c.id,
+                        nomenclature.c.name,
+                        nomenclature.c.category,
+                        warehouse_register_movement.c.organization_id,
+                        warehouse_register_movement.c.warehouse_id,
+                        func.sum(q).label("current_amount"),
+                    )
+                    .where(*sel_condition, *date_condition)
+                    .limit(limit)
+                    .offset(offset)
+                )
+                .group_by(
+                    nomenclature.c.name,
+                    nomenclature.c.id,
+                    warehouse_register_movement.c.organization_id,
+                    warehouse_register_movement.c.warehouse_id,
+                )
+                .select_from(
+                    warehouse_register_movement.join(
+                        nomenclature,
+                        warehouse_register_movement.c.nomenclature_id
+                        == nomenclature.c.id,
+                    )
+                )
+            )
 
             warehouse_balances_db_curr = await database.fetch_all(query)
         else:
@@ -270,22 +365,33 @@ async def get_nomenclature(
 
         for warehouse_balance in warehouse_balances_db:
 
-            current = [item for item in warehouse_balances_db_curr if item.id == warehouse_balance.id]
+            current = [
+                item
+                for item in warehouse_balances_db_curr
+                if item.id == warehouse_balance.id
+            ]
 
             balance_dict = dict(warehouse_balance)
 
             organization_db = await database.fetch_one(
-                organizations.select().where(organizations.c.id == warehouse_balance.organization_id))
+                organizations.select().where(
+                    organizations.c.id == warehouse_balance.organization_id
+                )
+            )
 
             plus_amount = 0
             minus_amount = 0
 
-            register_q = warehouse_register_movement.select().where(
-                warehouse_register_movement.c.warehouse_id == warehouse_id,
-                warehouse_register_movement.c.nomenclature_id == warehouse_balance.id,
-                *date_condition
-            ) \
+            register_q = (
+                warehouse_register_movement.select()
+                .where(
+                    warehouse_register_movement.c.warehouse_id == warehouse_id,
+                    warehouse_register_movement.c.nomenclature_id
+                    == warehouse_balance.id,
+                    *date_condition,
+                )
                 .order_by(warehouse_register_movement.c.id)
+            )
 
             register_events = await database.fetch_all(register_q)
 
@@ -295,28 +401,31 @@ async def get_nomenclature(
                 else:
                     minus_amount += reg_event.amount
 
-            balance_dict['organization_name'] = organization_db.short_name
-            balance_dict['plus_amount'] = plus_amount
-            balance_dict['minus_amount'] = minus_amount
-            balance_dict['start_ost'] = balance_dict['current_amount'] - plus_amount + minus_amount
-            balance_dict['now_ost'] = current[0].current_amount
+            balance_dict["organization_name"] = organization_db.short_name
+            balance_dict["plus_amount"] = plus_amount
+            balance_dict["minus_amount"] = minus_amount
+            balance_dict["start_ost"] = (
+                balance_dict["current_amount"] - plus_amount + minus_amount
+            )
+            balance_dict["now_ost"] = current[0].current_amount
             filter_warehouses = [
                 warehouses.c.cashbox == user.cashbox_id,
                 warehouses.c.is_deleted.is_not(True),
             ]
 
-            query = warehouses.select().where(warehouses.c.id == warehouse_balance.warehouse_id,
-                                              *filter_warehouses)
+            query = warehouses.select().where(
+                warehouses.c.id == warehouse_balance.warehouse_id, *filter_warehouses
+            )
 
             warehouses_db = await database.fetch_all(query)
             warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
-            balance_dict['warehouses'] = warehouses_db
+            balance_dict["warehouses"] = warehouses_db
 
             res.append(balance_dict)
         for category in categories_db:
             cat_children = []
             for item_cat in res:
-                if item_cat['category'] == category.id:
+                if item_cat["category"] == category.id:
                     item_cat.pop("id", None)
                     item_cat.pop("name", None)
 
@@ -328,23 +437,17 @@ async def get_nomenclature(
                     {
                         "name": category.name,
                         "key": category.id,
-                        "children": cat_children
+                        "children": cat_children,
                     }
                 )
 
         if len(res_with_cats) == 0:
-            res_with_cats.append(
-                {
-                    "name": "Без категории",
-                    "key": 0,
-                    "children": []
-                }
-            )
+            res_with_cats.append({"name": "Без категории", "key": 0, "children": []})
         else:
             for cat in res_with_cats:
-                for catinclusive in cat['children']:
-                    catinclusive.pop('category', None)
+                for catinclusive in cat["children"]:
+                    catinclusive.pop("category", None)
 
-        item['alt_warehouse_balances'] = res_with_cats
+        item["alt_warehouse_balances"] = res_with_cats
 
     return {"result": result_nomenclature, "count": nomenclature_db_c.count_1}

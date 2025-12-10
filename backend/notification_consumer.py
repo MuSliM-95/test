@@ -238,8 +238,7 @@ async def process_notification(message):
                 if success:
                     print(f"Legacy notification sent to {recipient_id}")
                 else:
-                    print(
-                        f"Failed to send legacy notification to {recipient_id}")
+                    print(f"Failed to send legacy notification to {recipient_id}")
         else:
             print(f"Unknown notification type: {data.get('type')}")
     except Exception as e:
@@ -290,8 +289,10 @@ async def consume():
 
         await queue.consume(on_message)
 
-        print(f"Notification consumer started. Waiting for messages in queue '{queue_name}'")
-        
+        print(
+            f"Notification consumer started. Waiting for messages in queue '{queue_name}'"
+        )
+
         # Бесконечный цикл вместо await asyncio.Future() для работы в фоновой задаче
         while True:
             await asyncio.sleep(1)
@@ -299,6 +300,7 @@ async def consume():
     except Exception as e:
         print(f"Error in notification consumer: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         if connection is not None:

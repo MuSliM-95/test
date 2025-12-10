@@ -1,4 +1,6 @@
-from api.nomenclature_groups.web.models.BaseNomenclatureGroup import BaseNomenclatureGroup
+from api.nomenclature_groups.web.models.BaseNomenclatureGroup import (
+    BaseNomenclatureGroup,
+)
 
 
 class ResponseCreateNomenclatureGroupModel(BaseNomenclatureGroup):

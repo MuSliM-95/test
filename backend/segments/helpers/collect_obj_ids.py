@@ -1,10 +1,6 @@
-from sqlalchemy import select, and_, or_
-
-from database.db import (
-    SegmentObjectType, database, segment_objects, segments
-)
-
+from database.db import SegmentObjectType, database, segment_objects, segments
 from segments.constants import SegmentChangeType
+from sqlalchemy import and_, or_, select
 
 
 async def collect_objects(segment_id, obj_type: SegmentObjectType, mode: str):
@@ -14,14 +10,14 @@ async def collect_objects(segment_id, obj_type: SegmentObjectType, mode: str):
 
     base_condition = [
         segment_objects.c.segment_id == segment_id,
-        segment_objects.c.object_type == obj_type
+        segment_objects.c.object_type == obj_type,
     ]
 
     if mode == SegmentChangeType.new.value:
         base_condition.append(
             or_(
                 segments.c.updated_at.is_(None),
-                segment_objects.c.valid_from >= segments.c.updated_at
+                segment_objects.c.valid_from >= segments.c.updated_at,
             )
         )
 
@@ -30,8 +26,7 @@ async def collect_objects(segment_id, obj_type: SegmentObjectType, mode: str):
 
     elif mode == SegmentChangeType.removed.value:
         base_condition.append(segment_objects.c.valid_to.isnot(None))
-        base_condition.append(
-            segment_objects.c.valid_to >= segments.c.updated_at)
+        base_condition.append(segment_objects.c.valid_to >= segments.c.updated_at)
 
     query = (
         select(segment_objects.c.object_id)

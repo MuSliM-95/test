@@ -1,12 +1,11 @@
 import re
 from enum import Enum
+from typing import List, Optional
 
-from pydantic import BaseModel, validator, root_validator, Field
-from typing import Optional, List
-
-from api.prices.schemas import PriceInList, PriceGetWithNomenclature
+from api.prices.schemas import PriceGetWithNomenclature
 from api.warehouse_balances.schemas import WarehouseWithNomenclature
 from database.db import NomenclatureCashbackType
+from pydantic import BaseModel, Field, validator
 
 
 class NomenclatureType(str, Enum):
@@ -17,7 +16,7 @@ class NomenclatureType(str, Enum):
     rental = "rental"
     property = "property"
     work = "work"
-    
+
 
 class NomenclatureBarcodeCreate(BaseModel):
     barcode: str
@@ -33,7 +32,9 @@ class NomenclatureCreate(BaseModel):
     category: Optional[int]
     manufacturer: Optional[int]
     chatting_percent: Optional[int] = Field(default=None, le=100, gt=0)
-    cashback_type: Optional[NomenclatureCashbackType] = NomenclatureCashbackType.lcard_cashback
+    cashback_type: Optional[NomenclatureCashbackType] = (
+        NomenclatureCashbackType.lcard_cashback
+    )
     cashback_value: Optional[int] = 0
 
     external_id: Optional[str]
@@ -63,6 +64,7 @@ class NomenclatureCreate(BaseModel):
                 )
 
         return tag_list
+
 
 class NomenclatureCreateMass(BaseModel):
     __root__: List[NomenclatureCreate]
@@ -116,6 +118,7 @@ class NomenclatureGet(NomenclatureCreate):
 
     class Config:
         orm_mode = True
+
 
 class NomenclatureList(BaseModel):
     __root__: Optional[List[Nomenclature]]

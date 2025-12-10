@@ -5,13 +5,12 @@ Revises: ad1f4037a8b7
 Create Date: 2025-11-27 21:55:14.868000
 
 """
-from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
-revision = 'merge_heads_002'
-down_revision = 'ad1f4037a8b7'  # Исправлено: указываем на единственный head в ветке chat-system
+revision = "merge_heads_002"
+down_revision = (
+    "ad1f4037a8b7"  # Исправлено: указываем на единственный head в ветке chat-system
+)
 branch_labels = None
 depends_on = None
 

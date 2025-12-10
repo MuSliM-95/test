@@ -1,18 +1,19 @@
+import uuid
+
+from database.db import Base
 from sqlalchemy import (
     Boolean,
+    Column,
+    DateTime,
     Enum,
+    Float,
     ForeignKey,
     Integer,
     String,
-    Column,
-    DateTime,
-    Float,
 )
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from database.db import Base
 from sqlalchemy.dialects.postgresql import UUID
-import uuid
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 
 class TechCardDB(Base):

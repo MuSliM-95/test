@@ -26,7 +26,9 @@ async def get_contract_by_id(token: str, idx: int):
 
 
 @router.get("/contracts/", response_model=schemas.ContractListGet)
-async def get_contracts(token: str, name: Optional[str] = None, limit: int = 100, offset: int = 0):
+async def get_contracts(
+    token: str, name: Optional[str] = None, limit: int = 100, offset: int = 0
+):
     """Получение списка контрактов"""
     user = await get_user_by_token(token)
     filters = [
@@ -65,7 +67,9 @@ async def new_contract(token: str, contracts_data: schemas.ContractCreateMass):
         if contract_values.get("contragent") is not None:
             if contract_values["contragent"] not in contragents_cache:
                 try:
-                    await check_contragent_exists(contract_values["contragent"], user.cashbox_id)
+                    await check_contragent_exists(
+                        contract_values["contragent"], user.cashbox_id
+                    )
                     contragents_cache.add(contract_values["contragent"])
                 except HTTPException as e:
                     exceptions.append(str(contract_values) + " " + e.detail)
@@ -74,7 +78,9 @@ async def new_contract(token: str, contracts_data: schemas.ContractCreateMass):
         if contract_values.get("organization") is not None:
             if contract_values["organization"] not in organizations_cache:
                 try:
-                    await check_entity_exists(organizations, contract_values["organization"], user.id)
+                    await check_entity_exists(
+                        organizations, contract_values["organization"], user.id
+                    )
                     organizations_cache.add(contract_values["organization"])
                 except HTTPException as e:
                     exceptions.append(str(contract_values) + " " + e.detail)
@@ -84,7 +90,9 @@ async def new_contract(token: str, contracts_data: schemas.ContractCreateMass):
         contract_id = await database.execute(query)
         inserted_ids.add(contract_id)
 
-    query = contracts.select().where(contracts.c.cashbox == user.cashbox_id, contracts.c.id.in_(inserted_ids))
+    query = contracts.select().where(
+        contracts.c.cashbox == user.cashbox_id, contracts.c.id.in_(inserted_ids)
+    )
     contracts_db = await database.fetch_all(query)
     contracts_db = [*map(datetime_to_timestamp, contracts_db)]
 
@@ -98,7 +106,9 @@ async def new_contract(token: str, contracts_data: schemas.ContractCreateMass):
     )
 
     if exceptions:
-        raise HTTPException(400, "Не были добавлены следующие записи: " + ", ".join(exceptions))
+        raise HTTPException(
+            400, "Не были добавлены следующие записи: " + ", ".join(exceptions)
+        )
 
     return contracts_db
 
@@ -116,12 +126,20 @@ async def edit_contract(
 
     if contract_values:
         if contract_values.get("contragent") is not None:
-            await check_contragent_exists(contract_values["contragent"], user.cashbox_id)
+            await check_contragent_exists(
+                contract_values["contragent"], user.cashbox_id
+            )
 
         if contract_values.get("organization") is not None:
-            await check_entity_exists(organizations, contract_values["organization"], user.id)
+            await check_entity_exists(
+                organizations, contract_values["organization"], user.id
+            )
 
-        query = contracts.update().where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id).values(contract_values)
+        query = (
+            contracts.update()
+            .where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id)
+            .values(contract_values)
+        )
         await database.execute(query)
         contract_db = await get_entity_by_id(contracts, idx, user.id)
 
@@ -142,10 +160,16 @@ async def delete_contract(token: str, idx: int):
 
     await get_entity_by_id(contracts, idx, user.id)
 
-    query = contracts.update().where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id).values({"is_deleted": True})
+    query = (
+        contracts.update()
+        .where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id)
+        .values({"is_deleted": True})
+    )
     await database.execute(query)
 
-    query = contracts.select().where(contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id)
+    query = contracts.select().where(
+        contracts.c.id == idx, contracts.c.cashbox == user.cashbox_id
+    )
     contract_db = await database.fetch_one(query)
     contract_db = datetime_to_timestamp(contract_db)
 

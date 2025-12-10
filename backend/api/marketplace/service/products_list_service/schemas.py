@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -18,8 +18,10 @@ class AvailableWarehouse(BaseModel):
     class Config:
         orm_mode = True
 
+
 class MarketplaceProduct(BaseModel):
     """Модель товара для маркетплейса"""
+
     id: int
     name: str
     description_short: Optional[str] = None
@@ -50,7 +52,7 @@ class MarketplaceProduct(BaseModel):
 
     seller_name: Optional[str] = None  # Имя селлера
     seller_photo: Optional[str] = None  # Фото селлера
-    seller_description: Optional[str] = None # Описание селлера
+    seller_description: Optional[str] = None  # Описание селлера
 
     total_sold: Optional[int] = None
 
@@ -62,13 +64,17 @@ class MarketplaceProduct(BaseModel):
     class Config:
         orm_mode = True
 
+
 class MarketplaceProductAttribute(BaseModel):
     """Атрибуты товара"""
+
     name: str
     value: str
 
+
 class MarketplaceProductDetail(MarketplaceProduct):
     """Дополненная модель товара для маркетплейса"""
+
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
     seo_keywords: Optional[List[str]] = None
@@ -79,8 +85,10 @@ class MarketplaceProductDetail(MarketplaceProduct):
     class Config:
         orm_mode = True
 
+
 class MarketplaceProductList(BaseModel):
     """Список товаров маркетплейса"""
+
     result: List[MarketplaceProduct]
     count: int
     page: int
@@ -96,6 +104,7 @@ class MarketplaceSort(Enum):
     total_sold = "total_sold"
     created_at = "created_at"
     updated_at = "updated_at"
+
 
 class MarketplaceProductsRequest(BaseModel):
     phone: Optional[str] = None

@@ -1,23 +1,29 @@
 import datetime
 import json
-from typing import Mapping, Any, Optional
+from typing import Any, Mapping, Optional
 
 from aio_pika import IncomingMessage
-from fastapi import HTTPException
-from sqlalchemy import select
-
 from api.docs_sales.api.routers import delivery_info as create_delivery_info
-from api.docs_sales.schemas import Create as CreateDocsSales
-from api.docs_sales.schemas import CreateMass as CreateMassDocsSales
-from api.docs_sales.schemas import Item as DocsSalesItem
+from api.docs_sales.schemas import (
+    Create as CreateDocsSales,
+    CreateMass as CreateMassDocsSales,
+    Item as DocsSalesItem,
+)
 from api.docs_sales.web.views.CreateDocsSalesView import CreateDocsSalesView
 from api.docs_sales_utm_tags.schemas import CreateUTMTag
 from api.docs_sales_utm_tags.service import get_docs_sales_utm_service
-from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import CreateMarketplaceOrderMessage
+from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import (
+    CreateMarketplaceOrderMessage,
+)
 from api.marketplace.rabbitmq.utils import get_rabbitmq_factory
-from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood, CreateOrderUtm
+from api.marketplace.service.orders_service.schemas import (
+    CreateOrderUtm,
+    MarketplaceOrderGood,
+)
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
-from database.db import users_cboxes_relation, database, prices
+from database.db import database, prices, users_cboxes_relation
+from fastapi import HTTPException
+from sqlalchemy import select
 
 
 class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]):
@@ -29,11 +35,19 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
         except HTTPException:
             pass
 
-    async def __call__(self, event: Mapping[str, Any], message: Optional[IncomingMessage] = None):
+    async def __call__(
+        self, event: Mapping[str, Any], message: Optional[IncomingMessage] = None
+    ):
         data = CreateMarketplaceOrderMessage(**event)
-        token_query = select(users_cboxes_relation.c.token).where(users_cboxes_relation.c.cashbox_id == data.cashbox_id)
+        token_query = select(users_cboxes_relation.c.token).where(
+            users_cboxes_relation.c.cashbox_id == data.cashbox_id
+        )
         token = (await database.fetch_one(token_query)).token
-        comment = json.dumps(data.additional_data, ensure_ascii=False) if data.additional_data else ""
+        comment = (
+            json.dumps(data.additional_data, ensure_ascii=False)
+            if data.additional_data
+            else ""
+        )
 
         # разделить по warehouses
         warehouses_dict: dict[tuple[int, int], list[MarketplaceOrderGood]] = {}
@@ -59,10 +73,18 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
                             warehouse=warehouse_and_organization[0],
                             goods=[
                                 DocsSalesItem(
-                                    price=(await database.fetch_one(select(prices.c.price).where(prices.c.nomenclature == good.nomenclature_id))).price,
+                                    price=(
+                                        await database.fetch_one(
+                                            select(prices.c.price).where(
+                                                prices.c.nomenclature
+                                                == good.nomenclature_id
+                                            )
+                                        )
+                                    ).price,
                                     quantity=good.quantity,
-                                    nomenclature=good.nomenclature_id
-                                ) for good in goods
+                                    nomenclature=good.nomenclature_id,
+                                )
+                                for good in goods
                             ],
                             dated=datetime.datetime.now().timestamp(),
                             status=True,
@@ -71,14 +93,12 @@ class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]
                             # loyality_card_id=,
                         )
                     ]
-                )
+                ),
             )
-            docs_sales_id = create_result[0]['id']
+            docs_sales_id = create_result[0]["id"]
             # выставляем delivery_info
             await create_delivery_info(
-                token=token,
-                idx=docs_sales_id,
-                data=data.delivery_info
+                token=token, idx=docs_sales_id, data=data.delivery_info
             )
             # добавляем utm
             if data.utm:

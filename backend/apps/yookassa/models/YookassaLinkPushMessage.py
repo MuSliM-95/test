@@ -11,4 +11,3 @@ class YookassaLinkPushMessage(BaseModelMessage):
     install_id: int
     cashbox_id: int
     payment: PaymentBaseModel
-

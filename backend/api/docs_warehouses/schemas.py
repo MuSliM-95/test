@@ -1,8 +1,7 @@
 from enum import Enum
+from typing import List, Optional
 
 from pydantic import BaseModel
-from typing import Optional, List
-from database.db import Operation
 
 
 class WarehouseOperations(str, Enum):
@@ -121,10 +120,6 @@ class ListView(BaseModel):
     class Config:
         orm_mode = True
 
+
 class DeleteListView(ViewInList):
     deleted: Optional[List]
-
-
-
-
-

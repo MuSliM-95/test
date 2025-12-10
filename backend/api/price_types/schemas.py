@@ -1,6 +1,7 @@
 import re
+from typing import List, Optional
+
 from pydantic import BaseModel, validator
-from typing import Optional, List
 
 
 class PriceTypeCreate(BaseModel):
@@ -49,6 +50,7 @@ class PriceTypeList(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 class PriceTypeListGet(BaseModel):
     result: Optional[List[PriceType]]

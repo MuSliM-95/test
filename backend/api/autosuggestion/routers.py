@@ -1,10 +1,9 @@
+from api.autosuggestion.schemas import AutosuggestResponse
+from common.geocoders.instance import geocoder
 from fastapi import APIRouter
 
-from common.geocoders.instance import geocoder
-
-from api.autosuggestion.schemas import AutosuggestResponse
-
 router = APIRouter(prefix="/autosuggestions", tags=["autosuggestions"])
+
 
 @router.get("/geolocation", response_model=AutosuggestResponse)
 async def autosuggest_location(query: str, limit: int = 5):

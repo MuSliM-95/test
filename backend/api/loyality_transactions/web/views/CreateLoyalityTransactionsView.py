@@ -2,13 +2,16 @@ import asyncio
 from datetime import datetime
 from typing import List, Union
 
-from fastapi import HTTPException
-from sqlalchemy import select, and_
-
 from api.loyality_transactions import schemas
 from api.loyality_transactions.routers import raschet_bonuses
 from database.db import database, loyality_cards, loyality_transactions
-from functions.helpers import get_user_by_token, clear_phone_number, datetime_to_timestamp
+from fastapi import HTTPException
+from functions.helpers import (
+    clear_phone_number,
+    datetime_to_timestamp,
+    get_user_by_token,
+)
+from sqlalchemy import and_, select
 from ws_manager import manager
 
 
@@ -73,7 +76,9 @@ class CreateLoyalityTransactionsView:
             if payload.get("dated"):
                 payload["dated"] = datetime.fromtimestamp(payload["dated"])
             else:
-                payload["dated"] = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                payload["dated"] = datetime.now().replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
 
             payload.update(
                 loyality_card_id=card.id,
@@ -105,17 +110,23 @@ class CreateLoyalityTransactionsView:
                 """
             await database.execute_many(
                 query=update_query,
-                values=[{"id": cid, "delta": round(d, 2)} for cid, d in balance_delta.items()],
+                values=[
+                    {"id": cid, "delta": round(d, 2)}
+                    for cid, d in balance_delta.items()
+                ],
             )
 
         lt_rows = await database.fetch_all(
-            select(loyality_transactions).where(loyality_transactions.c.id.in_([k.id for k in ids]))
+            select(loyality_transactions).where(
+                loyality_transactions.c.id.in_([k.id for k in ids])
+            )
         )
         lt_rows_ts = [datetime_to_timestamp(r) for r in lt_rows]
 
         for row in lt_rows_ts:
             await manager.send_message(
-                token, {"action": "create", "target": "loyality_transactions", "result": row}
+                token,
+                {"action": "create", "target": "loyality_transactions", "result": row},
             )
         for card_id in balance_delta:
             asyncio.create_task(raschet_bonuses(card_id))

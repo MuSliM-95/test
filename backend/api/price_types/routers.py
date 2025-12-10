@@ -1,16 +1,16 @@
-from fastapi import APIRouter, Query, HTTPException
-
-from database.db import database, price_types
+from typing import Optional
 
 import api.price_types.schemas as schemas
-
-from functions.helpers import datetime_to_timestamp, get_entity_by_id
-from functions.helpers import get_user_by_token, raise_bad_request
-
+from database.db import database, price_types
+from fastapi import APIRouter, HTTPException, Query
+from functions.helpers import (
+    datetime_to_timestamp,
+    get_entity_by_id,
+    get_user_by_token,
+    raise_bad_request,
+)
+from sqlalchemy import func, select
 from ws_manager import manager
-from sqlalchemy import select, func
-
-from typing import Optional
 
 router = APIRouter(tags=["price_types"])
 
@@ -26,11 +26,11 @@ async def get_price_type_by_id(token: str, idx: int):
 
 @router.get("/price_types/", response_model=schemas.PriceTypeListGet)
 async def get_price_types(
-        token: str,
-        limit: int = 100,
-        offset: int = 0,
-        tags: Optional[str] = Query(None),
-        mode: Optional[str] = Query("or"),
+    token: str,
+    limit: int = 100,
+    offset: int = 0,
+    tags: Optional[str] = Query(None),
+    mode: Optional[str] = Query("or"),
 ):
     """Получение списка типов цен"""
     user = await get_user_by_token(token)
@@ -40,12 +40,9 @@ async def get_price_types(
     if mode not in ("and", "or"):
         raise HTTPException(400, "mode must be 'and' or 'or'")
 
-    query = (
-        price_types.select()
-        .where(
-            price_types.c.cashbox == user.cashbox_id,
-            price_types.c.is_deleted.is_not(True),
-        )
+    query = price_types.select().where(
+        price_types.c.cashbox == user.cashbox_id,
+        price_types.c.is_deleted.is_not(True),
     )
 
     if tag_list:
@@ -59,12 +56,9 @@ async def get_price_types(
     price_types_db = await database.fetch_all(query)
     price_types_db = [*map(datetime_to_timestamp, price_types_db)]
 
-    count_query = (
-        select(func.count(price_types.c.id))
-        .where(
-            price_types.c.cashbox == user.cashbox_id,
-            price_types.c.is_deleted.is_not(True),
-        )
+    count_query = select(func.count(price_types.c.id)).where(
+        price_types.c.cashbox == user.cashbox_id,
+        price_types.c.is_deleted.is_not(True),
     )
 
     if tag_list:
@@ -74,7 +68,7 @@ async def get_price_types(
             count_query = count_query.where(price_types.c.tags.overlap(tag_list))
 
     price_types_db_count = await database.fetch_one(count_query)
-    
+
     return {"result": price_types_db, "count": price_types_db_count.count_1}
 
 
@@ -148,7 +142,7 @@ async def delete_price_type(token: str, idx: int):
 
     if price_type_db.is_system:
         raise_bad_request("Невозможно удалить системный вид цены")
-    
+
     query = (
         price_types.update()
         .where(price_types.c.id == idx, price_types.c.cashbox == user.cashbox_id)

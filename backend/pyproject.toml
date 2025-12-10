@@ -30,10 +30,10 @@ ignore = [
     "N803",  # Argument name should be lowercase (Имена аргументов)
     "N806",  # Variable in function should be lowercase (Переменные внутри функций)
     "N815",  # Variable in class scope should not be mixedCase (Переменные в классах)
-    # # TODO: удалить исключение после тестов
-    # "F821",  # Undefined name (Неопределенная переменная)
-    # # TODO: удалить исключение после тестов
-    # "F401"
+    # TODO: удалить исключение после тестов
+    "F821",  # Undefined name (Неопределенная переменная)
+    # TODO: удалить исключение после тестов
+    "F401"
 ]
 
 # Настройки сортировки импортов внутри Ruff

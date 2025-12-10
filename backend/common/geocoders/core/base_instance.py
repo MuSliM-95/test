@@ -1,6 +1,8 @@
-from common.geocoders.schemas import GeocoderSearchResponse
 from abc import ABC, abstractmethod
-from typing import Union, List
+from typing import List, Union
+
+from common.geocoders.schemas import GeocoderSearchResponse
+
 
 class BaseGeocoder(ABC):
     @abstractmethod
@@ -8,5 +10,7 @@ class BaseGeocoder(ABC):
         pass
 
     @abstractmethod
-    async def validate_address(self, address: str, limit=1) -> Union[GeocoderSearchResponse, None]:
+    async def validate_address(
+        self, address: str, limit=1
+    ) -> Union[GeocoderSearchResponse, None]:
         pass

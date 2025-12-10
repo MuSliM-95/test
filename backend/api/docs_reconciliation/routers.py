@@ -1,27 +1,23 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
-
 from const import PaymentType
 from database.db import (
-    database,
-    docs_reconciliation,
-    organizations,
-    docs_sales,
-    contragents,
-    docs_purchases,
-    payments,
-    entity_to_entity,
     contracts,
+    contragents,
+    database,
+    docs_purchases,
+    docs_reconciliation,
+    docs_sales,
+    entity_to_entity,
+    organizations,
+    payments,
 )
+from fastapi import APIRouter, HTTPException
+from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import func, select
+from ws_manager import manager
 
 from . import schemas
-
-from functions.helpers import datetime_to_timestamp
-from functions.helpers import get_user_by_token
-
-from ws_manager import manager
-from sqlalchemy import select, func
 
 router = APIRouter(tags=["docs_reconciliation"])
 
@@ -44,7 +40,7 @@ async def get_by_id(token: str, idx: int):
     instance_db = await database.fetch_one(query)
 
     if not instance_db:
-        raise HTTPException(status_code=404, detail=f"Не найдено.")
+        raise HTTPException(status_code=404, detail="Не найдено.")
 
     instance_db = datetime_to_timestamp(instance_db)
     return instance_db
@@ -63,9 +59,8 @@ async def get_list(token: str, limit: int = 100, offset: int = 0):
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
 
-    query = (
-        select(func.count(docs_reconciliation.c.id))
-        .where(docs_reconciliation.c.is_deleted.is_not(True))
+    query = select(func.count(docs_reconciliation.c.id)).where(
+        docs_reconciliation.c.is_deleted.is_not(True)
     )
     items_db_c = await database.fetch_one(query)
     return {"result": items_db, "count": items_db_c.count_1}
@@ -319,9 +314,11 @@ async def create(token: str, docs_reconciliation_data: schemas.CreateMass):
             "dated": int(datetime.now().timestamp()),
             "organization": organization_id,
             "contragent": contragent_id,
-            "contract": request_values["contract_id"]
-            if request_values.get("contract_id")
-            else None,
+            "contract": (
+                request_values["contract_id"]
+                if request_values.get("contract_id")
+                else None
+            ),
             "organization_name": organization_db.short_name,
             "contragent_name": contragent_db.name,
             "period_from": request_values["period_from"],

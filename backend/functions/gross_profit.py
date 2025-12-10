@@ -3,25 +3,24 @@ from datetime import datetime, timedelta
 from os import environ
 
 import aio_pika
-from sqlalchemy import desc
-
 from api.articles.schemas import DistributeAccording
-from const import SaleOperations, PaymentType, report_queue_name
+from const import PaymentType, SaleOperations, report_queue_name
 from database.db import (
-    organizations,
+    articles,
     database,
+    distribution_docs_operations,
     docs_sales,
     fifo_settings,
     gross_profit_docs,
     gross_profit_docs_operations,
-    distribution_docs_operations,
+    organizations,
     payments,
-    articles,
 )
 from functions.goods_distribution import (
     is_organization_in_progress,
     set_organization_in_progress,
 )
+from sqlalchemy import desc
 
 
 async def generate_gross_profit_report(

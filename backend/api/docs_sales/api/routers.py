@@ -1,13 +1,29 @@
 import asyncio
-import datetime
 import calendar
+import datetime
 import hashlib
 import os
-from typing import Any, Dict, Optional, Union, List
+from typing import Any, Dict, Optional, Union
 
+from api.docs_sales import schemas
+from api.docs_sales.application.queries import (
+    GetDocSaleByIdQuery,
+    GetDocsSalesListByCreatedDateQuery,
+    GetDocsSalesListByDeliveryDateQuery,
+    GetDocsSalesListQuery,
+)
+from api.docs_sales.notify_service import (
+    format_notification_text,
+    send_order_notification,
+)
 from api.docs_warehouses.routers import update as update_warehouse_doc
 from api.docs_warehouses.schemas import EditMass as WarehouseUpdate
 from api.docs_warehouses.utils import create_warehouse_docs
+from api.employee_shifts.service import (
+    check_user_on_shift,
+    get_available_couriers_on_shift,
+    get_available_pickers_on_shift,
+)
 from api.loyality_transactions.routers import raschet_bonuses
 from apps.yookassa.functions.impl.GetOauthCredentialFunction import (
     GetOauthCredentialFunction,
@@ -19,13 +35,6 @@ from apps.yookassa.models.PaymentModel import (
     ItemModel,
     PaymentCreateModel,
     ReceiptModel,
-    
-)
-from apps.yookassa.repositories.impl.YookassaTableNomenclature import (
-    YookassaTableNomenclature,
-)
-from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
-    YookasssaAmoTableCrmRepository,
 )
 from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import (
     YookassaCrmPaymentsRepository,
@@ -39,9 +48,14 @@ from apps.yookassa.repositories.impl.YookassaPaymentsRepository import (
 from apps.yookassa.repositories.impl.YookassaRequestRepository import (
     YookassaRequestRepository,
 )
+from apps.yookassa.repositories.impl.YookassaTableNomenclature import (
+    YookassaTableNomenclature,
+)
+from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
+    YookasssaAmoTableCrmRepository,
+)
 from apps.yookassa.services.impl.OauthService import OauthService
 from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
-
 from database.db import (
     NomenclatureCashbackType,
     OrderStatus,
@@ -68,9 +82,6 @@ from database.db import (
     users_cboxes_relation,
     warehouse_balances,
     warehouses,
-    segment_objects,
-    SegmentObjectType,
-    Role,
 )
 from fastapi import APIRouter, Depends, HTTPException, Query
 from functions.helpers import (
@@ -84,24 +95,11 @@ from functions.helpers import (
     datetime_to_timestamp,
     get_user_by_token,
     raschet_oplat,
-    build_filters
 )
 from functions.users import raschet
 from producer import queue_notification
-from sqlalchemy import and_, desc, func, select, exists, or_, String, cast
+from sqlalchemy import and_, desc, func, select
 from ws_manager import manager
-
-from api.docs_sales import schemas
-from api.docs_sales.notify_service import format_notification_text, send_order_notification
-
-from api.employee_shifts.service import (
-    check_user_on_shift,
-    get_available_pickers_on_shift,
-    get_available_couriers_on_shift
-)
-
-from api.docs_sales.application.queries import (GetDocsSalesListByDeliveryDateQuery,
-    GetDocsSalesListQuery, GetDocsSalesListByCreatedDateQuery, GetDocSaleByIdQuery)
 
 router = APIRouter(tags=["docs_sales"])
 
@@ -253,7 +251,10 @@ async def get_list(
 ):
     user = await get_user_by_token(token)
     query = GetDocsSalesListQuery()
-    return await query.execute(cashbox_id=user.cashbox_id, limit=limit, offset=offset, filters=filters)
+    return await query.execute(
+        cashbox_id=user.cashbox_id, limit=limit, offset=offset, filters=filters
+    )
+
 
 @router.get("/docs_sales/created/{date}", response_model=schemas.CountRes)
 async def get_list_by_created_date(
@@ -281,6 +282,7 @@ async def get_list_by_delivery_date(
     user = await get_user_by_token(token)
     query = GetDocsSalesListByDeliveryDateQuery()
     return await query.execute(cashbox_id=user.cashbox_id, date=date, filters=filters)
+
 
 async def check_foreign_keys(instance_values, user, exceptions) -> bool:
     if instance_values.get("client") is not None:
@@ -1294,7 +1296,12 @@ async def delivery_info(token: str, idx: int, data: schemas.DeliveryInfoSchema):
     )
     delivery_info_db = await database.fetch_one(check_delivery_info_query)
     if delivery_info_db:
-        query = docs_sales_delivery_info.update().values(data_dict).where(docs_sales_delivery_info.c.docs_sales_id == idx).returning(docs_sales_delivery_info.c.id)
+        query = (
+            docs_sales_delivery_info.update()
+            .values(data_dict)
+            .where(docs_sales_delivery_info.c.docs_sales_id == idx)
+            .returning(docs_sales_delivery_info.c.id)
+        )
     else:
         query = docs_sales_delivery_info.insert().values(data_dict)
 
@@ -1399,7 +1406,9 @@ async def notify_order(
 
     if notify_config.type == schemas.NotifyType.assembly:
         if order.assigned_picker:
-            if await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
+            if await check_user_on_shift(
+                order.assigned_picker, check_shift_settings=True
+            ):
                 picker_query = (
                     select([users.c.chat_id])
                     .select_from(
@@ -1413,10 +1422,10 @@ async def notify_order(
                 picker = await database.fetch_one(picker_query)
                 if picker and picker.chat_id:
                     recipients.append(picker.chat_id)
-        
+
         if not recipients:
             available_pickers = await get_available_pickers_on_shift(order.cashbox)
-            
+
             if available_pickers:
                 pickers_query = (
                     select([users.c.chat_id])
@@ -1435,7 +1444,9 @@ async def notify_order(
 
     elif notify_config.type == schemas.NotifyType.delivery:
         if order.assigned_courier:
-            if await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
+            if await check_user_on_shift(
+                order.assigned_courier, check_shift_settings=True
+            ):
                 courier_query = (
                     select([users.c.chat_id])
                     .select_from(
@@ -1449,10 +1460,10 @@ async def notify_order(
                 courier = await database.fetch_one(courier_query)
                 if courier and courier.chat_id:
                     recipients.append(courier.chat_id)
-        
+
         if not recipients:
             available_couriers = await get_available_couriers_on_shift(order.cashbox)
-            
+
             if available_couriers:
                 couriers_query = (
                     select([users.c.chat_id])
@@ -1470,7 +1481,9 @@ async def notify_order(
                         recipients.append(courier.chat_id)
 
     elif notify_config.type == schemas.NotifyType.general:
-        if order.assigned_picker and await check_user_on_shift(order.assigned_picker, check_shift_settings=True):
+        if order.assigned_picker and await check_user_on_shift(
+            order.assigned_picker, check_shift_settings=True
+        ):
             picker_query = (
                 select([users.c.chat_id])
                 .select_from(
@@ -1484,8 +1497,10 @@ async def notify_order(
             picker = await database.fetch_one(picker_query)
             if picker and picker.chat_id:
                 recipients.append(picker.chat_id)
-        
-        if order.assigned_courier and await check_user_on_shift(order.assigned_courier, check_shift_settings=True):
+
+        if order.assigned_courier and await check_user_on_shift(
+            order.assigned_courier, check_shift_settings=True
+        ):
             courier_query = (
                 select([users.c.chat_id])
                 .select_from(
@@ -1499,15 +1514,19 @@ async def notify_order(
             courier = await database.fetch_one(courier_query)
             if courier and courier.chat_id:
                 recipients.append(courier.chat_id)
-        
+
         if not recipients:
             all_available = []
-            available_pickers = await get_available_pickers_on_shift(order.cashbox)  # По умолчанию учитывает настройки
-            available_couriers = await get_available_couriers_on_shift(order.cashbox)  # По умолчанию учитывает настройки
+            available_pickers = await get_available_pickers_on_shift(
+                order.cashbox
+            )  # По умолчанию учитывает настройки
+            available_couriers = await get_available_couriers_on_shift(
+                order.cashbox
+            )  # По умолчанию учитывает настройки
             all_available.extend(available_pickers)
             all_available.extend(available_couriers)
-            all_available = list(set(all_available)) 
-            
+            all_available = list(set(all_available))
+
             if all_available:
                 workers_query = (
                     select([users.c.chat_id])
@@ -1622,7 +1641,7 @@ async def update_order_status(
         # Если сборщик еще не назначен, назначаем текущего пользователя
         if not order.assigned_picker:
             update_values["assigned_picker"] = user.id
-        
+
         # Проверяем назначенного сборщика
         assigned_picker = order.assigned_picker or user.id
         if await check_user_on_shift(assigned_picker):
@@ -1637,7 +1656,7 @@ async def update_order_status(
         # Если курьер еще не назначен, назначаем текущего пользователя
         if not order.assigned_courier:
             update_values["assigned_courier"] = user.id
-        
+
         assigned_courier = order.assigned_courier or user.id
         if await check_user_on_shift(assigned_courier):
             notification_recipients.append(assigned_courier)
@@ -1651,7 +1670,9 @@ async def update_order_status(
             if await check_user_on_shift(order.assigned_courier):
                 notification_recipients.append(order.assigned_courier)
             else:
-                available_couriers = await get_available_couriers_on_shift(order.cashbox)
+                available_couriers = await get_available_couriers_on_shift(
+                    order.cashbox
+                )
                 notification_recipients.extend(available_couriers)
 
     elif target_status == OrderStatus.delivered:
@@ -1675,13 +1696,15 @@ async def update_order_status(
 
     # Получаем данные о назначенных пользователях
     if updated_order.get("assigned_picker"):
-        user_query = users.select().where(users.c.id == updated_order["assigned_picker"])
+        user_query = users.select().where(
+            users.c.id == updated_order["assigned_picker"]
+        )
         picker_user = await database.fetch_one(user_query)
         if picker_user:
             updated_order["assigned_picker"] = {
                 "id": picker_user.id,
                 "first_name": picker_user.first_name,
-                "last_name": picker_user.last_name
+                "last_name": picker_user.last_name,
             }
             await manager.send_message(
                 token,
@@ -1694,15 +1717,16 @@ async def update_order_status(
                 },
             )
 
-
     if updated_order.get("assigned_courier"):
-        user_query = users.select().where(users.c.id == updated_order["assigned_courier"])
+        user_query = users.select().where(
+            users.c.id == updated_order["assigned_courier"]
+        )
         courier_user = await database.fetch_one(user_query)
         if courier_user:
             updated_order["assigned_courier"] = {
                 "id": courier_user.id,
                 "first_name": courier_user.first_name,
-                "last_name": courier_user.last_name
+                "last_name": courier_user.last_name,
             }
             await manager.send_message(
                 token,
@@ -1853,7 +1877,7 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
         if role == "general":
             order_data = datetime_to_timestamp(order)
             return order_data
-        
+
         elif role == "courier":
             courier_data = {
                 "id": order.id,
@@ -1880,7 +1904,7 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
 
     elif role == "picker":
         query = f"""
-            SELECT 
+            SELECT
                 sales.*,
                 {', '.join(f'warehouse.{c.name} AS warehouse_{c.name}' for c in warehouses.c)},
                 {', '.join(f'contragent.{c.name} AS contragent_{c.name}' for c in contragents.c)}
@@ -1889,12 +1913,12 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
             LEFT JOIN contragents contragent ON contragent.id = sales.contragent
             WHERE sales.id = :order_id AND sales.is_deleted IS NOT TRUE
         """
-        order = await database.fetch_one(query, { "order_id": order_id })
+        order = await database.fetch_one(query, {"order_id": order_id})
         order_dict = dict(order)
 
         if not order:
             raise HTTPException(status_code=404, detail="Заказ не найден")
-        
+
         order_dict["status"] = order_dict["order_status"]
 
         query = f"""
@@ -1914,17 +1938,17 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
             left join lateral (
                 select "id", "url", "is_main"
                 from "pictures"
-                where 
-                    "entity" = 'nomenclature' AND 
+                where
+                    "entity" = 'nomenclature' AND
                     "entity_id" = "nomenclature"."id"
-                order by 
+                order by
                     "is_main" desc,
                     "id" asc
                 limit 1
             ) "pictures" on true
             where "goods"."docs_sales_id" = :order_id
         """
-        goods = await database.fetch_all(query, { "order_id": order_id })
+        goods = await database.fetch_all(query, {"order_id": order_id})
 
         if goods:
             order_dict["goods"] = goods
@@ -1960,31 +1984,29 @@ async def get_cashier_stats(
     """Получение статистики кассира за период."""
     try:
         user = await get_user_by_token(token)
-        
+
         if year is None or month is None:
             now = datetime.datetime.now()
             year = year or now.year
             month = month or now.month
-        
+
         first_day_dt = datetime.datetime(year, month, 1)
         last_day_dt = datetime.datetime(
-            year, month, 
-            calendar.monthrange(year, month)[1], 
-            23, 59, 59
+            year, month, calendar.monthrange(year, month)[1], 23, 59, 59
         )
         first_day = int(first_day_dt.timestamp())
         last_day = int(last_day_dt.timestamp())
-        
+
         date_from = date_from or first_day
         date_to = date_to or last_day
-        
+
         conditions = [
             docs_sales.c.cashbox == user.cashbox_id,
             docs_sales.c.dated >= date_from,
             docs_sales.c.dated <= date_to,
-            docs_sales.c.is_deleted.is_not(True)
+            docs_sales.c.is_deleted.is_not(True),
         ]
-        
+
         query = select(
             docs_sales.c.id,
             docs_sales.c.order_status,
@@ -1993,9 +2015,9 @@ async def get_cashier_stats(
             docs_sales.c.picker_started_at,
             docs_sales.c.picker_finished_at,
         ).where(and_(*conditions))
-        
+
         orders = await database.fetch_all(query)
-        
+
         if not orders:
             return schemas.CashierStats(
                 orders_completed=0,
@@ -2003,35 +2025,37 @@ async def get_cashier_stats(
                 rating=0.0,
                 average_check=0.0,
                 hours_processed=0.0,
-                successful_orders_percent=0.0
+                successful_orders_percent=0.0,
             )
-        
+
         total_orders = len(orders)
-        completed = sum(1 for o in orders if o['order_status'] == 'success')
-        errors = sum(1 for o in orders if o['order_status'] == 'closed')
-        total_sum = sum(o['sum'] or 0 for o in orders)
-        
+        completed = sum(1 for o in orders if o["order_status"] == "success")
+        errors = sum(1 for o in orders if o["order_status"] == "closed")
+        total_sum = sum(o["sum"] or 0 for o in orders)
+
         average_check = total_sum / total_orders if total_orders > 0 else 0.0
-        
+
         hours_processed = 0.0
         for order in orders:
-            if order['picker_started_at'] and order['picker_finished_at']:
-                diff = order['picker_finished_at'] - order['picker_started_at']
+            if order["picker_started_at"] and order["picker_finished_at"]:
+                diff = order["picker_finished_at"] - order["picker_started_at"]
                 hours_processed += diff.total_seconds() / 3600
-        
+
         hours_processed = float(hours_processed)
-        
-        successful_percent = (completed / total_orders * 100) if total_orders > 0 else 0.0
-        
+
+        successful_percent = (
+            (completed / total_orders * 100) if total_orders > 0 else 0.0
+        )
+
         rating = 0.0
-        
+
         return schemas.CashierStats(
             orders_completed=completed,
             errors=errors,
             rating=rating,
             average_check=average_check,
             hours_processed=hours_processed,
-            successful_orders_percent=successful_percent
+            successful_orders_percent=successful_percent,
         )
     except Exception:
         return schemas.CashierStats(
@@ -2040,7 +2064,7 @@ async def get_cashier_stats(
             rating=0.0,
             average_check=0.0,
             hours_processed=0.0,
-            successful_orders_percent=0.0
+            successful_orders_percent=0.0,
         )
 
 
@@ -2056,84 +2080,86 @@ async def get_docs_sales_analytics(
     """Получение детальной аналитики по заказам за период."""
     try:
         user = await get_user_by_token(token)
-        
+
         if year is None or month is None:
             now = datetime.datetime.now()
             year = year or now.year
             month = month or now.month
-        
+
         first_day_dt = datetime.datetime(year, month, 1)
         last_day_dt = datetime.datetime(
-            year, month,
-            calendar.monthrange(year, month)[1],
-            23, 59, 59
+            year, month, calendar.monthrange(year, month)[1], 23, 59, 59
         )
         first_day = int(first_day_dt.timestamp())
         last_day = int(last_day_dt.timestamp())
-        
+
         date_from = date_from or first_day
         date_to = date_to or last_day
-        
+
         conditions = [
             docs_sales.c.cashbox == user.cashbox_id,
             docs_sales.c.dated >= date_from,
             docs_sales.c.dated <= date_to,
-            docs_sales.c.is_deleted.is_not(True)
+            docs_sales.c.is_deleted.is_not(True),
         ]
-        
+
         if role == "picker":
             conditions.append(docs_sales.c.assigned_picker == user.user)
         elif role == "courier":
             conditions.append(docs_sales.c.assigned_courier == user.user)
         elif role == "manager":
             conditions.append(docs_sales.c.created_by == user.user)
-        
-        query = select(
-            docs_sales.c.id,
-            docs_sales.c.dated,
-            docs_sales.c.order_status,
-            docs_sales.c.sum,
-            docs_sales.c.status,
-        ).where(and_(*conditions)).order_by(docs_sales.c.dated)
-        
+
+        query = (
+            select(
+                docs_sales.c.id,
+                docs_sales.c.dated,
+                docs_sales.c.order_status,
+                docs_sales.c.sum,
+                docs_sales.c.status,
+            )
+            .where(and_(*conditions))
+            .order_by(docs_sales.c.dated)
+        )
+
         orders = await database.fetch_all(query)
-        
+
         days_data = {}
         for order in orders:
-            order_dt = datetime.datetime.fromtimestamp(order['dated'])
+            order_dt = datetime.datetime.fromtimestamp(order["dated"])
             day_dt = order_dt.replace(hour=0, minute=0, second=0, microsecond=0)
             day_timestamp = int(day_dt.timestamp())
             day_number = order_dt.day
-            
+
             if day_timestamp not in days_data:
                 days_data[day_timestamp] = {
-                    'date': day_timestamp,
-                    'day_number': day_number,
-                    'orders_created': 0,
-                    'orders_paid': 0,
-                    'revenue': 0.0,
-                    'by_status': {
-                        'received': 0,
-                        'processed': 0,
-                        'collecting': 0,
-                        'collected': 0,
-                        'picked': 0,
-                        'delivered': 0,
-                        'closed': 0,
-                        'success': 0,
-                    }
+                    "date": day_timestamp,
+                    "day_number": day_number,
+                    "orders_created": 0,
+                    "orders_paid": 0,
+                    "revenue": 0.0,
+                    "by_status": {
+                        "received": 0,
+                        "processed": 0,
+                        "collecting": 0,
+                        "collected": 0,
+                        "picked": 0,
+                        "delivered": 0,
+                        "closed": 0,
+                        "success": 0,
+                    },
                 }
-            
-            days_data[day_timestamp]['orders_created'] += 1
-            days_data[day_timestamp]['revenue'] += float(order['sum'] or 0.0)
-            
-            if order['status'] is True:
-                days_data[day_timestamp]['orders_paid'] += 1
-            
-            status = order['order_status']
-            if status in days_data[day_timestamp]['by_status']:
-                days_data[day_timestamp]['by_status'][status] += 1
-        
+
+            days_data[day_timestamp]["orders_created"] += 1
+            days_data[day_timestamp]["revenue"] += float(order["sum"] or 0.0)
+
+            if order["status"] is True:
+                days_data[day_timestamp]["orders_paid"] += 1
+
+            status = order["order_status"]
+            if status in days_data[day_timestamp]["by_status"]:
+                days_data[day_timestamp]["by_status"][status] += 1
+
         days_list = []
         total_orders = 0
         total_revenue = 0.0
@@ -2143,70 +2169,73 @@ async def get_docs_sales_analytics(
         orders_completed = 0
         orders_planned = 0
         orders_cancelled = 0
-        
-        today_dt = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        today_dt = datetime.datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         today_timestamp = int(today_dt.timestamp())
-        
+
         for day_timestamp in sorted(days_data.keys()):
             day_data = days_data[day_timestamp]
-            total_orders += day_data['orders_created']
-            total_revenue += day_data['revenue']
-            total_paid += day_data['orders_paid']
-            
-            orders_completed += day_data['by_status']['success']
-            orders_planned += (day_data['by_status']['received'] + 
-                              day_data['by_status']['processed'] + 
-                              day_data['by_status']['collecting'] + 
-                              day_data['by_status']['collected'])
-            orders_cancelled += day_data['by_status']['closed']
-            
-            if day_data['orders_created'] > peak_day_orders:
-                peak_day_orders = day_data['orders_created']
+            total_orders += day_data["orders_created"]
+            total_revenue += day_data["revenue"]
+            total_paid += day_data["orders_paid"]
+
+            orders_completed += day_data["by_status"]["success"]
+            orders_planned += (
+                day_data["by_status"]["received"]
+                + day_data["by_status"]["processed"]
+                + day_data["by_status"]["collecting"]
+                + day_data["by_status"]["collected"]
+            )
+            orders_cancelled += day_data["by_status"]["closed"]
+
+            if day_data["orders_created"] > peak_day_orders:
+                peak_day_orders = day_data["orders_created"]
                 peak_day_date = day_timestamp
-            
+
             days_list.append(
                 schemas.DayAnalytics(
-                    date=day_data['date'],
-                    day_number=day_data['day_number'],
-                    orders_created=day_data['orders_created'],
-                    orders_paid=day_data['orders_paid'],
-                    revenue=day_data['revenue'],
-                    by_status=schemas.DayStatusBreakdown(**day_data['by_status'])
+                    date=day_data["date"],
+                    day_number=day_data["day_number"],
+                    orders_created=day_data["orders_created"],
+                    orders_paid=day_data["orders_paid"],
+                    revenue=day_data["revenue"],
+                    by_status=schemas.DayStatusBreakdown(**day_data["by_status"]),
                 )
             )
-        
+
         days_count = len(days_list)
         average_daily_load = total_orders / days_count if days_count > 0 else 0.0
-        
-        today_data = days_data.get(today_timestamp, {
-            'orders_created': 0,
-            'revenue': 0.0,
-            'by_status': {
-                'success': 0,
-                'received': 0,
-                'processed': 0,
-                'collecting': 0,
-                'collected': 0,
-                'closed': 0
-            }
-        })
-        
-        today_completed = today_data['by_status'].get('success', 0)
-        today_planned = (today_data['by_status'].get('received', 0) + 
-                        today_data['by_status'].get('processed', 0) + 
-                        today_data['by_status'].get('collecting', 0) + 
-                        today_data['by_status'].get('collected', 0))
-        today_cancelled = today_data['by_status'].get('closed', 0)
-        
+
+        today_data = days_data.get(
+            today_timestamp,
+            {
+                "orders_created": 0,
+                "revenue": 0.0,
+                "by_status": {
+                    "success": 0,
+                    "received": 0,
+                    "processed": 0,
+                    "collecting": 0,
+                    "collected": 0,
+                    "closed": 0,
+                },
+            },
+        )
+
+        today_completed = today_data["by_status"].get("success", 0)
+        today_planned = (
+            today_data["by_status"].get("received", 0)
+            + today_data["by_status"].get("processed", 0)
+            + today_data["by_status"].get("collecting", 0)
+            + today_data["by_status"].get("collected", 0)
+        )
+        today_cancelled = today_data["by_status"].get("closed", 0)
+
         return schemas.AnalyticsResponse(
-            period=schemas.AnalyticsPeriod(
-                date_from=date_from,
-                date_to=date_to
-            ),
-            filter=schemas.AnalyticsFilter(
-                role=role,
-                user_id=user.user
-            ),
+            period=schemas.AnalyticsPeriod(date_from=date_from, date_to=date_to),
+            filter=schemas.AnalyticsFilter(role=role, user_id=user.user),
             summary=schemas.AnalyticsSummary(
                 total_orders=total_orders,
                 total_revenue=total_revenue,
@@ -2217,26 +2246,25 @@ async def get_docs_sales_analytics(
                 orders_completed=orders_completed,
                 orders_planned=orders_planned,
                 orders_cancelled=orders_cancelled,
-                today_total_orders=today_data['orders_created'],
-                today_revenue=today_data['revenue'],
+                today_total_orders=today_data["orders_created"],
+                today_revenue=today_data["revenue"],
                 today_completed=today_completed,
                 today_planned=today_planned,
-                today_cancelled=today_cancelled
+                today_cancelled=today_cancelled,
             ),
-            days=days_list
+            days=days_list,
         )
     except Exception:
-        today_dt = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_dt = datetime.datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         today_timestamp = int(today_dt.timestamp())
         return schemas.AnalyticsResponse(
             period=schemas.AnalyticsPeriod(
                 date_from=date_from or int(today_dt.timestamp()),
-                date_to=date_to or int(today_dt.timestamp())
+                date_to=date_to or int(today_dt.timestamp()),
             ),
-            filter=schemas.AnalyticsFilter(
-                role=role,
-                user_id=0
-            ),
+            filter=schemas.AnalyticsFilter(role=role, user_id=0),
             summary=schemas.AnalyticsSummary(
                 total_orders=0,
                 total_revenue=0.0,
@@ -2251,7 +2279,7 @@ async def get_docs_sales_analytics(
                 today_revenue=0.0,
                 today_completed=0,
                 today_planned=0,
-                today_cancelled=0
+                today_cancelled=0,
             ),
-            days=[]
+            days=[],
         )

@@ -1,10 +1,12 @@
+import uuid
 from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from .models import TechCardDB, TechCardItemDB
+
 from ..deps import get_db, get_user_by_token
 from . import schemas
-import uuid
+from .models import TechCardDB, TechCardItemDB
 
 router = APIRouter(prefix="/tech_cards", tags=["tech_cards"])
 

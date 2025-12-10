@@ -1,8 +1,9 @@
-from typing import List, Optional
-from enum import Enum
-from pydantic import BaseModel, Field
-from uuid import UUID
 from datetime import datetime
+from enum import Enum
+from typing import List, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class TechCardType(str, Enum):

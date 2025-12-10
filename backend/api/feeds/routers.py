@@ -1,16 +1,13 @@
 import hashlib
 import os
 import uuid
-from typing import Optional
 
+from database.db import database, feeds
 from fastapi import APIRouter, HTTPException
+from functions.helpers import get_user_by_token
 from starlette.responses import Response
 
 from . import schemas
-from functions.helpers import get_user_by_token
-
-from database.db import feeds, database
-
 from .feed_generator.generator import FeedGenerator
 
 router = APIRouter(tags=["feeds"])
@@ -23,10 +20,7 @@ def generate_feed_token() -> str:
 
 
 @router.post("/feeds")
-async def create_feed(
-    token: str,
-    data: schemas.FeedCreate
-):
+async def create_feed(token: str, data: schemas.FeedCreate):
     user = await get_user_by_token(token)
 
     url_token = generate_feed_token()
@@ -45,7 +39,7 @@ async def create_feed(
 
 @router.get("/feeds/{url_token}")
 async def get_feed(
-        url_token: str,
+    url_token: str,
 ):
     query = feeds.select().where(feeds.c.url_token == url_token)
     feed = await database.fetch_one(query)
@@ -65,22 +59,14 @@ async def get_feeds(token: str):
 
     db_feeds = await database.fetch_all(query)
 
-    return schemas.GetFeeds(
-        count=len(db_feeds),
-        feeds=db_feeds
-    )
+    return schemas.GetFeeds(count=len(db_feeds), feeds=db_feeds)
 
 
 @router.patch("/feeds/{idx}")
-async def update_feed(
-        token: str,
-        idx: int,
-        data: schemas.FeedUpdate
-):
+async def update_feed(token: str, idx: int, data: schemas.FeedUpdate):
     user = await get_user_by_token(token)
     query = feeds.select().where(
-        feeds.c.id == idx,
-        feeds.c.cashbox_id == user.cashbox_id
+        feeds.c.id == idx, feeds.c.cashbox_id == user.cashbox_id
     )
     feed = await database.fetch_one(query)
     if feed is None:
@@ -98,18 +84,10 @@ async def update_feed(
 
 
 @router.delete("/feeds/{idx}")
-async def delete_feed(
-        token: str,
-        idx: int
-):
+async def delete_feed(token: str, idx: int):
     user = await get_user_by_token(token)
     query = feeds.delete().where(
-        feeds.c.id == idx,
-        feeds.c.cashbox_id == user.cashbox_id
+        feeds.c.id == idx, feeds.c.cashbox_id == user.cashbox_id
     )
     await database.execute(query)
     return Response(status_code=204)
-
-
-
-

@@ -2,29 +2,38 @@ import json
 import os
 import tempfile
 
-from py_pkpass.models import StoreCard, Pass, BarcodeFormat, Barcode, Field
-from sqlalchemy import select
-
 from api.apple_wallet_card_settings.schemas import WalletCardSettings
 from api.apple_wallet_card_settings.utils import create_default_apple_wallet_setting
-from common.apple_wallet_service.IWalletPassGeneratorService import IWalletPassGeneratorService
 from common.apple_wallet_service.impl.models import PassParamsModel
-from database.db import loyality_cards, contragents, organizations, database, apple_wallet_card_settings
+from common.apple_wallet_service.IWalletPassGeneratorService import (
+    IWalletPassGeneratorService,
+)
 from common.s3_service.impl.S3Client import S3Client
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
-
+from database.db import (
+    apple_wallet_card_settings,
+    contragents,
+    database,
+    loyality_cards,
+    organizations,
+)
+from py_pkpass.models import Barcode, BarcodeFormat, Field, Pass, StoreCard
+from sqlalchemy import select
 
 # load_dotenv()
 
+
 class WalletPassGeneratorService(IWalletPassGeneratorService):
     def __init__(self):
-        self.__wallet_pass_folder = 'apple_wallet_passes'
+        self.__wallet_pass_folder = "apple_wallet_passes"
         self.__bucket_name = "5075293c-docs_generated"
-        self.__s3_client = S3Client(S3SettingsModel(
-            aws_access_key_id=os.getenv("S3_ACCESS"),
-            aws_secret_access_key=os.getenv("S3_SECRET"),
-            endpoint_url=os.getenv("S3_URL")
-        ))
+        self.__s3_client = S3Client(
+            S3SettingsModel(
+                aws_access_key_id=os.getenv("S3_ACCESS"),
+                aws_secret_access_key=os.getenv("S3_SECRET"),
+                endpoint_url=os.getenv("S3_URL"),
+            )
+        )
 
     async def _get_image_from_s3_or_local(self, path: str) -> bytes:
         """
@@ -32,9 +41,9 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
         Если путь начинается с '/', то это локальный файл.
         Иначе это ключ в S3.
         """
-        if path.startswith('/'):
+        if path.startswith("/"):
             # Локальный файл
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 return f.read()
         else:
             # Файл в S3
@@ -43,27 +52,27 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
     async def _generate_pkpass(self, pass_params: PassParamsModel) -> tuple[str, str]:
         # Create a store card pass type
         card_info = StoreCard()
-        balance_field = Field('H1', str(pass_params.balance), 'Баланс')
-        balance_field.changeMessage = 'Ваш баланс %@'
-        cashback_field = Field('H2', str(pass_params.cashback_persent) + '%', 'Бонусы')
-        cashback_field.changeMessage = 'Ваш кешбек теперь %@'
+        balance_field = Field("H1", str(pass_params.balance), "Баланс")
+        balance_field.changeMessage = "Ваш баланс %@"
+        cashback_field = Field("H2", str(pass_params.cashback_persent) + "%", "Бонусы")
+        cashback_field.changeMessage = "Ваш кешбек теперь %@"
 
-        ad_field = Field('B1', pass_params.advertisement, 'Акции')
+        ad_field = Field("B1", pass_params.advertisement, "Акции")
         ad_field.changeMessage = "%@"
 
         card_info.headerFields.append(balance_field)
         card_info.headerFields.append(cashback_field)
         card_info.backFields.append(ad_field)
 
-        card_info.addSecondaryField('S1', pass_params.contragent_name, 'ВЛАДЕЛЕЦ КАРТЫ')
-        card_info.addSecondaryField('S2', pass_params.card_number, 'НОМЕР КАРТЫ')
+        card_info.addSecondaryField("S1", pass_params.contragent_name, "ВЛАДЕЛЕЦ КАРТЫ")
+        card_info.addSecondaryField("S2", pass_params.card_number, "НОМЕР КАРТЫ")
 
         # Create the Pass object with the required identifiers
         passfile = Pass(
             card_info,
-            passTypeIdentifier=os.getenv('APPLE_PASS_TYPE_ID'),
+            passTypeIdentifier=os.getenv("APPLE_PASS_TYPE_ID"),
             organizationName=pass_params.organization_name,
-            teamIdentifier=os.getenv('APPLE_TEAM_ID')
+            teamIdentifier=os.getenv("APPLE_TEAM_ID"),
         )
 
         # Set required pass information
@@ -95,9 +104,11 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
         strip_data = await self._get_image_from_s3_or_local(pass_params.strip_path)
 
         # Создаем временные файлы для изображений
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as icon_tmp, \
-             tempfile.NamedTemporaryFile(delete=False, suffix='.png') as logo_tmp, \
-             tempfile.NamedTemporaryFile(delete=False, suffix='.png') as strip_tmp:
+        with (
+            tempfile.NamedTemporaryFile(delete=False, suffix=".png") as icon_tmp,
+            tempfile.NamedTemporaryFile(delete=False, suffix=".png") as logo_tmp,
+            tempfile.NamedTemporaryFile(delete=False, suffix=".png") as strip_tmp,
+        ):
 
             icon_tmp.write(icon_data)
             logo_tmp.write(logo_data)
@@ -108,35 +119,37 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
             strip_tmp_path = strip_tmp.name
 
         # Создаем временный файл для pkpass
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pkpass') as pkpass_tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pkpass") as pkpass_tmp:
             pkpass_tmp_path = pkpass_tmp.name
 
         try:
             # Including the icon and logo is necessary for the passbook to be valid
-            passfile.addFile('icon.png', open(icon_tmp_path, 'rb'))
-            passfile.addFile('icon@2x.png', open(icon_tmp_path, 'rb'))
-            passfile.addFile('icon@3x.png', open(icon_tmp_path, 'rb'))
-            passfile.addFile('logo.png', open(logo_tmp_path, 'rb'))
-            passfile.addFile('strip@2x.png', open(strip_tmp_path, 'rb'))
+            passfile.addFile("icon.png", open(icon_tmp_path, "rb"))
+            passfile.addFile("icon@2x.png", open(icon_tmp_path, "rb"))
+            passfile.addFile("icon@3x.png", open(icon_tmp_path, "rb"))
+            passfile.addFile("logo.png", open(logo_tmp_path, "rb"))
+            passfile.addFile("strip@2x.png", open(strip_tmp_path, "rb"))
 
             # passfile.expirationDate = pass_params.exp_date.isoformat() if pass_params.exp_date else None
 
             # Create and output the Passbook file (.pkpass) во временный файл
-            password = os.getenv('PKPASS_PASSWORD')
+            password = os.getenv("PKPASS_PASSWORD")
             passfile.create(
-                os.getenv('APPLE_CERTIFICATE_PATH'),
-                os.getenv('APPLE_KEY_PATH'),
-                os.getenv('APPLE_WWDR_PATH'),
+                os.getenv("APPLE_CERTIFICATE_PATH"),
+                os.getenv("APPLE_KEY_PATH"),
+                os.getenv("APPLE_WWDR_PATH"),
                 password,
-                pkpass_tmp_path
+                pkpass_tmp_path,
             )
 
             # Загружаем pkpass файл в S3
-            with open(pkpass_tmp_path, 'rb') as f:
+            with open(pkpass_tmp_path, "rb") as f:
                 pkpass_bytes = f.read()
 
-            s3_key = f'{self.__wallet_pass_folder}/{pass_params.serial_number}.pkpass'
-            await self.__s3_client.upload_file_object(self.__bucket_name, s3_key, pkpass_bytes)
+            s3_key = f"{self.__wallet_pass_folder}/{pass_params.serial_number}.pkpass"
+            await self.__s3_client.upload_file_object(
+                self.__bucket_name, s3_key, pkpass_bytes
+            )
 
         finally:
             # Удаляем временные файлы
@@ -149,14 +162,14 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
 
     def get_card_s3_key(self, card_number: str) -> str:
         """Возвращает S3 ключ для pkpass файла"""
-        return f'{self.__wallet_pass_folder}/{card_number}.pkpass'
+        return f"{self.__wallet_pass_folder}/{card_number}.pkpass"
 
     def get_card_path_and_name(self, card_number: str) -> tuple[str, str]:
         """
         Deprecated: Использовать get_card_s3_key() для S3
         Возвращает S3 ключ и имя файла
         """
-        return self.get_card_s3_key(card_number), f'{card_number}.pkpass'
+        return self.get_card_s3_key(card_number), f"{card_number}.pkpass"
 
     async def get_pkpass_from_s3(self, card_number: str) -> bytes:
         """Получает pkpass файл из S3"""
@@ -183,48 +196,51 @@ class WalletPassGeneratorService(IWalletPassGeneratorService):
                 loyality_cards.c.balance,
                 loyality_cards.c.end_period,
                 loyality_cards.c.cashbox_id,
-                loyality_cards.c.apple_wallet_advertisement
+                loyality_cards.c.apple_wallet_advertisement,
             )
             .select_from(
-                loyality_cards
-                .join(
-                    contragents,
-                    contragents.c.id == loyality_cards.c.contragent_id
-                )
-                .join(
+                loyality_cards.join(
+                    contragents, contragents.c.id == loyality_cards.c.contragent_id
+                ).join(
                     organizations,
-                    organizations.c.id == loyality_cards.c.organization_id
+                    organizations.c.id == loyality_cards.c.organization_id,
                 )
-            ).where(loyality_cards.c.id == int(card_id))
+            )
+            .where(loyality_cards.c.id == int(card_id))
         )
         loyality_card_db = await database.fetch_one(query)
 
         card_settings_query = select(apple_wallet_card_settings.c.data).where(
-            apple_wallet_card_settings.c.cashbox_id == loyality_card_db.cashbox_id)
+            apple_wallet_card_settings.c.cashbox_id == loyality_card_db.cashbox_id
+        )
         card_settings_db = await database.fetch_one(card_settings_query)
 
         if card_settings_db is None:
-            card_settings = await create_default_apple_wallet_setting(loyality_card_db.cashbox_id)
+            card_settings = await create_default_apple_wallet_setting(
+                loyality_card_db.cashbox_id
+            )
         else:
             card_settings = WalletCardSettings(**json.loads(card_settings_db.data))
 
-        path, filename = await self._generate_pkpass(PassParamsModel(
-            serial_number=loyality_card_db.id,
-            card_number=loyality_card_db.card_number,
-            contragent_name=loyality_card_db.contragent_name,
-            organization_name=loyality_card_db.organization_name,
-            description=card_settings.description,
-            barcode_message=card_settings.barcode_message,
-            colors=card_settings.colors,
-            icon_path=card_settings.icon_path,
-            logo_path=card_settings.logo_path,
-            strip_path=card_settings.strip_path,
-            cashback_persent=loyality_card_db.cashback_percent,
-            locations=card_settings.locations,
-            logo_text=card_settings.logo_text,
-            balance=loyality_card_db.balance,
-            exp_date=loyality_card_db.end_period,
-            advertisement=loyality_card_db.apple_wallet_advertisement
-        ))
+        path, filename = await self._generate_pkpass(
+            PassParamsModel(
+                serial_number=loyality_card_db.id,
+                card_number=loyality_card_db.card_number,
+                contragent_name=loyality_card_db.contragent_name,
+                organization_name=loyality_card_db.organization_name,
+                description=card_settings.description,
+                barcode_message=card_settings.barcode_message,
+                colors=card_settings.colors,
+                icon_path=card_settings.icon_path,
+                logo_path=card_settings.logo_path,
+                strip_path=card_settings.strip_path,
+                cashback_persent=loyality_card_db.cashback_percent,
+                locations=card_settings.locations,
+                logo_text=card_settings.logo_text,
+                balance=loyality_card_db.balance,
+                exp_date=loyality_card_db.end_period,
+                advertisement=loyality_card_db.apple_wallet_advertisement,
+            )
+        )
 
         return path, filename

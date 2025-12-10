@@ -1,7 +1,7 @@
 from enum import Enum
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
-from typing import Optional, Dict, List
 
 
 class TypeDoc(str, Enum):
@@ -27,10 +27,3 @@ class Generate(BaseModel):
 
 class ReGenerateList(BaseModel):
     __root__: Optional[List[Generate]]
-
-
-
-
-
-
-

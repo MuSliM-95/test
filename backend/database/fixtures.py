@@ -1,13 +1,19 @@
 import json
 
+from database.db import (
+    entity_or_function,
+    global_categories,
+    payments,
+    units,
+)
 from sqlalchemy import event, text
-
-from database.db import engine, units, metadata, entity_or_function, payments, global_categories
 
 
 def prepopulate_global_categories(target, connection, **kwargs):
     print("Populating global_categories...")
-    with open("database/initial_data/global_categories.json", "r", encoding="UTF-8") as file:
+    with open(
+        "database/initial_data/global_categories.json", "r", encoding="UTF-8"
+    ) as file:
         values = json.load(file)
         connection.execute(target.insert(), *values)
 

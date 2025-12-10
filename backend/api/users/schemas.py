@@ -1,5 +1,6 @@
-from pydantic import BaseModel, validator
 from typing import List, Optional
+
+from pydantic import BaseModel, validator
 
 
 class CBUsers(BaseModel):
@@ -93,10 +94,12 @@ class UserPermissionsResult(BaseModel):
 class UserShiftSettings(BaseModel):
     shift_work_enabled: bool
 
+
 class UserShiftSettingsResponse(BaseModel):
     success: bool
     message: str
     shift_work_enabled: bool
+
 
 class UserWithShiftInfo(BaseModel):
     id: int
@@ -108,10 +111,12 @@ class UserWithShiftInfo(BaseModel):
     current_shift_status: Optional[str] = None
     shift_duration_minutes: Optional[int] = None
 
+
 class CBUsersListShortWithShifts(BaseModel):
     result: List[UserWithShiftInfo]
     count: int
     on_shift_total: int = 0  # Общее количество на сменах
+
 
 class ShiftStatistics(BaseModel):
     on_shift_count: int = 0

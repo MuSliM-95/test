@@ -5,13 +5,10 @@ Revises: ad90fb706d6a, 722d96cec7fb
 Create Date: 2025-10-25 07:51:54.000000
 
 """
-from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
-revision = 'merge_heads_001'
-down_revision = ('ad90fb706d6a', '722d96cec7fb')
+revision = "merge_heads_001"
+down_revision = ("ad90fb706d6a", "722d96cec7fb")
 branch_labels = None
 depends_on = None
 
