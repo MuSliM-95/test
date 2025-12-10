@@ -5,6 +5,36 @@ UPSTREAM_CONF_PATH="/etc/nginx/dir/upstream.conf"
 BOT_SERVICE_NAME="telegram_bot"
 BOT_CONTAINER_NAME_PREFIX="telegram_bot"
 
+update_nginx() {
+  echo "Обновление Nginx до образа: $CI_REGISTRY_IMAGE/nginx:$CI_COMMIT_SHA"
+  docker pull $CI_REGISTRY_IMAGE/nginx:$CI_COMMIT_SHA
+
+  # Остановка старого
+  docker stop nginx 2>/dev/null || true
+  docker rm nginx 2>/dev/null || true
+
+  # Запуск нового
+  docker run -d \
+    --name nginx \
+    --restart always \
+    --network nginx-proxy \
+    --network infrastructure \
+    --network shared_services \
+    -p 80:80 \
+    -p 443:443 \
+    -v /certbot/www:/var/www/certbot/:ro \
+    -v /etc/letsencrypt/:/etc/nginx/ssl/:ro \
+    -v /var/log:/var/log \
+    -v /var/www/tablecrm-app:/var/www/app \
+    -v /var/www/tablecrm-landing:/var/www/landing \
+    -v /photos:/nginx/photos \
+    --label logging="promtail" \
+    --label logging_jobname="containerlogs" \
+    $CI_REGISTRY_IMAGE/nginx:$CI_COMMIT_SHA
+
+  echo "Nginx обновлён"
+}
+
 reload_nginx() {
   docker exec $NGINX_CONTAINER_NAME nginx -s reload
 }
@@ -317,6 +347,7 @@ deploy_another_services() {
     /bin/bash -c "python3 notification_consumer.py"
 }
 
+update_nginx
 deploy_new_version
 deploy_new_bot_version
 deploy_another_services

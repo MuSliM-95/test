@@ -2,6 +2,10 @@ import json
 import os
 import time
 import logging
+
+from common.utils.logger import log_quota_exceeded
+from botocore.exceptions import ClientError
+
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -458,9 +462,11 @@ async def write_event_middleware(request: Request, call_next):
         response = await call_next(request)
         await _write_event(request=request, body=body, time_start=time_start, status_code=response.status_code)
         return response
-    except Exception as e:
-        await _write_event(request=request, body=body, time_start=time_start)
-        raise e
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "QuotaExceeded":
+            log_quota_exceeded()
+        else:
+            logger.exception("S3 ClientError")
 
 
 @app.on_event("startup")

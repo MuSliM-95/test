@@ -13,7 +13,11 @@ build-up-docker-job:
     - docker build -t tablecrm_backend:latest ./backend
     - docker tag tablecrm_backend:latest $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
+    # Сборка Nginx
+    - docker build --build-arg BRANCH_NAME=master -t $CI_REGISTRY_IMAGE/nginx:$CI_COMMIT_SHA ./nginx
+    - docker push $CI_REGISTRY_IMAGE/nginx:$CI_COMMIT_SHA
   script:
+    - export CI_COMMIT_SHA=$CI_COMMIT_SHA
     - chmod +x deploy.sh
     - ./deploy.sh
 
