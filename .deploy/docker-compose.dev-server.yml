@@ -303,7 +303,7 @@ services:
     user: "root"
     volumes:
       - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - /var/lib/grafana/data:/var/lib/grafana
     environment:
       - GF_SERVER_PROTOCOL=http
