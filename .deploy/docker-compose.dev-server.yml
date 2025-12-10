@@ -279,7 +279,7 @@ services:
     restart: unless-stopped
     user: "root"
     volumes:
-      - ./prometheus-dev-server.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - /var/lib/prometheus/data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
