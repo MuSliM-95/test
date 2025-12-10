@@ -1,7 +1,7 @@
 services:
   nginx:
     build:
-      context: ./nginx
+      context: ../nginx
       dockerfile: Dockerfile
       args:
         BRANCH_NAME: ${CI_COMMIT_REF_NAME}
@@ -23,10 +23,26 @@ services:
       - shared_services
     depends_on:
       - adminer
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3.8.16-management
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
+    networks:
+      - infrastructure
 
   certbot:
     image: certbot/certbot:latest
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot --webroot-path=/var/www/certbot --quiet --no-random-sleep-on-renew; sleep 12h & wait $${!}; done;'"
     volumes:
       - /certbot/www/:/var/www/certbot/:rw
       - /etc/letsencrypt/:/etc/letsencrypt/:rw
@@ -35,13 +51,12 @@ services:
 
   db:
     image: postgres:14.2
-    container_name: postgres_container
     restart: always
     command: postgres -c 'config_file=/etc/postgresql.conf'
     ports:
       - "48425:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata-new:/var/lib/postgresql/data
       - ./postgresql.conf:/etc/postgresql.conf:ro
       - ./initdb:/docker-entrypoint-initdb.d
     environment:
@@ -53,7 +68,8 @@ services:
       - infrastructure
 
   backup:
-    build: ./backup
+    build:
+      context: ../backup
     restart: always
     environment:
       SCHEDULE: '@hourly'
@@ -69,6 +85,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
       PGDUMP_EXTRA_OPTS: '--exclude-table-data=events'
+    depends_on:
+      - db
     networks:
       - nginx-proxy
 
@@ -81,18 +99,20 @@ services:
       - db
 
   backend:
-    build: ./backend
+    build:
+      context: ../backend
     image: tablecrm_backend:latest
     restart: always
-    command: bash -c "alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 8000 --log-level=info"
     volumes:
-      - ./backend:/backend
+      - ../backend:/backend
       - /certs:/certs
     ports:
       - "8000:8000"
     depends_on:
       - db
+      - rabbitmq
     environment:
+      LOG_LEVEL: debug
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
       APPLE_TEAM_ID: ${APPLE_TEAM_ID}
       APPLE_CERTIFICATE_PATH: ${APPLE_CERTIFICATE_PATH}
@@ -124,11 +144,11 @@ services:
       - infrastructure
 
   worker:
-    image: tablecrm_backend:latest
+    build:
+      context: ../backend
     restart: always
     command: bash -c "python3 worker.py"
     volumes:
-      - ./backend:/backend
       - /certs:/certs
     environment:
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
@@ -161,14 +181,14 @@ services:
       - infrastructure
 
   backend_jobs:
-    image: tablecrm_backend:latest
+    build:
+      context: ../backend
     restart: always
     command: bash -c "python3 start_jobs.py"
-    volumes:
-      - ./backend:/backend
     depends_on:
       - db
     environment:
+      LOG_LEVEL: debug
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
       APPLE_TEAM_ID: ${APPLE_TEAM_ID}
       APPLE_CERTIFICATE_PATH: ${APPLE_CERTIFICATE_PATH}
@@ -193,15 +213,17 @@ services:
       - nginx-proxy
 
   teleg_bot:
-    image: tablecrm_backend:latest
+    build:
+      context: ../backend
     restart: always
     command: python3 bot.py
     volumes:
-      - ./backend:/backend
       - /photos:/backend/photos
     depends_on:
       - backend
+      - rabbitmq
     environment:
+      LOG_LEVEL: debug
       APP_URL: ${APP_URL}
       TG_TOKEN: ${TG_TOKEN}
       CHEQUES_TOKEN: ${CHEQUES_TOKEN}
@@ -222,11 +244,10 @@ services:
       - infrastructure
 
   message_consumer_task:
-    build: ./backend
+    build:
+      context: ../backend
     restart: always
     command: python3 message_consumer.py
-    volumes:
-      - ./backend:/backend
     environment:
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
       APPLE_TEAM_ID: ${APPLE_TEAM_ID}
@@ -253,8 +274,68 @@ services:
       - nginx-proxy
       - infrastructure
 
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    user: "root"
+    volumes:
+      - ./prometheus-dev-server.yml:/etc/prometheus/prometheus.yml:ro
+      - /var/lib/prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.external-url=https://dev.tablecrm.com/prometheus'
+      - '--web.route-prefix=/'
+    networks:
+      - nginx-proxy
+      - infrastructure
+    depends_on:
+      - backend
+      - node-exporter
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    user: "root"
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - /var/lib/grafana/data:/var/lib/grafana
+    environment:
+      - GF_SERVER_PROTOCOL=http
+      - GF_SERVER_DOMAIN=dev.tablecrm.com
+      - GF_SERVER_ROOT_URL=https://dev.tablecrm.com/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    networks:
+      - nginx-proxy
+    depends_on:
+      - prometheus
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - infrastructure
+
 volumes:
-  pgdata:
+  pgdata-new:
 
 networks:
   nginx-proxy:
