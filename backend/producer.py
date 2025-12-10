@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+from datetime import datetime
 
 from api.apple_wallet.messages.AppleWalletCardUpdateMessage import AppleWalletCardUpdateMessage
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
@@ -106,6 +107,93 @@ async def send_order_assignment_notification(order_id: int, role: str, user_id: 
     # notification_data["recipients"] = ["chat_id1", "chat_id2", ...]
     
     return await queue_notification(notification_data)
+
+
+async def send_new_chat_notification(
+    cashbox_id: int,
+    chat_id: int,
+    contact_name: str = None,
+    channel_name: str = None,
+    ad_title: str = None
+) -> bool:
+    """
+    Отправляет уведомление о новом чате владельцам кассы
+    
+    Args:
+        cashbox_id: ID кассы
+        chat_id: ID созданного чата
+        contact_name: Имя контакта
+        channel_name: Название канала
+        ad_title: Название объявления
+        
+    Returns:
+        bool: Успешно ли добавлено уведомление в очередь
+    """
+    try:
+        print(f"=== send_new_chat_notification called ===")
+        print(f"cashbox_id: {cashbox_id}, chat_id: {chat_id}")
+        print(f"contact_name: {contact_name}, channel_name: {channel_name}, ad_title: {ad_title}")
+        
+        from sqlalchemy import select, and_
+        from database.db import users, users_cboxes_relation
+        
+        # Получаем всех владельцев кассы
+        owner_query = select([users.c.chat_id]).select_from(
+            users.join(
+                users_cboxes_relation,
+                users.c.id == users_cboxes_relation.c.user
+            )
+        ).where(
+            and_(
+                users_cboxes_relation.c.cashbox_id == cashbox_id,
+                users_cboxes_relation.c.is_owner == True,
+                users_cboxes_relation.c.status == True,
+                users.c.chat_id.isnot(None)
+            )
+        )
+        
+        owners = await database.fetch_all(owner_query)
+        recipients = [str(owner.chat_id) for owner in owners if owner.chat_id]
+        
+        print(f"Found {len(recipients)} owners: {recipients}")
+        
+        if not recipients:
+            print(f"No owners found for cashbox {cashbox_id} to send chat notification")
+            return False
+        
+        # Формируем текст уведомления
+        text = "💬 <b>Новый чат</b>\n\n"
+        
+        if contact_name:
+            text += f"Контакт: {contact_name}\n"
+        
+        if channel_name:
+            text += f"Канал: {channel_name}\n"
+        
+        if ad_title:
+            text += f"Объявление: {ad_title}\n"
+        
+        text += f"\nID чата: {chat_id}"
+        
+        print(f"Notification text: {text}")
+        
+        notification_data = {
+            "type": "segment_notification",
+            "recipients": recipients,
+            "text": text,
+            "timestamp": datetime.now().timestamp(),
+        }
+        
+        print(f"Sending notification to queue: {notification_data}")
+        result = await queue_notification(notification_data)
+        print(f"Notification queued: {result}")
+        return result
+        
+    except Exception as e:
+        print(f"Error sending new chat notification: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 async def publish_apple_wallet_pass_update(card_ids: list[int]):

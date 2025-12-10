@@ -71,7 +71,7 @@ def extract_cashbox_id_from_webhook(webhook_data: Dict[str, Any]) -> Optional[in
         return None
         
     except (ValueError, TypeError) as e:
-        logger.error(f"Error extracting cashbox_id from webhook: {e}")
+        logger.error(f"Error extracting cashbox_id from webhook: {e}", exc_info=True)
         return None
 
 
@@ -80,7 +80,9 @@ async def get_cashbox_id_for_avito_webhook(webhook_data: Dict[str, Any]) -> Opti
     from sqlalchemy import select, and_
     
     try:
-        payload_value = webhook_data.get('payload', {}).get('value', {})
+        payload = webhook_data.get('payload', {})
+        
+        payload_value = payload.get('value', {}) if isinstance(payload, dict) else {}
         if not payload_value:
             logger.warning("No payload.value in webhook data")
             return None
@@ -140,8 +142,6 @@ async def get_cashbox_id_for_avito_webhook(webhook_data: Dict[str, Any]) -> Opti
                 cashbox_id = creds['cashbox_id']
                 logger.info(f"Found cashbox_id {cashbox_id} from channel_credentials by avito_user_id {user_id}")
                 return cashbox_id
-            else:
-                logger.debug(f"Could not find channel_credentials by user_id {user_id}")
         
         logger.warning(
             f"Could not determine cashbox_id from webhook. "

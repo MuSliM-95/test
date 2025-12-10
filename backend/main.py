@@ -175,6 +175,7 @@ from api.chats.rabbitmq_consumer import chat_consumer
 from api.chats.avito.avito_routes import router as avito_router
 # from api.health.rabbitmq_check import router as rabbitmq_health_router
 from api.chats.avito.avito_consumer import avito_consumer
+import asyncio
 from api.chats.avito.avito_default_webhook import router as avito_default_webhook_router
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 
@@ -549,6 +550,14 @@ async def startup():
 
     try:
         await avito_consumer.start()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+
+    try:
+        # Запускаем notification_consumer в фоновой задаче
+        from notification_consumer import consume
+        asyncio.create_task(consume())
     except Exception as e:
         import traceback
         traceback.print_exc()
