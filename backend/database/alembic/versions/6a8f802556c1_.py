@@ -5,20 +5,20 @@ Revises: 5c9cbc4aa7c4
 Create Date: 2025-08-16 17:12:16.199504
 
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '6a8f802556c1'
-down_revision = '5c9cbc4aa7c4'
+revision = "6a8f802556c1"
+down_revision = "5c9cbc4aa7c4"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('docs_sales', sa.Column('priority', sa.Integer(), nullable=True))
+    op.add_column("docs_sales", sa.Column("priority", sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column('docs_sales', 'priority')
+    op.drop_column("docs_sales", "priority")

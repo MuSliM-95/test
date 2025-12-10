@@ -1,12 +1,14 @@
 from api.manufacturers import schemas
-from database.db import manufacturers, database
-from functions.helpers import get_user_by_token, get_entity_by_id, datetime_to_timestamp
+from database.db import database, manufacturers
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_user_by_token
 from ws_manager import manager
 
 
 class PatchManufacturersView:
 
-    async def __call__(self, token: str, idx: int, manufacturer: schemas.ManufacturerEdit):
+    async def __call__(
+        self, token: str, idx: int, manufacturer: schemas.ManufacturerEdit
+    ):
         """Редактирование производителя"""
         user = await get_user_by_token(token)
         manufacturer_db = await get_entity_by_id(manufacturers, idx, user.id)

@@ -1,13 +1,12 @@
+import datetime
 from enum import Enum
 from typing import List, Optional, Union
 from uuid import UUID
-import datetime
 
 from database.db import OrderStatus
 from database.enums import Repeatability
-from pydantic import BaseModel, conint, validator
-
 from functions.helpers import sanitize_float
+from pydantic import BaseModel, conint, validator
 
 
 class Item(BaseModel):
@@ -119,6 +118,7 @@ class UserShort(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 
+
 class ViewInList(BaseModel):
     id: int
     number: Optional[str]
@@ -173,9 +173,10 @@ class ViewInList(BaseModel):
     def check_paid_rubles(cls, v):
         return sanitize_float(v)
 
-    @validator('sum')
+    @validator("sum")
     def check_sum(cls, v):
         return sanitize_float(v)
+
 
 class ViewInListResult(BaseModel):
     result: List[ViewInList]
@@ -264,9 +265,7 @@ class AssignUser(BaseModel):
 class NotifyConfig(BaseModel):
     type: NotifyType
     send_notification: bool = True
-    recipients: Optional[List[str]] = (
-        None
-    )
+    recipients: Optional[List[str]] = None
 
 
 class NotifyResponse(BaseModel):
@@ -292,12 +291,15 @@ class OrderLinksResponse(BaseModel):
     picker_link: Optional[OrderLinkResponse] = None
     courier_link: Optional[OrderLinkResponse] = None
 
+
 # ============================================
 # ANALYTICS SCHEMAS
 # ============================================
 
+
 class DayStatusBreakdown(BaseModel):
     """Разбор заказов по статусам за день"""
+
     received: int = 0
     processed: int = 0
     collecting: int = 0
@@ -313,6 +315,7 @@ class DayStatusBreakdown(BaseModel):
 
 class DayAnalytics(BaseModel):
     """Аналитика за один день"""
+
     date: int
     day_number: int
     orders_created: int
@@ -326,6 +329,7 @@ class DayAnalytics(BaseModel):
 
 class AnalyticsPeriod(BaseModel):
     """Информация о периоде"""
+
     date_from: int
     date_to: int
 
@@ -335,6 +339,7 @@ class AnalyticsPeriod(BaseModel):
 
 class AnalyticsFilter(BaseModel):
     """Применённые фильтры"""
+
     role: Optional[str] = None
     user_id: int
 
@@ -344,6 +349,7 @@ class AnalyticsFilter(BaseModel):
 
 class AnalyticsSummary(BaseModel):
     """Общая сводка по периоду"""
+
     total_orders: int
     total_revenue: float
     total_paid: int
@@ -365,6 +371,7 @@ class AnalyticsSummary(BaseModel):
 
 class AnalyticsResponse(BaseModel):
     """Ответ с детальной аналитикой по дням"""
+
     period: AnalyticsPeriod
     filter: AnalyticsFilter
     summary: AnalyticsSummary
@@ -376,6 +383,7 @@ class AnalyticsResponse(BaseModel):
 
 class CashierStats(BaseModel):
     """Статистика кассира за период"""
+
     orders_completed: int
     errors: int
     rating: float

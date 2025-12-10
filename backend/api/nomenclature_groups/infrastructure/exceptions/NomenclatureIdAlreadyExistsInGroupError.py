@@ -8,4 +8,4 @@ class NomenclatureIdAlreadyExistsInGroupError(Exception):
 
     @property
     def title(self) -> str:
-        return f'A nomenclature with the {self.nomenclature_id} id already exists in group {self.group_id} id'
+        return f"A nomenclature with the {self.nomenclature_id} id already exists in group {self.group_id} id"

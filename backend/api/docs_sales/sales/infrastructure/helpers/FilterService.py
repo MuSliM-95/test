@@ -1,6 +1,7 @@
 import datetime
-from sqlalchemy import and_, func, exists, or_, String, cast
-from database.db import docs_sales, docs_sales_delivery_info, docs_sales_links, Role
+
+from database.db import Role, docs_sales, docs_sales_delivery_info, docs_sales_links
+from sqlalchemy import String, and_, cast, exists, func, or_
 
 
 class FilterService:

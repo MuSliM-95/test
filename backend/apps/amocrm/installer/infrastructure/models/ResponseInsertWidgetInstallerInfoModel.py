@@ -1,5 +1,6 @@
-from apps.amocrm.installer.infrastructure.models.InsertWidgetInstallerInfoModel import \
-    InsertWidgetInstallerInfoModel
+from apps.amocrm.installer.infrastructure.models.InsertWidgetInstallerInfoModel import (
+    InsertWidgetInstallerInfoModel,
+)
 
 
 class ResponseInsertWidgetInstallerInfoModel(InsertWidgetInstallerInfoModel):

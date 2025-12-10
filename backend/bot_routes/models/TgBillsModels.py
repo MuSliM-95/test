@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+
 from database.db import TgBillStatus
+from pydantic import BaseModel
+
 
 class TgBillsBaseModel(BaseModel):
     payment_date: Optional[datetime] = None
@@ -18,8 +20,10 @@ class TgBillsBaseModel(BaseModel):
 
     tochka_bank_account_id: Optional[int] = None
 
+
 class TgBillsCreateModel(TgBillsBaseModel):
     pass
+
 
 class TgBillsUpdateModel(TgBillsBaseModel):
     payment_date: Optional[datetime] = None
@@ -45,13 +49,11 @@ class TgBillsInDBBaseModel(TgBillsBaseModel):
     class Config:
         orm_mode = True
 
+
 class TgBillsModel(TgBillsInDBBaseModel):
     pass
 
 
-class TgBillsExtendedModel(TgBillsModel): 
-    accountId: Optional[str] = None 
+class TgBillsExtendedModel(TgBillsModel):
+    accountId: Optional[str] = None
     request_id: Optional[str] = None
-
-
-

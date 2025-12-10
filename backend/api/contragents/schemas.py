@@ -1,9 +1,11 @@
-from pydantic import BaseModel, Field
-from typing import Optional
-from common.schemas import RuPhone
-from enum import Enum
 from datetime import date
-from database.enums import Gender, ContragentType
+from enum import Enum
+from typing import Optional
+
+from common.schemas import RuPhone
+from database.enums import ContragentType, Gender
+from pydantic import BaseModel
+
 
 class Contragent_types(str, Enum):
     Supplier = "Поставщик"

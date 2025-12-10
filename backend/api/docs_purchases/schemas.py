@@ -1,5 +1,6 @@
+from typing import List, Optional
+
 from pydantic import BaseModel
-from typing import Optional, List
 
 
 class Item(BaseModel):
@@ -8,6 +9,7 @@ class Item(BaseModel):
     price: float
     quantity: float
     unit: Optional[int]
+
 
 class ItemGet(Item):
     nomenclature_name: Optional[str]
@@ -72,9 +74,11 @@ class ViewInList(BaseModel):
     updated_at: int
     created_at: int
 
+
 class ViewResult(BaseModel):
     result: List[ViewInList]
     count: int
+
 
 class View(ViewInList):
     goods: Optional[List[ItemGet]]

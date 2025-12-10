@@ -1,16 +1,10 @@
 from datetime import datetime
 
-from database.db import (
-    database, segments, segment_objects,
-    SegmentObjectType
-)
-
-from segments.helpers.collect_obj_ids import collect_objects
-from sqlalchemy import update, and_
-
+from database.db import SegmentObjectType, database, segment_objects
 from segments.constants import SegmentChangeType
-
 from segments.helpers.batch_insert import insert_in_batches
+from segments.helpers.collect_obj_ids import collect_objects
+from sqlalchemy import and_, update
 
 
 class SegmentLogic:
@@ -24,31 +18,47 @@ class SegmentLogic:
     async def collect_id_changes(self, new_ids: dict):
         """Сбор всех изменений относительно последнего среза"""
 
-        docs_sales_id_to_update = new_ids.get('docs_sales', [])
-        contragents_id_to_update = new_ids.get('contragents', [])
+        docs_sales_id_to_update = new_ids.get("docs_sales", [])
+        contragents_id_to_update = new_ids.get("contragents", [])
 
-        docs_sales_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.docs_sales.value, SegmentChangeType.active.value)
+        docs_sales_ids = await collect_objects(
+            self.segment_obj.id,
+            SegmentObjectType.docs_sales.value,
+            SegmentChangeType.active.value,
+        )
 
-        contragents_ids = await collect_objects(self.segment_obj.id, SegmentObjectType.contragents.value, SegmentChangeType.active.value)
+        contragents_ids = await collect_objects(
+            self.segment_obj.id,
+            SegmentObjectType.contragents.value,
+            SegmentChangeType.active.value,
+        )
 
         changes = {
             SegmentObjectType.docs_sales.value: {},
-            SegmentObjectType.contragents.value: {}
+            SegmentObjectType.contragents.value: {},
         }
 
         # собираем изменения документов продаж
         changes[SegmentObjectType.docs_sales.value][SegmentChangeType.new.value] = list(
-            set(docs_sales_id_to_update) - set(docs_sales_ids))
-        changes[SegmentObjectType.docs_sales.value][SegmentChangeType.removed.value] = list(
-            set(docs_sales_ids) - set(docs_sales_id_to_update))
-        changes[SegmentObjectType.docs_sales.value][SegmentChangeType.active.value] = docs_sales_id_to_update
+            set(docs_sales_id_to_update) - set(docs_sales_ids)
+        )
+        changes[SegmentObjectType.docs_sales.value][SegmentChangeType.removed.value] = (
+            list(set(docs_sales_ids) - set(docs_sales_id_to_update))
+        )
+        changes[SegmentObjectType.docs_sales.value][
+            SegmentChangeType.active.value
+        ] = docs_sales_id_to_update
 
         # собираем изменения контрагентов
-        changes[SegmentObjectType.contragents.value][SegmentChangeType.new.value] = list(
-            set(contragents_id_to_update) - set(contragents_ids))
-        changes[SegmentObjectType.contragents.value][SegmentChangeType.removed.value] = list(
-            set(contragents_ids) - set(contragents_id_to_update))
-        changes[SegmentObjectType.contragents.value][SegmentChangeType.active.value] = contragents_id_to_update
+        changes[SegmentObjectType.contragents.value][SegmentChangeType.new.value] = (
+            list(set(contragents_id_to_update) - set(contragents_ids))
+        )
+        changes[SegmentObjectType.contragents.value][
+            SegmentChangeType.removed.value
+        ] = list(set(contragents_ids) - set(contragents_id_to_update))
+        changes[SegmentObjectType.contragents.value][
+            SegmentChangeType.active.value
+        ] = contragents_id_to_update
 
         return changes
 
@@ -59,26 +69,32 @@ class SegmentLogic:
             if value_data.get(SegmentChangeType.new.value):
                 added_data = []
                 for id in value_data[SegmentChangeType.new.value]:
-                    added_data.append({
-                        "segment_id": self.segment_obj.id,
-                        "object_id": id,
-                        "object_type": object_type,
-                        "valid_from": datetime.now()
-                    })
+                    added_data.append(
+                        {
+                            "segment_id": self.segment_obj.id,
+                            "object_id": id,
+                            "object_type": object_type,
+                            "valid_from": datetime.now(),
+                        }
+                    )
                 if added_data:
-                    await insert_in_batches(segment_objects, added_data, batch_size=3000)
+                    await insert_in_batches(
+                        segment_objects, added_data, batch_size=3000
+                    )
 
             if ids := value_data.get(SegmentChangeType.removed.value):
                 batch_size = 30000  # чуть меньше лимита
                 for i in range(0, len(ids), batch_size):
-                    chunk = ids[i:i + batch_size]
+                    chunk = ids[i : i + batch_size]
                     query = (
                         update(segment_objects)
-                        .where(and_(
-                            segment_objects.c.object_id.in_(chunk),
-                            segment_objects.c.object_type == object_type,
-                            segment_objects.c.valid_to.is_(None)
-                        ))
+                        .where(
+                            and_(
+                                segment_objects.c.object_id.in_(chunk),
+                                segment_objects.c.object_type == object_type,
+                                segment_objects.c.valid_to.is_(None),
+                            )
+                        )
                         .values(valid_to=datetime.now())
                     )
                     await database.execute(query)

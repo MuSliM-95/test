@@ -1,24 +1,21 @@
+import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-
-from api.tech_cards.schemas import TechCardStatus
-from api.tech_cards.models import TechCardDB
-from api.tech_operations.schemas import (
-    TechOperation,
-    TechOperationCreate,
-    TechOperationComponentCreate,
-)
-from api.tech_operations.models import (
-    TechOperationDB,
-    TechOperationComponentDB,
-    TechOperationPaymentDB,
-)
-
-from database.db import warehouses, warehouse_balances, warehouse_register_movement
 
 from api.deps import get_db, get_user_by_token
-import uuid
+from api.tech_cards.models import TechCardDB
+from api.tech_cards.schemas import TechCardStatus
+from api.tech_operations.models import (
+    TechOperationComponentDB,
+    TechOperationDB,
+    TechOperationPaymentDB,
+)
+from api.tech_operations.schemas import (
+    TechOperation,
+    TechOperationComponentCreate,
+    TechOperationCreate,
+)
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/tech_operations", tags=["tech_operations"])
 

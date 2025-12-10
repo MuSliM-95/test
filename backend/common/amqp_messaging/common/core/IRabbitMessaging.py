@@ -1,11 +1,11 @@
-from typing import Type, Optional, List
+from typing import List, Type
 
 import aiormq
 from aio_pika.abc import AbstractRobustChannel
 
-from ..impl.models.QueueSettingsModel import QueueSettingsModel
 from ...common.core.EventHandler import IEventHandler
 from ...models.BaseModelMessage import BaseModelMessage
+from ..impl.models.QueueSettingsModel import QueueSettingsModel
 
 
 class IRabbitMessaging:
@@ -15,20 +15,16 @@ class IRabbitMessaging:
         message: BaseModelMessage,
         routing_key: str,
         priority: int = None,
-        ttl_expiration: int = None
+        ttl_expiration: int = None,
     ) -> aiormq.abc.ConfirmationFrameType:
         raise NotImplementedError()
 
     async def subscribe(
-        self,
-        event_type: Type[BaseModelMessage],
-        event_handler: IEventHandler
+        self, event_type: Type[BaseModelMessage], event_handler: IEventHandler
     ):
         raise NotImplementedError()
 
     async def install(
-        self,
-        queues_settings: List[QueueSettingsModel]
+        self, queues_settings: List[QueueSettingsModel]
     ) -> List[AbstractRobustChannel]:
         raise NotImplementedError()
-

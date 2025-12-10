@@ -1,9 +1,10 @@
 from datetime import datetime
-from typing import Optional, List, Literal
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, validator, constr, Field, root_validator
+from pydantic import BaseModel, Field, constr, root_validator, validator
 
 HEXColor = constr(regex=r"^#(?:[0-9a-fA-F]{6})$")
+
 
 class AddRemoveTags(BaseModel):
     name: List[str]
@@ -39,8 +40,7 @@ class TimeRange(BaseModel):
             datetime.strptime(from_, "%H:%M")
             datetime.strptime(to_, "%H:%M")
         except ValueError:
-            raise ValueError(
-                "Время должно быть в формате HH:MM (например, 09:30)")
+            raise ValueError("Время должно быть в формате HH:MM (например, 09:30)")
         return value
 
 
@@ -55,22 +55,22 @@ class TgNotificationsConditions(BaseModel):
     month_days: Optional[List[int]]
     month_day_modulo: Optional[Modulo]
 
-    @validator('weekdays')
+    @validator("weekdays")
     def validate_weekdays(cls, v):
         if v is None:
             return v
         if not all(1 <= day <= 7 for day in v):
             raise ValueError(
-                'Weekdays must be integers between 1 and 7 (1=Monday, 7=Sunday)')
+                "Weekdays must be integers between 1 and 7 (1=Monday, 7=Sunday)"
+            )
         return list(set(v))
 
-    @validator('month_days')
+    @validator("month_days")
     def validate_month_days(cls, v):
         if v is None:
             return v
         if not all(1 <= day <= 31 for day in v):
-            raise ValueError(
-                'Day of month must be integers between 1 and 31')
+            raise ValueError("Day of month must be integers between 1 and 31")
         return list(set(v))
 
 
@@ -124,6 +124,7 @@ class TransformLoyalityCard(BaseModel):
     tag: Optional[str]
     apple_wallet_advertisement: Optional[str]
 
+
 class AddRemoveTransaction(BaseModel):
     amount: float
     direction: Literal["plus", "minus"]
@@ -141,4 +142,3 @@ class SegmentActions(BaseModel):
     add_loyality_transaction: Optional[AddRemoveTransaction]
     send_wa_notification: Optional[WaNotification]
     do_http_request: Optional[HttpRequest]
-

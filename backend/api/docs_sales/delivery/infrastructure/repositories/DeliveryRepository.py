@@ -1,4 +1,4 @@
-from database.db import docs_sales_delivery_info, database
+from database.db import database, docs_sales_delivery_info
 
 
 class DeliveryRepository:
@@ -15,11 +15,15 @@ class DeliveryRepository:
         delivery_map: dict[int, dict] = {}
         for row in rows:
             delivery_map[row["docs_sales_id"]] = {
-                                                "address": row.get("address"),
-                                                "delivery_date": row["delivery_date"].timestamp() if row.get("delivery_date") else None,
-                                                "recipient": row.get("recipient"),
-                                                "note": row.get("note"),
-                                                }
+                "address": row.get("address"),
+                "delivery_date": (
+                    row["delivery_date"].timestamp()
+                    if row.get("delivery_date")
+                    else None
+                ),
+                "recipient": row.get("recipient"),
+                "note": row.get("note"),
+            }
         return delivery_map
 
     async def fetch_delivery_info_by_id(self, doc_id: int) -> dict:

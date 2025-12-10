@@ -1,14 +1,15 @@
 # from fastapi_pagination import Page as PPage
 from abc import ABC
-from typing import Any, Generic, Optional, Sequence, TypeVar
 from math import ceil
+from typing import Any, Generic, Optional, Sequence, TypeVar
+
 from fastapi import Query
-from pydantic import BaseModel
-from typing_extensions import Self
 from fastapi_pagination.bases import AbstractPage, AbstractParams, RawParams
 from fastapi_pagination.types import GreaterEqualOne, GreaterEqualZero
+from pydantic import BaseModel
 
 T = TypeVar("T")
+
 
 class BasePage(AbstractPage[T], Generic[T], ABC):
     result: Sequence[T]
@@ -33,7 +34,11 @@ class OptionalParams(Params):
     def to_raw_params(self) -> RawParams:
         return RawParams(
             limit=self.size if self.size is not None else None,
-            offset=self.size * (self.page - 1) if self.page is not None and self.size is not None else None,
+            offset=(
+                self.size * (self.page - 1)
+                if self.page is not None and self.size is not None
+                else None
+            ),
         )
 
 
@@ -41,7 +46,7 @@ class Page(BasePage[T], Generic[T]):
     page: Optional[GreaterEqualOne]
     size: Optional[GreaterEqualOne]
     pages: Optional[GreaterEqualZero] = None
-    
+
     __params_type__ = Params
 
     @classmethod

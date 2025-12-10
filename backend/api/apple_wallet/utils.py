@@ -1,5 +1,9 @@
-from common.apple_wallet_service.impl.WalletNotificationService import WalletNotificationService
-from common.apple_wallet_service.impl.WalletPassService import WalletPassGeneratorService
+from common.apple_wallet_service.impl.WalletNotificationService import (
+    WalletNotificationService,
+)
+from common.apple_wallet_service.impl.WalletPassService import (
+    WalletPassGeneratorService,
+)
 
 
 async def update_apple_wallet_pass(loyalty_card_id: int):

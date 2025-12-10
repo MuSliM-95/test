@@ -1,23 +1,19 @@
-import io
-
 import asyncio
 import logging
 import os
+import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import BytesIO
 from typing import Optional
 
-from aiogram import Bot, Dispatcher, Router, types, F
+import texts
+from aiogram import Bot, Dispatcher, F, Router, types
 from aiogram.client.session import aiohttp
 from aiogram.dispatcher.filters.command import CommandObject
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
-from aiogram.types import PhotoSize, ContentType
-from sqlalchemy import and_
-
-
-import texts
+from aiogram.types import ContentType, PhotoSize
 from api.articles.routers import new_article
 from api.articles.schemas import ArticleCreate
 from api.contragents.routers import create_contragent
@@ -26,29 +22,37 @@ from api.payments.routers import create_payment
 from api.payments.schemas import PaymentCreate
 from api.pboxes.routers import create_paybox
 from api.pboxes.schemas import PayboxesCreate
-
-from const import DEMO, cheque_service_url
-import re
-
-
-from database.db import database, cboxes, users, users_cboxes_relation, accounts_balances, tariffs, pboxes, payments, \
-    articles, cheques, contragents, messages
-from functions.cboxes import create_cbox, join_cbox
-from functions.helpers import gen_token
+from bot_routes.bills import get_bill_route
 from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
+from const import DEMO, cheque_service_url
+from database.db import (
+    accounts_balances,
+    articles,
+    cboxes,
+    cheques,
+    contragents,
+    database,
+    messages,
+    payments,
+    pboxes,
+    tariffs,
+    users,
+    users_cboxes_relation,
+)
+from functions.cboxes import create_cbox, join_cbox
+from functions.helpers import gen_token
 from producer import produce_message
-
-from bot_routes.bills import get_bill_route
+from sqlalchemy import and_
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(os.environ.get("TG_TOKEN"), parse_mode="HTML")
 
 s3_factory = S3ServiceFactory(
     s3_settings=S3SettingsModel(
-        aws_access_key_id=os.getenv('S3_ACCESS'),
-        aws_secret_access_key=os.getenv('S3_SECRET'),
-        endpoint_url=os.getenv('S3_URL')
+        aws_access_key_id=os.getenv("S3_ACCESS"),
+        aws_secret_access_key=os.getenv("S3_SECRET"),
+        endpoint_url=os.getenv("S3_URL"),
     )
 )
 s3_client = s3_factory()
@@ -96,10 +100,8 @@ choose_keyboard = types.ReplyKeyboardMarkup(
 async def add_referral_user(user_id: str, user_id_ref: str):
     query = (
         users.update()
-        .where(and_(
-            users.c.chat_id == str(user_id),
-            users.c.owner_id == str(user_id)
-        )).values({"ref_id": str(user_id_ref)})
+        .where(and_(users.c.chat_id == str(user_id), users.c.owner_id == str(user_id)))
+        .values({"ref_id": str(user_id_ref)})
     )
     await database.execute(query)
 
@@ -110,51 +112,49 @@ async def store_user_message(message: types.Message):
         tg_user_or_chat=str(message.chat.id),
         from_or_to=str(message.from_user.id),
         created_at=str(datetime.now()),
-        body=message.text if message.text else "photo"
+        body=message.text if message.text else "photo",
     )
     await database.execute(relship)
 
 
-async def store_bot_message(tg_message_id: int, tg_user_or_chat: str, from_or_to: str, body: str):
+async def store_bot_message(
+    tg_message_id: int, tg_user_or_chat: str, from_or_to: str, body: str
+):
     relship = messages.insert().values(
         tg_message_id=tg_message_id,
         tg_user_or_chat=str(tg_user_or_chat),
         from_or_to=str(from_or_to),
         created_at=str(datetime.now()),
-        body=body
+        body=body,
     )
     await database.execute(relship)
 
 
-SHARE_NUMBER_KEYBOARD = types.ReplyKeyboardMarkup(keyboard=[
-    [
-        types.KeyboardButton(text="Отправить номер", request_contact=True),
-        types.KeyboardButton(text="Отменить регистрацию")
-    ]
-], row_width=1, resize_keyboard=True)
+SHARE_NUMBER_KEYBOARD = types.ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            types.KeyboardButton(text="Отправить номер", request_contact=True),
+            types.KeyboardButton(text="Отменить регистрацию"),
+        ]
+    ],
+    row_width=1,
+    resize_keyboard=True,
+)
 
 
 async def get_open_app_link(token: str) -> types.InlineKeyboardMarkup:
     error_keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                types.InlineKeyboardButton(text="Произошла ошибка", callback_data="...")
-            ]
+            [types.InlineKeyboardButton(text="Произошла ошибка", callback_data="...")]
         ]
     )
-    query = (
-        users_cboxes_relation.select()
-        .where(users_cboxes_relation.c.token == token)
-    )
+    query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
     user_cbox_relation = await database.fetch_one(query)
 
     if not user_cbox_relation:
         return error_keyboard
 
-    query = (
-        users.select()
-        .where(users.c.id == user_cbox_relation.user)
-    )
+    query = users.select().where(users.c.id == user_cbox_relation.user)
     tg_account_info = await database.fetch_one(query)
 
     if not tg_account_info:
@@ -165,13 +165,16 @@ async def get_open_app_link(token: str) -> types.InlineKeyboardMarkup:
             [
                 types.InlineKeyboardButton(
                     text="🌍 Открыть приложение",
-                    url=texts.app_url_with_token.format(base_url=app_url, token=token)
+                    url=texts.app_url_with_token.format(base_url=app_url, token=token),
                 ),
             ],
             [
                 types.InlineKeyboardButton(
                     text="💰 Оплатить подписку",
-                    url=texts.url_link_pay.format(user_id=tg_account_info.owner_id, cashbox_id=user_cbox_relation.cashbox_id)
+                    url=texts.url_link_pay.format(
+                        user_id=tg_account_info.owner_id,
+                        cashbox_id=user_cbox_relation.cashbox_id,
+                    ),
                 )
             ],
         ]
@@ -184,21 +187,23 @@ async def welcome_and_share_number(message: types.Message):
         tg_message_id=message.message_id + 1,
         tg_user_or_chat=str(message.chat.id),
         from_or_to=str(bot.id),
-        body=texts.welcome.format(username=message.from_user.username)
+        body=texts.welcome.format(username=message.from_user.username),
     )
-    await message.answer(text=texts.complete_register, reply_markup=SHARE_NUMBER_KEYBOARD)
+    await message.answer(
+        text=texts.complete_register, reply_markup=SHARE_NUMBER_KEYBOARD
+    )
     await store_bot_message(
         tg_message_id=message.message_id + 1,
         tg_user_or_chat=str(message.chat.id),
         from_or_to=str(bot.id),
-        body=texts.complete_register
+        body=texts.complete_register,
     )
 
 
 async def user_rel_to_cashbox(user_id: int, cbox_id: int):
     query = users_cboxes_relation.select().where(
         users_cboxes_relation.c.cashbox_id == cbox_id,
-        users_cboxes_relation.c.user == user_id
+        users_cboxes_relation.c.user == user_id,
     )
     return await database.fetch_one(query)
 
@@ -206,28 +211,33 @@ async def user_rel_to_cashbox(user_id: int, cbox_id: int):
 async def create_user_to_cashbox_rel(user_id: int, cbox_id: int):
     rel_token = gen_token()
     relship = users_cboxes_relation.insert().values(
-        user=user_id, cashbox_id=cbox_id, token=rel_token,
-        status=True, is_owner=False,
+        user=user_id,
+        cashbox_id=cbox_id,
+        token=rel_token,
+        status=True,
+        is_owner=False,
         created_at=int(datetime.utcnow().timestamp()),
-        updated_at=int(datetime.utcnow().timestamp())
+        updated_at=int(datetime.utcnow().timestamp()),
     )
 
     rl_id = await database.execute(relship)
 
     return await database.fetch_one(
-        users_cboxes_relation.select().where(
-            users_cboxes_relation.c.id == rl_id
-        )
+        users_cboxes_relation.select().where(users_cboxes_relation.c.id == rl_id)
     )
 
 
-async def generate_new_user_access_token_for_cashbox(user_id: int, cashbox_id: int) -> str:
+async def generate_new_user_access_token_for_cashbox(
+    user_id: int, cashbox_id: int
+) -> str:
     token = gen_token()
-    query = users_cboxes_relation.update().where(
-        users_cboxes_relation.c.cashbox_id == cashbox_id,
-        users_cboxes_relation.c.user == user_id
-    ).values(
-        {"token": token}
+    query = (
+        users_cboxes_relation.update()
+        .where(
+            users_cboxes_relation.c.cashbox_id == cashbox_id,
+            users_cboxes_relation.c.user == user_id,
+        )
+        .values({"token": token})
     )
     await database.execute(query)
     return token
@@ -243,7 +253,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
     user = await database.fetch_one(
         users.select().where(
             users.c.chat_id == str(message.chat.id),
-            users.c.owner_id == str(message.from_user.id)
+            users.c.owner_id == str(message.from_user.id),
         )
     )
     if not user:
@@ -253,17 +263,17 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 
     ref_url = f"https://t.me/tablecrmbot?start=referral_{message.from_user.id}"
 
-    answer = f'''
+    answer = f"""
 Ваша ссылка для приглашения:
 
 {ref_url}
-'''
+"""
     await message.answer(text=answer)
     await store_bot_message(
         tg_message_id=message.message_id + 1,
         tg_user_or_chat=str(message.chat.id),
         from_or_to=str(bot.id),
-        body=answer
+        body=answer,
     )
     return
 
@@ -278,7 +288,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
     user = await database.fetch_one(
         users.select().where(
             users.c.chat_id == str(message.chat.id),
-            users.c.owner_id == str(message.from_user.id)
+            users.c.owner_id == str(message.from_user.id),
         )
     )
 
@@ -291,10 +301,14 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         return
 
     if user and not command_args:
-        users_cbox = await database.fetch_one(cboxes.select().where(cboxes.c.admin == user.id))
+        users_cbox = await database.fetch_one(
+            cboxes.select().where(cboxes.c.admin == user.id)
+        )
         if users_cbox:
             # Если у юзера есть cashbox - генерируем новый токен для него
-            token = await generate_new_user_access_token_for_cashbox(user_id=user.id, cashbox_id=users_cbox.id)
+            token = await generate_new_user_access_token_for_cashbox(
+                user_id=user.id, cashbox_id=users_cbox.id
+            )
             answer = texts.change_token.format(token=token, url=app_url)
         else:
             # В ином случае создаем новый cashbox
@@ -307,65 +321,82 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             tg_message_id=message.message_id + 1,
             tg_user_or_chat=str(message.chat.id),
             from_or_to=str(bot.id),
-            body=answer
+            body=answer,
         )
 
     if user and command_args:
         if "referral" in str(command_args):
-            answer = f"У вас уже есть регистрация в tablecrm.com!"
+            answer = "У вас уже есть регистрация в tablecrm.com!"
             await message.answer(text=answer)
             await store_bot_message(
                 tg_message_id=message.message_id + 1,
                 tg_user_or_chat=str(message.from_user.id),
                 from_or_to=str(bot.id),
-                body=answer
+                body=answer,
             )
             return
         else:
             # Если пользователь пришел по пригласительной ссылке -
             # пытаемся достать cashbox к которому его хотят присоединить
-            cbox_by_invite = await database.fetch_one(cboxes.select().where(cboxes.c.invite_token == command_args))
+            cbox_by_invite = await database.fetch_one(
+                cboxes.select().where(cboxes.c.invite_token == command_args)
+            )
 
             if not cbox_by_invite:
                 # Если пригласительный токен - невалидный - возвращаем ошибку
                 answer = texts.bad_token
-                await message.answer(text=answer, reply_markup=types.ReplyKeyboardRemove())
+                await message.answer(
+                    text=answer, reply_markup=types.ReplyKeyboardRemove()
+                )
                 await store_bot_message(
                     tg_message_id=message.message_id + 1,
                     tg_user_or_chat=str(message.chat.id),
                     from_or_to=str(bot.id),
-                    body=answer
+                    body=answer,
                 )
                 return
 
             # Если юзер уже существовует - проверяем привязку к cashbox в который его пригласили.
             # Если привязки нет - создаем новую.
-            user_to_cashbox_rel = await user_rel_to_cashbox(user_id=user.id, cbox_id=cbox_by_invite.id)
+            user_to_cashbox_rel = await user_rel_to_cashbox(
+                user_id=user.id, cbox_id=cbox_by_invite.id
+            )
             if not user_to_cashbox_rel:
-                user_to_cashbox_rel = await create_user_to_cashbox_rel(user_id=user.id, cbox_id=cbox_by_invite.id)
+                user_to_cashbox_rel = await create_user_to_cashbox_rel(
+                    user_id=user.id, cbox_id=cbox_by_invite.id
+                )
 
-            answer = texts.invite_cbox.format(token=user_to_cashbox_rel.token, url=app_url)
-            await message.answer(text=answer, reply_markup=await get_open_app_link(user_to_cashbox_rel.token))
+            answer = texts.invite_cbox.format(
+                token=user_to_cashbox_rel.token, url=app_url
+            )
+            await message.answer(
+                text=answer,
+                reply_markup=await get_open_app_link(user_to_cashbox_rel.token),
+            )
             await store_bot_message(
                 tg_message_id=message.message_id + 1,
                 tg_user_or_chat=str(message.chat.id),
                 from_or_to=str(bot.id),
-                body=answer
+                body=answer,
             )
 
     if not user and command_args:
         if "referral" in str(command_args):
             ref_id = command_args.split("referral_")[-1]
-            query = users.select().where(and_(users.c.chat_id == ref_id, users.c.owner_id == ref_id))
+            query = users.select().where(
+                and_(users.c.chat_id == ref_id, users.c.owner_id == ref_id)
+            )
             users_ref_exist = await database.fetch_one(query)
 
             if not users_ref_exist:
-                await message.answer(text="Пользователя, который вас пригласил, не существует")
+                await message.answer(
+                    text="Пользователя, который вас пригласил, не существует"
+                )
                 await store_bot_message(
                     tg_message_id=message.message_id + 1,
                     tg_user_or_chat=str(ref_id),
                     from_or_to=str(bot.id),
-                    body="Вы не можете регистировать самого себя!"
+                    body="Вы не можете регистировать самого себя!",
                 )
                 return
 
@@ -375,7 +406,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                     tg_message_id=message.message_id + 1,
                     tg_user_or_chat=str(ref_id),
                     from_or_to=str(bot.id),
-                    body="Вы не можете регистировать самого себя!"
+                    body="Вы не можете регистировать самого себя!",
                 )
                 return
 
@@ -386,7 +417,9 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         else:
             # Если пользователь пришел по пригласительной ссылке -
             # пытаемся достать cashbox к которому его хотят присоединить
-            cbox_by_invite = await database.fetch_one(cboxes.select().where(cboxes.c.invite_token == command_args))
+            cbox_by_invite = await database.fetch_one(
+                cboxes.select().where(cboxes.c.invite_token == command_args)
+            )
 
             if not cbox_by_invite:
                 # Если пригласительный токен - невалидный - пропускаем регистрацию как обычную
@@ -408,7 +441,9 @@ async def new_cheque(message: types.Message, state: FSMContext):
     await store_user_message(message)
     await state.set_state(Form.cheque_picture)
     await message.answer(texts.send_cheque, reply_markup=cancel_keyboard)
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.send_cheque)
+    await store_bot_message(
+        message.message_id + 1, message.chat.id, bot.id, texts.send_cheque
+    )
 
 
 async def get_cheque_info(photo: PhotoSize) -> Optional[dict]:
@@ -421,8 +456,8 @@ async def get_cheque_info(photo: PhotoSize) -> Optional[dict]:
             "qrfile": file,
         }
         async with session.post(
-                cheque_service_url,
-                data=req_data,
+            cheque_service_url,
+            data=req_data,
         ) as resp:
             data = await resp.json()
             if data["code"] != 1:
@@ -434,7 +469,10 @@ async def get_cheque_info(photo: PhotoSize) -> Optional[dict]:
 def get_cheque_items_text(cheque_info):
     description = ""
     for item in cheque_info["items"]:
-        description = description + f'{item["name"]} ({item["quantity"]} шт.) = {item["sum"] / 100} р.\n'
+        description = (
+            description
+            + f'{item["name"]} ({item["quantity"]} шт.) = {item["sum"] / 100} р.\n'
+        )
     return description.strip()
 
 
@@ -443,12 +481,16 @@ async def create_payment_from_cheque(cheque_info: dict, cbox) -> int:
     created = int(datetime.utcnow().timestamp())
 
     # getting user token
-    query = users_cboxes_relation.select().where(users_cboxes_relation.c.user == cbox.admin)
+    query = users_cboxes_relation.select().where(
+        users_cboxes_relation.c.user == cbox.admin
+    )
     user_info = await database.fetch_one(query)
     token = user_info.token
 
     # getting id of the article called "Покупки"
-    query = articles.select().where(articles.c.cashbox == cbox.id, articles.c.name == "Покупки")
+    query = articles.select().where(
+        articles.c.cashbox == cbox.id, articles.c.name == "Покупки"
+    )
     article = await database.fetch_one(query)
     if not article:
         # creating article if it doesn't exist
@@ -473,8 +515,9 @@ async def create_payment_from_cheque(cheque_info: dict, cbox) -> int:
     description = get_cheque_items_text(cheque_info)
 
     # getting contragent
-    query = contragents.select().where(contragents.c.inn == cheque_info["userInn"],
-                                       contragents.c.cashbox == cbox.id)
+    query = contragents.select().where(
+        contragents.c.inn == cheque_info["userInn"], contragents.c.cashbox == cbox.id
+    )
     contragent = await database.fetch_one(query)
     if not contragent:
         contragent_data = ContragentCreate(
@@ -502,7 +545,9 @@ async def create_payment_from_cheque(cheque_info: dict, cbox) -> int:
         amount=cheque_info["totalSum"] / 100,
         amount_without_tax=cheque_info["totalSum"] / 100,
         description=description,
-        date=int(datetime.strptime(cheque_info["dateTime"], "%Y-%m-%dT%H:%M:%S").timestamp()),
+        date=int(
+            datetime.strptime(cheque_info["dateTime"], "%Y-%m-%dT%H:%M:%S").timestamp()
+        ),
         contragent=contragent.id,
         cashbox=cbox.id,
         paybox=pbox.id,
@@ -538,27 +583,42 @@ async def new_cheque_pic(message: types.Message, state: FSMContext):
                     texts.cheque_not_detected,
                     reply_markup=cancel_keyboard,
                 )
-                await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.cheque_not_detected)
+                await store_bot_message(
+                    message.message_id + 1,
+                    message.chat.id,
+                    bot.id,
+                    texts.cheque_not_detected,
+                )
                 return
             payment = await create_payment_from_cheque(cheque_info, cbox)
             await state.set_state(Form.cheque_paybox)
-            await state.set_data(
-                {"payment": payment, "cheque": cheque_info}
-            )
+            await state.set_data({"payment": payment, "cheque": cheque_info})
             query = pboxes.select().where(pboxes.c.cashbox == cbox.id)
             payboxes = await database.fetch_all(query)
             buttons = []
             for paybox in payboxes:
                 if buttons and len(buttons[-1]) < 2:
-                    buttons[-1].append(types.InlineKeyboardButton(text=paybox.name, callback_data=paybox.id))
+                    buttons[-1].append(
+                        types.InlineKeyboardButton(
+                            text=paybox.name, callback_data=paybox.id
+                        )
+                    )
                 else:
-                    buttons.append([types.InlineKeyboardButton(text=paybox.name, callback_data=paybox.id)])
+                    buttons.append(
+                        [
+                            types.InlineKeyboardButton(
+                                text=paybox.name, callback_data=paybox.id
+                            )
+                        ]
+                    )
             keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
             await message.answer(
                 texts.select_paybox,
                 reply_markup=keyboard,
             )
-            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.select_paybox)
+            await store_bot_message(
+                message.message_id + 1, message.chat.id, bot.id, texts.select_paybox
+            )
 
 
 @router_comm.callback_query(state=Form.cheque_paybox)
@@ -572,7 +632,9 @@ async def select_cheque_paybox(callback_query: types.CallbackQuery, state: FSMCo
         cbox = await database.fetch_one(query)
 
         if cbox:
-            query = pboxes.select().where(pboxes.c.cashbox == cbox.id, pboxes.c.id == int(callback_query.data))
+            query = pboxes.select().where(
+                pboxes.c.cashbox == cbox.id, pboxes.c.id == int(callback_query.data)
+            )
             pbox = await database.fetch_one(query)
             if not pbox:
                 await callback_query.answer("Ошибка! " + texts.select_paybox)
@@ -580,8 +642,11 @@ async def select_cheque_paybox(callback_query: types.CallbackQuery, state: FSMCo
             state_data = await state.get_data()
             payment_id = state_data["payment"]
             cheque = state_data["cheque"]
-            query = payments.update().where(payments.c.id == payment_id) \
+            query = (
+                payments.update()
+                .where(payments.c.id == payment_id)
                 .values(paybox=pbox.id)
+            )
             await database.execute(query)
             await state.clear()
             await callback_query.answer("Готово!")
@@ -594,12 +659,17 @@ async def select_cheque_paybox(callback_query: types.CallbackQuery, state: FSMCo
                 ),
                 reply_markup=types.ReplyKeyboardRemove(),
             )
-            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.you_added_cheque.format(
-                amount=cheque["totalSum"] / 100,
-                address=cheque["retailPlaceAddress"],
-                items=get_cheque_items_text(cheque),
-                paybox=pbox.name,
-            ))
+            await store_bot_message(
+                message.message_id + 1,
+                message.chat.id,
+                bot.id,
+                texts.you_added_cheque.format(
+                    amount=cheque["totalSum"] / 100,
+                    address=cheque["retailPlaceAddress"],
+                    items=get_cheque_items_text(cheque),
+                    paybox=pbox.name,
+                ),
+            )
             await message.delete()
 
 
@@ -618,7 +688,10 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
         user = await database.fetch_one(query)
 
         if user:
-            query = users.select().where(users.c.owner_id == str(creator.id), users.c.chat_id == str(message.chat.id))
+            query = users.select().where(
+                users.c.owner_id == str(creator.id),
+                users.c.chat_id == str(message.chat.id),
+            )
             user_and_chat = await database.fetch_one(query)
 
             if user_and_chat:
@@ -627,19 +700,32 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
 
                 if cbox:
                     new_token = gen_token()
-                    query = users_cboxes_relation.update().where(users_cboxes_relation.c.cashbox_id == cbox.id,
-                                                                 users_cboxes_relation.c.user == user_and_chat.id).values(
-                        {"token": new_token})
+                    query = (
+                        users_cboxes_relation.update()
+                        .where(
+                            users_cboxes_relation.c.cashbox_id == cbox.id,
+                            users_cboxes_relation.c.user == user_and_chat.id,
+                        )
+                        .values({"token": new_token})
+                    )
 
                     await database.execute(query)
                     answer = texts.change_token.format(token=new_token, url=app_url)
-                    await message.answer(text=answer, reply_markup=await get_open_app_link(new_token))
-                    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+                    await message.answer(
+                        text=answer, reply_markup=await get_open_app_link(new_token)
+                    )
+                    await store_bot_message(
+                        message.message_id + 1, message.chat.id, bot.id, answer
+                    )
                 else:
                     rel = await create_cbox(user_and_chat)
                     answer = texts.create_cbox.format(token=rel.token, url=app_url)
-                    await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
-                    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+                    await message.answer(
+                        text=answer, reply_markup=await get_open_app_link(rel.token)
+                    )
+                    await store_bot_message(
+                        message.message_id + 1, message.chat.id, bot.id, answer
+                    )
                     await create_balance(rel.cashbox_id, message)
             else:
 
@@ -652,7 +738,7 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
                     last_name=user.last_name,
                     username=user.username,
                     created_at=int(datetime.utcnow().timestamp()),
-                    updated_at=int(datetime.utcnow().timestamp())
+                    updated_at=int(datetime.utcnow().timestamp()),
                 )
 
                 user_id = await database.execute(user_query)
@@ -662,20 +748,32 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
 
                 rel = await create_cbox(user)
                 answer = texts.create_cbox.format(token=rel.token, url=app_url)
-                await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
-                await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+                await message.answer(
+                    text=answer, reply_markup=await get_open_app_link(rel.token)
+                )
+                await store_bot_message(
+                    message.message_id + 1, message.chat.id, bot.id, answer
+                )
                 await create_balance(rel.cashbox_id, message)
 
         else:
-            await message.answer(text=texts.not_register,
-                                 reply_markup=types.ReplyKeyboardRemove())
-            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.not_register)
+            await message.answer(
+                text=texts.not_register, reply_markup=types.ReplyKeyboardRemove()
+            )
+            await store_bot_message(
+                message.message_id + 1, message.chat.id, bot.id, texts.not_register
+            )
     else:
         await message.answer(
             text=texts.not_admin_chat.format(creator=creator.username),
-            reply_markup=types.ReplyKeyboardRemove())
-        await store_bot_message(message.message_id + 1, message.chat.id, bot.id,
-                                texts.not_admin_chat.format(creator=creator.username))
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        await store_bot_message(
+            message.message_id + 1,
+            message.chat.id,
+            bot.id,
+            texts.not_admin_chat.format(creator=creator.username),
+        )
 
     await state.clear()
 
@@ -686,10 +784,17 @@ async def broadcast_message(message: types.Message, state: FSMContext):
     /newdelievery command handler for broadcast message
     """
     await store_user_message(message)
-    query = users.select().where(users.c.is_admin == True, users.c.chat_id == str(message.chat.id))
+    query = users.select().where(
+        users.c.is_admin == True, users.c.chat_id == str(message.chat.id)
+    )
     if await database.fetch_one(query):
         await message.answer(texts.send_broadcast_message)
-        await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.send_broadcast_message)
+        await store_bot_message(
+            message.message_id + 1,
+            message.chat.id,
+            bot.id,
+            texts.send_broadcast_message,
+        )
         await state.set_state(DeliveryForm.send)
 
 
@@ -709,11 +814,15 @@ async def send_text_broadcast_message(message: types.Message, state: FSMContext)
     await store_user_message(message)
     await message.answer(
         f"Вы уверены что хотите разослать сообщение по {len(last_active_users) - 1} живым пользователям?",
-        reply_markup=choose_keyboard
+        reply_markup=choose_keyboard,
     )
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id,
-                            f"Вы уверены что хотите разослать сообщение "
-                            f"по {len(last_active_users) - 1} живым пользователям?")
+    await store_bot_message(
+        message.message_id + 1,
+        message.chat.id,
+        bot.id,
+        f"Вы уверены что хотите разослать сообщение "
+        f"по {len(last_active_users) - 1} живым пользователям?",
+    )
     await state.set_state(DeliveryForm.submit)
 
 
@@ -736,10 +845,15 @@ async def confirm_broadcast_message(message: types.Message, state: FSMContext):
         await store_user_message(message)
         await message.answer(
             f"Вы уверены что хотите разослать сообщение по {len(last_active_users) - 1} живым пользователям?",
-            reply_markup=choose_keyboard)
-        await store_bot_message(message.message_id + 1, message.chat.id, bot.id,
-                                f"Вы уверены что хотите разослать сообщение "
-                                f"по {len(last_active_users) - 1} живым пользователям?")
+            reply_markup=choose_keyboard,
+        )
+        await store_bot_message(
+            message.message_id + 1,
+            message.chat.id,
+            bot.id,
+            f"Вы уверены что хотите разослать сообщение "
+            f"по {len(last_active_users) - 1} живым пользователям?",
+        )
         await state.set_state(DeliveryForm.submit)
 
 
@@ -755,17 +869,21 @@ async def prepare_registration(message):
         photo_path = photo_file.file_path
         await bot.download_file(photo_path, photo_path)
 
-    user_query = users.insert().values(
-        chat_id=str(message.chat.id),
-        owner_id=str(message.contact.user_id),
-        photo=photo_path,
-        phone_number=message.contact.phone_number,
-        first_name=message.from_user.first_name,
-        last_name=message.from_user.last_name,
-        username=message.from_user.username,
-        created_at=created,
-        updated_at=created
-    ).returning(users)
+    user_query = (
+        users.insert()
+        .values(
+            chat_id=str(message.chat.id),
+            owner_id=str(message.contact.user_id),
+            photo=photo_path,
+            phone_number=message.contact.phone_number,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.last_name,
+            username=message.from_user.username,
+            created_at=created,
+            updated_at=created,
+        )
+        .returning(users)
+    )
     return created, user_query
 
 
@@ -792,20 +910,30 @@ async def create_balance(cashbox_id, message, tariff=None):
             n=tariff.demo_days,
             tax=tariff.price,
             for_user=" за пользователя" if tariff.per_user else "",
-            link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
-        ), reply_markup=types.ReplyKeyboardRemove(), # Удаляем клавиатуру с кнопками "отправить номер телефона, отменить регистрацию"
+            link=texts.url_link_pay.format(
+                user_id=message.from_user.id, cashbox_id=cashbox_id
+            ),
+        ),
+        reply_markup=types.ReplyKeyboardRemove(),  # Удаляем клавиатуру с кнопками "отправить номер телефона, отменить регистрацию"
         # Чтобы скрыть предпросмотр ссылки на бота для оплаты
         # link_preview_is_disabled=True
     )
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, texts.you_got_demo.format(
-        n=tariff.demo_days,
-        tax=tariff.price,
-        for_user=" за пользователя" if tariff.per_user else "",
-        link=texts.url_link_pay.format(user_id=message.from_user.id, cashbox_id=cashbox_id),
-    ))
+    await store_bot_message(
+        message.message_id + 1,
+        message.chat.id,
+        bot.id,
+        texts.you_got_demo.format(
+            n=tariff.demo_days,
+            tax=tariff.price,
+            for_user=" за пользователя" if tariff.per_user else "",
+            link=texts.url_link_pay.format(
+                user_id=message.from_user.id, cashbox_id=cashbox_id
+            ),
+        ),
+    )
 
 
-@router_comm.message(Form.start, content_types=['contact'])
+@router_comm.message(Form.start, content_types=["contact"])
 async def reg_user_create(message: types.Message, state: FSMContext):
     await store_user_message(message)
     if message.contact:
@@ -821,7 +949,9 @@ async def reg_user_create(message: types.Message, state: FSMContext):
         rel = await create_cbox(user)
 
         answer = texts.create_cbox.format(token=rel.token, url=app_url)
-        await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
+        await message.answer(
+            text=answer, reply_markup=await get_open_app_link(rel.token)
+        )
         await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
         await create_balance(rel.cashbox_id, message, tariff)
 
@@ -831,21 +961,23 @@ async def reg_user_create(message: types.Message, state: FSMContext):
             name += f" ({message.from_user.username})"
         text = f"""
 <b>🥳 Новая регистрация</b>
-👤 {name} 
+👤 {name}
 ☎️ {message.contact.phone_number}
 """
 
         photos = await bot.get_user_profile_photos(user_id=message.from_user.id)
         if photos.total_count > 0:
             file_id = photos.photos[0][0].file_id
-            await bot.send_photo(chat_id=os.getenv("ADMIN_ID"), photo=file_id, caption=text)
+            await bot.send_photo(
+                chat_id=os.getenv("ADMIN_ID"), photo=file_id, caption=text
+            )
         else:
             await bot.send_message(chat_id=os.getenv("ADMIN_ID"), text=text)
 
         await state.clear()
 
 
-@router_comm.message(Form.join, content_types=['contact'])
+@router_comm.message(Form.join, content_types=["contact"])
 async def reg_user_join(message: types.Message, state: FSMContext):
     await store_user_message(message)
     if message.contact:
@@ -854,26 +986,34 @@ async def reg_user_join(message: types.Message, state: FSMContext):
         user_create_record = await database.fetch_one(user_query)
         data = await state.get_data()
         if data.get("cbox"):
-            rel = await join_cbox(user_create_record, data['cbox'])
+            rel = await join_cbox(user_create_record, data["cbox"])
             answer = texts.invite_cbox.format(token=rel.token, url=app_url)
-            await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
-            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+            await message.answer(
+                text=answer, reply_markup=await get_open_app_link(rel.token)
+            )
+            await store_bot_message(
+                message.message_id + 1, message.chat.id, bot.id, answer
+            )
             await state.clear()
         elif data.get("ref_id"):
             tariff_query = tariffs.select().where(tariffs.c.actual is True)
             tariff = await database.fetch_one(tariff_query)
 
-            await add_referral_user(message.from_user.id, data['ref_id'])
+            await add_referral_user(message.from_user.id, data["ref_id"])
             answer = f"У Вас новая регистрация от {message.from_user.first_name}"
-            await bot.send_message(chat_id=int(data['ref_id']), text=answer)
+            await bot.send_message(chat_id=int(data["ref_id"]), text=answer)
 
             query = users.select().where(users.c.id == user_create_record.id)
             user = await database.fetch_one(query)
             rel = await create_cbox(user)
 
             answer = texts.create_cbox.format(token=rel.token, url=app_url)
-            await message.answer(text=answer, reply_markup=await get_open_app_link(rel.token))
-            await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+            await message.answer(
+                text=answer, reply_markup=await get_open_app_link(rel.token)
+            )
+            await store_bot_message(
+                message.message_id + 1, message.chat.id, bot.id, answer
+            )
             await create_balance(rel.cashbox_id, message, tariff)
 
             await state.clear()
@@ -883,48 +1023,83 @@ async def reg_user_join(message: types.Message, state: FSMContext):
 async def without_puree(message: types.Message, state: FSMContext):
     await store_user_message(message)
     await state.clear()
-    await message.reply("Вы отменили регистрацию!", reply_markup=types.ReplyKeyboardRemove())
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, "Вы отменили регистрацию!")
+    await message.reply(
+        "Вы отменили регистрацию!", reply_markup=types.ReplyKeyboardRemove()
+    )
+    await store_bot_message(
+        message.message_id + 1, message.chat.id, bot.id, "Вы отменили регистрацию!"
+    )
 
 
 @router_comm.message(lambda message: message.text == "Отмена", state="*")
 async def cancel_cheque(message: types.Message, state: FSMContext):
     await store_user_message(message)
     await state.clear()
-    await message.reply("Вы отменили создание чека!", reply_markup=types.ReplyKeyboardRemove())
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, "Вы отменили создание чека!")
+    await message.reply(
+        "Вы отменили создание чека!", reply_markup=types.ReplyKeyboardRemove()
+    )
+    await store_bot_message(
+        message.message_id + 1, message.chat.id, bot.id, "Вы отменили создание чека!"
+    )
 
 
 @router_comm.message(lambda message: message.text == "No", state=DeliveryForm.submit)
 async def deny_broadcast_message(message: types.Message, state: FSMContext):
     await store_user_message(message)
     await state.clear()
-    await message.reply("Вы отменили отправку рассылки", reply_markup=types.ReplyKeyboardRemove())
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, "Вы отменили отправку рассылки")
+    await message.reply(
+        "Вы отменили отправку рассылки", reply_markup=types.ReplyKeyboardRemove()
+    )
+    await store_bot_message(
+        message.message_id + 1, message.chat.id, bot.id, "Вы отменили отправку рассылки"
+    )
 
 
 @router_comm.message(lambda message: message.text == "Yes", state=DeliveryForm.submit)
 async def sumbit_broadcast_message(message: types.Message, state: FSMContext):
     await store_user_message(message)
-    await message.reply("Готово, ваша рассылка запущена, вот тут вы можете видеть статус рассылки.",
-                        reply_markup=types.ReplyKeyboardRemove())
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id,
-                            "Готово, ваша рассылка запущена, вот тут вы можете видеть статус рассылки.")
+    await message.reply(
+        "Готово, ваша рассылка запущена, вот тут вы можете видеть статус рассылки.",
+        reply_markup=types.ReplyKeyboardRemove(),
+    )
+    await store_bot_message(
+        message.message_id + 1,
+        message.chat.id,
+        bot.id,
+        "Готово, ваша рассылка запущена, вот тут вы можете видеть статус рассылки.",
+    )
     # При реализации хранения картинок нужно подумать над форматом сериализации картинок
-    await produce_message({"text": BroadcastMessageStore.text, "picture": BroadcastMessageStore.picture,
-                           "tg_message_id": BroadcastMessageStore.tg_message_id,
-                           "tg_user_or_chat": BroadcastMessageStore.tg_user_or_chat,
-                           "created_at": BroadcastMessageStore.created_at,
-                           "message_id": message.message_id})
+    await produce_message(
+        {
+            "text": BroadcastMessageStore.text,
+            "picture": BroadcastMessageStore.picture,
+            "tg_message_id": BroadcastMessageStore.tg_message_id,
+            "tg_user_or_chat": BroadcastMessageStore.tg_user_or_chat,
+            "created_at": BroadcastMessageStore.created_at,
+            "message_id": message.message_id,
+        }
+    )
     await state.clear()
 
 
-async def finish_broadcast_messaging(chat_id: str, total: int, active_before: int, active_after: int, message_id: int):
+async def finish_broadcast_messaging(
+    chat_id: str, total: int, active_before: int, active_after: int, message_id: int
+):
     try:
-        await bot.send_message(chat_id=chat_id, text=texts.send_broadcast_messaging_logs.format(
-            total=total, before=active_before, after=active_after))
-        await store_bot_message(message_id, chat_id, bot.id, texts.send_broadcast_messaging_logs.format(
-            total=total, before=active_before, after=active_after))
+        await bot.send_message(
+            chat_id=chat_id,
+            text=texts.send_broadcast_messaging_logs.format(
+                total=total, before=active_before, after=active_after
+            ),
+        )
+        await store_bot_message(
+            message_id,
+            chat_id,
+            bot.id,
+            texts.send_broadcast_messaging_logs.format(
+                total=total, before=active_before, after=active_after
+            ),
+        )
     except Exception as e:
         print("Notification failed")
 
@@ -932,20 +1107,30 @@ async def finish_broadcast_messaging(chat_id: str, total: int, active_before: in
 async def message_to_chat_by_id(chat_id: str, message: str, picture):
     try:
         if picture:
-            await bot.send_photo(chat_id=chat_id, photo=picture, caption=message, parse_mode="markdown")
+            await bot.send_photo(
+                chat_id=chat_id, photo=picture, caption=message, parse_mode="markdown"
+            )
         else:
             await bot.send_message(chat_id=chat_id, text=message, parse_mode="markdown")
         print(f"Sent to {chat_id}")
     except Exception as e:
         print(f"Broadcast sending message to {chat_id} exception occured {e}")
-        await database.execute(users.update().where(users.c.chat_id == chat_id).values({"is_blocked": True}))
+        await database.execute(
+            users.update()
+            .where(users.c.chat_id == chat_id)
+            .values({"is_blocked": True})
+        )
         return False
     return True
 
+
 @router_add_migrate.message(F.migrate_to_chat_id)
 async def group_to_supegroup_migration(message: types.Message):
-    query = users.update().where(users.c.chat_id == str(message.chat.id)).values(
-        {"chat_id": str(message.migrate_to_chat_id)})
+    query = (
+        users.update()
+        .where(users.c.chat_id == str(message.chat.id))
+        .values({"chat_id": str(message.migrate_to_chat_id)})
+    )
     await database.execute(query)
 
 
@@ -953,8 +1138,12 @@ async def group_to_supegroup_migration(message: types.Message):
 async def handle_phone_number(message: types.Message, state: FSMContext):
     await store_user_message(message)
     await message.reply(texts.get_phone_by_btn)
-    await store_bot_message(message.message_id + 1, message.chat.id, bot.id, "Вы указали номер телефона. Нажмите на кнопку, чтобы отправить его.")
-
+    await store_bot_message(
+        message.message_id + 1,
+        message.chat.id,
+        bot.id,
+        "Вы указали номер телефона. Нажмите на кнопку, чтобы отправить его.",
+    )
 
 
 async def main():

@@ -1,11 +1,10 @@
 from asyncpg import UniqueViolationError
+from database.db import database, fifo_settings
 from fastapi import APIRouter, HTTPException
+from functions.helpers import datetime_to_timestamp, get_user_by_token
+from ws_manager import manager
 
 from . import schemas
-from database.db import database, fifo_settings
-from functions.helpers import datetime_to_timestamp
-from functions.helpers import get_user_by_token
-from ws_manager import manager
 
 router = APIRouter(tags=["fifo_settings"])
 
@@ -20,7 +19,7 @@ async def get_by_id(token: str, organization_id: int):
     instance_db = await database.fetch_one(query)
 
     if not instance_db:
-        raise HTTPException(status_code=404, detail=f"Не найдено.")
+        raise HTTPException(status_code=404, detail="Не найдено.")
 
     instance_db = datetime_to_timestamp(instance_db)
 
@@ -36,7 +35,9 @@ async def create(token: str, fifo_settings_data: schemas.Create):
     try:
         instance_id = await database.execute(query)
     except UniqueViolationError:
-        raise HTTPException(400, "Настройки организации уже существуют, вы можете отредактировать их")
+        raise HTTPException(
+            400, "Настройки организации уже существуют, вы можете отредактировать их"
+        )
 
     query = fifo_settings.select().where(fifo_settings.c.id == instance_id)
     instance = await database.fetch_one(query)

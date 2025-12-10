@@ -10,9 +10,11 @@ def safe_parse_json(value: Any) -> Optional[Dict[str, Any]]:
         if isinstance(value, dict):
             return value  # already parsed
         import json
+
         return json.loads(value)
     except Exception:
         return None
+
 
 async def get_marketplace_service() -> MarketplaceService:
     marketplace_service = MarketplaceService()

@@ -1,10 +1,11 @@
-from typing import Optional, Union, List
-
-from fastapi import FastAPI
-from starlette import status
+from typing import List, Optional, Union
 
 from api.loyality_transactions import schemas
-from api.loyality_transactions.web.views.CreateLoyalityTransactionsView import CreateLoyalityTransactionsView
+from api.loyality_transactions.web.views.CreateLoyalityTransactionsView import (
+    CreateLoyalityTransactionsView,
+)
+from fastapi import FastAPI
+from starlette import status
 
 
 class InstallLoyalityTransactionsWeb:
@@ -18,5 +19,7 @@ class InstallLoyalityTransactionsWeb:
             methods=["POST"],
             status_code=status.HTTP_200_OK,
             tags=["loyality_transactions"],
-            response_model=Optional[Union[schemas.LoyalityTransaction, List[schemas.LoyalityTransaction]]]
+            response_model=Optional[
+                Union[schemas.LoyalityTransaction, List[schemas.LoyalityTransaction]]
+            ],
         )

@@ -1,9 +1,8 @@
 from enum import Enum
-
-from pydantic import BaseModel, validator
 from typing import List, Optional
 
 from functions.helpers import sanitize_float
+from pydantic import BaseModel, validator
 
 
 class RepeatPeriod(str, Enum):
@@ -132,6 +131,7 @@ class PaymentDB(PaymentCreate):
     class Config:
         orm_mode = True
 
+
 class PaymentInList(BaseModel):
     id: int
     contragent: Optional[int]
@@ -179,8 +179,10 @@ class PaymentInList(BaseModel):
     class Config:
         orm_mode = True
 
+
 class PaymentInListWithData(PaymentInList):
     data: dict
+
 
 class PaymentEdit(BaseModel):
     type: Optional[PaymentType]

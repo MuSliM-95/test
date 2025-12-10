@@ -1,10 +1,12 @@
-from database.db import payments, entity_to_entity, database
-from sqlalchemy import select, and_, func, case, cast, Integer
+from database.db import database, entity_to_entity, payments
+from sqlalchemy import and_, func, select
 
 
 class PaymentsRepository:
     @staticmethod
-    async def fetch_payments_map_by_ids(doc_ids: list[int]) -> dict[tuple[int, int], dict]:
+    async def fetch_payments_map_by_ids(
+        doc_ids: list[int],
+    ) -> dict[tuple[int, int], dict]:
         if not doc_ids:
             return {}
 
@@ -12,7 +14,7 @@ class PaymentsRepository:
             select(
                 entity_to_entity.c.from_id.label("doc_id"),
                 entity_to_entity.c.cashbox_id,
-                func.sum(payments.c.amount).label("total_amount")
+                func.sum(payments.c.amount).label("total_amount"),
             )
             .join(payments, payments.c.id == entity_to_entity.c.to_id)
             .where(
@@ -21,7 +23,7 @@ class PaymentsRepository:
                     entity_to_entity.c.to_entity == 5,
                     entity_to_entity.c.from_id.in_(doc_ids),
                     payments.c.status.is_(True),
-                    payments.c.is_deleted.is_(False)
+                    payments.c.is_deleted.is_(False),
                 )
             )
             .group_by(entity_to_entity.c.from_id, entity_to_entity.c.cashbox_id)
@@ -33,5 +35,7 @@ class PaymentsRepository:
             for row in rows
         }
 
-    async def fetch_payments_map_by_id(self, doc_id: int) -> dict[tuple[int, int], dict]:
+    async def fetch_payments_map_by_id(
+        self, doc_id: int
+    ) -> dict[tuple[int, int], dict]:
         return await self.fetch_payments_map_by_ids([doc_id])

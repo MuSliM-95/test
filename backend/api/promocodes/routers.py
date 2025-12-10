@@ -1,10 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
-from sqlalchemy import and_, select
-from sqlalchemy.orm import Session
-
 import api.promocodes.schemas as schemas
 from api.deps import get_db, get_user_by_token
 from api.promocodes.models import PromocodeDB, PromocodeType
@@ -16,6 +12,9 @@ from database.db import (
     loyality_transactions,
     organizations,
 )
+from fastapi import APIRouter, Body, Depends, HTTPException
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session
 from ws_manager import manager
 
 router = APIRouter(tags=["promocodes"])
