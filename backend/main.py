@@ -167,6 +167,7 @@ from api.tech_cards.router import router as tech_cards_router
 from api.tech_operations.router import router as tech_operations_router
 from api.settings.cashbox.routers import router as cashbox_settings_router
 from api.segments_tags.routers import router as segments_tags_router
+from api.promocodes.routers import router as promocodes_router
 from api.employee_shifts.routers import router as employee_shifts_router
 from api.feeds.routers import router as feeds_router
 from api.chats.routers import router as chats_router
@@ -257,6 +258,7 @@ app.include_router(loyality_transactions)
 app.include_router(loyality_settings)
 app.include_router(cashbox_settings_router)
 app.include_router(segments_tags_router)
+app.include_router(promocodes_router)
 
 app.include_router(int_router)
 app.include_router(oauth_router)
