@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -22,8 +23,9 @@ from database.db import database, pictures
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 
-router = APIRouter(prefix="/chats", tags=["chats"])
+logger = logging.getLogger(__name__)
 
+router = APIRouter(prefix="/chats", tags=["chats"])
 
 @router.post("/channels/", response_model=ChannelResponse)
 async def create_channel(

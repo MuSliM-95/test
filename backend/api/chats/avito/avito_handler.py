@@ -1147,7 +1147,7 @@ class AvitoHandler:
 
     @staticmethod
     async def sync_messages_from_avito(
-        client: "AvitoClient", chat_id: int, cashbox_id: int, external_chat_id: str
+        client, chat_id: int, cashbox_id: int, external_chat_id: str
     ) -> Dict[str, Any]:
         try:
             logger.info(
