@@ -40,9 +40,7 @@ async def filter_out_service_goods(goods: list) -> list:
 
     # Убираем услуги (type == 'service')
     filtered = [
-        item
-        for item in goods
-        if types_map.get(item.get("nomenclature")) != "service"
+        item for item in goods if types_map.get(item.get("nomenclature")) != "service"
     ]
 
     return filtered
@@ -52,7 +50,9 @@ async def check_relationship(entity):
     exeptions = set()
     try:
         if not await database.fetch_one(
-            docs_purchases.select().where(docs_purchases.c.id == entity["docs_purchases"])
+            docs_purchases.select().where(
+                docs_purchases.c.id == entity["docs_purchases"]
+            )
         ):
             exeptions.add(
                 f"error not found docs_purchases.id = {entity['docs_purchases']}"
@@ -62,9 +62,7 @@ async def check_relationship(entity):
         if not await database.fetch_one(
             docs_sales.select().where(docs_sales.c.id == entity["docs_sales_id"])
         ):
-            exeptions.add(
-                f"error not found docs_sales.id = {entity['docs_sales_id']}"
-            )
+            exeptions.add(f"error not found docs_sales.id = {entity['docs_sales_id']}")
             del entity["docs_sales_id"]
 
         if not await database.fetch_one(
@@ -293,9 +291,7 @@ async def check_exist_amount(goods, warehouse):
         if good_db and good_db["current_amount"] >= good["quantity"]:
             continue
         else:
-            raise Exception(
-                f"there is not enough balance to outgoing good = {good}"
-            )
+            raise Exception(f"there is not enough balance to outgoing good = {good}")
 
 
 async def insert_goods(entity, doc_id, type_operation, not_create_goods: bool = False):

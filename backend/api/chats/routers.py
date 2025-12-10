@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
+
 @router.post("/channels/", response_model=ChannelResponse)
 async def create_channel(
     token: str, channel: ChannelCreate, user=Depends(get_current_user_owner)
