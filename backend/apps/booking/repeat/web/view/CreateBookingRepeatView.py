@@ -1,29 +1,24 @@
 import uuid
 
-from fastapi import HTTPException
-from sqlalchemy import select, and_
-from starlette import status
-from starlette.requests import Request
-
-from apps.booking.repeat.models.BaseBookingRepeatMessageModel import BaseBookingRepeatMessage
+from apps.booking.repeat.models.BaseBookingRepeatMessageModel import (
+    BaseBookingRepeatMessage,
+)
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
-from database.db import amo_leads, database, booking, booking_tags
+from database.db import amo_leads, booking, booking_tags, database
+from fastapi import HTTPException
 from functions.helpers import get_user_by_token
+from sqlalchemy import and_, select
+from starlette import status
+from starlette.requests import Request
 
 
 class CreateBookingRepeatView:
 
-    def __init__(
-        self,
-        amqp_messaging_factory: IRabbitFactory
-    ):
+    def __init__(self, amqp_messaging_factory: IRabbitFactory):
         self.__amqp_messaging_factory = amqp_messaging_factory
 
-    async def __call__(
-        self,
-        token: str, request: Request
-    ):
+    async def __call__(self, token: str, request: Request):
         form = await request.form()
         form_dict = dict(form)
 
@@ -33,27 +28,32 @@ class CreateBookingRepeatView:
 
         lead_id = form_dict.get("leads[add][0][id]")
         if not lead_id:
-            return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lead Id Not Available")
+            return HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Lead Id Not Available"
+            )
 
-        query = (
-            select(amo_leads.c.id)
-            .where(and_(
+        query = select(amo_leads.c.id).where(
+            and_(
                 amo_leads.c.amo_id == int(lead_id),
                 amo_leads.c.is_deleted == False,
-            ))
+            )
         )
         amo_lead_info = await database.fetch_one(query)
         if not amo_lead_info:
-            return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead Not Found")
+            return HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Lead Not Found"
+            )
 
         query = (
             select(booking)
             .join(booking_tags, booking.c.id == booking_tags.c.booking_id)
-            .where(and_(
-                booking.c.cashbox == user.cashbox_id,
-                booking_tags.c.name == f"ID_{lead_id}",
-                booking.c.is_deleted == False
-            ))
+            .where(
+                and_(
+                    booking.c.cashbox == user.cashbox_id,
+                    booking_tags.c.name == f"ID_{lead_id}",
+                    booking.c.is_deleted == False,
+                )
+            )
         )
         booking_info = await database.fetch_one(query)
 
@@ -68,7 +68,7 @@ class CreateBookingRepeatView:
                 start_booking=booking_info.start_booking,
                 end_booking=booking_info.end_booking,
                 token=token,
-                lead_id=amo_lead_info.id
+                lead_id=amo_lead_info.id,
             ),
-            routing_key="booking_repeat_tasks"
+            routing_key="booking_repeat_tasks",
         )

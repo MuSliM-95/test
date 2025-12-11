@@ -1,9 +1,8 @@
-from datetime import datetime
-
-from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 
 from database.enums import DebitCreditType
+from pydantic import BaseModel
+
 
 class PaymentFiltersQuery(BaseModel):
     name: Optional[str]
@@ -21,37 +20,45 @@ class PaymentFiltersQuery(BaseModel):
     include_paybox_dest: Optional[bool] = False
     timezone: Optional[str] = "UTC"
 
+
 class AnalyticsFiltersQuery(BaseModel):
     datefrom: Optional[int]
     dateto: Optional[int]
     paybox_id: Optional[str]
     status: Optional[str]
 
+
 class ChequesFiltersQuery(BaseModel):
     datefrom: Optional[int]
     dateto: Optional[int]
     user: Optional[int]
 
+
 class PayboxesFiltersQuery(BaseModel):
     external_id: Optional[str]
     name: Optional[str]
+
 
 class ProjectsFiltersQuery(BaseModel):
     external_id: Optional[str]
     name: Optional[str]
 
+
 class ArticlesFiltersQuery(BaseModel):
     name: Optional[str]
     dc: Optional[DebitCreditType]
 
+
 class UsersFiltersQuery(BaseModel):
     external_id: Optional[str]
+
 
 class CAFiltersQuery(BaseModel):
     name: Optional[str]
     inn: Optional[int]
     phone: Optional[str]
     external_id: Optional[str]
+
 
 class PicturesFiltersQuery(BaseModel):
     entity: Optional[str]

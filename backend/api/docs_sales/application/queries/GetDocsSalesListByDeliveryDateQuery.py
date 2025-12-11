@@ -1,44 +1,41 @@
 import asyncio
 from datetime import datetime
-from fastapi import HTTPException
-from typing import Any, Optional, Dict, Tuple, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from database.db import database
-from functions.helpers import datetime_to_timestamp
-from sqlalchemy import and_
-
-from api.docs_sales import schemas
-from api.docs_sales.sales.infrastructure.helpers.FilterService import FilterService
-from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import (
-    DocsSalesListRepository,
+from api.contragents.infrastructure.repositories.ContragentRepository import (
+    ContragentRepository,
 )
-
-from api.users.infrastructure.repositories.UsersRepository import UsersRepository
-from api.payments.infrastructure.repositories.PaymentsRepository import (
-    PaymentsRepository,
+from api.docs_sales import schemas
+from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import (
+    DeliveryRepository,
 )
 from api.docs_sales.goods.infrastructure.repositories.GoodsRepository import (
     GoodsRepository,
 )
+from api.docs_sales.sales.infrastructure.helpers.FilterService import FilterService
+from api.docs_sales.sales.infrastructure.helpers.id_extractors import (
+    extract_contragent_id,
+    extract_doc_id,
+    extract_settings_id,
+    extract_user_ids,
+)
+from api.docs_sales.sales.infrastructure.repositories.DocsSalesListRepository import (
+    DocsSalesListRepository,
+)
 from api.loyality_transactions.infrastructure.repositories.LoyalityRepository import (
     LoyalityRepository,
 )
-from api.docs_sales.delivery.infrastructure.repositories.DeliveryRepository import (
-    DeliveryRepository,
-)
-from api.contragents.infrastructure.repositories.ContragentRepository import (
-    ContragentRepository,
+from api.payments.infrastructure.repositories.PaymentsRepository import (
+    PaymentsRepository,
 )
 from api.settings.infrastructure.repositories.SettingsRepository import (
     SettingsRepository,
 )
-
-from api.docs_sales.sales.infrastructure.helpers.id_extractors import (
-    extract_doc_id,
-    extract_settings_id,
-    extract_contragent_id,
-    extract_user_ids,
-)
+from api.users.infrastructure.repositories.UsersRepository import UsersRepository
+from database.db import database
+from fastapi import HTTPException
+from functions.helpers import datetime_to_timestamp
+from sqlalchemy import and_
 
 
 class GetDocsSalesListByDeliveryDateQuery:

@@ -58,7 +58,10 @@ async def new_organization(token: str, organization: schemas.OrganizationCreate)
     query = organizations.insert().values(organization_values)
     organization_id = await database.execute(query)
 
-    query = organizations.select().where(organizations.c.id == organization_id, organizations.c.cashbox == user.cashbox_id)
+    query = organizations.select().where(
+        organizations.c.id == organization_id,
+        organizations.c.cashbox == user.cashbox_id,
+    )
     organization_db = await database.fetch_one(query)
     organization_db = datetime_to_timestamp(organization_db)
 
@@ -88,7 +91,9 @@ async def edit_organization(
     if organization_values:
         query = (
             organizations.update()
-            .where(organizations.c.id == idx, organizations.c.cashbox == user.cashbox_id)
+            .where(
+                organizations.c.id == idx, organizations.c.cashbox == user.cashbox_id
+            )
             .values(organization_values)
         )
         await database.execute(query)
@@ -118,7 +123,9 @@ async def delete_organization(token: str, idx: int):
     )
     await database.execute(query)
 
-    query = organizations.select().where(organizations.c.id == idx, organizations.c.cashbox == user.cashbox_id)
+    query = organizations.select().where(
+        organizations.c.id == idx, organizations.c.cashbox == user.cashbox_id
+    )
     organization_db = await database.fetch_one(query)
     organization_db = datetime_to_timestamp(organization_db)
 

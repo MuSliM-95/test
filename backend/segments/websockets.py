@@ -1,13 +1,12 @@
-import json
-from ws_manager import manager
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
+from ws_manager import manager
 
 
-async def notify(ws_token: str,
-                 event: str,
-                 segment_id: int,
-                 payload: Optional[Dict[str, Any]] = None):
+async def notify(
+    ws_token: str, event: str, segment_id: int, payload: Optional[Dict[str, Any]] = None
+):
     message = {
         "event": event,
         "segment_id": segment_id,

@@ -1,14 +1,15 @@
 from typing import Union
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
-from database.db import tg_bot_bills
 
-from bot_routes.repositories.core.ITgBillsRepository import ITgBillsRepository
 from bot_routes.models.TgBillsModels import (
-    TgBillsUpdateModel,
     TgBillsCreateModel,
     TgBillsExtendedModel,
+    TgBillsUpdateModel,
 )
+from bot_routes.repositories.core.ITgBillsRepository import ITgBillsRepository
+from database.db import tg_bot_bills
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+
 
 class TgBillsRepository(ITgBillsRepository):
 
@@ -26,7 +27,7 @@ class TgBillsRepository(ITgBillsRepository):
             )
             await self.database.execute(query)
         except SQLAlchemyError as e:
-            raise Exception(f"Database error: {e}") 
+            raise Exception(f"Database error: {e}")
 
     async def insert(self, bill: TgBillsCreateModel) -> int:
         try:
@@ -35,7 +36,6 @@ class TgBillsRepository(ITgBillsRepository):
             return result
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
-
 
     async def delete(self, id: int) -> None:
         try:
@@ -49,11 +49,14 @@ class TgBillsRepository(ITgBillsRepository):
             query = (
                 select([self.tg_bot_bills, self.tochka_bank_accounts.c.accountId])
                 .select_from(tg_bot_bills)
-                .outerjoin(self.tochka_bank_accounts, self.tg_bot_bills.c.tochka_bank_account_id == self.tochka_bank_accounts.c.id)
+                .outerjoin(
+                    self.tochka_bank_accounts,
+                    self.tg_bot_bills.c.tochka_bank_account_id
+                    == self.tochka_bank_accounts.c.id,
+                )
                 .where(self.tg_bot_bills.c.id == id)
             )
             result = await self.database.fetch_one(query)
             return result
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {e}")
-

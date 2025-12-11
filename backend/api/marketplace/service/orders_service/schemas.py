@@ -1,20 +1,20 @@
-from typing import Optional, List, Dict, Any
-
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 
 from api.docs_sales.schemas import DeliveryInfoSchema
 from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
+from pydantic import BaseModel, Field
 
 
 class MarketplaceOrderGood(BaseModel):
     nomenclature_id: int
-    warehouse_id: Optional[int] = None # ID помещения
+    warehouse_id: Optional[int] = None  # ID помещения
     quantity: int = 1  # Количество товара
     is_from_cart: Optional[bool] = False
 
 
 class MarketplaceOrderRequest(BaseModel):
     """Запрос на создание заказа маркетплейса"""
+
     goods: List[MarketplaceOrderGood]
     delivery: DeliveryInfoSchema
     contragent_phone: str
@@ -23,14 +23,17 @@ class MarketplaceOrderRequest(BaseModel):
     client_lon: Optional[float] = None
     additional_data: List[Dict[str, Any]] = Field(default_factory=list)
 
+
 class MarketplaceOrderResponse(BaseModel):
     """Ответ на создание заказа маркетплейса"""
+
     # order_id: str
     # status: str
     message: str
     processing_time_ms: Optional[int] = None
     # estimated_delivery: Optional[str] = None
     # cashbox_assignments: Optional[List[dict]] = None
+
 
 class CreateOrderUtm(BaseMarketplaceUtm):
     entity_type: UtmEntityType = UtmEntityType.docs_sales

@@ -1,7 +1,7 @@
-from pydantic import BaseModel, validator
-from typing import Optional, List
+from typing import List, Optional
 
 from common.utils.validators import sanitize_float
+from pydantic import BaseModel, validator
 
 
 class Payboxes(BaseModel):

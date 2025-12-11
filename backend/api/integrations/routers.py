@@ -1,11 +1,10 @@
-import json
+from database.db import database, integrations, pictures, users_cboxes_relation
 from fastapi import APIRouter, HTTPException
-from fastapi.security import SecurityScopes
-from .scopes import parse_openapi_json
-from .shemas import Integration, JwtScope, UpdateIntegration, ShowIntegrationGet, CreateApp
-from database.db import database, users_cboxes_relation, integrations, integrations_to_cashbox, pictures
+from sqlalchemy import func, select
+
 from ..oauth.utils import generate_rand_hex, ouath_response
-from sqlalchemy import select, func
+from .shemas import CreateApp, ShowIntegrationGet, UpdateIntegration
+
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
 
@@ -24,11 +23,12 @@ async def create_integration(token: str, integration: CreateApp):
             dct["code"] = generate_rand_hex()[:8]
             query = integrations.insert(values=dct)
             int_id = await database.execute(query)
-            return {"id": int_id, 
-                    **integration.dict(), 
-                    # "client_secret": client_secret,
-                    # "code": dct["code"] ##TODO Для тестов
-                    }
+            return {
+                "id": int_id,
+                **integration.dict(),
+                # "client_secret": client_secret,
+                # "code": dct["code"] ##TODO Для тестов
+            }
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
@@ -41,7 +41,9 @@ async def get_ints_by_token(token: str):
             query = integrations.select().where(integrations.c.owner == user.id)
             ints = await database.fetch_all(query)
 
-            query = select(func.count(integrations.c.id)).where(integrations.c.owner == user.id)
+            query = select(func.count(integrations.c.id)).where(
+                integrations.c.owner == user.id
+            )
             count = await database.fetch_one(query)
 
             res_ints = []
@@ -51,7 +53,7 @@ async def get_ints_by_token(token: str):
                     pictures.c.owner == user.id,
                     pictures.c.entity == "integrations",
                     pictures.c.entity_id == integr["id"],
-                    pictures.c.is_main == True
+                    pictures.c.is_main == True,
                 )
                 img = await database.fetch_one(query)
                 url = img.url if img else ""
@@ -61,7 +63,7 @@ async def get_ints_by_token(token: str):
                     pictures.c.owner == user.id,
                     pictures.c.entity == "integrations",
                     pictures.c.entity_id == integr["id"],
-                    pictures.c.is_main == False
+                    pictures.c.is_main == False,
                 )
                 imgs = await database.fetch_all(query)
                 res_imgs = []
@@ -72,12 +74,12 @@ async def get_ints_by_token(token: str):
                 res_ints.append(integr_dict)
 
             return {"result": res_ints, "count": count.count_1}
-        
+
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
 @router.patch("/{intg_id}/")
-async def update_integration(intg_id: int,body: UpdateIntegration, token: str):
+async def update_integration(intg_id: int, body: UpdateIntegration, token: str):
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
     query = integrations.select(integrations.c.id == intg_id)
@@ -88,7 +90,11 @@ async def update_integration(intg_id: int,body: UpdateIntegration, token: str):
             if integration.owner == user.id:
                 body = body.dict(exclude_unset=True)
                 print(body)
-                query = integrations.update().values(body).where(integrations.c.id == intg_id)
+                query = (
+                    integrations.update()
+                    .values(body)
+                    .where(integrations.c.id == intg_id)
+                )
                 await database.execute(query)
                 return body
             raise HTTPException(status_code=403, detail="Недостаточно прав")
@@ -103,7 +109,10 @@ async def install_app(intg_id: int, token: str):
     integration = await database.fetch_one(query)
     if user:
         if user.status:
-            url = integration.url + f"?client_id={user.id}&client_secret={integration.client_secret}&code={integration.code}"
+            url = (
+                integration.url
+                + f"?client_id={user.id}&client_secret={integration.client_secret}&code={integration.code}"
+            )
             await ouath_response(url)
             return {"installed": True}
-    raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")    
+    raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")

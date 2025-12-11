@@ -2,13 +2,14 @@ import json
 import os
 import uuid
 
-from api.apple_wallet.messages.AppleWalletCardUpdateMessage import AppleWalletCardUpdateMessage
+import aio_pika
+from api.apple_wallet.messages.AppleWalletCardUpdateMessage import (
+    AppleWalletCardUpdateMessage,
+)
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from common.utils.ioc.ioc import ioc
 from database.db import database, users
-import aio_pika
-from const import marketplace_orders_queue_name
 
 
 async def produce_message(body: dict) -> None:
@@ -45,7 +46,7 @@ async def queue_notification(notification_data: dict) -> bool:
 
     Args:
         notification_data: Данные для уведомления (тип, получатели, содержимое и т.д.)
-        
+
     Returns:
         bool: Успешно ли добавлено уведомление в очередь
     """
@@ -76,19 +77,21 @@ async def queue_notification(notification_data: dict) -> bool:
     except Exception as e:
         print(f"Error adding notification to queue: {e}")
         return False
-        
-        
-async def send_order_assignment_notification(order_id: int, role: str, user_id: int, user_name: str, links: dict = None) -> bool:
+
+
+async def send_order_assignment_notification(
+    order_id: int, role: str, user_id: int, user_name: str, links: dict = None
+) -> bool:
     """
     Отправляет уведомление о назначении исполнителя для заказа
-    
+
     Args:
         order_id: ID заказа
         role: Роль исполнителя (picker, courier)
         user_id: ID назначенного пользователя
         user_name: Имя назначенного пользователя
         links: Ссылки на заказ для разных ролей
-        
+
     Returns:
         bool: Успешно ли добавлено уведомление в очередь
     """
@@ -98,13 +101,13 @@ async def send_order_assignment_notification(order_id: int, role: str, user_id: 
         "role": role,
         "user_id": user_id,
         "user_name": user_name,
-        "links": links or {}
+        "links": links or {},
     }
-    
+
     # Здесь можно получить chat_id других участников процесса и добавить их в recipients
     # Например, менеджеров, которым нужно знать о назначении
     # notification_data["recipients"] = ["chat_id1", "chat_id2", ...]
-    
+
     return await queue_notification(notification_data)
 
 
@@ -117,5 +120,5 @@ async def publish_apple_wallet_pass_update(card_ids: list[int]):
                 message_id=uuid.uuid4(),
                 loyality_card_id=card_id,
             ),
-            routing_key="teach_card_operation"
+            routing_key="teach_card_operation",
         )

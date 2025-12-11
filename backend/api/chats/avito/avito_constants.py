@@ -11,4 +11,3 @@ AVITO_SVG_ICON = """<svg width="24" height="24" viewBox="0 0 24 24" fill="none" 
 
 # URL на официальную иконку Avito (альтернативный вариант)
 AVITO_ICON_URL = "https://www.avito.ru/favicon.ico"
-

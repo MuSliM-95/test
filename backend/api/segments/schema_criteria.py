@@ -1,8 +1,8 @@
-from typing import Optional, List
+from typing import List, Optional
 
-from pydantic import BaseModel, validator, constr
+from api.segments.schema_base import DateRange, Range
+from pydantic import BaseModel, validator
 
-from api.segments.schema_base import Range, DateRange
 
 class PurchaseCriteria(BaseModel):
     total_amount: Optional[Range]
@@ -63,4 +63,4 @@ class SegmentCriteria(BaseModel):
     picker: Optional[PickerCourierSchema]
     courier: Optional[PickerCourierSchema]
     delivery_info: Optional[DeliverySchema]
-    orders:  Optional[OrderCriteriaSchema]
+    orders: Optional[OrderCriteriaSchema]

@@ -1,5 +1,5 @@
-from database.db import manufacturers, database
-from functions.helpers import get_user_by_token, get_entity_by_id, datetime_to_timestamp
+from database.db import database, manufacturers
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_user_by_token
 from ws_manager import manager
 
 
@@ -16,7 +16,7 @@ class DeleteManufacturersView:
             .where(
                 manufacturers.c.id == idx,
                 manufacturers.c.owner == user.id,
-                manufacturers.c.cashbox == user.cashbox_id
+                manufacturers.c.cashbox == user.cashbox_id,
             )
             .values({"is_deleted": True})
         )
@@ -25,7 +25,7 @@ class DeleteManufacturersView:
         query = manufacturers.select().where(
             manufacturers.c.id == idx,
             manufacturers.c.owner == user.id,
-            manufacturers.c.cashbox == user.cashbox_id
+            manufacturers.c.cashbox == user.cashbox_id,
         )
         manufacturer_db = await database.fetch_one(query)
         manufacturer_db = datetime_to_timestamp(manufacturer_db)

@@ -1,12 +1,11 @@
 import asyncio
-from os import environ
-
-from const import report_queue_name
-from database.db import database
-import aio_pika
 import json
 import logging
+from os import environ
 
+import aio_pika
+from const import report_queue_name
+from database.db import database
 from functions.goods_distribution import distribute
 from functions.gross_profit import generate_gross_profit_report
 

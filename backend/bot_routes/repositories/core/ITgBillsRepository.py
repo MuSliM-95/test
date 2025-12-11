@@ -1,9 +1,9 @@
-from typing import List, Union
+from typing import Union
 
 from bot_routes.models.TgBillsModels import (
-    TgBillsUpdateModel, 
-    TgBillsCreateModel, 
-    TgBillsExtendedModel
+    TgBillsCreateModel,
+    TgBillsExtendedModel,
+    TgBillsUpdateModel,
 )
 
 
@@ -19,5 +19,3 @@ class ITgBillsRepository:
 
     async def get_by_id(self, id: int) -> Union[TgBillsExtendedModel, None]:
         raise NotImplementedError
-    
-

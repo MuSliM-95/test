@@ -1,6 +1,3 @@
-from fastapi import FastAPI
-from starlette import status
-
 from api.manufacturers import schemas
 from api.manufacturers.web.views.CreateManufacturersView import CreateManufacturersView
 from api.manufacturers.web.views.DeleteManufacturersView import DeleteManufacturersView
@@ -9,6 +6,8 @@ from api.manufacturers.web.views.GetManufacturersView import GetManufacturersVie
 from api.manufacturers.web.views.PatchManufacturersView import PatchManufacturersView
 from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from common.utils.ioc.ioc import ioc
+from fastapi import FastAPI
+from starlette import status
 
 
 class InstallManufacturersWeb:
@@ -32,7 +31,7 @@ class InstallManufacturersWeb:
             methods=["GET"],
             status_code=status.HTTP_200_OK,
             response_model=schemas.Manufacturer,
-            tags=["nomenclature"]
+            tags=["nomenclature"],
         )
 
         app.add_api_route(
@@ -41,7 +40,7 @@ class InstallManufacturersWeb:
             methods=["GET"],
             status_code=status.HTTP_200_OK,
             response_model=schemas.ManufacturerListGet,
-            tags=["nomenclature"]
+            tags=["nomenclature"],
         )
 
         app.add_api_route(
@@ -50,7 +49,7 @@ class InstallManufacturersWeb:
             methods=["POST"],
             status_code=status.HTTP_200_OK,
             response_model=schemas.ManufacturerList,
-            tags=["nomenclature"]
+            tags=["nomenclature"],
         )
 
         app.add_api_route(
@@ -59,7 +58,7 @@ class InstallManufacturersWeb:
             methods=["PATCH"],
             status_code=status.HTTP_200_OK,
             response_model=schemas.Manufacturer,
-            tags=["nomenclature"]
+            tags=["nomenclature"],
         )
 
         app.add_api_route(
@@ -68,5 +67,5 @@ class InstallManufacturersWeb:
             methods=["DELETE"],
             status_code=status.HTTP_200_OK,
             response_model=schemas.Manufacturer,
-            tags=["nomenclature"]
+            tags=["nomenclature"],
         )

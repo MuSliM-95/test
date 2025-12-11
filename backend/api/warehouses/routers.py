@@ -1,11 +1,17 @@
 from typing import Optional
 
 import api.warehouses.schemas as schemas
-from database.db import database, warehouses, warehouse_hash
 from common.geocoders.instance import geocoder
-from database.db import database, warehouses, warehouse_hash
+from database.db import database, warehouse_hash, warehouses
 from fastapi import APIRouter, HTTPException
-from functions.helpers import check_entity_exists, datetime_to_timestamp, get_entity_by_id, get_user_by_token, create_entity_hash, update_entity_hash
+from functions.helpers import (
+    check_entity_exists,
+    create_entity_hash,
+    datetime_to_timestamp,
+    get_entity_by_id,
+    get_user_by_token,
+    update_entity_hash,
+)
 from sqlalchemy import func, select
 from ws_manager import manager
 
@@ -22,7 +28,9 @@ async def get_warehouse_by_id(token: str, idx: int):
 
 
 @router.get("/warehouses/", response_model=schemas.WarehouseListGet)
-async def get_warehouses(token: str, name: Optional[str] = None, limit: int = 100, offset: int = 0):
+async def get_warehouses(
+    token: str, name: Optional[str] = None, limit: int = 100, offset: int = 0
+):
     """Получение списка складов"""
     user = await get_user_by_token(token)
     filters = [
@@ -62,7 +70,9 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
         if warehouse_values.get("parent") is not None:
             if warehouse_values["parent"] not in warehouses_cache:
                 try:
-                    await check_entity_exists(warehouses, warehouse_values["parent"], user.id)
+                    await check_entity_exists(
+                        warehouses, warehouse_values["parent"], user.id
+                    )
                     warehouses_cache.add(warehouse_values["parent"])
                 except HTTPException as e:
                     exceptions.append(str(warehouse_values) + " " + e.detail)
@@ -70,7 +80,9 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
 
         if warehouse_values.get("address") is not None:
 
-            structured_geo = await geocoder.validate_address(warehouse_values.get("address"))
+            structured_geo = await geocoder.validate_address(
+                warehouse_values.get("address")
+            )
 
             if structured_geo is None:
                 exceptions.append(str(warehouse_values) + " incorrect address field")
@@ -79,14 +91,17 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
             warehouse_values.update(
                 {
                     "address": ", ".join(
-                        filter(None, [
-                            structured_geo.country,
-                            structured_geo.state,
-                            structured_geo.city,
-                            structured_geo.street,
-                            structured_geo.housenumber,
-                            structured_geo.postcode,
-                        ])
+                        filter(
+                            None,
+                            [
+                                structured_geo.country,
+                                structured_geo.state,
+                                structured_geo.city,
+                                structured_geo.street,
+                                structured_geo.housenumber,
+                                structured_geo.postcode,
+                            ],
+                        )
                     ),
                     "latitude": structured_geo.latitude,
                     "longitude": structured_geo.longitude,
@@ -95,10 +110,14 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
 
         query = warehouses.insert().values(warehouse_values)
         warehouse_id = await database.execute(query)
-        await create_entity_hash(table=warehouses, table_hash=warehouse_hash, idx=warehouse_id)
+        await create_entity_hash(
+            table=warehouses, table_hash=warehouse_hash, idx=warehouse_id
+        )
         inserted_ids.add(warehouse_id)
 
-    query = warehouses.select().where(warehouses.c.cashbox == user.cashbox_id, warehouses.c.id.in_(inserted_ids))
+    query = warehouses.select().where(
+        warehouses.c.cashbox == user.cashbox_id, warehouses.c.id.in_(inserted_ids)
+    )
     warehouses_db = await database.fetch_all(query)
     warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
 
@@ -112,7 +131,9 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
     )
 
     if exceptions:
-        raise HTTPException(400, "Не были добавлены следующие записи: " + ", ".join(exceptions))
+        raise HTTPException(
+            400, "Не были добавлены следующие записи: " + ", ".join(exceptions)
+        )
 
     return warehouses_db
 
@@ -133,11 +154,15 @@ async def edit_warehouse(
             await check_entity_exists(warehouses, warehouse_values["parent"], user.id)
 
         query = (
-            warehouses.update().where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id).values(warehouse_values)
+            warehouses.update()
+            .where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id)
+            .values(warehouse_values)
         )
         await database.execute(query)
-        warehouse_db = await get_entity_by_id(warehouses, idx,user.cashbox_id)
-        await update_entity_hash(table=warehouses, table_hash=warehouse_hash, entity=warehouse_db)
+        warehouse_db = await get_entity_by_id(warehouses, idx, user.cashbox_id)
+        await update_entity_hash(
+            table=warehouses, table_hash=warehouse_hash, entity=warehouse_db
+        )
 
     warehouse_db = datetime_to_timestamp(warehouse_db)
 
@@ -157,11 +182,15 @@ async def delete_warehouse(token: str, idx: int):
     await get_entity_by_id(warehouses, idx, user.id)
 
     query = (
-        warehouses.update().where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id).values({"is_deleted": True})
+        warehouses.update()
+        .where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id)
+        .values({"is_deleted": True})
     )
     await database.execute(query)
 
-    query = warehouses.select().where(warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id)
+    query = warehouses.select().where(
+        warehouses.c.id == idx, warehouses.c.cashbox == user.cashbox_id
+    )
     warehouse_db = await database.fetch_one(query)
     warehouse_db = datetime_to_timestamp(warehouse_db)
 

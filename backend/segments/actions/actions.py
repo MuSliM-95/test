@@ -4,28 +4,36 @@ import logging
 from datetime import datetime
 from typing import List
 
-from common.apple_wallet_service.impl.WalletNotificationService import WalletNotificationService
-from common.apple_wallet_service.impl.WalletPassService import WalletPassGeneratorService
-from database.db import (
-    database, segments, tags, contragents_tags, SegmentObjectType, users,
-    users_cboxes_relation, docs_sales, docs_sales_tags, employee_shifts,
-    contragents, loyality_cards, loyality_transactions
-)
-from sqlalchemy import select, and_, func, literal, or_, update
-from sqlalchemy.dialects.postgresql import insert
-
-from segments.actions.segment_tg_notification import send_segment_notification
-from segments.masks import replace_masks
-
-from segments.helpers.collect_obj_ids import collect_objects
-
-from segments.constants import SegmentChangeType
-
-from segments.helpers.functions import create_replacements
-
 from api.loyality_transactions.routers import raschet_bonuses
-
+from common.apple_wallet_service.impl.WalletNotificationService import (
+    WalletNotificationService,
+)
+from common.apple_wallet_service.impl.WalletPassService import (
+    WalletPassGeneratorService,
+)
+from database.db import (
+    SegmentObjectType,
+    contragents,
+    contragents_tags,
+    database,
+    docs_sales,
+    docs_sales_tags,
+    employee_shifts,
+    loyality_cards,
+    loyality_transactions,
+    segments,
+    tags,
+    users,
+    users_cboxes_relation,
+)
+from segments.actions.segment_tg_notification import send_segment_notification
+from segments.constants import SegmentChangeType
+from segments.helpers.collect_obj_ids import collect_objects
+from segments.helpers.functions import create_replacements
 from segments.helpers.http_client import HttpClient
+from segments.masks import replace_masks
+from sqlalchemy import and_, func, literal, or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 
 logger = logging.getLogger(__name__)
 
@@ -36,52 +44,52 @@ class SegmentActions:
         self.ACTIONS = {
             "add_existed_tags": {
                 "obj_type": SegmentObjectType.contragents.value,
-                "method": self.add_existed_tags
+                "method": self.add_existed_tags,
             },
             "remove_tags": {
                 "obj_type": SegmentObjectType.contragents.value,
-                "method": self.remove_tags
+                "method": self.remove_tags,
             },
             "client_tags": {
                 "obj_type": SegmentObjectType.contragents.value,
-                "method": self.client_tags
+                "method": self.client_tags,
             },
             "send_tg_notification": {
                 "obj_type": SegmentObjectType.docs_sales.value,
-                "method": self.send_tg_notification
+                "method": self.send_tg_notification,
             },
             "add_docs_sales_tags": {
                 "obj_type": SegmentObjectType.docs_sales.value,
-                "method": self.add_docs_sales_tags
+                "method": self.add_docs_sales_tags,
             },
             "remove_docs_sales_tags": {
                 "obj_type": SegmentObjectType.docs_sales.value,
-                "method": self.remove_docs_sales_tags
+                "method": self.remove_docs_sales_tags,
             },
             "transform_loyality_card": {
                 "obj_type": SegmentObjectType.contragents.value,
-                "method": self.transform_loyality_card
+                "method": self.transform_loyality_card,
             },
             "add_loyality_transaction": {
                 "obj_type": SegmentObjectType.contragents.value,
-                "method": self.add_loyality_transaction
+                "method": self.add_loyality_transaction,
             },
             "send_wa_notification": {
                 "obj_type": SegmentObjectType.docs_sales.value,
-                "method": self.send_whatsapp_notification
+                "method": self.send_whatsapp_notification,
             },
             "do_http_request": {
                 "obj_type": SegmentObjectType.docs_sales.value,
-                "method": self.do_http_request
-            }
+                "method": self.do_http_request,
+            },
         }
 
     async def refresh_segment_obj(self):
         self.segment_obj = await database.fetch_one(
-            segments.select().where(segments.c.id == self.segment_obj.id))
+            segments.select().where(segments.c.id == self.segment_obj.id)
+        )
 
-    async def run(self, action: str, ids: List[int],
-                  data: dict = None):
+    async def run(self, action: str, ids: List[int], data: dict = None):
         """Метод для выполения action"""
         await self.ACTIONS[action]["method"](ids, data)
 
@@ -96,19 +104,26 @@ class SegmentActions:
         for k, v in actions.items():
             if k not in self.ACTIONS:
                 continue
-            if v.get('trigger_on_new'):
-                del v['trigger_on_new']
-                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"],
-                                            SegmentChangeType.new.value)
-            elif v.get('trigger_on_removed'):
-                ids = await collect_objects(self.segment_obj.id, self.ACTIONS[k]["obj_type"],
-                                            SegmentChangeType.removed.value)
-                del v['trigger_on_removed']
+            if v.get("trigger_on_new"):
+                del v["trigger_on_new"]
+                ids = await collect_objects(
+                    self.segment_obj.id,
+                    self.ACTIONS[k]["obj_type"],
+                    SegmentChangeType.new.value,
+                )
+            elif v.get("trigger_on_removed"):
+                ids = await collect_objects(
+                    self.segment_obj.id,
+                    self.ACTIONS[k]["obj_type"],
+                    SegmentChangeType.removed.value,
+                )
+                del v["trigger_on_removed"]
             else:
                 ids = await collect_objects(
                     self.segment_obj.id,
                     self.ACTIONS[k]["obj_type"],
-                    SegmentChangeType.active.value)
+                    SegmentChangeType.active.value,
+                )
             if ids:
                 await self.run(k, ids, v)
         return
@@ -116,14 +131,23 @@ class SegmentActions:
     async def add_existed_tags(self, contragents_ids: List[int], data: dict):
         tag_names = data.get("name", [])
         query = select(tags.c.id).where(
-            and_(tags.c.name.in_(tag_names), tags.c.cashbox_id == self.segment_obj.cashbox_id))
+            and_(
+                tags.c.name.in_(tag_names),
+                tags.c.cashbox_id == self.segment_obj.cashbox_id,
+            )
+        )
         rows = await database.fetch_all(query)
         tag_ids = [row.id for row in rows]
         new_values = []
         for tag_id in tag_ids:
             for contragent_id in contragents_ids:
                 new_values.append(
-                    {"contragent_id": contragent_id, "tag_id": tag_id, "cashbox_id": self.segment_obj.cashbox_id})
+                    {
+                        "contragent_id": contragent_id,
+                        "tag_id": tag_id,
+                        "cashbox_id": self.segment_obj.cashbox_id,
+                    }
+                )
         if not new_values:
             return
         query = insert(contragents_tags).values(new_values)
@@ -134,12 +158,14 @@ class SegmentActions:
 
     async def remove_tags(self, contragents_ids: List[int], data: dict):
         tag_names = data.get("name", [])
-        query = select(tags.c.id).where(tags.c.name.in_(tag_names), tags.c.cashbox_id == self.segment_obj.cashbox_id)
+        query = select(tags.c.id).where(
+            tags.c.name.in_(tag_names), tags.c.cashbox_id == self.segment_obj.cashbox_id
+        )
         rows = await database.fetch_all(query)
         tag_ids = [row.id for row in rows]
-        query = (
-            contragents_tags.delete()
-            .where(contragents_tags.c.tag_id.in_(tag_ids), contragents_tags.c.contragent_id.in_(contragents_ids))
+        query = contragents_tags.delete().where(
+            contragents_tags.c.tag_id.in_(tag_ids),
+            contragents_tags.c.contragent_id.in_(contragents_ids),
         )
         await database.execute(query)
 
@@ -149,25 +175,32 @@ class SegmentActions:
         tags_data = data.get("tags", [])
         for d in tags_data:
             names.append(d["name"])
-            prepared_data.append({
-                "name": d["name"],
-                "emoji": d.get("emoji", None),
-                "color": d.get("color", None),
-                "description": d.get("description", None),
-                "cashbox_id": self.segment_obj.cashbox_id,
-            })
+            prepared_data.append(
+                {
+                    "name": d["name"],
+                    "emoji": d.get("emoji", None),
+                    "color": d.get("color", None),
+                    "description": d.get("description", None),
+                    "cashbox_id": self.segment_obj.cashbox_id,
+                }
+            )
 
         count_query = (
             select(func.count())
             .select_from(tags)
-            .where(tags.c.name.in_(names), tags.c.cashbox_id == self.segment_obj.cashbox_id)
+            .where(
+                tags.c.name.in_(names), tags.c.cashbox_id == self.segment_obj.cashbox_id
+            )
         )
 
         count_rows = await database.execute(count_query)
 
         if count_rows != len(set(names)):
-            insert_query = insert(tags).values(prepared_data).on_conflict_do_nothing(
-                index_elements=['name', "cashbox_id"])
+            insert_query = (
+                insert(tags)
+                .values(prepared_data)
+                .on_conflict_do_nothing(index_elements=["name", "cashbox_id"])
+            )
             await database.execute(insert_query)
 
         await self.add_existed_tags(contragents_ids, {"name": names})
@@ -236,11 +269,13 @@ class SegmentActions:
             for recipient in recipients:
                 if self._check_recipient_conditions(recipient.get("conditions", {})):
                     chat_ids.update(
-                        await self.get_user_chat_ids_by_tag(recipient.get("user_tag"), recipient.get("shift_status"))
+                        await self.get_user_chat_ids_by_tag(
+                            recipient.get("user_tag"), recipient.get("shift_status")
+                        )
                     )
 
         for order_id in order_ids:
-            message_text = f'Заказ # - {str(order_id)}\n\n' + message
+            message_text = f"Заказ # - {str(order_id)}\n\n" + message
 
             replacements = await create_replacements(order_id)
 
@@ -260,31 +295,30 @@ class SegmentActions:
     async def get_user_chat_ids_by_tag(self, user_tag: str, shift_status: str = None):
         subquery = (
             select(users.c.chat_id, users_cboxes_relation.c.id.label("relation_id"))
-            .join(users_cboxes_relation,
-                  users_cboxes_relation.c.user == users.c.id)
-            .where(and_(
-                users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
-                literal(user_tag) == func.any(users_cboxes_relation.c.tags)
-            ))
+            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
+            .where(
+                and_(
+                    users_cboxes_relation.c.cashbox_id == self.segment_obj.cashbox_id,
+                    literal(user_tag) == func.any(users_cboxes_relation.c.tags),
+                )
+            )
         ).subquery("sub")
         query = select(subquery.c.chat_id)
         if shift_status:
-            if shift_status == 'off_shift':
+            if shift_status == "off_shift":
                 where_clause = or_(
                     employee_shifts.c.user_id.is_(None),
-                    employee_shifts.c.status == shift_status
+                    employee_shifts.c.status == shift_status,
                 )
             else:
-                where_clause = or_(
-                    employee_shifts.c.status == shift_status
-                )
-            query = (
-                query
-                .outerjoin(employee_shifts, subquery.c.user_id == employee_shifts.c.user_id)
-                .where(or_(
+                where_clause = or_(employee_shifts.c.status == shift_status)
+            query = query.outerjoin(
+                employee_shifts, subquery.c.user_id == employee_shifts.c.user_id
+            ).where(
+                or_(
                     employee_shifts.c.user_id.is_(None),
-                    employee_shifts.c.status == shift_status
-                ))
+                    employee_shifts.c.status == shift_status,
+                )
             )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
@@ -293,8 +327,15 @@ class SegmentActions:
         query = (
             select(users.c.chat_id)
             .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-            .outerjoin(docs_sales, docs_sales.c.assigned_picker == users_cboxes_relation.c.id)
-            .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
+            .outerjoin(
+                docs_sales, docs_sales.c.assigned_picker == users_cboxes_relation.c.id
+            )
+            .where(
+                and_(
+                    docs_sales.c.id == order_id,
+                    docs_sales.c.cashbox == self.segment_obj.cashbox_id,
+                )
+            )
         )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
@@ -303,8 +344,15 @@ class SegmentActions:
         query = (
             select(users.c.chat_id)
             .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
-            .outerjoin(docs_sales, docs_sales.c.assigned_courier == users_cboxes_relation.c.id)
-            .where(and_(docs_sales.c.id == order_id, docs_sales.c.cashbox == self.segment_obj.cashbox_id))
+            .outerjoin(
+                docs_sales, docs_sales.c.assigned_courier == users_cboxes_relation.c.id
+            )
+            .where(
+                and_(
+                    docs_sales.c.id == order_id,
+                    docs_sales.c.cashbox == self.segment_obj.cashbox_id,
+                )
+            )
         )
         rows = await database.fetch_all(query)
         return [row.chat_id for row in rows]
@@ -316,10 +364,7 @@ class SegmentActions:
 
         for doc_id in docs_ids:
             for tag in set(tags):
-                prepared_data.append({
-                    "docs_sales_id": doc_id,
-                    "name": tag
-                })
+                prepared_data.append({"docs_sales_id": doc_id, "name": tag})
 
         if prepared_data:
             query = insert(docs_sales_tags).values(prepared_data)
@@ -327,10 +372,12 @@ class SegmentActions:
 
     async def remove_docs_sales_tags(self, docs_ids: List[int], data: dict):
         tags = data.get("tags")
-        query = docs_sales_tags.delete().where(and_(
-            docs_sales_tags.c.docs_sales_id.in_(docs_ids),
-            docs_sales_tags.c.name.in_(tags)
-        ))
+        query = docs_sales_tags.delete().where(
+            and_(
+                docs_sales_tags.c.docs_sales_id.in_(docs_ids),
+                docs_sales_tags.c.name.in_(tags),
+            )
+        )
 
         await database.execute(query)
 
@@ -353,10 +400,11 @@ class SegmentActions:
             replacements = await create_replacements(idx)
             message_text = replace_masks(message, replacements)
 
-            url = f"https://wappi.pro/api/sync/message/send?profile_id={wappi_profile_id}"
+            url = (
+                f"https://wappi.pro/api/sync/message/send?profile_id={wappi_profile_id}"
+            )
             headers = {"Authorization": f"{wappi_token}"}
-            d = {
-                "body": message_text, "recipient": contragent.phone}
+            d = {"body": message_text, "recipient": contragent.phone}
 
             async with HttpClient() as client:
                 status, response = await client.post(url, headers=headers, data=d)
@@ -369,7 +417,11 @@ class SegmentActions:
             data = replace_masks(data, replacements)
             url = data["url"]
             if data.get("params"):
-                url = data["url"] + "?" + "&".join([f"{k}={v}" for k, v in data["params"].items()])
+                url = (
+                    data["url"]
+                    + "?"
+                    + "&".join([f"{k}={v}" for k, v in data["params"].items()])
+                )
             async with HttpClient() as client:
                 try:
 
@@ -399,18 +451,26 @@ class SegmentActions:
         if data.get("cashback_percent"):
             fields_for_update["cashback_percent"] = data.get("cashback_percent")
         if data.get("max_withdraw_percentage"):
-            fields_for_update["max_withdraw_percentage"] = data.get("max_withdraw_percentage")
+            fields_for_update["max_withdraw_percentage"] = data.get(
+                "max_withdraw_percentage"
+            )
         if data.get("lifetime"):
             fields_for_update["lifetime"] = data.get("lifetime")
         if data.get("tag"):
             fields_for_update["tags"] = data.get("tag")
-        if data.get('apple_wallet_advertisement'):
-            fields_for_update["apple_wallet_advertisement"] = data.get("apple_wallet_advertisement")
+        if data.get("apple_wallet_advertisement"):
+            fields_for_update["apple_wallet_advertisement"] = data.get(
+                "apple_wallet_advertisement"
+            )
 
-        query = update(loyality_cards).where(
-            loyality_cards.c.contragent_id.in_(contragents_ids),
-            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
-        ).values(**fields_for_update)
+        query = (
+            update(loyality_cards)
+            .where(
+                loyality_cards.c.contragent_id.in_(contragents_ids),
+                loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id,
+            )
+            .values(**fields_for_update)
+        )
 
         await database.execute(query)
 
@@ -419,18 +479,19 @@ class SegmentActions:
 
         loyality_ids_query = select(loyality_cards.c.id).where(
             loyality_cards.c.contragent_id.in_(contragents_ids),
-            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
+            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id,
         )
         loyality_ids = [i.id for i in (await database.fetch_all(loyality_ids_query))]
         for card_id in loyality_ids:
             await apple_wallet_service.update_pass(card_id)
             await apple_notification_service.ask_update_pass(card_id)
 
-
     async def add_loyality_transaction(self, contragents_ids: List[int], data: dict):
         insert_data = {}
         insert_data["amount"] = data.get("amount")
-        insert_data["type"] = "accrual" if data.get("direction") == "plus" else "withdraw"
+        insert_data["type"] = (
+            "accrual" if data.get("direction") == "plus" else "withdraw"
+        )
         if data.get("comment"):
             insert_data["name"] = data.get("comment")
         else:
@@ -441,13 +502,11 @@ class SegmentActions:
 
         query = select(loyality_cards).where(
             loyality_cards.c.contragent_id.in_(contragents_ids),
-            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id
+            loyality_cards.c.cashbox_id == self.segment_obj.cashbox_id,
         )
         cards = await database.fetch_all(query)
         for card in cards:
             insert_data["loyality_card_id"] = card.id
             insert_data["loyality_card_number"] = card.card_number
-            await database.execute(
-                loyality_transactions.insert().values(insert_data)
-            )
+            await database.execute(loyality_transactions.insert().values(insert_data))
             await asyncio.gather(asyncio.create_task(raschet_bonuses(card.id)))

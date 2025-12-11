@@ -1,4 +1,4 @@
-from typing import Sequence, List, Mapping, Any
+from typing import Any, List, Mapping, Sequence
 
 from ....domain.models.CreateBookingEventModel import CreateBookingEventModel
 from ....domain.models.PatchBookingEventsModel import PatchBookingEventsModel
@@ -9,7 +9,9 @@ class IBookingEventsRepository:
     async def get_by_ids(self, event_ids: List[int], cashbox_id: int):
         raise NotImplementedError()
 
-    async def get_by_nomenclature_ids(self, nomenclature_ids: Sequence[int], cashbox_id: int):
+    async def get_by_nomenclature_ids(
+        self, nomenclature_ids: Sequence[int], cashbox_id: int
+    ):
         raise NotImplementedError()
 
     async def get_all(self, cashbox_id: int):

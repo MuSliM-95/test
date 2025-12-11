@@ -1,9 +1,7 @@
-from fastapi import APIRouter, HTTPException
-
-from database.db import database, units
-
 import api.units.schemas as schemas
-from sqlalchemy import select, func
+from database.db import database, units
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import func, select
 
 router = APIRouter(tags=["units"])
 
@@ -27,6 +25,6 @@ async def get_unit(idx: int):
     entity_db = await database.fetch_one(query)
 
     if not entity_db:
-        raise HTTPException(status_code=404, detail=f"У вас нет ед. изм. с таким id")
+        raise HTTPException(status_code=404, detail="У вас нет ед. изм. с таким id")
 
     return entity_db

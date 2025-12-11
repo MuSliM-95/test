@@ -5,23 +5,25 @@ Revises: 25ce6f85de08
 Create Date: 2025-08-12 02:33:18.752992
 
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'ded27e5f734b'
-down_revision = '25ce6f85de08'
+revision = "ded27e5f734b"
+down_revision = "25ce6f85de08"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('segments', sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False))
+    op.add_column(
+        "segments",
+        sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
+    )
 
     op.execute("UPDATE segments SET is_deleted = false WHERE is_deleted IS NULL")
 
 
-
 def downgrade() -> None:
-    op.drop_column('segments', 'is_deleted')
+    op.drop_column("segments", "is_deleted")

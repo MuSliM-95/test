@@ -8,7 +8,6 @@ Create Date: 2025-10-09 19:33:08.204582
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision = "optimize_segments_003"
 down_revision = "optimize_segments_002"

@@ -231,8 +231,7 @@ async def process_notification(message):
                 if success:
                     print(f"Legacy notification sent to {recipient_id}")
                 else:
-                    print(
-                        f"Failed to send legacy notification to {recipient_id}")
+                    print(f"Failed to send legacy notification to {recipient_id}")
         else:
             print(f"Unknown notification type: {data.get('type')}")
     except Exception as e:

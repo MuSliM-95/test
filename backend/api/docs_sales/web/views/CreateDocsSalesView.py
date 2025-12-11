@@ -1,61 +1,60 @@
 import asyncio
-import os
 import uuid
 from collections import defaultdict
 from datetime import datetime
-from typing import Set, Any
-import decimal
-
-from fastapi import HTTPException
-from sqlalchemy import select, and_, or_, desc, func, cast, Integer
+from typing import Any, Set
 
 from api.docs_sales import schemas
+
 # from api.docs_sales.events.financials.messages.RecalculateFinancialsMessageModel import \
 #     RecalculateFinancialsMessageModel
 # from api.docs_sales.events.loyalty_points.messages.RecalculateLoyaltyPointsMessageModel import \
 #     RecalculateLoyaltyPointsMessageModel
-
-from api.docs_sales.messages.TechCardWarehouseOperationMessage import TechCardWarehouseOperationMessage
-
+from api.docs_sales.messages.TechCardWarehouseOperationMessage import (
+    TechCardWarehouseOperationMessage,
+)
 from api.docs_warehouses.utils import create_warehouse_docs
 from api.loyality_transactions.routers import raschet_bonuses
-from apps.yookassa.functions.impl.GetOauthCredentialFunction import GetOauthCredentialFunction
-from apps.yookassa.models.PaymentModel import PaymentCreateModel,AmountModel,ReceiptModel,CustomerModel,ItemModel,\
-    ConfirmationRedirect
-from apps.yookassa.repositories.core.IYookassaTableNomenclature import IYookassaTableNomenclature
-from apps.yookassa.repositories.impl.YookassaCrmPaymentsRepository import YookassaCrmPaymentsRepository
-from apps.yookassa.repositories.impl.YookassaOauthRepository import YookassaOauthRepository
-from apps.yookassa.repositories.impl.YookassaPaymentsRepository import YookassaPaymentsRepository
-from apps.yookassa.repositories.impl.YookassaRequestRepository import YookassaRequestRepository
-from apps.yookassa.repositories.impl.YookassaTableNomenclature import YookassaTableNomenclature
-from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import YookasssaAmoTableCrmRepository
-from apps.yookassa.services.impl.OauthService import OauthService
-from apps.yookassa.services.impl.YookassaApiService import YookassaApiService
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
-from database.db import database, contragents, contracts, organizations, warehouses, users_cboxes_relation, \
-    nomenclature, price_types, units, articles, pboxes, fifo_settings, docs_sales, loyality_cards, docs_sales_goods, \
-    docs_sales_tags, payments, loyality_transactions, entity_to_entity, warehouse_balances, docs_sales_settings, \
-    NomenclatureCashbackType
-from functions.helpers import get_user_by_token, datetime_to_timestamp
+from database.db import (
+    NomenclatureCashbackType,
+    articles,
+    contracts,
+    contragents,
+    database,
+    docs_sales,
+    docs_sales_goods,
+    docs_sales_settings,
+    docs_sales_tags,
+    entity_to_entity,
+    fifo_settings,
+    loyality_cards,
+    loyality_transactions,
+    nomenclature,
+    organizations,
+    payments,
+    pboxes,
+    price_types,
+    units,
+    users_cboxes_relation,
+    warehouse_balances,
+    warehouses,
+)
+from fastapi import HTTPException
+from functions.helpers import datetime_to_timestamp, get_user_by_token
 from functions.users import raschet
+from sqlalchemy import and_, func, or_, select
 from ws_manager import manager
-import phonenumbers
 
 
 class CreateDocsSalesView:
 
-    def __init__(
-        self,
-        rabbitmq_messaging_factory: IRabbitFactory
-    ):
+    def __init__(self, rabbitmq_messaging_factory: IRabbitFactory):
         self.__rabbitmq_messaging_factory = rabbitmq_messaging_factory
 
     async def __call__(
-        self,
-        token: str,
-        docs_sales_data: schemas.CreateMass,
-        generate_out: bool = True
+        self, token: str, docs_sales_data: schemas.CreateMass, generate_out: bool = True
     ):
         rabbitmq_messaging: IRabbitMessaging = await self.__rabbitmq_messaging_factory()
         user = await get_user_by_token(token)
@@ -95,13 +94,24 @@ class CreateDocsSalesView:
         conds = []
         for d in docs_sales_data.__root__:
             if d.dated is not None:
-                conds.append(and_(fifo_settings.c.organization_id == d.organization, fifo_settings.c.blocked_date >= d.dated))
+                conds.append(
+                    and_(
+                        fifo_settings.c.organization_id == d.organization,
+                        fifo_settings.c.blocked_date >= d.dated,
+                    )
+                )
         if conds:
             blocked = await database.fetch_all(
-                select(fifo_settings.c.organization_id, fifo_settings.c.blocked_date).where(or_(*conds)))
+                select(
+                    fifo_settings.c.organization_id, fifo_settings.c.blocked_date
+                ).where(or_(*conds))
+            )
             if blocked:
                 bad_orgs = {b.organization_id for b in blocked}
-                raise HTTPException(400, f"Период закрыт для организаций: {', '.join(map(str, bad_orgs))}")
+                raise HTTPException(
+                    400,
+                    f"Период закрыт для организаций: {', '.join(map(str, bad_orgs))}",
+                )
 
         article_id = await database.fetch_val(
             select(articles.c.id)
@@ -125,7 +135,7 @@ class CreateDocsSalesView:
             column=0,
         )
         if not default_paybox:
-            raise HTTPException(404, f"Paybox Not Found")
+            raise HTTPException(404, "Paybox Not Found")
 
         if fks["loyality_cards"]:
             rows = await database.fetch_all(
@@ -136,11 +146,14 @@ class CreateDocsSalesView:
                     loyality_cards.c.cashback_percent,
                 ).where(loyality_cards.c.id.in_(fks["loyality_cards"]))
             )
-            card_info = {r.id: {
-                "number": r.card_number,
-                "balance": r.balance,
-                "percent": r.cashback_percent or 0,
-            } for r in rows}
+            card_info = {
+                r.id: {
+                    "number": r.card_number,
+                    "balance": r.balance,
+                    "percent": r.cashback_percent or 0,
+                }
+                for r in rows
+            }
 
         nom_rows = await database.fetch_all(
             select(
@@ -167,19 +180,19 @@ class CreateDocsSalesView:
                 docs_sales.c.organization,
                 docs_sales.c.number,
                 func.row_number()
-                .over(partition_by=docs_sales.c.organization,
-                      order_by=docs_sales.c.id.desc())
-                .label("rn")
-            )
-            .where(
+                .over(
+                    partition_by=docs_sales.c.organization,
+                    order_by=docs_sales.c.id.desc(),
+                )
+                .label("rn"),
+            ).where(
                 docs_sales.c.organization.in_(fks["org"]),
                 docs_sales.c.is_deleted.is_(False),
             )
         ).subquery()
 
         last_number_rows = await database.fetch_all(
-            select(subq.c.organization, subq.c.number)
-            .where(subq.c.rn == 1)
+            select(subq.c.organization, subq.c.number).where(subq.c.rn == 1)
         )
 
         last_number_by_org: dict[int, str] = {
@@ -189,7 +202,10 @@ class CreateDocsSalesView:
         for idx, doc in enumerate(docs_sales_data.__root__):
             if doc.settings:
                 raw = doc.settings.dict(exclude_unset=True) or {}
-                if raw.get("repeatability_value") is not None and raw.get("repeatability_period") is not None:
+                if (
+                    raw.get("repeatability_value") is not None
+                    and raw.get("repeatability_period") is not None
+                ):
                     settings_payload.append(raw)
                 else:
                     settings_payload.append(None)
@@ -210,7 +226,7 @@ class CreateDocsSalesView:
                 last_number_by_org[doc.organization] = number_str
 
             if doc.priority is not None and (doc.priority < 0 or doc.priority > 10):
-                raise HTTPException(400, "Приоритет должен быть от 0 до 10")   
+                raise HTTPException(400, "Приоритет должен быть от 0 до 10")
 
             doc_dict = {
                 "number": number_str,
@@ -230,7 +246,7 @@ class CreateDocsSalesView:
                 "cashbox": user.cashbox_id,
                 "is_deleted": False,
                 "priority": doc.priority,
-                "is_marketplace_order": doc.is_marketplace_order
+                "is_marketplace_order": doc.is_marketplace_order,
             }
             docs_rows.append(doc_dict)
 
@@ -256,8 +272,10 @@ class CreateDocsSalesView:
             docs_sales.insert()
             .values(docs_rows)
             .returning(
-                docs_sales.c.id, docs_sales.c.organization,
-                docs_sales.c.number, docs_sales.c.warehouse
+                docs_sales.c.id,
+                docs_sales.c.organization,
+                docs_sales.c.number,
+                docs_sales.c.warehouse,
             )
         )
 
@@ -276,7 +294,11 @@ class CreateDocsSalesView:
             full_payment = paid_r + paid_lt
 
             if tags:
-                tags_rows.extend({"docs_sales_id": doc_id, "name": t.strip()} for t in tags.split(",") if t.strip())
+                tags_rows.extend(
+                    {"docs_sales_id": doc_id, "name": t.strip()}
+                    for t in tags.split(",")
+                    if t.strip()
+                )
 
             total, cashback_sum = 0.0, 0.0
 
@@ -306,58 +328,72 @@ class CreateDocsSalesView:
                     if nom.cashback_type == NomenclatureCashbackType.no_cashback:
                         pass
                     elif nom.cashback_type == NomenclatureCashbackType.percent:
-                        current_percent = g.price * g.quantity * (nom.cashback_value / 100)
+                        current_percent = (
+                            g.price * g.quantity * (nom.cashback_value / 100)
+                        )
                         cashback_sum += share_rubles * current_percent
                     elif nom.cashback_type == NomenclatureCashbackType.const:
                         cashback_sum += g.quantity * nom.cashback_value
                     elif nom.cashback_type == NomenclatureCashbackType.lcard_cashback:
-                        current_percent = g.price * g.quantity * ((card_info[card_id]["percent"] or 0) / 100)
+                        current_percent = (
+                            g.price
+                            * g.quantity
+                            * ((card_info[card_id]["percent"] or 0) / 100)
+                        )
                         cashback_sum += share_rubles * current_percent
                     else:
-                        current_percent = g.price * g.quantity * ((card_info[card_id]["percent"] or 0) / 100)
+                        current_percent = (
+                            g.price
+                            * g.quantity
+                            * ((card_info[card_id]["percent"] or 0) / 100)
+                        )
                         cashback_sum += share_rubles * current_percent
 
             if paid_r:
-                payments_rows.append({
-                    "contragent": doc_in.contragent,
-                    "type": "incoming",
-                    "name": f"Оплата по документу {created.number}",
-                    "amount": round(paid_r, 2),
-                    "amount_without_tax": round(paid_r, 2),
-                    "tax": 0,
-                    "tax_type": "internal",
-                    "article_id": article_id,
-                    "article": "Продажи",
-                    "paybox": doc_in.paybox or default_paybox,
-                    "date": int(datetime.now().timestamp()),
-                    "account": user.user,
-                    "cashbox": user.cashbox_id,
-                    "status": doc_in.status,
-                    "stopped": True,
-                    "is_deleted": False,
-                    "created_at": int(datetime.now().timestamp()),
-                    "updated_at": int(datetime.now().timestamp()),
-                    "docs_sales_id": doc_id,
-                    "tags": tags,
-                })
+                payments_rows.append(
+                    {
+                        "contragent": doc_in.contragent,
+                        "type": "incoming",
+                        "name": f"Оплата по документу {created.number}",
+                        "amount": round(paid_r, 2),
+                        "amount_without_tax": round(paid_r, 2),
+                        "tax": 0,
+                        "tax_type": "internal",
+                        "article_id": article_id,
+                        "article": "Продажи",
+                        "paybox": doc_in.paybox or default_paybox,
+                        "date": int(datetime.now().timestamp()),
+                        "account": user.user,
+                        "cashbox": user.cashbox_id,
+                        "status": doc_in.status,
+                        "stopped": True,
+                        "is_deleted": False,
+                        "created_at": int(datetime.now().timestamp()),
+                        "updated_at": int(datetime.now().timestamp()),
+                        "docs_sales_id": doc_id,
+                        "tags": tags,
+                    }
+                )
                 e2e_rows.append(("p", doc_id))
 
             if card_id and paid_lt:
                 info = card_info.get(card_id) or {}
-                lt_rows.append({
-                    "loyality_card_id": card_id,
-                    "loyality_card_number": info.get("number"),
-                    "type": "withdraw",
-                    "name": f"Оплата по документу {created.number}",
-                    "amount": paid_lt,
-                    "created_by_id": user.id,
-                    "card_balance": info.get("balance"),
-                    "dated": datetime.utcnow(),
-                    "cashbox": user.cashbox_id,
-                    "tags": doc_in.tags or "",
-                    "status": True,
-                    "is_deleted": False,
-                })
+                lt_rows.append(
+                    {
+                        "loyality_card_id": card_id,
+                        "loyality_card_number": info.get("number"),
+                        "type": "withdraw",
+                        "name": f"Оплата по документу {created.number}",
+                        "amount": paid_lt,
+                        "created_by_id": user.id,
+                        "card_balance": info.get("balance"),
+                        "dated": datetime.utcnow(),
+                        "cashbox": user.cashbox_id,
+                        "tags": doc_in.tags or "",
+                        "status": True,
+                        "is_deleted": False,
+                    }
+                )
                 e2e_rows.append(("l", doc_id))
                 card_withdraw_total[card_id] += paid_lt
 
@@ -382,28 +418,31 @@ class CreateDocsSalesView:
                 card_accrual_total[card_id] += round(cashback_sum, 2)
 
             if generate_out and wh_id:
-                out_docs.append((
-                    {
-                        "number": None,
-                        "dated": doc_in.dated,
-                        "docs_sales_id": doc_id,
-                        "warehouse": wh_id,
-                        "contragent": doc_in.contragent,
-                        "organization": org_id,
-                        "operation": "outgoing",
-                        "status": True,
-                        "comment": doc_in.comment,
-                    },
-                    [
+                out_docs.append(
+                    (
                         {
-                            "price_type": 1,
-                            "price": 0,
-                            "quantity": g.quantity,
-                            "unit": g.unit,
-                            "nomenclature": int(g.nomenclature)
-                        } for g in goods
-                    ],
-                ))
+                            "number": None,
+                            "dated": doc_in.dated,
+                            "docs_sales_id": doc_id,
+                            "warehouse": wh_id,
+                            "contragent": doc_in.contragent,
+                            "organization": org_id,
+                            "operation": "outgoing",
+                            "status": True,
+                            "comment": doc_in.comment,
+                        },
+                        [
+                            {
+                                "price_type": 1,
+                                "price": 0,
+                                "quantity": g.quantity,
+                                "unit": g.unit,
+                                "nomenclature": int(g.nomenclature),
+                            }
+                            for g in goods
+                        ],
+                    )
+                )
 
             doc_sum_updates.append({"id": created.id, "sum": round(total, 2)})
 
@@ -422,24 +461,31 @@ class CreateDocsSalesView:
         payment_ids_map = {}
         if payments_rows:
             inserted_pmt = await database.fetch_all(
-                payments.insert()
-                .values(payments_rows)
-                .returning(payments.c.id)
+                payments.insert().values(payments_rows).returning(payments.c.id)
             )
             payment_ids = [row.id for row in inserted_pmt]
-            payment_ids_map = dict(zip([i for i, t in enumerate(e2e_rows) if t[0] == "p"], payment_ids))
+            payment_ids_map = dict(
+                zip([i for i, t in enumerate(e2e_rows) if t[0] == "p"], payment_ids)
+            )
 
         lt_ids_map = {}
         if lt_rows:
             inserted_lt = await database.fetch_all(
                 loyality_transactions.insert()
-                .values([{k: v for k, v in row.items() if k != "__tmp_id"} for row in lt_rows])
+                .values(
+                    [
+                        {k: v for k, v in row.items() if k != "__tmp_id"}
+                        for row in lt_rows
+                    ]
+                )
                 .returning(loyality_transactions.c.id)
             )
-            lt_ids_map = dict(zip(
-                [i for i, t in enumerate(e2e_rows) if t[0] == "l"],
-                [r.id for r in inserted_lt],
-            ))
+            lt_ids_map = dict(
+                zip(
+                    [i for i, t in enumerate(e2e_rows) if t[0] == "l"],
+                    [r.id for r in inserted_lt],
+                )
+            )
 
             # if card_withdraw_total:
             #     query_update_cards = """
@@ -456,20 +502,23 @@ class CreateDocsSalesView:
             e2e_to_insert = []
             for idx, (typ, doc_id) in enumerate(e2e_rows):
                 to_id = payment_ids_map.get(idx) if typ == "p" else lt_ids_map.get(idx)
-                e2e_to_insert.append({
-                    "from_entity": 7,
-                    "to_entity": 5 if typ == "p" else 6,
-                    "from_id": doc_id,
-                    "to_id": to_id,
-                    "cashbox_id": user.cashbox_id,
-                    "type": "docs_sales_payments" if typ == "p" else "docs_sales_loyality_transactions",
-                    "status": True,
-                    "delinked": False,
-                })
-            query = (
-                entity_to_entity.insert()
-                .values(e2e_to_insert)
-            )
+                e2e_to_insert.append(
+                    {
+                        "from_entity": 7,
+                        "to_entity": 5 if typ == "p" else 6,
+                        "from_id": doc_id,
+                        "to_id": to_id,
+                        "cashbox_id": user.cashbox_id,
+                        "type": (
+                            "docs_sales_payments"
+                            if typ == "p"
+                            else "docs_sales_loyality_transactions"
+                        ),
+                        "status": True,
+                        "delinked": False,
+                    }
+                )
+            query = entity_to_entity.insert().values(e2e_to_insert)
             await database.execute(query)
 
         if wb_rows_dict:
@@ -486,37 +535,40 @@ class CreateDocsSalesView:
                     warehouse_balances.c.warehouse_id,
                     warehouse_balances.c.nomenclature_id,
                     warehouse_balances.c.current_amount,
-                    func.row_number().over(
+                    func.row_number()
+                    .over(
                         partition_by=(
                             warehouse_balances.c.warehouse_id,
                             warehouse_balances.c.nomenclature_id,
                         ),
                         order_by=warehouse_balances.c.created_at.desc(),
-                    ).label("rn"),
-                )
-                .where(
+                    )
+                    .label("rn"),
+                ).where(
                     warehouse_balances.c.cashbox_id == user.cashbox_id,
                     or_(*conditions),
                 )
             ).subquery()
 
-            latest = await database.fetch_all(
-                select(subq).where(subq.c.rn == 1)
-            )
-            latest_map = {(r.warehouse_id, r.nomenclature_id): r.current_amount for r in latest}
+            latest = await database.fetch_all(select(subq).where(subq.c.rn == 1))
+            latest_map = {
+                (r.warehouse_id, r.nomenclature_id): r.current_amount for r in latest
+            }
 
             wb_to_insert = []
             for (wh, nom, org), qty in wb_rows_dict.items():
                 prev = latest_map.get((wh, nom), 0)
-                wb_to_insert.append({
-                    "organization_id": org,
-                    "warehouse_id": wh,
-                    "nomenclature_id": nom,
-                    "document_sale_id": None,
-                    "outgoing_amount": qty,
-                    "current_amount": prev - qty,
-                    "cashbox_id": user.cashbox_id,
-                })
+                wb_to_insert.append(
+                    {
+                        "organization_id": org,
+                        "warehouse_id": wh,
+                        "nomenclature_id": nom,
+                        "document_sale_id": None,
+                        "outgoing_amount": qty,
+                        "current_amount": prev - qty,
+                        "cashbox_id": user.cashbox_id,
+                    }
+                )
 
             # Выбираем номенклатуры, которые являются ("product", "property"):
             filtered_wb_to_insert = []
@@ -527,11 +579,16 @@ class CreateDocsSalesView:
                     filtered_wb_to_insert.append(record)
             # Вставляем только те записи, которые соответствуют условиям
             if filtered_wb_to_insert:
-                await database.execute_many(warehouse_balances.insert(), filtered_wb_to_insert)
+                await database.execute_many(
+                    warehouse_balances.insert(), filtered_wb_to_insert
+                )
 
         for payload, goods in out_docs:
-            asyncio.create_task(create_warehouse_docs(token, {**payload, "goods": goods}, user.cashbox_id))
-
+            asyncio.create_task(
+                create_warehouse_docs(
+                    token, {**payload, "goods": goods}, user.cashbox_id
+                )
+            )
 
         asyncio.create_task(raschet(user, token))
         for card_id in set(list(card_withdraw_total) + list(card_accrual_total)):
@@ -559,7 +616,9 @@ class CreateDocsSalesView:
         )
         result = [datetime_to_timestamp(r) for r in rows]
         asyncio.create_task(
-            manager.send_message(token, {"action": "create", "target": "docs_sales", "result": result})
+            manager.send_message(
+                token, {"action": "create", "target": "docs_sales", "result": result}
+            )
         )
 
         # Юкасса
@@ -661,7 +720,7 @@ class CreateDocsSalesView:
                         tech_card_operation_uuid=create.tech_card_operation_uuid,
                         user_cashbox_id=user.cashbox_id,
                     ),
-                    routing_key="teach_card_operation"
+                    routing_key="teach_card_operation",
                 )
         return result
 
@@ -674,5 +733,5 @@ class CreateDocsSalesView:
         if missing:
             raise HTTPException(
                 400,
-                detail=f"{name}.id: {', '.join(map(str, sorted(missing)))} не найден(ы)"
+                detail=f"{name}.id: {', '.join(map(str, sorted(missing)))} не найден(ы)",
             )

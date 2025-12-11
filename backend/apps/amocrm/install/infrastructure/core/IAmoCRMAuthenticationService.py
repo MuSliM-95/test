@@ -1,5 +1,6 @@
-from apps.amocrm.install.infrastructure.impl.models.AmoCRMAuthenticationResultModel import \
-    AmoCRMAuthenticationResultModel
+from apps.amocrm.install.infrastructure.impl.models.AmoCRMAuthenticationResultModel import (
+    AmoCRMAuthenticationResultModel,
+)
 
 
 class IAmoCRMAuthenticationService:

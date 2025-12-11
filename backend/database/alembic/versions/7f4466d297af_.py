@@ -5,13 +5,10 @@ Revises: 97e4fd750ed6
 Create Date: 2024-11-29 14:38:34.943680
 
 """
-from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
-revision = '7f4466d297af'
-down_revision = '97e4fd750ed6'
+revision = "7f4466d297af"
+down_revision = "97e4fd750ed6"
 branch_labels = None
 depends_on = None
 

@@ -1,18 +1,21 @@
+from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
+from database.db import (
+    booking,
+    booking_events,
+    booking_events_photo,
+    booking_nomenclature,
+    database,
+    pictures,
+)
 from sqlalchemy import select
 
-from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
-from database.db import booking_events, booking_nomenclature, booking, database, booking_events_photo, pictures
-
-from ..core.IEventsGetFunction import IEventsGetFunction
 from ...domain.models.ResponseGetBookingEventModel import ResponseGetBookingEventsModel
+from ..core.IEventsGetFunction import IEventsGetFunction
 
 
 class EventsGetFunction(IEventsGetFunction):
 
-    def __init__(
-        self,
-        s3_factory: IS3ServiceFactory
-    ):
+    def __init__(self, s3_factory: IS3ServiceFactory):
         self.__s3_factory = s3_factory
 
     async def __call__(
@@ -37,11 +40,12 @@ class EventsGetFunction(IEventsGetFunction):
                 booking_events.c.updated_at,
                 booking_events.c.is_deleted,
             )
-            .join(booking_nomenclature, booking_events.c.booking_nomenclature_id == booking_nomenclature.c.id)
-            .join(booking, booking_nomenclature.c.booking_id == booking.c.id)
-            .where(
-                booking.c.cashbox == cashbox_id
+            .join(
+                booking_nomenclature,
+                booking_events.c.booking_nomenclature_id == booking_nomenclature.c.id,
             )
+            .join(booking, booking_nomenclature.c.booking_id == booking.c.id)
+            .where(booking.c.cashbox == cashbox_id)
         )
         for join_model in joins:
             query = query.join(*join_model)
@@ -68,13 +72,10 @@ class EventsGetFunction(IEventsGetFunction):
             for picture_info in pictures_list:
 
                 url = await s3_client.get_link_object(
-                    bucket_name="5075293c-docs_generated",
-                    file_key=picture_info.url
+                    bucket_name="5075293c-docs_generated", file_key=picture_info.url
                 )
                 event_dict["photos"].append(url)
 
             return_dict.append(event_dict)
 
-        return ResponseGetBookingEventsModel(
-            data=return_dict
-        )
+        return ResponseGetBookingEventsModel(data=return_dict)

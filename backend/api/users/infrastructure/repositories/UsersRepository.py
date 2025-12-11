@@ -1,4 +1,5 @@
-from database.db import users, database
+from database.db import database, users
+
 
 class UsersRepository:
     async def fetch_users_by_ids(self, user_ids: list[int]) -> dict[int, dict]:
@@ -12,4 +13,3 @@ class UsersRepository:
     async def fetch_users_by_id(self, user_id: int) -> dict:
         users_map = await self.fetch_users_by_ids([user_id])
         return users_map.get(user_id, {})
-

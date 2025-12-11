@@ -1,5 +1,7 @@
-from pydantic import BaseModel
 from typing import Union
+
+from pydantic import BaseModel
+
 
 class GeocoderSearchResponse(BaseModel):
     country: Union[str, None]
@@ -8,6 +10,6 @@ class GeocoderSearchResponse(BaseModel):
     street: Union[str, None]
     housenumber: Union[str, None]
     timezone: Union[str, None]
-    postcode:  Union[str, None]
+    postcode: Union[str, None]
     latitude: Union[float, None]
     longitude: Union[float, None]
