@@ -1,5 +1,6 @@
 from api.docs_warehouses.func_warehouse import (
     call_type_movement,
+    filter_out_service_goods,
     set_data_doc_warehouse,
     update_docs_warehouse,
     update_goods_warehouse,
@@ -222,7 +223,9 @@ async def create(token: str, docs_warehouse_data: schemas.CreateMass):
         ):
             continue
 
-        goods: list = instance_values.get("goods")
+        goods: list = instance_values.get("goods") or []
+        goods = await filter_out_service_goods(goods)
+
         try:
             del instance_values["goods"]
         except KeyError:

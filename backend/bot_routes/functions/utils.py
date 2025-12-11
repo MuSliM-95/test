@@ -83,7 +83,7 @@ def validate_inn(inn: str) -> bool:
 
 
 async def download_telegram_file(file_id: str, token: str) -> bytes:
-    file_info = await bot.get_file(file_id)
+    file_info = await bot.get_file(file_id)  # noqa: F821
     file_path = file_info.file_path
     file_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
 

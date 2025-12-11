@@ -4,6 +4,7 @@ import logging
 import os
 import time
 
+logger = logging.getLogger(__name__)
 from api.analytics.routers import router as analytics_router
 from api.apple_wallet.routers import router as apple_wallet_router
 from api.apple_wallet_card_settings.routers import (

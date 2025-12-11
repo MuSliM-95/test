@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -21,6 +22,8 @@ from api.chats.websocket import chat_manager
 from database.db import database, pictures
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
