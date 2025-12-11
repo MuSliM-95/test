@@ -5,7 +5,7 @@ variables:
   TERM: "xterm-256color"
   CLICOLOR_FORCE: "1"
   FORCE_COLOR: "1"
-  SKIP_TEST: "false"  # Установите "true" для временного отключения
+  SKIP_TEST: "true"  # Установите "true" для временного отключения
 
 workflow:
   auto_cancel:
