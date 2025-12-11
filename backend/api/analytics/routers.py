@@ -1,14 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional
 
-from const import PaymentType
-from database.db import database, users_cboxes_relation, loyality_cards, users
 import api.analytics.schemas as analytics_schemas
 import functions.filter_schemas as filter_schemas
+from const import PaymentType
+from database.db import database, loyality_cards, users, users_cboxes_relation
+from fastapi import APIRouter, Depends, HTTPException
 from functions.helpers import get_filters_analytics
-from datetime import date, timedelta, datetime
-from sqlalchemy import and_, func, select, distinct
-from typing import Optional
-import uuid
+from sqlalchemy import func, select
 
 router = APIRouter(tags=["analytics"])
 
@@ -33,22 +33,40 @@ async def analytics(
             cashbox = user.cashbox_id
             queries = []
             for payment_direction in payment_directions:
-                query_sums = "("+f"""
+                query_sums = (
+                    "("
+                    + f"""
                     SELECT articles.name AS name, payments.type AS type, sum(payments.amount) AS sum
                     FROM payments JOIN articles ON articles.id = payments.article_id
                     WHERE payments.cashbox = {cashbox} AND payments.type = '{payment_direction}' AND payments.is_deleted != true
-                    """ + filters + " GROUP BY articles.name, payments.type"+") as sums"
-                query_articles = "(" + f"""
-                    SELECT articles.id AS id, articles.name AS name, articles.emoji AS emoji, articles.icon_file AS icon_file 
+                    """
+                    + filters
+                    + " GROUP BY articles.name, payments.type"
+                    + ") as sums"
+                )
+                query_articles = (
+                    "("
+                    + f"""
+                    SELECT articles.id AS id, articles.name AS name, articles.emoji AS emoji, articles.icon_file AS icon_file
                     FROM articles
                     WHERE articles.cashbox = {cashbox}
-                """+") as articles"
-                total_column = f"""
+                """
+                    + ") as articles"
+                )
+                total_column = (
+                    f"""
                     SELECT sum(payments.amount) AS total
                     FROM payments JOIN articles ON articles.id = payments.article_id
                     WHERE payments.cashbox = {cashbox} AND payments.type = '{payment_direction}' AND payments.is_deleted != true
-                """ + filters
-                queries_joined = query_articles + " JOIN " + query_sums + " ON sums.name=articles.name"
+                """
+                    + filters
+                )
+                queries_joined = (
+                    query_articles
+                    + " JOIN "
+                    + query_sums
+                    + " ON sums.name=articles.name"
+                )
 
                 queries.append(
                     f"""
@@ -62,7 +80,7 @@ async def analytics(
                 query = query + " UNION " + subquery
 
             sort_name, sort_direction = sort.split(":")[:2]
-            if sort_name not in ("percentage", ):
+            if sort_name not in ("percentage",):
                 raise HTTPException(
                     status_code=400, detail="Вы ввели некорректный параметр сортировки!"
                 )
@@ -91,8 +109,6 @@ async def analytics(
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
-
-
 @router.get("/analytics_cards/")
 async def analytics(
     token: str,
@@ -100,7 +116,7 @@ async def analytics(
     date_to: int,
     user_id: Optional[int] = None,
 ):
-    
+
     def daterange(start_date, end_date):
         for n in range(int((end_date - start_date).days)):
             yield start_date + timedelta(n)
@@ -114,7 +130,7 @@ async def analytics(
             end_date = datetime.fromtimestamp(date_to)
 
             res = []
-            
+
             filters = [users_cboxes_relation.c.cashbox_id == user.cashbox_id]
             if user_id:
                 filters.append(users_cboxes_relation.c.user == user_id)
@@ -126,7 +142,10 @@ async def analytics(
                 user_tg_q = users.select().where(users.c.id == c_user.user)
                 user_tg = await database.fetch_one(user_tg_q)
 
-                q = select(func.count(loyality_cards.c.id)).where(loyality_cards.c.cashbox_id == user.cashbox_id, loyality_cards.c.created_by_id == c_user.id)
+                q = select(func.count(loyality_cards.c.id)).where(
+                    loyality_cards.c.cashbox_id == user.cashbox_id,
+                    loyality_cards.c.created_by_id == c_user.id,
+                )
                 all_cards = await database.fetch_one(q)
 
                 user_body = {
@@ -138,10 +157,19 @@ async def analytics(
                 subres = []
 
                 for single_date in daterange(start_date, end_date):
-                    day_start = single_date.replace(hour=0, minute=0, second=0, microsecond=000000)
-                    day_end = single_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+                    day_start = single_date.replace(
+                        hour=0, minute=0, second=0, microsecond=000000
+                    )
+                    day_end = single_date.replace(
+                        hour=23, minute=59, second=59, microsecond=999999
+                    )
 
-                    q = loyality_cards.select().where(loyality_cards.c.cashbox_id == user.cashbox_id, loyality_cards.c.created_at >= day_start, loyality_cards.c.created_at <= day_end, loyality_cards.c.created_by_id == c_user.id)
+                    q = loyality_cards.select().where(
+                        loyality_cards.c.cashbox_id == user.cashbox_id,
+                        loyality_cards.c.created_at >= day_start,
+                        loyality_cards.c.created_at <= day_end,
+                        loyality_cards.c.created_by_id == c_user.id,
+                    )
                     all_cards = await database.fetch_all(q)
 
                     subres_body = {
@@ -152,10 +180,8 @@ async def analytics(
 
                     subres.append(subres_body)
 
-                
-                user_body['result'] = subres
+                user_body["result"] = subres
                 res.append(user_body)
             return res
-
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")

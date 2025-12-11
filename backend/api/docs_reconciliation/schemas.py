@@ -1,5 +1,6 @@
+from typing import List, Optional
+
 from pydantic import BaseModel
-from typing import Optional, List
 
 
 class Create(BaseModel):
@@ -29,11 +30,13 @@ class CreateError(Create):
     class Config:
         orm_mode = True
 
+
 class CreateErrorMass(BaseModel):
     __root__: List[CreateError]
 
     class Config:
         orm_mode = True
+
 
 class ViewInList(BaseModel):
     id: int
@@ -76,7 +79,6 @@ class ListView(BaseModel):
 class ListViewGet(BaseModel):
     result: Optional[List[ViewInList]]
     count: int
-
 
 
 class CreateListView(BaseModel):

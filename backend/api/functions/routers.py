@@ -1,14 +1,13 @@
-from fastapi import APIRouter, HTTPException
-
-from database.db import database, entity_or_function, status_entity_function
-
 import api.functions.schemas as schemas
-
-from functions.helpers import datetime_to_timestamp, check_function_exists
-from functions.helpers import get_user_by_token
-
+from database.db import database, entity_or_function, status_entity_function
+from fastapi import APIRouter, HTTPException
+from functions.helpers import (
+    check_function_exists,
+    datetime_to_timestamp,
+    get_user_by_token,
+)
+from sqlalchemy import func, select
 from ws_manager import manager
-from sqlalchemy import select, func
 
 router = APIRouter(tags=["cashbox_functions"])
 
@@ -30,7 +29,9 @@ async def get_user_functions(token: str, limit: int = 100, offset: int = 0):
     )
     cashbox_functions = await database.fetch_all(query)
     if cashbox_functions:
-        cashbox_functions_names = [entity.entity_or_function for entity in cashbox_functions]
+        cashbox_functions_names = [
+            entity.entity_or_function for entity in cashbox_functions
+        ]
         result = [*map(dict, cashbox_functions)]
     else:
         cashbox_functions_names, result = [], []
@@ -39,11 +40,8 @@ async def get_user_functions(token: str, limit: int = 100, offset: int = 0):
         if entity.name not in cashbox_functions_names:
             result.append({"entity_or_function": entity.name, "status": False})
 
-    query = (
-        select(func.count(status_entity_function.c.id))
-        .where(
-            status_entity_function.c.cashbox == user.cashbox_id,
-        )
+    query = select(func.count(status_entity_function.c.id)).where(
+        status_entity_function.c.cashbox == user.cashbox_id,
     )
     cashbox_functions_c = await database.fetch_one(query)
     return {"result": result, "count": cashbox_functions_c.count_1}
@@ -105,7 +103,9 @@ async def deactivate_function(token: str, function: str):
     if not function_db:
         raise HTTPException(status_code=404, detail="Эта функция не была активирована")
 
-    query = status_entity_function.delete().where(status_entity_function.c.id == function_db.id)
+    query = status_entity_function.delete().where(
+        status_entity_function.c.id == function_db.id
+    )
     await database.execute(query)
 
     return True

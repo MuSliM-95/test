@@ -1,5 +1,6 @@
+from typing import List, Optional
+
 from pydantic import BaseModel
-from typing import Optional, List
 
 
 class PriceCreate(BaseModel):
@@ -28,11 +29,13 @@ class PriceEdit(BaseModel):
     date_from: Optional[int]
     date_to: Optional[int]
 
+
 class PriceEditOne(BaseModel):
     price: Optional[float]
     price_type: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+
 
 class PriceInList(BaseModel):
     id: int
@@ -96,6 +99,7 @@ class PriceListPure(BaseModel):
 class PriceGetWithNomenclature(BaseModel):
     price: Optional[float]
     price_type: Optional[str]
+
 
 class FilterSchema(BaseModel):
     price_type_id: Optional[int]

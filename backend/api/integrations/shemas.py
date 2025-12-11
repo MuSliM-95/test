@@ -1,19 +1,22 @@
 from enum import Enum
-from typing import Optional, List, Union
-from pydantic import BaseModel, Field, HttpUrl
+from typing import List, Optional, Union
+
+from pydantic import BaseModel, HttpUrl
 
 # class Status(Enum):
-    
+
 #     2
+
 
 class CostType(str, Enum):
     per_user = "per_user"
     per_account = "per_account"
 
+
 class ShowIntegration(BaseModel):
     id: int
-    status : bool
-    name: str   
+    status: bool
+    name: str
     image: str
     images: list[str]
     description_short: str
@@ -29,13 +32,15 @@ class ShowIntegration(BaseModel):
     is_payed: Optional[bool] = False
     trial: Optional[str] = ""
 
+
 class ShowIntegrationGet(BaseModel):
     result: Optional[List[ShowIntegration]]
     count: int
 
+
 class Integration(BaseModel):
-    status : bool
-    name: str   
+    status: bool
+    name: str
     description_short: str
     description_long: str
     folder_name: str
@@ -48,7 +53,7 @@ class Integration(BaseModel):
     # is_payed: bool
     # trial: str
 
-    class Config:  
+    class Config:
         use_enum_values = True
 
 
@@ -58,20 +63,21 @@ class CreateApp(Integration):
     url: Union[HttpUrl, str]
     redirect_uri: Union[HttpUrl, str] = None
 
+
 class UpdateIntegration(BaseModel):
-    status : Optional[bool] =  None
-    name: Optional[str] =  None
-    description_short: Optional[str] =  None
-    description_long: Optional[str] =  None
-    folder_name: Optional[str] =  None
-    microservice_id: Optional[int] =  None
+    status: Optional[bool] = None
+    name: Optional[str] = None
+    description_short: Optional[str] = None
+    description_long: Optional[str] = None
+    folder_name: Optional[str] = None
+    microservice_id: Optional[int] = None
     is_public: Optional[int] = None
     cost: Optional[int] = None
     cost_type: Optional[CostType] = None
     cost_percent: Optional[float] = None
     payed_to: Optional[str] = None
     # is_payed: Optional[bool] =  None
-    trial: Optional[str] =  None
+    trial: Optional[str] = None
 
 
 class JwtScope(BaseModel):

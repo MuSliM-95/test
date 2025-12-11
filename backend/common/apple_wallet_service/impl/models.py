@@ -10,10 +10,12 @@ class PassColorConfig(BaseModel):
     foregroundColor: str
     labelColor: str
 
+
 class Location(BaseModel):
     longitude: float
     latitude: float
     relevantText: str
+
 
 class PassParamsModel(BaseModel):
     serial_number: str
@@ -39,15 +41,15 @@ class PassParamsModel(BaseModel):
 
     auth_token: str = str(uuid.uuid4())
 
-    advertisement: str = 'TableCRM'
+    advertisement: str = "TableCRM"
 
-    @validator('description')
+    @validator("description")
     def description_validator(cls, value):
         if value:
             return value
         return "TableCRM"
 
-    @validator('barcode_message')
+    @validator("barcode_message")
     def barcode_message_validator(cls, value):
         if value:
             return value

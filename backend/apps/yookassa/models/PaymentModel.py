@@ -1,8 +1,8 @@
 from datetime import datetime
+from enum import Enum
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
-from typing import List,Literal,Union,Optional
-from enum import Enum
 
 
 class EventWebhookPayment(str, Enum):
@@ -32,7 +32,7 @@ class MarkQuantityModel(BaseModel):
 class ItemModel(BaseModel):
     description: str
     amount: AmountModel
-    vat_code: int = Field(ge = 1, le = 10)
+    vat_code: int = Field(ge=1, le=10)
     quantity: float
     measure: Optional[str] = None
     mark_quantity: Optional[MarkQuantityModel] = None
@@ -101,7 +101,9 @@ class PaymentCreateModel(BaseModel):
     merchant_customer_id: str = None
     payment_method_data: Union[MethodBankCard, MethodSbp] = None
     test: bool = True
-    confirmation: Union[ConfirmationRedirect, ConfirmationEmbedded, ConfirmationRedirectResponce] = None
+    confirmation: Union[
+        ConfirmationRedirect, ConfirmationEmbedded, ConfirmationRedirectResponce
+    ] = None
 
 
 class PaymentCreateModelView(PaymentCreateModel):
@@ -130,8 +132,3 @@ class PaymentWebhookEventModel(BaseModel):
     type: str
     event: EventWebhookPayment
     object: PaymentBaseModel
-
-
-
-
-

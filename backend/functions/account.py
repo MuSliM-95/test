@@ -1,15 +1,23 @@
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, func
-
 import texts
 from api.payments.schemas import PaymentType
 from bot import bot
-from const import PAID, SUCCESS, BLOCKED
-from database.db import accounts_balances, database, transactions, tariffs, users_cboxes_relation, users
+from const import BLOCKED, PAID, SUCCESS
+from database.db import (
+    accounts_balances,
+    database,
+    tariffs,
+    transactions,
+    users,
+    users_cboxes_relation,
+)
+from sqlalchemy import func, select
 
 
-async def make_transaction(balance: accounts_balances, price: int, users_quantity: int) -> None:
+async def make_transaction(
+    balance: accounts_balances, price: int, users_quantity: int
+) -> None:
     """Takes money from balance, sets its status to success and creates a new transaction"""
     now = datetime.utcnow()
     query = (
@@ -33,7 +41,7 @@ async def make_transaction(balance: accounts_balances, price: int, users_quantit
             "status": SUCCESS,
             "created_at": int(datetime.utcnow().timestamp()),
             "updated_at": int(datetime.utcnow().timestamp()),
-            "type": PaymentType.incoming
+            "type": PaymentType.incoming,
         }
     )
     result = await database.execute(query)
@@ -57,12 +65,15 @@ async def make_account(balance: accounts_balances) -> None:
         transaction = await database.fetch_one(
             transactions.select().where(transactions.c.id == balance.last_transaction)
         )
-        if datetime.fromtimestamp(transaction.updated_at) + timedelta(days=balance_tariff.frequency) > now:
+        if (
+            datetime.fromtimestamp(transaction.updated_at)
+            + timedelta(days=balance_tariff.frequency)
+            > now
+        ):
             return
 
-    count_query = (
-        select(func.count(users_cboxes_relation.c.id))
-        .where(users_cboxes_relation.c.cashbox_id == balance.cashbox)
+    count_query = select(func.count(users_cboxes_relation.c.id)).where(
+        users_cboxes_relation.c.cashbox_id == balance.cashbox
     )
     users_quantity = await database.execute(count_query)
     price = balance_tariff.price / balance_tariff.frequency
@@ -95,6 +106,8 @@ async def make_account(balance: accounts_balances) -> None:
             users=users_quantity,
             per_user=balance_tariff.price if balance_tariff.per_user else 0,
             total=price,
-            link=texts.url_link_pay.format(user_id=user.owner_id, cashbox_id=balance.cashbox),
+            link=texts.url_link_pay.format(
+                user_id=user.owner_id, cashbox_id=balance.cashbox
+            ),
         ),
     )

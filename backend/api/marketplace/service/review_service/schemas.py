@@ -2,27 +2,27 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
-
 from api.marketplace.service.review_service.constants import ReviewEntityTypes
+from pydantic import BaseModel, Field
 
 
 class CreateReviewRequest(BaseModel):
     """Запрос на создание отзыва"""
+
     entity_type: ReviewEntityTypes
     entity_id: int
-    rating: int = Field(ge=1, le=5) # 1-5
+    rating: int = Field(ge=1, le=5)  # 1-5
     text: str
     contragent_phone: str
 
 
-
 class MarketplaceReview(BaseModel):
     """Ответ с отзывом"""
+
     id: int
     entity_type: ReviewEntityTypes
     entity_id: int
-    rating: int = Field(ge=1, le=5) # 1-5
+    rating: int = Field(ge=1, le=5)  # 1-5
     text: str
     status: str  # pending, visible, hidden
     created_at: datetime
@@ -34,6 +34,7 @@ class MarketplaceReview(BaseModel):
 
 class ReviewListResponse(BaseModel):
     """Список отзывов"""
+
     result: List[MarketplaceReview]
     count: int
     page: int

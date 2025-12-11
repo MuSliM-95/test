@@ -5,13 +5,10 @@ Revises: 58249a41dca1
 Create Date: 2025-10-23 20:58:35.938583
 
 """
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'ad90fb706d6a'
-down_revision = '58249a41dca1'
+revision = "ad90fb706d6a"
+down_revision = "58249a41dca1"
 branch_labels = None
 depends_on = None
 

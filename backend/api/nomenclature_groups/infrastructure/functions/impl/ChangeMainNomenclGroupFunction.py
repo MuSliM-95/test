@@ -1,8 +1,8 @@
-from sqlalchemy import update, and_
-
-from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import \
-    IChangeMainNomenclGroupFunction
+from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import (
+    IChangeMainNomenclGroupFunction,
+)
 from database.db import database, nomenclature_groups_value
+from sqlalchemy import and_, update
 
 
 class ChangeMainNomenclGroupFunction(IChangeMainNomenclGroupFunction):
@@ -11,29 +11,25 @@ class ChangeMainNomenclGroupFunction(IChangeMainNomenclGroupFunction):
         async with database.connection() as connection:
             async with connection.transaction():
                 query = (
-                    update(
-                        nomenclature_groups_value
+                    update(nomenclature_groups_value)
+                    .where(
+                        and_(
+                            nomenclature_groups_value.c.group_id == group_id,
+                            nomenclature_groups_value.c.is_main == True,
+                        )
                     )
-                    .where(and_(
-                        nomenclature_groups_value.c.group_id == group_id,
-                        nomenclature_groups_value.c.is_main == True
-                    ))
-                    .values(
-                        is_main=False
-                    )
+                    .values(is_main=False)
                 )
                 await database.execute(query)
 
                 query = (
-                    update(
-                        nomenclature_groups_value
+                    update(nomenclature_groups_value)
+                    .where(
+                        and_(
+                            nomenclature_groups_value.c.group_id == group_id,
+                            nomenclature_groups_value.c.nomenclature_id == nomen_id,
+                        )
                     )
-                    .where(and_(
-                        nomenclature_groups_value.c.group_id == group_id,
-                        nomenclature_groups_value.c.nomenclature_id == nomen_id
-                    ))
-                    .values(
-                        is_main=True
-                    )
+                    .values(is_main=True)
                 )
                 await database.execute(query)

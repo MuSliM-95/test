@@ -1,16 +1,13 @@
 from apps.yookassa.services.core.IOauthService import IOauthService
 from fastapi import HTTPException
-
-
 from functions.helpers import get_user_by_token
 
 
 class RevokeTokenOauthView:
 
     def __init__(
-            self,
-            oauth_service: IOauthService,
-
+        self,
+        oauth_service: IOauthService,
     ):
         self.__oauth_service = oauth_service
 
@@ -21,6 +18,6 @@ class RevokeTokenOauthView:
             return res
         except Exception as error:
             raise HTTPException(
-                status_code = 432,
-                detail = f"ошибка при отзыве access_token в yookassa.ru: {str(error)}"
+                status_code=432,
+                detail=f"ошибка при отзыве access_token в yookassa.ru: {str(error)}",
             )

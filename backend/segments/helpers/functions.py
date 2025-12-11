@@ -2,16 +2,25 @@ import asyncio
 import json
 
 from api.docs_sales.api.routers import generate_and_save_order_links
-
 from database.db import (
-    docs_sales_delivery_info, database, docs_sales, warehouses, users,
-    users_cboxes_relation, docs_sales_goods, nomenclature, units, contragents,
-    loyality_cards
+    contragents,
+    database,
+    docs_sales,
+    docs_sales_delivery_info,
+    docs_sales_goods,
+    loyality_cards,
+    nomenclature,
+    units,
+    users,
+    users_cboxes_relation,
+    warehouses,
 )
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 
-def format_contragent_text_notifications(action: str, segment_name: str, name: str, phone: str):
+def format_contragent_text_notifications(
+    action: str, segment_name: str, name: str, phone: str
+):
     if action == "new_contragent":
         header = "Новый пользователь добавлен в сегмент!"
     else:
@@ -19,7 +28,7 @@ def format_contragent_text_notifications(action: str, segment_name: str, name: s
     return f"{header}\nСегмент: {segment_name}.\nКлиент:\n{name}\nТелефон: {phone}"
 
 
-async def create_replacements(obj_id:int, obj_type: str = "docs_sales") -> dict:
+async def create_replacements(obj_id: int, obj_type: str = "docs_sales") -> dict:
     replacements = {}
     tasks = []
     contragent_id = None
@@ -43,7 +52,7 @@ async def create_replacements(obj_id:int, obj_type: str = "docs_sales") -> dict:
     if contragent_id:
         tasks += [
             add_contragent_info_to_replacements(replacements, contragent_id),
-            add_loyality_card_info_to_replacements(replacements, contragent_id)
+            add_loyality_card_info_to_replacements(replacements, contragent_id),
         ]
 
     await asyncio.gather(*tasks)
@@ -65,16 +74,19 @@ async def order_info_to_replacements(replacements: dict, order_id: int):
         "picked": "Назначен доставщик",
         "delivered": "Доставлен",
         "closed": "Закрыт",
-        "success": "Успешно"
+        "success": "Успешно",
     }
     if order.order_status:
-        data["order_status"] = order_statuses[order.order_status] if order.order_status in order_statuses else order.status
+        data["order_status"] = (
+            order_statuses[order.order_status]
+            if order.order_status in order_statuses
+            else order.status
+        )
 
     if order.assigned_picker:
         query = (
             users.select()
-            .join(users_cboxes_relation,
-                                    users_cboxes_relation.c.user == users.c.id)
+            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
             .where(users_cboxes_relation.c.id == order.assigned_picker)
         )
         user = await database.fetch_one(query)
@@ -88,8 +100,7 @@ async def order_info_to_replacements(replacements: dict, order_id: int):
     if order.assigned_courier:
         query = (
             users.select()
-            .join(users_cboxes_relation,
-                                    users_cboxes_relation.c.user == users.c.id)
+            .join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
             .where(users_cboxes_relation.c.id == order.assigned_courier)
         )
         user = await database.fetch_one(query)
@@ -103,9 +114,13 @@ async def order_info_to_replacements(replacements: dict, order_id: int):
     replacements.update(data)
 
 
-async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
+async def add_warehouse_info_to_replacements(replacements: dict, order_id: int):
     data = {}
-    query = warehouses.select().join(docs_sales, docs_sales.c.warehouse == warehouses.c.id).where(docs_sales.c.id == order_id)
+    query = (
+        warehouses.select()
+        .join(docs_sales, docs_sales.c.warehouse == warehouses.c.id)
+        .where(docs_sales.c.id == order_id)
+    )
     row = await database.fetch_one(query)
     if row:
         if row.name:
@@ -117,13 +132,15 @@ async def add_warehouse_info_to_replacements(replacements:dict, order_id:int):
     replacements.update(data)
 
 
-async def add_manager_info_to_replacements(replacements:dict, order_id:int):
+async def add_manager_info_to_replacements(replacements: dict, order_id: int):
     data = {}
     order_query = docs_sales.select().where(docs_sales.c.id == order_id)
     order = await database.fetch_one(order_query)
     if not order:
         return
-    query = users.select().join(users_cboxes_relation, users_cboxes_relation.c.user == users.c.id)
+    query = users.select().join(
+        users_cboxes_relation, users_cboxes_relation.c.user == users.c.id
+    )
     user = await database.fetch_one(query)
     if user:
         data["manager_name"] = ""
@@ -140,14 +157,16 @@ async def add_manager_info_to_replacements(replacements:dict, order_id:int):
 async def link_replacements(replacements, order_id):
     data = {}
     links = await generate_and_save_order_links(order_id)
-    for k,v in links.items():
+    for k, v in links.items():
         data[k] = f"\n\n<a href='{v['url']}'>Открыть заказ</a>"
 
     replacements.update(data)
 
 
 async def create_delivery_info_text(replacements: dict, docs_sales_id: int):
-    query = docs_sales_delivery_info.select().where(docs_sales_delivery_info.c.docs_sales_id == docs_sales_id)
+    query = docs_sales_delivery_info.select().where(
+        docs_sales_delivery_info.c.docs_sales_id == docs_sales_id
+    )
     delivery_info = await database.fetch_one(query)
     data = {}
     if delivery_info is None:
@@ -157,21 +176,32 @@ async def create_delivery_info_text(replacements: dict, docs_sales_id: int):
     if delivery_info.note:
         data["delivery_note"] = delivery_info.note
     if delivery_info.delivery_date:
-        data["delivery_date"] = delivery_info.delivery_date.strftime('%d.%m.%Y %H:%M')
+        data["delivery_date"] = delivery_info.delivery_date.strftime("%d.%m.%Y %H:%M")
     if delivery_info.recipient:
         recipient_data = json.loads(delivery_info.recipient)
         if recipient_data:
-            data["delivery_recipient_name"] = recipient_data.get('name')
-            data["delivery_recipient_phone"] =recipient_data.get('phone')
+            data["delivery_recipient_name"] = recipient_data.get("name")
+            data["delivery_recipient_phone"] = recipient_data.get("phone")
 
     replacements.update(data)
 
 
-async def add_docs_sales_goods_info_to_replacements(replacements:dict, docs_sales_id:int):
+async def add_docs_sales_goods_info_to_replacements(
+    replacements: dict, docs_sales_id: int
+):
     data = {}
-    subquery = docs_sales_goods.select().where(docs_sales_goods.c.docs_sales_id == docs_sales_id).subquery("goods")
+    subquery = (
+        docs_sales_goods.select()
+        .where(docs_sales_goods.c.docs_sales_id == docs_sales_id)
+        .subquery("goods")
+    )
     query = (
-        select(nomenclature.c.name, subquery.c.price, subquery.c.quantity, units.c.convent_national_view)
+        select(
+            nomenclature.c.name,
+            subquery.c.price,
+            subquery.c.quantity,
+            units.c.convent_national_view,
+        )
         .outerjoin(nomenclature, subquery.c.nomenclature == nomenclature.c.id)
         .outerjoin(units, subquery.c.unit == units.c.id)
     )
@@ -194,10 +224,7 @@ async def add_docs_sales_goods_info_to_replacements(replacements:dict, docs_sale
 async def add_contragent_info_to_replacements(replacements: dict, contragent_id: int):
     data = {}
 
-    query = (
-        select(contragents)
-        .where(contragents.c.id == contragent_id)
-    )
+    query = select(contragents).where(contragents.c.id == contragent_id)
     contragent = await database.fetch_one(query)
     if contragent:
         data["contragent_name"] = contragent.name
@@ -207,7 +234,9 @@ async def add_contragent_info_to_replacements(replacements: dict, contragent_id:
     replacements.update(data)
 
 
-async def add_loyality_card_info_to_replacements(replacements: dict, contragent_id: int):
+async def add_loyality_card_info_to_replacements(
+    replacements: dict, contragent_id: int
+):
     data = {}
     query = (
         select(loyality_cards)

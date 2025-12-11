@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+
 class RabbitMqSettings(BaseModel):
     rabbitmq_host: str
     rabbitmq_user: str

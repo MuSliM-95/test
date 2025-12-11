@@ -1,9 +1,11 @@
-import aiohttp
 import asyncio
+
+import aiohttp
+
 
 async def main():
     async with aiohttp.ClientSession() as session1:
-        async with session1.get(f'https://google.com') as resp:
+        async with session1.get("https://google.com") as resp:
             # amo_resp_json = await resp.json()
             print(resp)
             event_body = {
@@ -21,5 +23,6 @@ async def main():
             }
             print(event_body)
         await session1.close()
+
 
 asyncio.run(main())

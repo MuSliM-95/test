@@ -1,6 +1,9 @@
 import json
-from typing import Dict, Any, Optional, Union, Callable
+from typing import Any, Callable, Dict
+
 from aiogram.types import CallbackQuery
+
+
 class CallbackData:
     def __init__(self, *args: str):
         self.fields = args
@@ -11,7 +14,9 @@ class CallbackData:
             if key not in kwargs:
                 raise ValueError(f"Missing required field: {key}")
             data[key] = kwargs[key]
-        return json.dumps(data, ensure_ascii=False)  # ensure_ascii=False for Unicode support
+        return json.dumps(
+            data, ensure_ascii=False
+        )  # ensure_ascii=False for Unicode support
 
     def parse(self, callback_data: str) -> Dict[str, Any]:
         try:
@@ -48,4 +53,4 @@ class CallbackData:
             except ValueError:
                 return False
 
-        return filter_function 
+        return filter_function

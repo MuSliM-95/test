@@ -1,5 +1,6 @@
+from typing import List, Optional
+
 from pydantic import BaseModel
-from typing import Optional, List, Union
 
 
 class AttributeCreate(BaseModel):
@@ -17,13 +18,16 @@ class AttributeValue(BaseModel):
     attribute_id: int
     value: str
 
+
 class AttributeValues(BaseModel):
     attribute_value_id: int
     value: str
 
+
 class ResponseAttributeValue(BaseModel):
     attribute_id: int
     attribute_value: List[AttributeValues]
+
 
 class AttributeValueCreate(BaseModel):
     nomenclature_id: int
@@ -56,11 +60,7 @@ class NomenclatureRelations(BaseModel):
     nomenclature_ids: List[int]
 
     class Config:
-        schema_extra = {
-            "example": {
-                "nomenclature_ids": []
-            }
-        }
+        schema_extra = {"example": {"nomenclature_ids": []}}
 
 
 class AddNomenclatureRequest(BaseModel):

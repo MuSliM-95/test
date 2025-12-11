@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Mapping, Any
-from database.db import Tariff, DocSalesStatus, BookingStatus, BookingEventStatus
+from typing import Any, List, Mapping, Optional
+
 from api.nomenclature.schemas import NomenclatureCreate
+from database.db import BookingEventStatus, BookingStatus, DocSalesStatus, Tariff
+from pydantic import BaseModel, Field
 
 
 class NomenclatureBookingCreate(BaseModel):
@@ -15,7 +16,6 @@ class NomenclatureBookingEditView(NomenclatureBookingCreate):
 
 class NomenclatureBookingEdit(NomenclatureBookingEditView):
     id: int
-
 
 
 class NomenclatureBookingPatch(NomenclatureCreate):
@@ -48,7 +48,6 @@ class BookingView(BaseModel):
 
 class BookingEdit(BookingView):
     id: Optional[int]
-
 
     class Config:
         orm_mode = True
@@ -123,7 +122,7 @@ class ResponseBookingEventCreateList(BaseModel):
 
 
 class BookingFiltersList(BaseModel):
-    title: Optional[str] = Field(default = None)
+    title: Optional[str] = Field(default=None)
     # good_category: Optional[int] = None
     contragent: Optional[int] = None
     start_booking: Optional[int] = None
@@ -131,13 +130,3 @@ class BookingFiltersList(BaseModel):
     status_doc_sales: Optional[DocSalesStatus] = None
     status_booking: Optional[BookingStatus] = None
     tags: Optional[str] = None
-
-
-
-
-
-
-
-
-
-

@@ -28,9 +28,9 @@ config.set_section_option(section, "POSTGRES_PORT", os.environ.get("POSTGRES_POR
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from database import init_db
-from api.tech_operations.models import *
 from api.tech_cards.models import *
+from api.tech_operations.models import *
+from database import init_db
 
 target_metadata = init_db.db.metadata
 target_metadata = init_db.db.Base.metadata
@@ -93,4 +93,3 @@ if offline_mode:
     run_migrations_offline()
 else:
     run_migrations_online()
-

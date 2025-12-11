@@ -1,10 +1,10 @@
-from typing import TypeVar, Generic, Optional
+from typing import Generic, Optional, TypeVar
 
 from aio_pika import IncomingMessage
-
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
 
-E = TypeVar('E', bound=BaseModelMessage)
+E = TypeVar("E", bound=BaseModelMessage)
+
 
 class IEventHandler(Generic[E]):
 

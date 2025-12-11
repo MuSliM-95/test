@@ -1,4 +1,6 @@
-from apps.booking.events.domain.models.ResponseGetBookingEventModel import ResponseGetBookingEventsModel
+from apps.booking.events.domain.models.ResponseGetBookingEventModel import (
+    ResponseGetBookingEventsModel,
+)
 
 
 class IEventsGetFunction:

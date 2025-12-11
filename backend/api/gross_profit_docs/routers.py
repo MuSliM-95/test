@@ -1,13 +1,10 @@
-from fastapi import APIRouter, HTTPException
-
 from database.db import database, gross_profit_docs, gross_profit_docs_operations
+from fastapi import APIRouter, HTTPException
+from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import func, select
+from ws_manager import manager
 
 from . import schemas
-from functions.helpers import datetime_to_timestamp
-from functions.helpers import get_user_by_token
-
-from ws_manager import manager
-from sqlalchemy import select, func
 
 router = APIRouter(tags=["gross_profit_docs"])
 
@@ -22,7 +19,7 @@ async def get_by_id(token: str, idx: int):
     instance_db = await database.fetch_one(query)
 
     if not instance_db:
-        raise HTTPException(status_code=404, detail=f"Не найдено.")
+        raise HTTPException(status_code=404, detail="Не найдено.")
 
     instance_db = datetime_to_timestamp(instance_db)
 
@@ -48,12 +45,10 @@ async def get_list(token: str, limit: int = 100, offset: int = 0):
     items_db = await database.fetch_all(query)
     items_db = [*map(datetime_to_timestamp, items_db)]
 
-    query = (
-        select(func.count(gross_profit_docs.c.id))
-        .where(gross_profit_docs.c.is_deleted.is_not(True))
+    query = select(func.count(gross_profit_docs.c.id)).where(
+        gross_profit_docs.c.is_deleted.is_not(True)
     )
     items_db_c = await database.fetch_one(query)
-
 
     return {"result": items_db, "count": items_db_c.count_1}
 

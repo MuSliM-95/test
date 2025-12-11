@@ -1,56 +1,22 @@
-import asyncio
 import os
-import re
-from datetime import datetime, timedelta, timezone
-from time import sleep
-from typing import List, Union, Any, Dict
-from itertools import zip_longest
-from asyncpg import create_pool
-
-import aiohttp
-from apscheduler.jobstores.base import JobLookupError
-from databases.backends.postgres import Record
-from dateutil.relativedelta import relativedelta
-from fastapi.exceptions import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from api.docs_sales.schemas import Item as goods_schema
-from sqlalchemy import desc, select, or_, and_, alias, func, asc
-from sqlalchemy.exc import DatabaseError
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from pytz import utc
-
-from api.contracts.schemas import PaymentType
-from api.docs_warehouses.func_warehouse import call_type_movement
-from api.payments.routers import read_payments_list, create_payment
-from api.payments.schemas import PaymentCreate
-from apps.tochka_bank.schemas import StatementData
-
-from const import PAID, DEMO, RepeatPeriod
-from database.db import engine, accounts_balances, database, tariffs, payments, loyality_transactions, loyality_cards, \
-    cboxes, engine_job_store, tochka_bank_accounts, tochka_bank_credentials, pboxes, users_cboxes_relation, \
-    entity_to_entity, tochka_bank_payments, contragents, docs_sales, docs_sales_settings, warehouse_balances, \
-    docs_sales_goods, docs_sales_tags, docs_warehouse, nomenclature, SQLALCHEMY_DATABASE_URL, async_session_maker, \
-    module_bank_operations, module_bank_accounts, module_bank_credentials, integrations_to_cashbox
-from database.enums import Repeatability
-from functions.account import make_account
-from functions.filter_schemas import PaymentFiltersQuery
-from functions.goods_distribution import process_distribution
-from functions.gross_profit import process_gross_profit_report
-from functions.helpers import init_statement, get_statement
-from functions.payments import clear_repeats, repeat_payment
-from functions.users import raschet
-from jobs.autoburn_job.job import autoburn
-from jobs.module_bank_job.job import module_bank_update_transaction
-from jobs.tochka_bank_job.job import tochka_update_transaction
-from jobs.check_account.job import check_account
-from jobs.segment_jobs.job import segment_update
-from jobs.avito_status_check_job.job import check_avito_accounts_status
-from jobs.avito_auto_sync_chats_job.job import sync_avito_chats_and_messages
 
 # Добавляем импорт для обновления времени смен
 from api.employee_shifts.websocket_service import send_shift_time_updates
+from apscheduler.jobstores.base import JobLookupError
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from database.db import (
+    engine_job_store,
+)
+from jobs.autoburn_job.job import autoburn
+from jobs.avito_auto_sync_chats_job.job import sync_avito_chats_and_messages
+from jobs.avito_status_check_job.job import check_avito_accounts_status
+from jobs.check_account.job import check_account
+from jobs.module_bank_job.job import module_bank_update_transaction
+from jobs.segment_jobs.job import segment_update
+from jobs.tochka_bank_job.job import tochka_update_transaction
+from pytz import utc
+from sqlalchemy.exc import DatabaseError
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc
@@ -86,20 +52,76 @@ def add_job_to_sched(func, **kwargs):
 
 accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 
-scheduler.add_job(func=tochka_update_transaction, trigger='interval', minutes=5, id="tochka_update_transaction", max_instances=1, replace_existing=True)
-scheduler.add_job(func=module_bank_update_transaction, trigger='interval', minutes=5, id="module_bank_update_transaction", max_instances=1, replace_existing=True)
-scheduler.add_job(func=autoburn, trigger="interval", seconds=5, id="autoburn", max_instances=1, replace_existing=True)
-scheduler.add_job(func=check_account, trigger="interval", seconds=accountant_interval, id="check_account", max_instances=1, replace_existing=True)
-scheduler.add_job(func=segment_update, trigger="interval", seconds=60, id="segment_update", max_instances=1, replace_existing=True)
+scheduler.add_job(
+    func=tochka_update_transaction,
+    trigger="interval",
+    minutes=5,
+    id="tochka_update_transaction",
+    max_instances=1,
+    replace_existing=True,
+)
+scheduler.add_job(
+    func=module_bank_update_transaction,
+    trigger="interval",
+    minutes=5,
+    id="module_bank_update_transaction",
+    max_instances=1,
+    replace_existing=True,
+)
+scheduler.add_job(
+    func=autoburn,
+    trigger="interval",
+    seconds=5,
+    id="autoburn",
+    max_instances=1,
+    replace_existing=True,
+)
+scheduler.add_job(
+    func=check_account,
+    trigger="interval",
+    seconds=accountant_interval,
+    id="check_account",
+    max_instances=1,
+    replace_existing=True,
+)
+scheduler.add_job(
+    func=segment_update,
+    trigger="interval",
+    seconds=60,
+    id="segment_update",
+    max_instances=1,
+    replace_existing=True,
+)
 
 # Добавляем джоб для обновления времени смен каждую минуту
-scheduler.add_job(func=send_shift_time_updates, trigger="interval", minutes=1, id="shift_time_updates", max_instances=1, replace_existing=True)
+scheduler.add_job(
+    func=send_shift_time_updates,
+    trigger="interval",
+    minutes=1,
+    id="shift_time_updates",
+    max_instances=1,
+    replace_existing=True,
+)
 
 # Добавляем джоб для проверки статусов Avito аккаунтов каждые 5 минут
-scheduler.add_job(func=check_avito_accounts_status, trigger="interval", minutes=5, id="avito_status_check", max_instances=1, replace_existing=True)
+scheduler.add_job(
+    func=check_avito_accounts_status,
+    trigger="interval",
+    minutes=5,
+    id="avito_status_check",
+    max_instances=1,
+    replace_existing=True,
+)
 
 # Добавляем джоб для автоматической выгрузки чатов и сообщений из Avito каждые 5 минут
-scheduler.add_job(func=sync_avito_chats_and_messages, trigger="interval", minutes=5, id="avito_auto_sync_chats", max_instances=1, replace_existing=True)
+scheduler.add_job(
+    func=sync_avito_chats_and_messages,
+    trigger="interval",
+    minutes=5,
+    id="avito_auto_sync_chats",
+    max_instances=1,
+    replace_existing=True,
+)
 
 # accountant_interval = int(os.getenv("ACCOUNT_INTERVAL", default=300))
 # amo_interval = int(os.getenv("AMO_CONTACTS_IMPORT_FREQUENCY_SECONDS", default=120))
@@ -518,9 +540,3 @@ scheduler.add_job(func=sync_avito_chats_and_messages, trigger="interval", minute
 #     await database.connect()
 #     await process_distribution()
 #     await process_gross_profit_report()
-
-
-
-
-
-

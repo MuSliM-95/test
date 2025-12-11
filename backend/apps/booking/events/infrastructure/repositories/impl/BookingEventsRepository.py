@@ -1,10 +1,20 @@
-from typing import List, Mapping, Any, Dict
+from typing import Any, List, Mapping
 
-from sqlalchemy import and_, select, update
+from apps.booking.events.domain.models.CreateBookingEventModel import (
+    CreateBookingEventModel,
+)
+from apps.booking.events.domain.models.PatchBookingEventsModel import (
+    PatchBookingEventsModel,
+)
+from database.db import (
+    booking,
+    booking_events,
+    booking_events_photo,
+    booking_nomenclature,
+    database,
+)
+from sqlalchemy import and_, select
 
-from apps.booking.events.domain.models.CreateBookingEventModel import CreateBookingEventModel
-from apps.booking.events.domain.models.PatchBookingEventsModel import PatchBookingEventsModel
-from database.db import booking_events, database, booking_events_photo, booking_nomenclature, booking
 from ..core.IBookingEventsRepository import IBookingEventsRepository
 
 
@@ -13,12 +23,16 @@ class BookingEventsRepository(IBookingEventsRepository):
     async def get_by_ids(self, event_ids: List[int], cashbox_id: int):
         query = (
             select(booking_events.c.id)
-            .join(booking_nomenclature, booking_events.c.booking_nomenclature_id == booking_nomenclature.c.id)
+            .join(
+                booking_nomenclature,
+                booking_events.c.booking_nomenclature_id == booking_nomenclature.c.id,
+            )
             .join(booking, booking_nomenclature.c.booking_id == booking.c.id)
-            .where(and_(
-                booking_events.c.id.in_(event_ids),
-                booking.c.cashbox == cashbox_id
-            ))
+            .where(
+                and_(
+                    booking_events.c.id.in_(event_ids), booking.c.cashbox == cashbox_id
+                )
+            )
         )
         event_ids = await database.fetch_all(query)
         return [element.id for element in event_ids]
@@ -35,7 +49,7 @@ class BookingEventsRepository(IBookingEventsRepository):
                 value=event.value,
                 latitude=event.latitude,
                 longitude=event.longitude,
-                is_deleted=False
+                is_deleted=False,
             )
             .returning(booking_events.c.id)
         )
@@ -43,53 +57,46 @@ class BookingEventsRepository(IBookingEventsRepository):
         return result.id
 
     async def add_more(self, events: List[Mapping[str, Any]]) -> List[int]:
-        query = (
-            booking_events.insert()
-            .values(events)
-            .returning(booking_events.c.id)
-        )
+        query = booking_events.insert().values(events).returning(booking_events.c.id)
         result = await database.fetch_all(query)
         return [element.id for element in result]
 
     async def add_photos(self, events_photos: List[Mapping[str, Any]]):
-        query = (
-            booking_events_photo.insert()
-            .values(events_photos)
-        )
+        query = booking_events_photo.insert().values(events_photos)
         await database.execute(query)
 
     async def delete_photos_by_event_ids(self, event_ids: List[int]):
-        query = (
-            booking_events_photo.delete()
-            .where(
-                booking_events_photo.c.booking_event_id.in_(event_ids)
-            )
+        query = booking_events_photo.delete().where(
+            booking_events_photo.c.booking_event_id.in_(event_ids)
         )
         await database.execute(query)
 
     async def delete_photos_by_ids(self, photo_ids: List[int]):
-        query = (
-            booking_events_photo.delete()
-            .where(booking_events_photo.c.id.in_(photo_ids))
+        query = booking_events_photo.delete().where(
+            booking_events_photo.c.id.in_(photo_ids)
         )
         await database.execute(query)
 
     async def delete_by_ids(self, event_ids: List[int], cashbox_id: int):
-        query = (
-            booking_events.delete()
-            .where(booking_events.c.id.in_(event_ids))
-        )
+        query = booking_events.delete().where(booking_events.c.id.in_(event_ids))
         await database.execute(query)
 
     async def patch(self, patch_event: PatchBookingEventsModel, cashbox_id: int):
         query = (
             booking.select()
-            .join(booking_nomenclature, booking.c.id == booking_nomenclature.c.booking_id)
-            .join(booking_events, booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id)
-            .where(and_(
-                booking.c.cashbox == cashbox_id,
-                booking_events.c.id == patch_event.id
-            ))
+            .join(
+                booking_nomenclature, booking.c.id == booking_nomenclature.c.booking_id
+            )
+            .join(
+                booking_events,
+                booking_nomenclature.c.id == booking_events.c.booking_nomenclature_id,
+            )
+            .where(
+                and_(
+                    booking.c.cashbox == cashbox_id,
+                    booking_events.c.id == patch_event.id,
+                )
+            )
         )
         booking_info = await database.fetch_one(query)
 

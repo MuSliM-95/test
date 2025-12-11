@@ -6,11 +6,11 @@ Create Date: 2025-12-01 00:00:00.000000
 
 """
 
-from alembic import op
-import sqlalchemy as sa
 import json
 import os
 
+import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "add_global_categories"

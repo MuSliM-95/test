@@ -1,9 +1,9 @@
-from fastapi.testclient import TestClient
-#from main import app
+# from main import app
 
-client = None #TestClient(app)
+client = None  # TestClient(app)
 
-#TODO: fix import
+# TODO: fix import
+
 
 def test_get_account():
     return True

@@ -1,7 +1,7 @@
-import aiohttp
 import asyncio
 from typing import Union
 
+import aiohttp
 from common.geocoders.core.base_instance import BaseGeocoder
 from common.geocoders.schemas import GeocoderSearchResponse
 from common.geocoders.utils import AsyncLRU
@@ -18,7 +18,9 @@ class Geoapify(BaseGeocoder):
                 raise ValueError("Geoapify API key is required")
             cls._instance = super().__new__(cls)
             cls._instance.api_key = api_key
-            cls._instance.autocomplete_url = "https://api.geoapify.com/v1/geocode/autocomplete"
+            cls._instance.autocomplete_url = (
+                "https://api.geoapify.com/v1/geocode/autocomplete"
+            )
             cls._instance.search_url = "https://api.geoapify.com/v1/geocode/search"
             cls._instance.autocomplete_cache = AsyncLRU()
             cls._instance.search_cache = AsyncLRU()
@@ -31,12 +33,19 @@ class Geoapify(BaseGeocoder):
             return self._session
 
     async def autocomplete(self, text: str, limit=5) -> Union[list[str], list]:
-        return await self.autocomplete_cache.get(key=text, func=self._autocomplete, text=text, limit=limit)
+        return await self.autocomplete_cache.get(
+            key=text, func=self._autocomplete, text=text, limit=limit
+        )
 
     async def _autocomplete(self, text, limit=5) -> Union[list[str], list]:
         try:
             session = await self._get_session()
-            params = {"text": text, "apiKey": self.api_key, "limit": limit, "lang": "ru"}
+            params = {
+                "text": text,
+                "apiKey": self.api_key,
+                "limit": limit,
+                "lang": "ru",
+            }
             async with session.get(self.autocomplete_url, params=params) as resp:
                 resp.raise_for_status()
                 data = await resp.json()
@@ -44,13 +53,24 @@ class Geoapify(BaseGeocoder):
         except aiohttp.ClientError as e:
             return []
 
-    async def validate_address(self, address: str, limit=1) -> Union[GeocoderSearchResponse, None]:
-        return await self.search_cache.get(address, func=self._validate_address, address=address, limit=limit)
+    async def validate_address(
+        self, address: str, limit=1
+    ) -> Union[GeocoderSearchResponse, None]:
+        return await self.search_cache.get(
+            address, func=self._validate_address, address=address, limit=limit
+        )
 
-    async def _validate_address(self, address: str, limit=1) -> Union[GeocoderSearchResponse, None]:
+    async def _validate_address(
+        self, address: str, limit=1
+    ) -> Union[GeocoderSearchResponse, None]:
         try:
             session = await self._get_session()
-            params = {"text": address, "apiKey": self.api_key, "limit": limit, "lang": "ru"}
+            params = {
+                "text": address,
+                "apiKey": self.api_key,
+                "limit": limit,
+                "lang": "ru",
+            }
             async with session.get(self.search_url, params=params) as resp:
                 resp.raise_for_status()
                 resp = await resp.json()

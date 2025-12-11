@@ -5,9 +5,8 @@ from functions.helpers import get_user_by_token
 class GetMeApiView:
 
     def __init__(
-            self,
-            oauth_service: IOauthService,
-
+        self,
+        oauth_service: IOauthService,
     ):
         self.__oauth_service = oauth_service
 

@@ -1,15 +1,19 @@
 from collections import defaultdict
 
-from sqlalchemy import select
-
 from database.db import (
-    docs_sales, docs_sales_tags, OrderStatus, docs_sales_delivery_info, users_cboxes_relation, segments,
-    database, SegmentObjectType, contragents, contragents_tags, tags, loyality_cards, loyality_transactions
+    SegmentObjectType,
+    contragents,
+    contragents_tags,
+    database,
+    docs_sales,
+    docs_sales_delivery_info,
+    docs_sales_tags,
+    segments,
+    users_cboxes_relation,
 )
-
-from segments.query import filters as filter_query
-
 from segments.logger import logger
+from segments.query import filters as filter_query
+from sqlalchemy import select
 
 FILTER_PRIORYTY_TAGS = {
     "self": 1,
@@ -24,7 +28,8 @@ FILTER_PRIORYTY_TAGS = {
 def chunk_list(lst, chunk_size=30000):
     """Разбивает список на части заданного размера"""
     for i in range(0, len(lst), chunk_size):
-        yield lst[i:i + chunk_size]
+        yield lst[i : i + chunk_size]
+
 
 class SegmentCriteriaQuery:
 
@@ -82,20 +87,19 @@ class SegmentCriteriaQuery:
             "delivery_info": {
                 "join_type": "outerjoin",
                 "table": docs_sales_delivery_info,
-                "condition": lambda
-                    base: docs_sales_delivery_info.c.docs_sales_id == base.c.id,
+                "condition": lambda base: docs_sales_delivery_info.c.docs_sales_id
+                == base.c.id,
             },
             "docs_sales_tags": {
                 "join_type": "join",
                 "table": docs_sales_tags,
-                "condition": lambda
-                    base: docs_sales_tags.c.docs_sales_id == base.c.id,
+                "condition": lambda base: docs_sales_tags.c.docs_sales_id == base.c.id,
             },
             "contragents_tags": {
                 "join_type": "join",
                 "table": contragents_tags,
-                "condition": lambda
-                    base: contragents_tags.c.contragent_id == base.c.contragent,
+                "condition": lambda base: contragents_tags.c.contragent_id
+                == base.c.contragent,
             },
             "loyality": None,
         }
@@ -114,8 +118,7 @@ class SegmentCriteriaQuery:
             if not cfg:
                 continue
             tag = cfg["filter_tag"]
-            priority = FILTER_PRIORYTY_TAGS.get(tag,
-                                                999)  # дефолт — низший приоритет
+            priority = FILTER_PRIORYTY_TAGS.get(tag, 999)  # дефолт — низший приоритет
             grouped[priority].add(key)
 
         # сортируем по приоритету и собираем как list[set]
@@ -137,21 +140,26 @@ class SegmentCriteriaQuery:
 
     async def calculate(self):
         """Собираем Id документов продаж"""
-        docs_sales_rows = await database.fetch_all(select(docs_sales.c.id).where(docs_sales.c.cashbox == self.cashbox_id, docs_sales.c.is_deleted == False))
+        docs_sales_rows = await database.fetch_all(
+            select(docs_sales.c.id).where(
+                docs_sales.c.cashbox == self.cashbox_id,
+                docs_sales.c.is_deleted == False,
+            )
+        )
         self.docs_sales_ids = [row.id for row in docs_sales_rows]
         groups = self.group_criteria_by_priority()
         for group in groups:
             if not self.docs_sales_ids:
                 return []
 
-            tag = self.criteria_config.get(list(group)[0]).get("filter_tag",
-                                                               "self")
+            tag = self.criteria_config.get(list(group)[0]).get("filter_tag", "self")
 
             # Обрабатываем ID частями
             all_filtered_rows = []
 
             for chunk_num, chunk_ids in enumerate(
-                    chunk_list(self.docs_sales_ids, 30000)):
+                chunk_list(self.docs_sales_ids, 30000)
+            ):
                 # Создаем подзапрос для текущей части
                 subq = (
                     select(docs_sales)
@@ -165,8 +173,7 @@ class SegmentCriteriaQuery:
                 # Применяем обработчики критериев
                 for criteria in group:
                     data = self.criteria_data.get(criteria)
-                    handler = self.criteria_config.get(criteria, {}).get(
-                        "handler")
+                    handler = self.criteria_config.get(criteria, {}).get("handler")
                     if handler:
                         query = handler(query, data, subq)
                 # Выполняем запрос для части
@@ -188,12 +195,11 @@ class SegmentCriteriaQuery:
 
         data = {
             SegmentObjectType.docs_sales.value: set(),
-            SegmentObjectType.contragents.value: set()
+            SegmentObjectType.contragents.value: set(),
         }
 
         # Обрабатываем ID частями
-        for chunk_num, chunk_ids in enumerate(
-                chunk_list(docs_sales_ids, 30000)):
+        for chunk_num, chunk_ids in enumerate(chunk_list(docs_sales_ids, 30000)):
 
             # Создаем запрос для текущей части
             query = select(docs_sales.c.id, docs_sales.c.contragent).where(
@@ -207,8 +213,7 @@ class SegmentCriteriaQuery:
                 for row in chunk_rows:
                     data[SegmentObjectType.docs_sales.value].add(row.id)
                     if row.contragent:
-                        data[SegmentObjectType.contragents.value].add(
-                            row.contragent)
+                        data[SegmentObjectType.contragents.value].add(row.contragent)
 
             except Exception as e:
                 logger.error(f"Error processing chunk {chunk_num + 1}: {e}")
@@ -219,7 +224,7 @@ class SegmentCriteriaQuery:
 
 async def get_token_by_segment_id(segment_id: int) -> str:
     """Получение токена по ID сегмента"""
-    query =(
+    query = (
         select(users_cboxes_relation.c.token)
         .join(segments, users_cboxes_relation.c.cashbox_id == segments.c.cashbox_id)
         .where(segments.c.id == segment_id)
@@ -227,9 +232,9 @@ async def get_token_by_segment_id(segment_id: int) -> str:
     row = await database.fetch_one(query)
     return row.token if row else None
 
+
 async def fetch_contragent_by_id(cid):
     row = await database.fetch_one(
-        select([contragents.c.name, contragents.c.phone])
-        .where(contragents.c.id == cid)
+        select([contragents.c.name, contragents.c.phone]).where(contragents.c.id == cid)
     )
     return row

@@ -1,24 +1,16 @@
-from sqlalchemy import select, func
-
 from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
-from database.db import categories, pictures, database
-from functions.helpers import get_user_by_token, datetime_to_timestamp
+from database.db import categories, database, pictures
+from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import func, select
 
 
 class GetAllCategoriesView:
 
-    def __init__(
-        self,
-        s3_factory: IS3ServiceFactory
-    ):
+    def __init__(self, s3_factory: IS3ServiceFactory):
         self.__s3_factory = s3_factory
 
     async def __call__(
-        self,
-        token: str,
-        limit: int = 100,
-        offset: int = 0,
-        include_photo: bool = False
+        self, token: str, limit: int = 100, offset: int = 0, include_photo: bool = False
     ):
         """Получение списка категорий, отсортированных по дате создания"""
         user = await get_user_by_token(token)
@@ -26,21 +18,19 @@ class GetAllCategoriesView:
         if include_photo:
             # Фото ищутся по entity/category, как для nomenclature
             query = (
-                select(
-                    categories,
-                    pictures.c.url.label("picture")
-                )
+                select(categories, pictures.c.url.label("picture"))
                 .select_from(categories)
                 .outerjoin(
                     pictures,
-                    (pictures.c.entity == 'categories') &
-                    (pictures.c.entity_id == categories.c.id) &
-                    (pictures.c.is_deleted.is_not(True))
+                    (pictures.c.entity == "categories")
+                    & (pictures.c.entity_id == categories.c.id)
+                    & (pictures.c.is_deleted.is_not(True)),
                 )
                 .where(
                     categories.c.cashbox == user.cashbox_id,
                     categories.c.is_deleted.is_not(True),
-                ).order_by(categories.c.created_at.desc())
+                )
+                .order_by(categories.c.created_at.desc())
                 .limit(limit)
                 .offset(offset)
             )
@@ -51,7 +41,8 @@ class GetAllCategoriesView:
                 .where(
                     categories.c.cashbox == user.cashbox_id,
                     categories.c.is_deleted.is_not(True),
-                ).order_by(categories.c.created_at.desc())
+                )
+                .order_by(categories.c.created_at.desc())
                 .limit(limit)
                 .offset(offset)
             )

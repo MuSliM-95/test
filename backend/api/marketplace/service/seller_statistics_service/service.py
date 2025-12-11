@@ -1,19 +1,19 @@
 import os
 
-from sqlalchemy import select, func, and_, desc, case, cast, Integer
-
 from database.db import (
-    database,
-    warehouses,
-    warehouse_balances,
-    nomenclature,
-    marketplace_rating_aggregates,
-    docs_sales,
     cboxes,
-    users
+    database,
+    docs_sales,
+    marketplace_rating_aggregates,
+    nomenclature,
+    users,
+    warehouse_balances,
+    warehouses,
 )
+from sqlalchemy import Integer, and_, cast, desc, func, select
 
 from .schemas import SellerStatisticsItem, SellerStatisticsResponse
+
 
 class MarketplaceSellerStatisticsService:
 
@@ -43,9 +43,7 @@ class MarketplaceSellerStatisticsService:
                 ).label("seller_photo"),
                 cboxes.c.created_at.label("created_at"),
             )
-            .select_from(
-                cboxes.outerjoin(users, users.c.id == cboxes.c.admin)
-            )
+            .select_from(cboxes.outerjoin(users, users.c.id == cboxes.c.admin))
             .where(cboxes.c.balance > 0)
         )
 
@@ -74,35 +72,31 @@ class MarketplaceSellerStatisticsService:
         )
         warehouses_rows = await database.fetch_all(warehouses_query)
         warehouses_map = {
-            row["seller_id"]: row["active_warehouses"] or 0
-            for row in warehouses_rows
+            row["seller_id"]: row["active_warehouses"] or 0 for row in warehouses_rows
         }
 
         # 3. Кол-во товаров на складах селлера
         wb = warehouse_balances
 
-        wb_ranked = (
-            select(
-                wb.c.organization_id.label("organization_id"),
-                wb.c.warehouse_id.label("warehouse_id"),
-                wb.c.nomenclature_id.label("nomenclature_id"),
-                wb.c.current_amount.label("current_amount"),
-                func.row_number()
-                .over(
-                    partition_by=[
-                        wb.c.organization_id,
-                        wb.c.warehouse_id,
-                        wb.c.nomenclature_id,
-                    ],
-                    order_by=[
-                        desc(wb.c.created_at),
-                        desc(wb.c.id),
-                    ],
-                )
-                .label("rn"),
+        wb_ranked = select(
+            wb.c.organization_id.label("organization_id"),
+            wb.c.warehouse_id.label("warehouse_id"),
+            wb.c.nomenclature_id.label("nomenclature_id"),
+            wb.c.current_amount.label("current_amount"),
+            func.row_number()
+            .over(
+                partition_by=[
+                    wb.c.organization_id,
+                    wb.c.warehouse_id,
+                    wb.c.nomenclature_id,
+                ],
+                order_by=[
+                    desc(wb.c.created_at),
+                    desc(wb.c.id),
+                ],
             )
-            .subquery("wb_ranked")
-        )
+            .label("rn"),
+        ).subquery("wb_ranked")
 
         wb_latest = (
             select(
@@ -119,9 +113,7 @@ class MarketplaceSellerStatisticsService:
             select(
                 nomenclature.c.cashbox.label("seller_id"),
                 func.coalesce(
-                    func.sum(
-                        func.greatest(wb_latest.c.current_amount, 0)
-                    ),
+                    func.sum(func.greatest(wb_latest.c.current_amount, 0)),
                     0,
                 ).label("total_products"),
             )
@@ -155,7 +147,9 @@ class MarketplaceSellerStatisticsService:
             select(
                 nomenclature.c.cashbox.label("seller_id"),
                 func.avg(marketplace_rating_aggregates.c.avg_rating).label("rating"),
-                func.sum(marketplace_rating_aggregates.c.reviews_count).label("reviews"),
+                func.sum(marketplace_rating_aggregates.c.reviews_count).label(
+                    "reviews"
+                ),
             )
             .select_from(
                 marketplace_rating_aggregates.join(

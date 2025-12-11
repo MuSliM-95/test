@@ -1,10 +1,12 @@
+from api.nomenclature_groups.infrastructure.functions.core.IDeleteNomenclatureGroupFunction import (
+    IDeleteNomenclatureGroupFunction,
+)
+from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import (
+    INomenclatureGroupsReader,
+)
 from fastapi import HTTPException
-from starlette import status
-
-from api.nomenclature_groups.infrastructure.functions.core.IDeleteNomenclatureGroupFunction import \
-    IDeleteNomenclatureGroupFunction
-from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
 from functions.helpers import get_user_by_token
+from starlette import status
 
 
 class DeleteNomenclatureGroupView:
@@ -26,9 +28,10 @@ class DeleteNomenclatureGroupView:
         )
 
         if not group_info:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Group not found"
+            )
 
         await self.__delete_nomenclature_group_function(
-            group_id=id,
-            cashbox_id=user.cashbox_id
+            group_id=id, cashbox_id=user.cashbox_id
         )

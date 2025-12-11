@@ -1,16 +1,22 @@
 import re
-from typing import Optional, Dict, List, Any
+from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel, constr, Field, validator
+from pydantic import BaseModel, Field, constr, validator
 
-XML_TAG_RE = re.compile(r'^[A-Za-z_:][A-Za-z0-9._:\-]*$')
+XML_TAG_RE = re.compile(r"^[A-Za-z_:][A-Za-z0-9._:\-]*$")
 
-XML_TAG = constr(regex=r'^[A-Za-z_:][A-Za-z0-9._:\-]*$')
+XML_TAG = constr(regex=r"^[A-Za-z_:][A-Za-z0-9._:\-]*$")
 
-ALLOWED_DB_FIELDS = ['name', 'description', 'category', 'price',
-                     'current_amount', 'images', 'params']
-
+ALLOWED_DB_FIELDS = [
+    "name",
+    "description",
+    "category",
+    "price",
+    "current_amount",
+    "images",
+    "params",
+]
 
 
 def is_valid_xml_tag(tag: str) -> bool:
@@ -22,8 +28,8 @@ def is_valid_xml_tag(tag: str) -> bool:
 
 
 class PricesFeed(BaseModel):
-    from_: float = Field(..., alias='from')
-    to_: float = Field(..., alias='to')
+    from_: float = Field(..., alias="from")
+    to_: float = Field(..., alias="to")
 
 
 class CriteriaFeed(BaseModel):
@@ -46,11 +52,13 @@ class FeedCreate(BaseModel):
     def validate_field_tags(cls, values: Dict[str, str]) -> Dict[str, str]:
         for xml_tag, value in values.items():
             if not is_valid_xml_tag(xml_tag):
-                raise HTTPException(status_code=400,
-                                    detail=f"Invalid xml tag: {xml_tag}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid xml tag: {xml_tag}"
+                )
             if value not in ALLOWED_DB_FIELDS:
-                raise HTTPException(status_code=400,
-                                    detail=f"Field not allowed: {value}")
+                raise HTTPException(
+                    status_code=400, detail=f"Field not allowed: {value}"
+                )
         return values
 
 
