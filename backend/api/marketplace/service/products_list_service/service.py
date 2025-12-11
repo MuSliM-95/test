@@ -1,25 +1,54 @@
 import json
 import os
 from datetime import datetime
-from typing import Optional, List
-from fastapi import HTTPException
-
-from sqlalchemy import and_, select, func, asc, desc, literal_column, cast
-from sqlalchemy.dialects.postgresql import JSONB
+from typing import List, Optional
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
-from api.marketplace.service.products_list_service.schemas import MarketplaceProduct, MarketplaceProductDetail, \
-    MarketplaceProductAttribute, MarketplaceProductList, AvailableWarehouse, MarketplaceProductsRequest, MarketplaceSort
-from database.db import nomenclature, prices, price_types, database, warehouses, warehouse_balances, units, categories, \
-    manufacturers, cboxes, marketplace_rating_aggregates, pictures, nomenclature_barcodes, users, docs_sales_goods, \
-    docs_sales, nomenclature_attributes, nomenclature_attributes_value, nomenclature_groups_value, nomenclature_groups
+from api.marketplace.service.products_list_service.schemas import (
+    AvailableWarehouse,
+    MarketplaceProduct,
+    MarketplaceProductAttribute,
+    MarketplaceProductDetail,
+    MarketplaceProductList,
+    MarketplaceProductsRequest,
+    MarketplaceSort,
+)
+from database.db import (
+    categories,
+    cboxes,
+    database,
+    docs_sales_goods,
+    manufacturers,
+    marketplace_rating_aggregates,
+    nomenclature,
+    nomenclature_attributes,
+    nomenclature_attributes_value,
+    nomenclature_barcodes,
+    nomenclature_groups,
+    nomenclature_groups_value,
+    pictures,
+    price_types,
+    prices,
+    units,
+    users,
+    warehouse_balances,
+    warehouses,
+)
+from fastapi import HTTPException
+from sqlalchemy import and_, asc, cast, desc, func, literal_column, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
         base_url = os.getenv("APP_URL")
-        return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+        photo_url = photo_path.lstrip("/")
+
+        if "seller" in photo_url:
+            return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+        else:
+            return f'https://{base_url}/{photo_path.lstrip("/")}'
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
 
@@ -27,23 +56,27 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         ranked_prices_subquery = (
             select(
-                prices.c.nomenclature.label('nomenclature_id'),
-                prices.c.id.label('price_id'),
+                prices.c.nomenclature.label("nomenclature_id"),
+                prices.c.id.label("price_id"),
                 prices.c.price,
                 prices.c.price_type,
                 prices.c.created_at,
                 prices.c.date_from,
                 prices.c.date_to,
                 prices.c.is_deleted,
-                func.row_number().over(
+                func.row_number()
+                .over(
                     partition_by=prices.c.nomenclature,
                     order_by=[
-                        desc(func.coalesce(prices.c.date_from <= current_timestamp, True)
-                             & func.coalesce(current_timestamp < prices.c.date_to, True)),
+                        desc(
+                            func.coalesce(prices.c.date_from <= current_timestamp, True)
+                            & func.coalesce(current_timestamp < prices.c.date_to, True)
+                        ),
                         desc(prices.c.created_at),
-                        desc(prices.c.id)
-                    ]
-                ).label('rn')
+                        desc(prices.c.id),
+                    ],
+                )
+                .label("rn"),
             )
             .where(prices.c.is_deleted.is_not(True))
             .subquery()
@@ -58,7 +91,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         total_sold_subquery = (
             select(
                 docs_sales_goods.c.nomenclature,
-                func.count(docs_sales_goods.c.id).label("total_sold")
+                func.count(docs_sales_goods.c.id).label("total_sold"),
             )
             .group_by(docs_sales_goods.c.nomenclature)
             .subquery()
@@ -77,60 +110,80 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 nomenclature.c.updated_at,
                 nomenclature.c.tags,
                 nomenclature.c.type,
-
                 nomenclature.c.seo_title,
                 nomenclature.c.seo_description,
                 nomenclature.c.seo_keywords,
-
                 units.c.convent_national_view.label("unit_name"),
                 categories.c.name.label("category_name"),
                 manufacturers.c.name.label("manufacturer_name"),
-
                 active_prices_subquery.c.price,
                 price_types.c.name.label("price_type"),
-
-                cboxes.c.name.label("seller_name"),
-                users.c.photo.label("seller_photo"),
-
+                func.coalesce(
+                    func.nullif(cboxes.c.seller_name, ""),
+                    cboxes.c.name,
+                ).label("seller_name"),
+                func.coalesce(
+                    func.nullif(cboxes.c.seller_photo, ""),
+                    users.c.photo,
+                ).label("seller_photo"),
+                cboxes.c.seller_description.label("seller_description"),
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
                 marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
-
                 func.array_agg(func.distinct(pictures.c.url))
-                .filter(pictures.c.url.is_not(None)).label("images"),
-
+                .filter(pictures.c.url.is_not(None))
+                .label("images"),
                 func.array_agg(func.distinct(nomenclature_barcodes.c.code))
-                .filter(nomenclature_barcodes.c.code.is_not(None)).label("barcodes"),
-
+                .filter(nomenclature_barcodes.c.code.is_not(None))
+                .label("barcodes"),
                 func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
             )
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
             .join(categories, categories.c.id == nomenclature.c.category, isouter=True)
-            .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, isouter=True)
-            .join(active_prices_subquery, active_prices_subquery.c.nomenclature_id == nomenclature.c.id)
+            .join(
+                manufacturers,
+                manufacturers.c.id == nomenclature.c.manufacturer,
+                isouter=True,
+            )
+            .join(
+                active_prices_subquery,
+                active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
+            )
             .join(price_types, price_types.c.id == active_prices_subquery.c.price_type)
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
             .join(users, users.c.id == cboxes.c.admin)
-            .join(pictures, and_(
-                pictures.c.entity == "nomenclature",
-                pictures.c.entity_id == nomenclature.c.id,
-                pictures.c.is_deleted.is_not(True)
-            ), isouter=True)
-            .join(nomenclature_barcodes, nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id, isouter=True)
+            .join(
+                pictures,
+                and_(
+                    pictures.c.entity == "nomenclature",
+                    pictures.c.entity_id == nomenclature.c.id,
+                    pictures.c.is_deleted.is_not(True),
+                ),
+                isouter=True,
+            )
+            .join(
+                nomenclature_barcodes,
+                nomenclature_barcodes.c.nomenclature_id == nomenclature.c.id,
+                isouter=True,
+            )
             .join(
                 marketplace_rating_aggregates,
                 and_(
                     marketplace_rating_aggregates.c.entity_id == nomenclature.c.id,
-                    marketplace_rating_aggregates.c.entity_type == "nomenclature"
+                    marketplace_rating_aggregates.c.entity_type == "nomenclature",
                 ),
-                isouter=True
+                isouter=True,
             )
-            .join(total_sold_subquery, total_sold_subquery.c.nomenclature == nomenclature.c.id, isouter=True)
+            .join(
+                total_sold_subquery,
+                total_sold_subquery.c.nomenclature == nomenclature.c.id,
+                isouter=True,
+            )
             .where(
                 and_(
                     nomenclature.c.id == product_id,
                     nomenclature.c.is_deleted.is_not(True),
-                    price_types.c.name == "chatting"
+                    price_types.c.name == "chatting",
                 )
             )
             .group_by(
@@ -140,11 +193,14 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 manufacturers.c.name,
                 active_prices_subquery.c.price,
                 price_types.c.name,
+                cboxes.c.seller_name,
                 cboxes.c.name,
+                cboxes.c.seller_photo,
                 users.c.photo,
+                cboxes.c.seller_description,
                 marketplace_rating_aggregates.c.avg_rating,
                 marketplace_rating_aggregates.c.reviews_count,
-                total_sold_subquery.c.total_sold
+                total_sold_subquery.c.total_sold,
             )
         )
 
@@ -163,18 +219,24 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 warehouses.c.latitude,
                 warehouses.c.longitude,
                 warehouse_balances.c.current_amount,
-                warehouse_balances.c.organization_id
+                warehouse_balances.c.organization_id,
             )
             .select_from(warehouse_balances)
-            .join(warehouses, and_(
-                warehouses.c.id == warehouse_balances.c.warehouse_id,
-                # warehouses.c.status.is_(True),
-                warehouses.c.is_deleted.is_not(True)
-            ))
-            .where(and_(
-                warehouse_balances.c.nomenclature_id == product_id,
-                warehouse_balances.c.current_amount > 0  # Только склады с остатками
-            ))
+            .join(
+                warehouses,
+                and_(
+                    warehouses.c.id == warehouse_balances.c.warehouse_id,
+                    # warehouses.c.status.is_(True),
+                    warehouses.c.is_deleted.is_not(True),
+                ),
+            )
+            .where(
+                and_(
+                    warehouse_balances.c.nomenclature_id == product_id,
+                    warehouse_balances.c.current_amount
+                    > 0,  # Только склады с остатками
+                )
+            )
         )
 
         warehouses_rows = await database.fetch_all(warehouses_query)
@@ -193,8 +255,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     latitude=wh_dict["latitude"],
                     longitude=wh_dict["longitude"],
                     current_amount=wh_dict["current_amount"],
-                    distance_to_client=self._count_distance_to_client(None, None, wh_dict["latitude"],
-                                                                      wh_dict["longitude"])
+                    distance_to_client=self._count_distance_to_client(
+                        None, None, wh_dict["latitude"], wh_dict["longitude"]
+                    ),
                 )
             )
 
@@ -206,12 +269,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         group_query = (
             select(
                 nomenclature_groups_value.c.group_id,
-                nomenclature_groups.c.name.label("group_name")
+                nomenclature_groups.c.name.label("group_name"),
             )
             .select_from(nomenclature_groups_value)
             .join(
                 nomenclature_groups,
-                nomenclature_groups.c.id == nomenclature_groups_value.c.group_id
+                nomenclature_groups.c.id == nomenclature_groups_value.c.group_id,
             )
             .where(nomenclature_groups_value.c.nomenclature_id == product_id)
         )
@@ -229,12 +292,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 select(
                     nomenclature.c.id,
                     nomenclature.c.name,
-                    nomenclature_groups_value.c.is_main
+                    nomenclature_groups_value.c.is_main,
                 )
                 .select_from(nomenclature_groups_value)
                 .join(
                     nomenclature,
-                    nomenclature.c.id == nomenclature_groups_value.c.nomenclature_id
+                    nomenclature.c.id == nomenclature_groups_value.c.nomenclature_id,
                 )
                 .where(nomenclature_groups_value.c.group_id == group_id)
             )
@@ -242,18 +305,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             variations = await database.fetch_all(variations_query)
 
             items = [
-                {
-                    "id": v.id,
-                    "name": v.name,
-                    "is_main": v.is_main
-                }
-                for v in variations
+                {"id": v.id, "name": v.name, "is_main": v.is_main} for v in variations
             ]
 
-            nomenclatures_result.append({
-                "group_name": group_name,
-                "items": items
-            })
+            nomenclatures_result.append({"group_name": group_name, "items": items})
 
         product["nomenclatures"] = nomenclatures_result or None
 
@@ -265,7 +320,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         # Селлер
         if product["seller_photo"]:
-            product["seller_photo"] = self.__transform_photo_route(product["seller_photo"])
+            product["seller_photo"] = self.__transform_photo_route(
+                product["seller_photo"]
+            )
 
         # Штрихкоды
         product["barcodes"] = [b for b in (product["barcodes"] or []) if b]
@@ -280,36 +337,35 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         # distance — расстояние до ближайшего склада
         if product["available_warehouses"]:
-            product["distance"] = (
-                min(
-                    product["available_warehouses"],
-                    key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0)
-                ).distance_to_client
-            )
+            product["distance"] = min(
+                product["available_warehouses"],
+                key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0),
+            ).distance_to_client
         else:
             product["distance"] = None
 
         # Добавляем атрибуты
         attrs = await database.fetch_all(
             select(
-                nomenclature_attributes.c.name,
-                nomenclature_attributes_value.c.value
+                nomenclature_attributes.c.name, nomenclature_attributes_value.c.value
             )
             .select_from(nomenclature_attributes_value)
-            .join(nomenclature_attributes, nomenclature_attributes.c.id == nomenclature_attributes_value.c.attribute_id)
+            .join(
+                nomenclature_attributes,
+                nomenclature_attributes.c.id
+                == nomenclature_attributes_value.c.attribute_id,
+            )
             .where(nomenclature_attributes_value.c.nomenclature_id == product_id)
         )
         product_attributes = [
-            MarketplaceProductAttribute(name=a.name, value=a.value)
-            for a in attrs
+            MarketplaceProductAttribute(name=a.name, value=a.value) for a in attrs
         ]
 
         return MarketplaceProductDetail(**product, attributes=product_attributes)
 
-
     async def get_products(
-            self,
-            request: MarketplaceProductsRequest,
+        self,
+        request: MarketplaceProductsRequest,
     ) -> MarketplaceProductList:
         # --- НАЧАЛО: Подзапрос для выбора актуальной цены ---
         # Получаем текущий timestamp (в PostgreSQL это NOW())
@@ -319,8 +375,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # Используем ROW_NUMBER для ранжирования цен по приоритету
         ranked_prices_subquery = (
             select(
-                prices.c.nomenclature.label('nomenclature_id'),
-                prices.c.id.label('price_id'),
+                prices.c.nomenclature.label("nomenclature_id"),
+                prices.c.id.label("price_id"),
                 prices.c.price,
                 prices.c.price_type,
                 prices.c.created_at,
@@ -328,7 +384,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 prices.c.date_to,
                 prices.c.is_deleted,
                 # Ранжируем: 1. по времени (текущее в интервале), 2. по дате создания (новые первые), 3. по id (стабильность)
-                func.row_number().over(
+                func.row_number()
+                .over(
                     partition_by=prices.c.nomenclature,
                     order_by=[
                         # Если дата не указана (None), считаем, что она подходит (предполагаем, что None означает "без ограничений")
@@ -344,13 +401,17 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                         # desc((prices.c.date_from <= current_timestamp) & (current_timestamp < prices.c.date_to)),
                         # Сортировка: сначала те, у кого даты указаны и они подходят, потом без дат (или частично), потом по created_at DESC
                         # Чтобы сначала шли подходящие по времени:
-                        desc(func.coalesce(prices.c.date_from <= current_timestamp, True) & func.coalesce(current_timestamp < prices.c.date_to, True)),
+                        desc(
+                            func.coalesce(prices.c.date_from <= current_timestamp, True)
+                            & func.coalesce(current_timestamp < prices.c.date_to, True)
+                        ),
                         # Потом по дате создания (новые первые)
                         desc(prices.c.created_at),
                         # Потом по ID (стабильность)
-                        desc(prices.c.id)
-                    ]
-                ).label('rn')
+                        desc(prices.c.id),
+                    ],
+                )
+                .label("rn"),
             )
             .where(
                 # Учитываем только неудаленные цены
@@ -362,7 +423,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         total_sold_subquery = (
             select(
                 docs_sales_goods.c.nomenclature,
-                func.count(docs_sales_goods.c.id).label("total_sold")
+                func.count(docs_sales_goods.c.id).label("total_sold"),
             )
             .select_from(docs_sales_goods)
             .group_by(docs_sales_goods.c.nomenclature)
@@ -371,33 +432,36 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         # Фильтруем подзапрос, чтобы оставить только первую (самую приоритетную) цену для каждой номенклатуры
         # Это будет "актуальная" цена
-        active_prices_subquery = select(ranked_prices_subquery).where(ranked_prices_subquery.c.rn == 1).subquery()
+        active_prices_subquery = (
+            select(ranked_prices_subquery)
+            .where(ranked_prices_subquery.c.rn == 1)
+            .subquery()
+        )
 
         # --- КОНЕЦ: Подзапрос для выбора актуальной цены ---
 
         # --- Балансы по складам ---
 
         # 1) Берём последнюю запись по каждой паре (организация, склад, номенклатура)
-        wb_ranked = (
-            select(
-                warehouse_balances.c.organization_id.label("organization_id"),
-                warehouse_balances.c.warehouse_id.label("warehouse_id"),
-                warehouse_balances.c.nomenclature_id.label("nomenclature_id"),
-                warehouse_balances.c.current_amount.label("current_amount"),
-                func.row_number().over(
-                    partition_by=[
-                        warehouse_balances.c.organization_id,
-                        warehouse_balances.c.warehouse_id,
-                        warehouse_balances.c.nomenclature_id,
-                    ],
-                    order_by=[
-                        desc(warehouse_balances.c.created_at),
-                        desc(warehouse_balances.c.id),
-                    ],
-                ).label("rn"),
+        wb_ranked = select(
+            warehouse_balances.c.organization_id.label("organization_id"),
+            warehouse_balances.c.warehouse_id.label("warehouse_id"),
+            warehouse_balances.c.nomenclature_id.label("nomenclature_id"),
+            warehouse_balances.c.current_amount.label("current_amount"),
+            func.row_number()
+            .over(
+                partition_by=[
+                    warehouse_balances.c.organization_id,
+                    warehouse_balances.c.warehouse_id,
+                    warehouse_balances.c.nomenclature_id,
+                ],
+                order_by=[
+                    desc(warehouse_balances.c.created_at),
+                    desc(warehouse_balances.c.id),
+                ],
             )
-            .subquery()
-        )
+            .label("rn"),
+        ).subquery()
 
         wb_latest = (
             select(
@@ -414,9 +478,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         stock_subquery = (
             select(
                 wb_latest.c.nomenclature_id.label("nomenclature_id"),
-                func.sum(
-                    func.greatest(wb_latest.c.current_amount, 0)
-                ).label("current_amount"),
+                func.sum(func.greatest(wb_latest.c.current_amount, 0)).label(
+                    "current_amount"
+                ),
             )
             .select_from(wb_latest)
             .group_by(wb_latest.c.nomenclature_id)
@@ -427,13 +491,20 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         wh_bal = warehouses.alias("wh_bal")
 
         json_obj = func.jsonb_build_object(
-            literal_column("'warehouse_id'"), wh_bal.c.id,
-            literal_column("'organization_id'"), wb_latest.c.organization_id,
-            literal_column("'warehouse_name'"), wh_bal.c.name,
-            literal_column("'warehouse_address'"), wh_bal.c.address,
-            literal_column("'latitude'"), wh_bal.c.latitude,
-            literal_column("'longitude'"), wh_bal.c.longitude,
-            literal_column("'current_amount'"), wb_latest.c.current_amount,
+            literal_column("'warehouse_id'"),
+            wh_bal.c.id,
+            literal_column("'organization_id'"),
+            wb_latest.c.organization_id,
+            literal_column("'warehouse_name'"),
+            wh_bal.c.name,
+            literal_column("'warehouse_address'"),
+            wh_bal.c.address,
+            literal_column("'latitude'"),
+            wh_bal.c.latitude,
+            literal_column("'longitude'"),
+            wh_bal.c.longitude,
+            literal_column("'current_amount'"),
+            wb_latest.c.current_amount,
         )
 
         available_warehouses_agg = (
@@ -465,25 +536,38 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 manufacturers.c.name.label("manufacturer_name"),
                 active_prices_subquery.c.price,
                 price_types.c.name.label("price_type"),
-                cboxes.c.name.label("seller_name"),
-                users.c.photo.label("seller_photo"),
+                func.coalesce(
+                    func.nullif(cboxes.c.seller_name, ""),
+                    cboxes.c.name,
+                ).label("seller_name"),
+                func.coalesce(
+                    func.nullif(cboxes.c.seller_photo, ""),
+                    users.c.photo,
+                ).label("seller_photo"),
+                cboxes.c.seller_description.label("seller_description"),
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
                 marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
-                func.array_agg(
-                    func.distinct(pictures.c.url)
-                ).filter(pictures.c.url.is_not(None)).label("images"),
-                func.array_agg(
-                    func.distinct(nomenclature_barcodes.c.code)
-                ).filter(nomenclature_barcodes.c.code.is_not(None)).label("barcodes"),
+                func.array_agg(func.distinct(pictures.c.url))
+                .filter(pictures.c.url.is_not(None))
+                .label("images"),
+                func.array_agg(func.distinct(nomenclature_barcodes.c.code))
+                .filter(nomenclature_barcodes.c.code.is_not(None))
+                .label("barcodes"),
                 # суммарный остаток по всем складам (минимум 0)
-                func.coalesce(stock_subquery.c.current_amount, 0).label("current_amount"),
+                func.coalesce(stock_subquery.c.current_amount, 0).label(
+                    "current_amount"
+                ),
                 func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
                 available_warehouses_agg,
             )
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
             .join(categories, categories.c.id == nomenclature.c.category, isouter=True)
-            .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, isouter=True)
+            .join(
+                manufacturers,
+                manufacturers.c.id == nomenclature.c.manufacturer,
+                isouter=True,
+            )
             .join(
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
@@ -561,9 +645,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             # фильтруем по суммарному остатку
             conditions.append(stock_subquery.c.current_amount > 0)
         if request.rating_from:
-            conditions.append(marketplace_rating_aggregates.c.avg_rating >= request.rating_from)
+            conditions.append(
+                marketplace_rating_aggregates.c.avg_rating >= request.rating_from
+            )
         if request.rating_to:
-            conditions.append(marketplace_rating_aggregates.c.avg_rating <= request.rating_to)
+            conditions.append(
+                marketplace_rating_aggregates.c.avg_rating <= request.rating_to
+            )
 
         query = query.where(and_(*conditions))
 
@@ -575,8 +663,11 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             manufacturers.c.name,
             active_prices_subquery.c.price,
             price_types.c.name,
+            cboxes.c.seller_name,
             cboxes.c.name,
+            cboxes.c.seller_photo,
             users.c.photo,
+            cboxes.c.seller_description,
             marketplace_rating_aggregates.c.avg_rating,
             marketplace_rating_aggregates.c.reviews_count,
             stock_subquery.c.current_amount,
@@ -614,7 +705,11 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             select(func.count(func.distinct(nomenclature.c.id)))
             .select_from(nomenclature)
             .join(categories, categories.c.id == nomenclature.c.category, isouter=True)
-            .join(manufacturers, manufacturers.c.id == nomenclature.c.manufacturer, isouter=True)
+            .join(
+                manufacturers,
+                manufacturers.c.id == nomenclature.c.manufacturer,
+                isouter=True,
+            )
             .join(
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
@@ -671,8 +766,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     w
                     for w in wh_raw
                     if w is not None
-                       and w.get("warehouse_id") is not None
-                       and (w.get("current_amount") or 0) > 0
+                    and w.get("warehouse_id") is not None
+                    and (w.get("current_amount") or 0) > 0
                 ]
                 if wh_valid:
                     product_dict["available_warehouses"] = sorted(
@@ -688,7 +783,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                             )
                             for w in wh_valid
                         ],
-                        key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0),
+                        key=lambda x: (
+                            x.distance_to_client is None,
+                            x.distance_to_client or 0,
+                        ),
                     )
                 else:
                     product_dict["available_warehouses"] = None
@@ -728,12 +826,11 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             size=request.size,
         )
 
-
     async def _fetch_available_warehouses(
-            self,
-            nomenclature_id: int,
-            client_lat: Optional[float] = None,
-            client_lon: Optional[float] = None
+        self,
+        nomenclature_id: int,
+        client_lat: Optional[float] = None,
+        client_lon: Optional[float] = None,
     ) -> List[AvailableWarehouse]:
         """
         Получает список публичных, активных и неудалённых складов,
@@ -743,12 +840,18 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         # Формируем JSON-объект для каждого склада
         json_obj = func.jsonb_build_object(
-            literal_column("'warehouse_id'"), warehouses.c.id,
-            literal_column("'organization_id'"), warehouse_balances.c.organization_id,
-            literal_column("'warehouse_name'"), warehouses.c.name,
-            literal_column("'warehouse_address'"), warehouses.c.address,
-            literal_column("'latitude'"), warehouses.c.latitude,
-            literal_column("'longitude'"), warehouses.c.longitude
+            literal_column("'warehouse_id'"),
+            warehouses.c.id,
+            literal_column("'organization_id'"),
+            warehouse_balances.c.organization_id,
+            literal_column("'warehouse_name'"),
+            warehouses.c.name,
+            literal_column("'warehouse_address'"),
+            warehouses.c.address,
+            literal_column("'latitude'"),
+            warehouses.c.latitude,
+            literal_column("'longitude'"),
+            warehouses.c.longitude,
         )
 
         # Запрос: склады с остатками по указанной номенклатуре
@@ -761,8 +864,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     warehouses.c.id == warehouse_balances.c.warehouse_id,
                     warehouses.c.is_public.is_(True),
                     warehouses.c.status.is_(True),
-                    warehouses.c.is_deleted.is_not(True)
-                )
+                    warehouses.c.is_deleted.is_not(True),
+                ),
             )
             .where(
                 and_(
@@ -789,11 +892,17 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         result = []
         for w in raw_warehouses:
-            result.append(AvailableWarehouse(**w, distance_to_client=self._count_distance_to_client(client_lat,
-                                                                                                    client_lon,
-                                                                                                    w['latitude'],
-                                                                                                    w['longitude'])))
+            result.append(
+                AvailableWarehouse(
+                    **w,
+                    distance_to_client=self._count_distance_to_client(
+                        client_lat, client_lon, w["latitude"], w["longitude"]
+                    ),
+                )
+            )
 
         # Сортируем: сначала склады с известным расстоянием (по возрастанию), потом — без координат
-        result.sort(key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0))
+        result.sort(
+            key=lambda x: (x.distance_to_client is None, x.distance_to_client or 0)
+        )
         return result

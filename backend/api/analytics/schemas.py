@@ -12,5 +12,6 @@ class PaymentAnalytics(BaseModel):
     sum: int
     percentage: float
 
+
 class PaymentsAnalytics(BaseModel):
     __root__: Optional[list[PaymentAnalytics]]

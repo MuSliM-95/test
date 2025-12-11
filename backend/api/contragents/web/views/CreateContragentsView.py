@@ -1,20 +1,23 @@
 from datetime import datetime
-from typing import Union, List
+from typing import List, Union
 
+import api.contragents.schemas as ca_schemas
 import phonenumbers
+from database.db import contragents, database, users_cboxes_relation
 from fastapi import HTTPException
 from fastapi.responses import Response
 from phonenumbers import geocoder
 from sqlalchemy import select
-
-import api.contragents.schemas as ca_schemas
-from database.db import database, users_cboxes_relation, contragents
 from ws_manager import manager
 
 
 class CreateContragentsView:
 
-    async def __call__(self, token: str, body: Union[ca_schemas.ContragentCreate, List[ca_schemas.ContragentCreate]]):
+    async def __call__(
+        self,
+        token: str,
+        body: Union[ca_schemas.ContragentCreate, List[ca_schemas.ContragentCreate]],
+    ):
         user = await database.fetch_one(
             users_cboxes_relation.select(users_cboxes_relation.c.token == token)
         )
@@ -29,40 +32,55 @@ class CreateContragentsView:
         for item in items:
             data = item.dict(exclude_unset=True)
 
-            phone_number = data['phone']
+            phone_number = data["phone"]
             phone_code = None
             is_phone_formatted = False
 
             if phone_number:
                 try:
-                    phone_number_with_plus = f"+{phone_number}" if not phone_number.startswith("+") else phone_number
-                    number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
-                    phone_number = phonenumbers.format_number(number_phone_parsed,
-                                                              phonenumbers.PhoneNumberFormat.E164)
-                    phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                    phone_number_with_plus = (
+                        f"+{phone_number}"
+                        if not phone_number.startswith("+")
+                        else phone_number
+                    )
+                    number_phone_parsed = phonenumbers.parse(
+                        phone_number_with_plus, "RU"
+                    )
+                    phone_number = phonenumbers.format_number(
+                        number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
+                    )
+                    phone_code = geocoder.description_for_number(
+                        number_phone_parsed, "en"
+                    )
                     is_phone_formatted = True
                     if not phone_code:
-                        phone_number = data['phone']
+                        phone_number = data["phone"]
                         is_phone_formatted = False
                 except:
                     try:
                         number_phone_parsed = phonenumbers.parse(phone_number, "RU")
-                        phone_number = phonenumbers.format_number(number_phone_parsed,
-                                                                  phonenumbers.PhoneNumberFormat.E164)
-                        phone_code = geocoder.description_for_number(number_phone_parsed, "en")
+                        phone_number = phonenumbers.format_number(
+                            number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
+                        )
+                        phone_code = geocoder.description_for_number(
+                            number_phone_parsed, "en"
+                        )
                         is_phone_formatted = True
                         if not phone_code:
-                            phone_number = data['phone']
+                            phone_number = data["phone"]
                             is_phone_formatted = False
                     except:
-                        phone_number = data['phone']
+                        phone_number = data["phone"]
                         is_phone_formatted = False
 
             if phone_number in phones_seen:
-                raise HTTPException(status_code=400, detail={
-                    "message": "Phone number already in use",
-                    "phones": [phone_number]
-                })
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "message": "Phone number already in use",
+                        "phones": [phone_number],
+                    },
+                )
 
             phones_seen.add(phone_number)
 
@@ -101,21 +119,24 @@ class CreateContragentsView:
             )
             existing_phones = {r.phone for r in rows}
 
-        duplicated_contragent_phones = [p for p in insert_values if p["phone"] in existing_phones]
+        duplicated_contragent_phones = [
+            p for p in insert_values if p["phone"] in existing_phones
+        ]
 
         if duplicated_contragent_phones:
-            raise HTTPException(status_code=400, detail={
-                "message": "Phone number already in use",
-                "phones": [p["phone"] for p in duplicated_contragent_phones]
-            })
-        query = (
-            contragents.insert()
-            .values(insert_values)
-            .returning(contragents.c.id)
-        )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Phone number already in use",
+                    "phones": [p["phone"] for p in duplicated_contragent_phones],
+                },
+            )
+        query = contragents.insert().values(insert_values).returning(contragents.c.id)
         ids = await database.fetch_all(query=query)
 
-        rows = await database.fetch_all(select(contragents).where(contragents.c.id.in_([k.id for k in ids])))
+        rows = await database.fetch_all(
+            select(contragents).where(contragents.c.id.in_([k.id for k in ids]))
+        )
         for r in rows:
             await manager.send_message(
                 token, {"action": "create", "target": "contragents", "result": dict(r)}

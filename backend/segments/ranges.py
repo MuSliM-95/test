@@ -20,7 +20,7 @@ def apply_range(col, rng: dict, container: list):
         container.append(col.is_(None) if rng["is_none"] else col.is_not(None))
 
 
-def apply_date_range(col, rng:dict, container: list):
+def apply_date_range(col, rng: dict, container: list):
     now = datetime.now(timezone.utc)
     relative_keys = {"gte_seconds_ago", "lte_seconds_ago"}
     absolute_keys = {"gte", "lte"}

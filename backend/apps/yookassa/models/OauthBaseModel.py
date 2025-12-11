@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional,Literal,List
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -48,7 +48,7 @@ class SettingsFiscalization(BaseModel):
         "mertrade",
         "modul_kassa",
         "rocket",
-        "shtrih_m"
+        "shtrih_m",
     ]
     enabled: bool
 
@@ -60,5 +60,3 @@ class OauthSettings(BaseModel):
     fiscalization_enabled: Optional[bool] = None
     payment_methods: List[str] = None
     status: Literal["enabled", "disabled"]
-
-

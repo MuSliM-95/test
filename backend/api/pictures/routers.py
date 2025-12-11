@@ -1,23 +1,17 @@
-import aiofiles
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from fastapi.responses import Response
-from uuid import uuid4
+import io
 from os import environ
+from uuid import uuid4
 
 import aioboto3
-import io
-
+import api.pictures.schemas as schemas
 from database import db
 from database.db import database, pictures
-
-import api.pictures.schemas as schemas
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
 from functions.filter_schemas import PicturesFiltersQuery
-
-from functions.helpers import datetime_to_timestamp, get_entity_by_id
-from functions.helpers import get_user_by_token
-
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_user_by_token
+from sqlalchemy import func, select
 from ws_manager import manager
-from sqlalchemy import select, func
 
 router = APIRouter(tags=["pictures"])
 
@@ -50,10 +44,9 @@ async def get_picture_by_id(filename: str):
     async with s3_session.client(**s3_data) as s3:
         try:
 
-
             file_key = f"photos/{filename}"
             s3_ob = await s3.get_object(Bucket=bucket_name, Key=file_key)
-            body = await s3_ob['Body'].read()
+            body = await s3_ob["Body"].read()
 
             return Response(content=body, media_type="image/jpg")
 
@@ -69,18 +62,11 @@ async def get_picture_link_by_id(filename: str):
         try:
             file_key = f"photos/{filename}"
             url = await s3.generate_presigned_url(
-                'get_object',
-                Params={
-                    'Bucket': bucket_name,
-                    'Key': file_key
-                },
-                ExpiresIn=None
+                "get_object",
+                Params={"Bucket": bucket_name, "Key": file_key},
+                ExpiresIn=None,
             )
-            return {
-                "data": {
-                    "url": url
-                }
-            }
+            return {"data": {"url": url}}
         except Exception as err:
             print(err)
             raise HTTPException(status_code=404, detail="Такой картинки не существует")
@@ -116,13 +102,10 @@ async def get_pictures(
     pictures_db = await database.fetch_all(query)
     pictures_db = [*map(datetime_to_timestamp, pictures_db)]
 
-    query = (
-        select(func.count(pictures.c.id))
-        .where(
-            pictures.c.owner == user.id,
-            pictures.c.is_deleted.is_not(True),
-            *filters_list,
-        )
+    query = select(func.count(pictures.c.id)).where(
+        pictures.c.owner == user.id,
+        pictures.c.is_deleted.is_not(True),
+        *filters_list,
     )
 
     pictures_db_c = await database.fetch_one(query)
@@ -170,12 +153,12 @@ async def new_picture(
         "url": file_link,
         "size": file_size,
         "cashbox": user.cashbox_id,
-        "is_deleted": False
+        "is_deleted": False,
     }
 
     query = pictures.insert().values(picture_values)
     picture_id = await database.execute(query)
-    
+
     query = pictures.select().where(
         pictures.c.id == picture_id,
         pictures.c.owner == user.id,

@@ -1,7 +1,7 @@
 from enum import Enum
+from typing import List, Optional
 
 from pydantic import BaseModel
-from typing import Optional,  List
 
 
 class LoyalityTranstactionFilters(BaseModel):
@@ -18,6 +18,7 @@ class LoyalityTranstactionFilters(BaseModel):
     status: Optional[bool]
 
     # autoburned: Optional[bool]
+
 
 class LoyalityTranstactionType(str, Enum):
     accrual = "accrual"

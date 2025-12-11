@@ -1,8 +1,9 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from typing import List, Optional
+
 from api.pictures.schemas import Picture
 from api.price_types.schemas import PriceType
 from api.warehouses.schemas import Warehouse
+from pydantic import BaseModel
 
 
 class PriceInList(BaseModel):
@@ -57,4 +58,3 @@ class WebappItem(BaseModel):
 class WebappResponse(BaseModel):
     result: Optional[List[WebappItem]]
     count: int
-

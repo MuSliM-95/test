@@ -1,7 +1,8 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from typing import List, Optional
 
-from datetime import date
+from common.schemas import RuPhone
+from pydantic import BaseModel
+
 
 class LoyalityCardFilters(BaseModel):
     card_number: Optional[int]
@@ -40,13 +41,9 @@ class LoyalityCardFilters(BaseModel):
 
 
 class LoyalityCardCreate(BaseModel):
-    # id: int
     card_number: Optional[str]
     tags: Optional[str]
-    # balance: Optional[float]
-    # income: Optional[int]
-    # outcome: Optional[int]
-    phone_number: Optional[str]
+    phone_number: Optional[RuPhone]
     contragent_id: Optional[int]
     contragent_name: Optional[str]
     organization_id: Optional[int]
@@ -56,16 +53,14 @@ class LoyalityCardCreate(BaseModel):
     start_period: Optional[int] = None
     end_period: Optional[int] = None
     max_percentage: Optional[int] = None
-
-    lifetime: Optional[int] # lifetime in seconds
-
+    lifetime: Optional[int]  # lifetime in seconds
     status_card: bool = True
     is_deleted: bool = False
-
-    apple_wallet_advertisement: str = 'TableCRM'
+    apple_wallet_advertisement: str = "TableCRM"
 
     class Config:
         orm_mode = True
+        arbitrary_types_allowed = True
 
 
 class LoyalityCard(LoyalityCardCreate):
@@ -85,7 +80,7 @@ class LoyalityCardEdit(BaseModel):
     max_percentage: Optional[int]
     max_withdraw_percentage: Optional[int]
 
-    lifetime: Optional[int] # lifetime in seconds
+    lifetime: Optional[int]  # lifetime in seconds
 
     status_card: Optional[bool]
     is_deleted: Optional[bool]
@@ -111,7 +106,7 @@ class LoyalityCardGet(BaseModel):
     end_period: int
     max_percentage: int
 
-    lifetime: Optional[int] # lifetime in seconds
+    lifetime: Optional[int]  # lifetime in seconds
 
     apple_wallet_advertisement: str
 
@@ -123,11 +118,13 @@ class LoyalityCardGet(BaseModel):
     class Config:
         orm_mode = True
 
+
 class LoyalityCardCreateMass(BaseModel):
     __root__: List[LoyalityCardCreate]
 
     class Config:
         orm_mode = True
+
 
 class LoyalityCardsListGet(BaseModel):
     __root__: Optional[List[LoyalityCardGet]]
@@ -135,11 +132,13 @@ class LoyalityCardsListGet(BaseModel):
     class Config:
         orm_mode = True
 
+
 class LoyalityCardsList(BaseModel):
     __root__: Optional[List[LoyalityCard]]
 
     class Config:
         orm_mode = True
+
 
 class CountRes(BaseModel):
     result: Optional[LoyalityCardsListGet]

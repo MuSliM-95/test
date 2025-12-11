@@ -1,11 +1,17 @@
 from collections import defaultdict
 
-from sqlalchemy import case, select, func, and_
-
 from database.db import (
-    warehouse_register_movement, price_types, nomenclature, database, prices,
-    categories, pictures, nomenclature_attributes_value, nomenclature_attributes
+    categories,
+    database,
+    nomenclature,
+    nomenclature_attributes,
+    nomenclature_attributes_value,
+    pictures,
+    price_types,
+    prices,
+    warehouse_register_movement,
 )
+from sqlalchemy import and_, case, func, select
 
 
 class FeedCriteriaFilter:
@@ -24,9 +30,7 @@ class FeedCriteriaFilter:
             )
 
         if criteria.get("category_id"):
-            query = query.where(
-                nomenclature.c.category.in_(criteria["category_id"])
-            )
+            query = query.where(nomenclature.c.category.in_(criteria["category_id"]))
 
         if criteria.get("prices"):
             if criteria["prices"].get("from"):
@@ -42,10 +46,7 @@ class FeedCriteriaFilter:
     async def get_warehouse_balance(self):
         price_type_id = self.criteria_data.get("price_types_id")
         if not price_type_id:
-            query = (
-                select(price_types)
-                .where(price_types.c.cashbox == self.cashbox_id)
-            )
+            query = select(price_types).where(price_types.c.cashbox == self.cashbox_id)
             types = await database.fetch_all(query)
             price_type_id = types[0].id if types else None
 
@@ -54,7 +55,10 @@ class FeedCriteriaFilter:
 
         # считаем остаток (учёт минус/плюс)
         q = case(
-            (warehouse_register_movement.c.type_amount == "minus", warehouse_register_movement.c.amount * -1),
+            (
+                warehouse_register_movement.c.type_amount == "minus",
+                warehouse_register_movement.c.amount * -1,
+            ),
             else_=warehouse_register_movement.c.amount,
         )
 
@@ -90,7 +94,7 @@ class FeedCriteriaFilter:
                 warehouse_register_movement.c.organization_id,
                 warehouse_register_movement.c.warehouse_id,
                 categories.c.name,
-                prices.c.price
+                prices.c.price,
             )
         )
 
@@ -108,16 +112,10 @@ class FeedCriteriaFilter:
         nomenclature_ids = [r["id"] for r in results]
 
         # тянем картинки пачкой
-        images_query = (
-            select(
-                pictures.c.entity_id,
-                pictures.c.url
-            )
-            .where(
-                and_(
-                    pictures.c.entity == "nomenclature",
-                    pictures.c.entity_id.in_(nomenclature_ids)
-                )
+        images_query = select(pictures.c.entity_id, pictures.c.url).where(
+            and_(
+                pictures.c.entity == "nomenclature",
+                pictures.c.entity_id.in_(nomenclature_ids),
             )
         )
         images_rows = await database.fetch_all(images_query)
@@ -125,7 +123,9 @@ class FeedCriteriaFilter:
         # группируем картинки по номенклатуре
         images_map = defaultdict(list)
         for row in images_rows:
-            images_map[row.entity_id].append(f"https://app.tablecrm.com/api/v1/{row.url}")
+            images_map[row.entity_id].append(
+                f"https://app.tablecrm.com/api/v1/{row.url}"
+            )
 
         # ---- атрибуты ----
         attrs_query = (
@@ -136,12 +136,14 @@ class FeedCriteriaFilter:
             )
             .join(
                 nomenclature_attributes,
-                nomenclature_attributes.c.id == nomenclature_attributes_value.c.attribute_id,
+                nomenclature_attributes.c.id
+                == nomenclature_attributes_value.c.attribute_id,
             )
             .where(
                 and_(
                     nomenclature_attributes_value.c.nomenclature_id.in_(
-                        nomenclature_ids),
+                        nomenclature_ids
+                    ),
                     nomenclature_attributes.c.cashbox == self.cashbox_id,
                 )
             )

@@ -1,11 +1,14 @@
 from collections import defaultdict
-from database.db import segment_objects, SegmentObjectType, database
+
+from database.db import SegmentObjectType, database, segment_objects
 from sqlalchemy import select
 
 
 class ContragentRepository:
     @staticmethod
-    async def fetch_segments_by_contragent_ids(contragent_ids: list[int]) -> dict[int, list[int]]:
+    async def fetch_segments_by_contragent_ids(
+        contragent_ids: list[int],
+    ) -> dict[int, list[int]]:
         segments_map = defaultdict(list)
         if contragent_ids:
             query = (

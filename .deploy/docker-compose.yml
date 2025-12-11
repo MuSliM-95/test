@@ -1,6 +1,6 @@
 services:
   docasaurus:
-    build: ./submodule-docurus
+    build: ../submodule-docurus
     restart: always
     command: npm run serve -- --build --port 3000 --host 0.0.0.0
     networks:
@@ -8,7 +8,7 @@ services:
 
   nginx:
     build:
-      context: ./nginx
+      context: ../nginx
       dockerfile: Dockerfile
       args:
         BRANCH_NAME: ${CI_COMMIT_REF_NAME}
@@ -55,7 +55,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgresql.conf:/etc/postgresql.conf:ro
-      - ./initdb:/docker-entrypoint-initdb.d
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
@@ -65,7 +65,7 @@ services:
       - infrastructure
 
   backup:
-    build: ./backup
+    build: ../backup
     restart: always
     environment:
       SCHEDULE: '@hourly'
@@ -112,8 +112,8 @@ services:
     image: prom/prometheus
     restart: always
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./web.yml:/etc/prometheus/web.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./web.yml:/etc/prometheus/web.yml:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--web.external-url=/prometheus/'
@@ -131,7 +131,7 @@ services:
     image: grafana/loki:latest
     restart: always
     volumes:
-      - ./loki-config:/etc/loki
+      - ./loki-config.yaml:/etc/loki/loki-config.yaml:ro
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - nginx-proxy
@@ -141,7 +141,7 @@ services:
     restart: always
     volumes:
       - /var/log:/var/log
-      - ./promtail-config:/etc/promtail
+      - ./promtail-config.yaml:/etc/promtail/config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock
     command: -config.file=/etc/promtail/config.yaml
@@ -154,7 +154,7 @@ services:
     container_name: telegraf
     hostname: telegraf
     volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
       - /var/log:/var/log
     ports:
       - 9126:9126

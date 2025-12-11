@@ -1,24 +1,23 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, or_, func, select, text, exists
-from sqlalchemy.sql import Select
-
 from database.db import (
-    docs_sales,
     OrderStatus,
+    categories,
+    docs_sales,
     docs_sales_delivery_info,
     docs_sales_goods,
-    nomenclature,
-    categories,
+    docs_sales_tags,
+    entity_to_entity,
     loyality_cards,
     loyality_transactions,
-    tags,
-    docs_sales_tags,
-    pictures,
+    nomenclature,
     payments,
-    entity_to_entity,
+    pictures,
+    tags,
 )
-from segments.ranges import apply_range, apply_date_range
+from segments.ranges import apply_date_range, apply_range
+from sqlalchemy import and_, exists, func, or_, select, text
+from sqlalchemy.sql import Select
 
 
 def orders_filters(query: Select, order_filters: dict, sub) -> Select:
@@ -45,7 +44,7 @@ def add_picker_filters(query: Select, picker_filters, sub):
     photos_not_added_minutes = picker_filters.get("photos_not_added_minutes")
 
     if photos_not_added_minutes is not None and isinstance(
-            photos_not_added_minutes, int
+        photos_not_added_minutes, int
     ):
         sales_entity = "docs_sales"
 
@@ -179,21 +178,20 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
         where_clauses.append(exists(exists_clause))
 
     if cog := purchase_criteria.get("count_of_goods"):
-        query = (
-            query
-            .outerjoin(docs_sales_goods, docs_sales_goods.c.docs_sales_id == sub.c.id)
+        query = query.outerjoin(
+            docs_sales_goods, docs_sales_goods.c.docs_sales_id == sub.c.id
         )
 
-        apply_range(func.coalesce(func.sum(docs_sales_goods.c.quantity), 0), cog,
-                    having_clauses)
+        apply_range(
+            func.coalesce(func.sum(docs_sales_goods.c.quantity), 0), cog, having_clauses
+        )
 
     if purchase_criteria.get("is_fully_paid"):
         # --- сумма оплат в рублях ---
         rub_cte = (
             select(
                 entity_to_entity.c.from_id.label("docs_sales_id"),
-                func.coalesce(func.sum(payments.c.amount), 0).label(
-                    "paid_rub"),
+                func.coalesce(func.sum(payments.c.amount), 0).label("paid_rub"),
             )
             .select_from(entity_to_entity)
             .join(
@@ -213,7 +211,8 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
             select(
                 entity_to_entity.c.from_id.label("docs_sales_id"),
                 func.coalesce(func.sum(loyality_transactions.c.amount), 0).label(
-                    "paid_bonus"),
+                    "paid_bonus"
+                ),
             )
             .select_from(entity_to_entity)
             .join(
@@ -227,35 +226,38 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
             .group_by(entity_to_entity.c.from_id)
             .cte("bonus_cte")
         )
-        query = (
-            query
-            .outerjoin(rub_cte, rub_cte.c.docs_sales_id == sub.c.id)
-            .outerjoin(bonus_cte, bonus_cte.c.docs_sales_id == sub.c.id)
+        query = query.outerjoin(rub_cte, rub_cte.c.docs_sales_id == sub.c.id).outerjoin(
+            bonus_cte, bonus_cte.c.docs_sales_id == sub.c.id
         )
 
         # фильтр на полностью оплаченные
         having_clauses.append(
             (
-                    func.coalesce(func.max(rub_cte.c.paid_rub), 0) +
-                    func.coalesce(func.max(bonus_cte.c.paid_bonus), 0)
-            ) >= sub.c.sum
+                func.coalesce(func.max(rub_cte.c.paid_rub), 0)
+                + func.coalesce(func.max(bonus_cte.c.paid_bonus), 0)
+            )
+            >= sub.c.sum
         )
 
     # ---- 4. Агрегаты по контрагенту (COUNT / SUM) -----------------
     # ОПТИМИЗАЦИЯ: применяем WHERE фильтры до агрегации
     if (
-            having_clauses
-            or purchase_criteria.get("count")
-            or purchase_criteria.get("total_amount")
+        having_clauses
+        or purchase_criteria.get("count")
+        or purchase_criteria.get("total_amount")
     ):
         # Создаем алиас для docs_sales внутри агрегационного запроса
         docs_sales_agg = docs_sales.alias("docs_sales_agg")
 
-        agg_query = select(
-            docs_sales_agg.c.contragent,
-            func.count(docs_sales_agg.c.id).label("purchase_count"),
-            func.sum(docs_sales_agg.c.sum).label("total_amount"),
-        ).select_from(docs_sales_agg).where(docs_sales_agg.c.is_deleted == False)
+        agg_query = (
+            select(
+                docs_sales_agg.c.contragent,
+                func.count(docs_sales_agg.c.id).label("purchase_count"),
+                func.sum(docs_sales_agg.c.sum).label("total_amount"),
+            )
+            .select_from(docs_sales_agg)
+            .where(docs_sales_agg.c.is_deleted == False)
+        )
 
         # Фильтрация по категориям/номенклатурам ДО агрегации
         category_filter_clauses = []
@@ -269,9 +271,7 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
                     nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
                 )
                 .join(categories, nomenclature.c.category == categories.c.id)
-                .where(
-                    docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
-                )
+                .where(docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id)
                 .where(or_(*category_conditions))
             )
             category_filter_clauses.append(category_exists)
@@ -286,9 +286,7 @@ def add_purchase_filters(query: Select, purchase_criteria: dict, sub) -> Select:
                 .join(
                     nomenclature, docs_sales_goods.c.nomenclature == nomenclature.c.id
                 )
-                .where(
-                    docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id
-                )
+                .where(docs_sales_goods.c.docs_sales_id == docs_sales_agg.c.id)
                 .where(or_(*nomenclature_conditions))
             )
             category_filter_clauses.append(nomenclature_exists)
@@ -375,21 +373,22 @@ def add_loyality_filters(query: Select, loyality_criteria: dict, sub) -> Select:
         return query
 
     # Подзапрос по картам (возможно с фильтром баланса)
-    loyalty_subq = (
-        select(
-            loyality_cards.c.id.label("card_id"),
-            loyality_cards.c.contragent_id,
-            loyality_cards.c.balance,
-            loyality_cards.c.lifetime,
-        )
-        .where(loyality_cards.c.contragent_id.isnot(None))
-    )
+    loyalty_subq = select(
+        loyality_cards.c.id.label("card_id"),
+        loyality_cards.c.contragent_id,
+        loyality_cards.c.balance,
+        loyality_cards.c.lifetime,
+    ).where(loyality_cards.c.contragent_id.isnot(None))
 
     if balance := loyality_criteria.get("balance"):
         if "gte" in balance:
-            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance >= balance["gte"])
+            loyalty_subq = loyalty_subq.where(
+                loyality_cards.c.balance >= balance["gte"]
+            )
         if "lte" in balance:
-            loyalty_subq = loyalty_subq.where(loyality_cards.c.balance <= balance["lte"])
+            loyalty_subq = loyalty_subq.where(
+                loyality_cards.c.balance <= balance["lte"]
+            )
         if "eq" in balance:
             loyalty_subq = loyalty_subq.where(loyality_cards.c.balance == balance["eq"])
 
@@ -414,7 +413,9 @@ def add_loyality_filters(query: Select, loyality_criteria: dict, sub) -> Select:
         query = query.join(
             last_tx, last_tx.c.loyality_card_id == loyalty_subq.c.card_id
         )
-        expiry_datetime = last_tx.c.last_tx + text("INTERVAL '1 second'") * loyalty_subq.c.lifetime
+        expiry_datetime = (
+            last_tx.c.last_tx + text("INTERVAL '1 second'") * loyalty_subq.c.lifetime
+        )
         days_left = func.DATE_PART("day", expiry_datetime - func.now())
         apply_range(days_left, expire, where_clauses)
 

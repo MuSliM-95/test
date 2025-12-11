@@ -1,4 +1,5 @@
 """Pydantic схемы для категорий (public_categories service)"""
+
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -37,13 +38,15 @@ class GlobalCategory(GlobalCategoryBase):
 
 
 class GlobalCategoryTree(GlobalCategory):
-    children: Optional[List['GlobalCategoryTree']] = []  # noqa: E501
+    children: Optional[List["GlobalCategoryTree"]] = []  # noqa: E501
     processing_time_ms: Optional[int] = None
+
 
 class GlobalCategoryList(BaseModel):
     result: List[GlobalCategory]
     count: int
     processing_time_ms: Optional[int] = None
+
 
 class GlobalCategoryTreeList(BaseModel):
     result: List[GlobalCategoryTree]

@@ -1,8 +1,12 @@
-from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import \
-    ICreateNomenclatureGroupFunction
-from api.nomenclature_groups.web.models.BaseNomenclatureGroup import BaseNomenclatureGroup
-from api.nomenclature_groups.web.models.ResponseCreateNomenclatureGroupModel import ResponseCreateNomenclatureGroupModel
-
+from api.nomenclature_groups.infrastructure.functions.core.ICreateNomenclatureGroupFunction import (
+    ICreateNomenclatureGroupFunction,
+)
+from api.nomenclature_groups.web.models.BaseNomenclatureGroup import (
+    BaseNomenclatureGroup,
+)
+from api.nomenclature_groups.web.models.ResponseCreateNomenclatureGroupModel import (
+    ResponseCreateNomenclatureGroupModel,
+)
 from functions.helpers import get_user_by_token
 
 
@@ -18,12 +22,9 @@ class CreateNomenclatureGroupView:
         user = await get_user_by_token(token)
 
         result = await self.__create_nomenclature_group_function(
-            name=data.name,
-            cashbox_id=user.cashbox_id
+            name=data.name, cashbox_id=user.cashbox_id
         )
 
         return ResponseCreateNomenclatureGroupModel(
-            id=result.id,
-            name=result.name,
-            cashbox_id=result.cashbox_id
+            id=result.id, name=result.name, cashbox_id=result.cashbox_id
         )

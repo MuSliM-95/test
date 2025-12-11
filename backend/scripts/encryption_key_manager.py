@@ -1,4 +1,5 @@
 import argparse
+
 from cryptography.fernet import Fernet
 
 
@@ -26,35 +27,27 @@ Examples:
   python encryption_key_manager.py --generate
   python encryption_key_manager.py --validate "your-key-here"
   python encryption_key_manager.py --test "your-key-here"
-        """
+        """,
     )
-    
+
     parser.add_argument(
-        "--generate",
-        action="store_true",
-        help="Generate a new encryption key"
+        "--generate", action="store_true", help="Generate a new encryption key"
     )
-    
+
     parser.add_argument(
-        "--validate",
-        type=str,
-        metavar="KEY",
-        help="Validate an encryption key"
+        "--validate", type=str, metavar="KEY", help="Validate an encryption key"
     )
-    
+
     parser.add_argument(
-        "--test",
-        type=str,
-        metavar="KEY",
-        help="Test encryption/decryption with a key"
+        "--test", type=str, metavar="KEY", help="Test encryption/decryption with a key"
     )
-    
+
     args = parser.parse_args()
-    
+
     if not any([args.generate, args.validate, args.test]):
         parser.print_help()
         return
-    
+
     if args.generate:
         print("Generating new encryption key...\n")
         key = generate_key()
@@ -63,9 +56,9 @@ Examples:
         print(f"{key}")
         print("═" * 70)
         print("\nCopy this to your .env or environment variable:")
-        print(f"export AVITO_ENCRYPTION_KEY=\"{key}\"")
+        print(f'export AVITO_ENCRYPTION_KEY="{key}"')
         print()
-    
+
     if args.validate:
         print(f"Validating key: {args.validate[:50]}...\n")
         if validate_key(args.validate):

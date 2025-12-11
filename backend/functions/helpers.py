@@ -1,36 +1,35 @@
+import hashlib
+import json
+import math
 import random
 import string
-import hashlib
 from datetime import datetime
-from typing import Optional, Union, Any, List
-import json
+from typing import Any, List, Optional, Union
 
 import aiohttp
-import math
 import pytz
-from databases.backends.postgres import Record
-from fastapi import HTTPException
-from sqlalchemy import Table, cast, String, and_, or_, func
-
-from database.db import articles
-
 from const import PaymentType
 from database.db import (
-    users_cboxes_relation,
-    database,
-    entity_to_entity,
-    nomenclature,
+    articles,
     contragents,
-    payments,
-    docs_sales_goods,
+    database,
     docs_sales_delivery_info,
-    loyality_transactions,
-    organizations,
-    units,
+    docs_sales_goods,
+    docs_sales_settings,
     entity_or_function,
-    fifo_settings, docs_sales_settings,
-    user_permissions
+    entity_to_entity,
+    fifo_settings,
+    loyality_transactions,
+    nomenclature,
+    organizations,
+    payments,
+    units,
+    user_permissions,
+    users_cboxes_relation,
 )
+from databases.backends.postgres import Record
+from fastapi import HTTPException
+from sqlalchemy import String, Table, and_, cast, func, or_
 from sqlalchemy.sql import ColumnElement
 
 
@@ -67,7 +66,9 @@ def get_filters(table, filters):
                 )
         elif filter == "paybox":
             if value:
-                is_include_paybox_dest = str(filters_dict.get("include_paybox_dest", "")).lower() == "true"
+                is_include_paybox_dest = (
+                    str(filters_dict.get("include_paybox_dest", "")).lower() == "true"
+                )
                 if is_include_paybox_dest:
                     filters_list.append(
                         (
@@ -91,9 +92,9 @@ def get_filters(table, filters):
         elif filter == "payment_type":
             if value:
                 if value in (
-                        PaymentType.incoming,
-                        PaymentType.outgoing,
-                        PaymentType.transfer,
+                    PaymentType.incoming,
+                    PaymentType.outgoing,
+                    PaymentType.transfer,
                 ):
                     filters_list.append((f"payments.type = '{value}'"))
         elif filter == "external_id":
@@ -103,10 +104,10 @@ def get_filters(table, filters):
             if value:
                 if value == "parents":
                     # filters_list.append(table.c.parent_id == None)
-                    filters_list.append((f"payments.parent_id IS NULL"))
+                    filters_list.append(("payments.parent_id IS NULL"))
                 elif value == "childs":
                     # filters_list.append(table.c.parent_id != None)
-                    filters_list.append((f"payments.parent_id IS NOT NULL"))
+                    filters_list.append(("payments.parent_id IS NOT NULL"))
 
     datefrom = None
     dateto = None
@@ -127,7 +128,9 @@ def get_filters(table, filters):
 
     if filters_dict["dateto"]:
         try:
-            date_obj = datetime.strptime(filters_dict["dateto"], "%d-%m-%Y").replace(hour=23, minute=59, second=59)
+            date_obj = datetime.strptime(filters_dict["dateto"], "%d-%m-%Y").replace(
+                hour=23, minute=59, second=59
+            )
             date_obj = timezone.localize(date_obj)
             dateto = date_obj.astimezone(pytz.UTC).timestamp()
         except (ValueError, TypeError):
@@ -212,8 +215,12 @@ def get_filters_transactions(table, filters):
             filters_list.append(table.c.dated <= datetime.fromtimestamp(dateto))
 
         if datefrom and dateto:
-            filters_list.append(and_(table.c.dated >= datetime.fromtimestamp(datefrom),
-                                     table.c.dated <= datetime.fromtimestamp(dateto)))
+            filters_list.append(
+                and_(
+                    table.c.dated >= datetime.fromtimestamp(datefrom),
+                    table.c.dated <= datetime.fromtimestamp(dateto),
+                )
+            )
 
     _periods_filter("dated")
 
@@ -223,7 +230,11 @@ def get_filters_transactions(table, filters):
                 filters_list.append(table.c.type == value)
         if filter == "loyality_card_number":
             if value:
-                filters_list.append(cast(table.c.loyality_card_number, String).ilike(f"%{value}%"))
+                filters_list.append(
+                    cast(table.c.loyality_card_number, String).ilike(
+                        f"%{str(value)[1:]}%"
+                    )
+                )
         if filter == "amount":
             if value:
                 filters_list.append(table.c.amount == value)
@@ -246,27 +257,53 @@ def get_filters_cards(table, filters):
 
     and_conditions = []
     if filters_dict.get("start_period_from"):
-        and_conditions.append(table.c.start_period >= datetime.fromtimestamp(filters_dict.get("start_period_from")))
+        and_conditions.append(
+            table.c.start_period
+            >= datetime.fromtimestamp(filters_dict.get("start_period_from"))
+        )
     if filters_dict.get("start_period_to"):
-        and_conditions.append(table.c.start_period <= datetime.fromtimestamp(filters_dict.get("start_period_to")))
+        and_conditions.append(
+            table.c.start_period
+            <= datetime.fromtimestamp(filters_dict.get("start_period_to"))
+        )
     if filters_dict.get("end_period_from"):
-        and_conditions.append(table.c.end_period >= datetime.fromtimestamp(filters_dict.get("end_period_from")))
+        and_conditions.append(
+            table.c.end_period
+            >= datetime.fromtimestamp(filters_dict.get("end_period_from"))
+        )
     if filters_dict.get("end_period_to"):
-        and_conditions.append(table.c.end_period <= datetime.fromtimestamp(filters_dict.get("end_period_to")))
+        and_conditions.append(
+            table.c.end_period
+            <= datetime.fromtimestamp(filters_dict.get("end_period_to"))
+        )
     if filters_dict.get("created_at_from"):
-        and_conditions.append(table.c.created_at >= datetime.fromtimestamp(filters_dict.get("created_at_from")))
+        and_conditions.append(
+            table.c.created_at
+            >= datetime.fromtimestamp(filters_dict.get("created_at_from"))
+        )
     if filters_dict.get("created_at_to"):
-        and_conditions.append(table.c.created_at <= datetime.fromtimestamp(filters_dict.get("created_at_to")))
+        and_conditions.append(
+            table.c.created_at
+            <= datetime.fromtimestamp(filters_dict.get("created_at_to"))
+        )
     if filters_dict.get("updated_at_from"):
-        and_conditions.append(table.c.updated_at >= datetime.fromtimestamp(filters_dict.get("updated_at_from")))
+        and_conditions.append(
+            table.c.updated_at
+            >= datetime.fromtimestamp(filters_dict.get("updated_at_from"))
+        )
     if filters_dict.get("updated_at_to"):
-        and_conditions.append(table.c.updated_at <= datetime.fromtimestamp(filters_dict.get("updated_at_to")))
+        and_conditions.append(
+            table.c.updated_at
+            <= datetime.fromtimestamp(filters_dict.get("updated_at_to"))
+        )
     filters_list.append(and_(*and_conditions))
 
     for filter, value in filters_dict.items():
         if filter == "card_number":
             if value:
-                filters_list.append(cast(table.c.card_number, String).ilike(f"%{value}%"))
+                filters_list.append(
+                    cast(table.c.card_number, String).ilike(f"%{value}%")
+                )
         if filter == "balance":
             if value:
                 filters_list.append(table.c.balance == value)
@@ -361,7 +398,9 @@ def get_filters_ca(table, filters):
             if value:
                 normalized_search_phone = clear_phone_number(value)
                 if normalized_search_phone:
-                    normalized_phone_in_db = func.regexp_replace(table.c.phone, r'[^\d]', '', 'g')
+                    normalized_phone_in_db = func.regexp_replace(
+                        table.c.phone, r"[^\d]", "", "g"
+                    )
                     filters_list.append(
                         normalized_phone_in_db.ilike(f"%{normalized_search_phone}%")
                     )
@@ -406,13 +445,22 @@ async def add_nomenclature_count(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
         instance = dict(instance)
 
-        q = docs_sales_goods.select().where(docs_sales_goods.c.docs_sales_id == instance['id'])
+        q = docs_sales_goods.select().where(
+            docs_sales_goods.c.docs_sales_id == instance["id"]
+        )
         goods = await database.fetch_all(q)
 
         if goods:
             instance["nomenclature_count"] = len(goods)
             instance["doc_discount"] = round(
-                sum([(0 if not good.sum_discounted else good.sum_discounted) for good in goods]), 2)
+                sum(
+                    [
+                        (0 if not good.sum_discounted else good.sum_discounted)
+                        for good in goods
+                    ]
+                ),
+                2,
+            )
         else:
             instance["nomenclature_count"] = 0
             instance["doc_discount"] = 0
@@ -424,7 +472,7 @@ async def add_nomenclature_name_to_goods(instance: Optional[Record]) -> Optional
     if instance is not None:
         instance = dict(instance)
 
-        q = nomenclature.select().where(nomenclature.c.id == instance['nomenclature'])
+        q = nomenclature.select().where(nomenclature.c.id == instance["nomenclature"])
         nomenclature_db = await database.fetch_one(q)
 
         if instance.get("unit"):
@@ -432,7 +480,7 @@ async def add_nomenclature_name_to_goods(instance: Optional[Record]) -> Optional
             unit_db = await database.fetch_one(q)
 
             if unit_db:
-                instance['unit_name'] = unit_db.convent_national_view
+                instance["unit_name"] = unit_db.convent_national_view
 
         if nomenclature_db:
             instance["nomenclature_name"] = nomenclature_db.name
@@ -447,9 +495,9 @@ async def add_docs_sales_settings(instance: Optional[Record]) -> Optional[dict]:
         instance = dict(instance)
 
         settings = await database.fetch_one(
-            docs_sales_settings
-            .select()
-            .where(docs_sales_settings.c.id == instance["settings"])
+            docs_sales_settings.select().where(
+                docs_sales_settings.c.id == instance["settings"]
+            )
         )
 
         instance["settings"] = settings
@@ -463,17 +511,22 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
 
     instance = dict(instance)
 
-    proxyes_q = (
-        entity_to_entity.select()
-        .where(
-            entity_to_entity.c.cashbox_id == instance['cashbox'],
-            entity_to_entity.c.from_id == instance['id']
-        )
+    proxyes_q = entity_to_entity.select().where(
+        entity_to_entity.c.cashbox_id == instance["cashbox"],
+        entity_to_entity.c.from_id == instance["id"],
     )
     proxyes = await database.fetch_all(proxyes_q)
 
-    payment_ids = [proxy.to_id for proxy in proxyes if proxy.from_entity == 7 and proxy.to_entity == 5]
-    transaction_ids = [proxy.to_id for proxy in proxyes if proxy.from_entity == 7 and proxy.to_entity == 6]
+    payment_ids = [
+        proxy.to_id
+        for proxy in proxyes
+        if proxy.from_entity == 7 and proxy.to_entity == 5
+    ]
+    transaction_ids = [
+        proxy.to_id
+        for proxy in proxyes
+        if proxy.from_entity == 7 and proxy.to_entity == 6
+    ]
 
     paid_rubles = 0
     paid_loyality = 0
@@ -481,9 +534,9 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
     if payment_ids:
         q_payment = payments.select().where(
             payments.c.id.in_(payment_ids),
-            payments.c.cashbox == instance['cashbox'],
+            payments.c.cashbox == instance["cashbox"],
             payments.c.status == True,
-            payments.c.is_deleted == False
+            payments.c.is_deleted == False,
         )
         payments_data = await database.fetch_all(q_payment)
         paid_rubles = sum(payment.amount for payment in payments_data)
@@ -491,9 +544,9 @@ async def raschet_oplat(instance: Optional[Record]) -> Optional[dict]:
     if transaction_ids:
         q_trans = loyality_transactions.select().where(
             loyality_transactions.c.id.in_(transaction_ids),
-            loyality_transactions.c.cashbox == instance['cashbox'],
+            loyality_transactions.c.cashbox == instance["cashbox"],
             loyality_transactions.c.status == True,
-            loyality_transactions.c.is_deleted == False
+            loyality_transactions.c.is_deleted == False,
         )
         transactions_data = await database.fetch_all(q_trans)
         paid_loyality = sum(trans.amount for trans in transactions_data)
@@ -513,7 +566,7 @@ async def nomenclature_unit_id_to_name(instance: Optional[Record]) -> Optional[d
         unit_db = await database.fetch_one(q)
 
         if unit_db:
-            instance['unit_name'] = unit_db.convent_national_view
+            instance["unit_name"] = unit_db.convent_national_view
 
         return instance
 
@@ -555,9 +608,7 @@ def rem_owner_is_deleted(instance: Optional[Record]) -> Optional[dict]:
 def add_status(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
         instance = dict(instance)
-        instance["data"] = {
-            "status": "success"
-        }
+        instance["data"] = {"status": "success"}
 
         return instance
 
@@ -570,8 +621,13 @@ async def get_user_by_token(token: str) -> Record:
     return user
 
 
-async def check_user_permission(user_id: int, cashbox_id: int, section: str, paybox_id: int = None,
-                                need_edit: bool = False) -> bool:
+async def check_user_permission(
+    user_id: int,
+    cashbox_id: int,
+    section: str,
+    paybox_id: int = None,
+    need_edit: bool = False,
+) -> bool:
     """
     Проверка прав пользователя на доступ к разделу/счету
 
@@ -588,7 +644,7 @@ async def check_user_permission(user_id: int, cashbox_id: int, section: str, pay
     user_query = users_cboxes_relation.select().where(
         and_(
             users_cboxes_relation.c.id == user_id,
-            users_cboxes_relation.c.cashbox_id == cashbox_id
+            users_cboxes_relation.c.cashbox_id == cashbox_id,
         )
     )
     user = await database.fetch_one(user_query)
@@ -600,7 +656,7 @@ async def check_user_permission(user_id: int, cashbox_id: int, section: str, pay
             user_permissions.c.user_id == user_id,
             user_permissions.c.cashbox_id == cashbox_id,
             user_permissions.c.section == section,
-            user_permissions.c.can_view == True
+            user_permissions.c.can_view == True,
         )
     )
 
@@ -611,7 +667,7 @@ async def check_user_permission(user_id: int, cashbox_id: int, section: str, pay
         query = query.where(
             or_(
                 user_permissions.c.paybox_id.is_(None),
-                user_permissions.c.paybox_id == paybox_id
+                user_permissions.c.paybox_id == paybox_id,
             )
         )
 
@@ -664,7 +720,9 @@ async def get_entity_by_id(entity: Table, idx: int, cashbox: int) -> Record:
     return entity_db
 
 
-async def get_entity_by_id_and_created_by(entity: Table, idx: int, created_by: int) -> Record:
+async def get_entity_by_id_and_created_by(
+    entity: Table, idx: int, created_by: int
+) -> Record:
     """Returns entity from db, filtered by owner and is_deleted fields"""
 
     query = entity.select().where(
@@ -704,8 +762,8 @@ async def contr_org_ids_to_name(instance: Optional[Record]) -> Optional[dict]:
     if instance is not None:
         instance = dict(instance)
 
-        contr_id = instance['contragent_id']
-        org_id = instance['organization_id']
+        contr_id = instance["contragent_id"]
+        org_id = instance["organization_id"]
 
         query = contragents.select().where(contragents.c.id == contr_id)
         contr = await database.fetch_one(query)
@@ -713,8 +771,8 @@ async def contr_org_ids_to_name(instance: Optional[Record]) -> Optional[dict]:
         query = organizations.select().where(organizations.c.id == org_id)
         org = await database.fetch_one(query)
 
-        instance['contragent'] = contr.name
-        instance['organization'] = org.short_name
+        instance["contragent"] = contr.name
+        instance["organization"] = org.short_name
 
         return instance
 
@@ -746,7 +804,7 @@ async def check_function_exists(name: str):
     if not await database.fetch_one(query):
         raise HTTPException(
             status_code=404,
-            detail=f"Функция не существует!",
+            detail="Функция не существует!",
         )
     return True
 
@@ -775,19 +833,51 @@ async def check_period_blocked(organization_id: int, date: int, exceptions: list
     return True
 
 
-def clear_phone_number(phone_number: str) -> Union[int, None]:
-    if not phone_number:
+def clear_phone_number(phone_number) -> Union[int, None]:
+    """Универсальная очистка телефонного номера"""
+    # Защита от None и пустых значений
+    if phone_number is None:
         return None
+
+    # Если уже int - возвращаем как есть
+    if isinstance(phone_number, int):
+        return phone_number
+
+    # Конвертируем в строку
+    if not isinstance(phone_number, str):
+        phone_number = str(phone_number)
+
+    # Защита от пустой строки
+    if not phone_number or phone_number.strip() == "":
+        return None
+
+    # Убираем + в начале
+    if phone_number.startswith("+"):
+        phone_number = phone_number[1:]
+
     try:
-        return int(''.join(i for i in phone_number if i in string.digits))
-    except ValueError: # если телефон состоит из букв, а не цифр
+        # Оставляем только цифры
+        cleaned = "".join(filter(str.isdigit, phone_number))
+
+        # Если пусто после очистки
+        if not cleaned:
+            return None
+
+        # Конвертируем в int
+        return int(cleaned)
+    except (ValueError, TypeError):
         return None
+
 
 async def get_statement(statement_id: str, account_id: str, access_token: str):
     async with aiohttp.ClientSession() as session:
         async with session.get(
-                f'https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}',
-                headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            f"https://enter.tochka.com/uapi/open-banking/v1.0/accounts/{account_id}/statements/{statement_id}",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
+        ) as resp:
             try:
                 init_statement_json = await resp.json()
             except:
@@ -798,15 +888,22 @@ async def get_statement(statement_id: str, account_id: str, access_token: str):
 
 async def init_statement(statement_data: dict, access_token: str):
     async with aiohttp.ClientSession() as session:
-        async with session.post(f'https://enter.tochka.com/uapi/open-banking/v1.0/statements', json={
-            'Data': {
-                'Statement': {
-                    'accountId': statement_data.get('accountId'),
-                    'startDateTime': statement_data.get('startDateTime'),
-                    'endDateTime': statement_data.get('endDateTime'),
+        async with session.post(
+            "https://enter.tochka.com/uapi/open-banking/v1.0/statements",
+            json={
+                "Data": {
+                    "Statement": {
+                        "accountId": statement_data.get("accountId"),
+                        "startDateTime": statement_data.get("startDateTime"),
+                        "endDateTime": statement_data.get("endDateTime"),
+                    }
                 }
-            }
-        }, headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {access_token}'}) as resp:
+            },
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
+        ) as resp:
             try:
                 init_statement_json = await resp.json()
             except:
@@ -817,74 +914,101 @@ async def init_statement(statement_data: dict, access_token: str):
 
 async def add_delivery_info_to_doc(doc: dict) -> dict:
     delivery_info_query = docs_sales_delivery_info.select().where(
-        docs_sales_delivery_info.c.docs_sales_id == doc.get('id'))
+        docs_sales_delivery_info.c.docs_sales_id == doc.get("id")
+    )
     delivery_info = await database.fetch_one(delivery_info_query)
     if delivery_info:
         doc["delivery_info"] = {
-            "address": delivery_info.get('address'),
-            "delivery_date": delivery_info['delivery_date'].timestamp() if delivery_info.get('delivery_date') else None,
-            "delivery_price": delivery_info['delivery_price'],
-            "recipient": delivery_info.get('recipient'),
-            "note": delivery_info.get('note'),
+            "address": delivery_info.get("address"),
+            "delivery_date": (
+                delivery_info["delivery_date"].timestamp()
+                if delivery_info.get("delivery_date")
+                else None
+            ),
+            "delivery_price": delivery_info["delivery_price"],
+            "recipient": delivery_info.get("recipient"),
+            "note": delivery_info.get("note"),
         }
     return doc
 
 
 async def check_article_exists(name: str, user_cashbox_id: str, dc_type: str):
-    check_query = articles.select().where(and_(
-        articles.c.name == name,
-        articles.c.cashbox == user_cashbox_id,
-        articles.c.dc == dc_type
-    ))
+    check_query = articles.select().where(
+        and_(
+            articles.c.name == name,
+            articles.c.cashbox == user_cashbox_id,
+            articles.c.dc == dc_type,
+        )
+    )
     article_exists = await database.fetch_all(check_query)
     return True if article_exists else False
 
 
 async def create_entity_hash(table: Table, table_hash: Table, idx: int):
-    query = table.select().with_only_columns(
-        table.c.id,
-        table.c.created_at,
-        table.c.updated_at
-    ).where(table.c.id == idx)
+    query = (
+        table.select()
+        .with_only_columns(table.c.id, table.c.created_at, table.c.updated_at)
+        .where(table.c.id == idx)
+    )
     entity = await database.fetch_one(query)
-    data = str({"type": table.name,
-           "id": entity.id,
-           "created_at": entity.created_at,
-           "updated_at": entity.updated_at})
-    
+    data = str(
+        {
+            "type": table.name,
+            "id": entity.id,
+            "created_at": entity.created_at,
+            "updated_at": entity.updated_at,
+        }
+    )
+
     hash_string = f"{table.name}_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
-    hash_data = {"hash": hash_string,
-                 f"{table.name}_id": entity.id,
-                 "created_at": datetime.now(),
-                 "updated_at": datetime.now()}
+    hash_data = {
+        "hash": hash_string,
+        f"{table.name}_id": entity.id,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+    }
     insert_query = table_hash.insert().values(hash_data)
     await database.execute(insert_query)
 
+
 async def update_entity_hash(table: Table, table_hash: Table, entity):
-    data = str({"type": table.name,
-           "id": entity.id,
-           "created_at": entity.created_at,
-           "updated_at": entity.updated_at})
-    
+    data = str(
+        {
+            "type": table.name,
+            "id": entity.id,
+            "created_at": entity.created_at,
+            "updated_at": entity.updated_at,
+        }
+    )
+
     hash_string = f"{table.name}_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
-    hash_data = {"hash": hash_string, f"{table.name}_id": entity.id, "updated_at": datetime.now()}
+    hash_data = {
+        "hash": hash_string,
+        f"{table.name}_id": entity.id,
+        "updated_at": datetime.now(),
+    }
     if table.name == "nomenclature":
-        update_query = table_hash.update().where(table_hash.c.nomenclature_id==entity.id).values(hash_data)
+        update_query = (
+            table_hash.update()
+            .where(table_hash.c.nomenclature_id == entity.id)
+            .values(hash_data)
+        )
     else:
-        update_query = table_hash.update().where(table_hash.c.warehouses_id==entity.id).values(hash_data)
+        update_query = (
+            table_hash.update()
+            .where(table_hash.c.warehouses_id == entity.id)
+            .values(hash_data)
+        )
     await database.execute(update_query)
-    
 
-
-    
 
 def sanitize_float(value):
     if isinstance(value, float):
         if math.isnan(value) or math.isinf(value):
-            return None 
+            return None
     return value
 
-        
+
 def deep_sanitize(obj):
     if isinstance(obj, dict):
         return {k: deep_sanitize(v) for k, v in obj.items()}
@@ -910,12 +1034,14 @@ def coerce_value(v: str):
             pass
     # float (включая отрицательные)
     try:
-        if '.' in s or (s.startswith('-') and s[1:].replace('.', '', 1).isdigit()):
+        if "." in s or (s.startswith("-") and s[1:].replace(".", "", 1).isdigit()):
             return float(s)
     except:
         pass
     # JSON
-    if (s.startswith('{') and s.endswith('}')) or (s.startswith('[') and s.endswith(']')):
+    if (s.startswith("{") and s.endswith("}")) or (
+        s.startswith("[") and s.endswith("]")
+    ):
         try:
             return json.loads(s)
         except:

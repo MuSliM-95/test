@@ -1,5 +1,3 @@
-from typing import List
-
 from uuid import UUID
 
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage

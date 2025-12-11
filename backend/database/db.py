@@ -5,9 +5,18 @@ from enum import Enum as ENUM
 
 import databases
 import sqlalchemy
+from database.enums import (
+    ContragentType,
+    DebitCreditType,
+    Gender,
+    Repeatability,
+    TriggerTime,
+    TriggerType,
+)
 from dotenv import load_dotenv
 from sqlalchemy import (
     ARRAY,
+    BIGINT,
     JSON,
     BigInteger,
     Boolean,
@@ -16,28 +25,18 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
-    SmallInteger,
-    BIGINT,
     text,
-    Index,
 )
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql import func
-
-from database.enums import (
-    Repeatability,
-    DebitCreditType,
-    Gender,
-    ContragentType,
-    TriggerType,
-    TriggerTime,
-)
 
 load_dotenv()
 
@@ -675,6 +674,9 @@ cboxes = sqlalchemy.Table(
     sqlalchemy.Column("invite_token", String, unique=True),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("seller_name", String, nullable=True),
+    sqlalchemy.Column("seller_description", Text, nullable=True),
+    sqlalchemy.Column("seller_photo", String, nullable=True),
 )
 
 organizations = sqlalchemy.Table(

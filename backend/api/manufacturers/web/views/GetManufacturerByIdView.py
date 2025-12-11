@@ -1,5 +1,5 @@
 from database.db import manufacturers
-from functions.helpers import get_user_by_token, get_entity_by_id, datetime_to_timestamp
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_user_by_token
 
 
 class GetManufacturerByIdView:

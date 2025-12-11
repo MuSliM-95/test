@@ -1,11 +1,14 @@
-from asyncpg import UniqueViolationError, PostgresError
-
-from api.nomenclature_groups.infrastructure.exceptions.GroupAlreadyHaveIsMainError import GroupAlreadyHaveIsMainError
-from api.nomenclature_groups.infrastructure.exceptions.NomenclatureIdAlreadyExistsInGroupError import \
-    NomenclatureIdAlreadyExistsInGroupError
-from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import \
-    IAddNomenclatureToGroupFunction
-from database.db import nomenclature_groups_value, database
+from api.nomenclature_groups.infrastructure.exceptions.GroupAlreadyHaveIsMainError import (
+    GroupAlreadyHaveIsMainError,
+)
+from api.nomenclature_groups.infrastructure.exceptions.NomenclatureIdAlreadyExistsInGroupError import (
+    NomenclatureIdAlreadyExistsInGroupError,
+)
+from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import (
+    IAddNomenclatureToGroupFunction,
+)
+from asyncpg import PostgresError, UniqueViolationError
+from database.db import database, nomenclature_groups_value
 
 
 class AddNomenclatureToGroupFunction(IAddNomenclatureToGroupFunction):
@@ -26,10 +29,14 @@ class AddNomenclatureToGroupFunction(IAddNomenclatureToGroupFunction):
         except UniqueViolationError as error:
             self._parse_error(error, group_id, nomenclature_id)
 
-    def _parse_error(self, err: PostgresError, group_id: int, nomenclature_id: int) -> None:
-        if err.constraint_name == "uq_nomenclature_groups_value_nomenclature_id": # type: ignore
-            raise NomenclatureIdAlreadyExistsInGroupError(nomenclature_id, group_id) from err
-        elif err.constraint_name == "uq_nomenclature_groups_value_group_id_is_main": # type: ignore
+    def _parse_error(
+        self, err: PostgresError, group_id: int, nomenclature_id: int
+    ) -> None:
+        if err.constraint_name == "uq_nomenclature_groups_value_nomenclature_id":  # type: ignore
+            raise NomenclatureIdAlreadyExistsInGroupError(
+                nomenclature_id, group_id
+            ) from err
+        elif err.constraint_name == "uq_nomenclature_groups_value_group_id_is_main":  # type: ignore
             raise GroupAlreadyHaveIsMainError(group_id) from err
         else:
             raise err

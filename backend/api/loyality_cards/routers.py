@@ -2,37 +2,37 @@ from datetime import datetime
 from random import randint
 from typing import Optional
 
-import phonenumbers
-from fastapi import APIRouter, Depends, HTTPException
-from fuzzywuzzy import fuzz
-from phonenumbers import geocoder
-from sqlalchemy import func, select
-from sqlalchemy import or_
-
 import api.loyality_cards.schemas as schemas
+import phonenumbers
 from api.apple_wallet.utils import update_apple_wallet_pass
-from common.apple_wallet_service.impl.WalletPassService import WalletPassGeneratorService
+from common.apple_wallet_service.impl.WalletPassService import (
+    WalletPassGeneratorService,
+)
 from database.db import (
+    contragents,
     database,
     loyality_cards,
-    contragents,
-    organizations,
     loyality_settings,
+    organizations,
     users,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, Depends, HTTPException
 from functions.helpers import (
+    add_status,
+    build_filters,
+    clear_phone_number,
+    contr_org_ids_to_name,
     datetime_to_timestamp,
     get_entity_by_id,
-    add_status,
-    get_entity_by_id_cashbox,
-    contr_org_ids_to_name,
     get_entity_by_id_and_created_by,
+    get_entity_by_id_cashbox,
     get_filters_cards,
-    clear_phone_number,
-    build_filters,
+    get_user_by_token,
 )
-from functions.helpers import get_user_by_token
+from fuzzywuzzy import fuzz
+from phonenumbers import geocoder, region_code_for_number
+from sqlalchemy import func, or_, select
 from ws_manager import manager
 
 router = APIRouter(tags=["loyality_cards"])
@@ -213,6 +213,11 @@ async def new_loyality_card(
     for loyality_cards_values in loyality_card_data.dict()["__root__"]:
         tag_phone = None
         user_by_phone = None
+        loyality_cards_values["card_number"] = (
+            int("".join(filter(str.isdigit, loyality_cards_values["card_number"])))
+            if loyality_cards_values["card_number"]
+            else None
+        )
         if loyality_cards_values.get("tags"):
             tags_arr = loyality_cards_values["tags"].split(",")
 
@@ -278,39 +283,33 @@ async def new_loyality_card(
                         0, 9_223_372_036_854_775
                     )
         else:
-            loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
             phone_code = None
             is_phone_formatted = False
-            try:
-                phone_number_with_plus = (
-                    f"+{phone_number}"
-                    if not phone_number.startswith("+")
-                    else phone_number
-                )
-                number_phone_parsed = phonenumbers.parse(phone_number_with_plus, "RU")
-                phone_number = phonenumbers.format_number(
-                    number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
-                )
-                phone_code = geocoder.description_for_number(number_phone_parsed, "en")
-                is_phone_formatted = True
-                if not phone_code:
-                    phone_number = loyality_cards_values.get("phone_number")
-                    is_phone_formatted = False
-            except Exception:
+
+            if phone_number:
                 try:
-                    number_phone_parsed = phonenumbers.parse(phone_number, "RU")
-                    phone_number = phonenumbers.format_number(
-                        number_phone_parsed, phonenumbers.PhoneNumberFormat.E164
+                    # Конвертируем в строку и парсим
+                    phone_str = (
+                        str(phone_number)
+                        if not isinstance(phone_number, str)
+                        else phone_number
                     )
-                    phone_code = geocoder.description_for_number(
-                        number_phone_parsed, "en"
-                    )
-                    is_phone_formatted = True
-                    if not phone_code:
-                        phone_number = loyality_cards_values.get("phone_number")
-                        is_phone_formatted = False
+                    parsed_number = phonenumbers.parse(phone_str, "RU")
+
+                    if phonenumbers.is_valid_number(parsed_number):
+                        phone_code = geocoder.description_for_number(
+                            parsed_number, "en"
+                        )
+                        is_phone_formatted = True
+
+                        # Fallback если нет описания
+                        if not phone_code:
+                            country_code = region_code_for_number(parsed_number)
+                            if country_code:
+                                phone_code = country_code
                 except Exception:
-                    phone_number = loyality_cards_values.get("phone_number")
+                    # Любые ошибки при парсинге
+                    phone_code = None
                     is_phone_formatted = False
 
             q = contragents.select().where(
@@ -460,8 +459,17 @@ async def new_loyality_card(
         if card:
             inserted_ids.add(card.id)
         else:
+            if not loyality_cards_values["card_number"]:
+                loyality_cards_values["card_number"] = randint(0, 9_223_372_036_854_775)
             query = loyality_cards.insert().values(loyality_cards_values)
-            loyality_card_id = await database.execute(query)
+            try:
+                loyality_card_id = await database.execute(query)
+            except Exception as e:
+                print("ошибка при создании loyality_cards {}".format(e))
+                raise HTTPException(
+                    status_code=403,
+                    detail="запись существует",
+                )
             inserted_ids.add(loyality_card_id)
     print(inserted_ids)
     query = loyality_cards.select().where(
@@ -489,7 +497,10 @@ async def new_loyality_card(
     apple_wallet_service = WalletPassGeneratorService()
 
     for card in loyality_cards_db:
-        await apple_wallet_service.update_pass(card['id'])
+        try:
+            await apple_wallet_service.update_pass(card["id"])
+        except Exception as e:
+            print(e)
 
     return loyality_cards_db
 
@@ -543,7 +554,7 @@ async def edit_loyality_transaction(
         {"action": "edit", "target": "loyality_cards", "result": loyality_card_db},
     )
 
-    await update_apple_wallet_pass(loyality_card_db['id'])
+    await update_apple_wallet_pass(loyality_card_db["id"])
 
     return {**loyality_card_db, **{"data": {"status": "success"}}}
 

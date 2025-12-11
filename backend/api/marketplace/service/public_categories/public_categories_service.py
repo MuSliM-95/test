@@ -1,17 +1,18 @@
-from database.db import database, global_categories
-from sqlalchemy import select, func
-from fastapi import HTTPException, UploadFile
-from pathlib import Path
 import os
-from common.s3_service.impl.S3Client import S3Client
-from common.s3_service.models.S3SettingsModel import S3SettingsModel
 import uuid
 from datetime import datetime
+from pathlib import Path
+
+from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.public_categories.schema import (
     GlobalCategoryCreate,
     GlobalCategoryUpdate,
 )
-from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
+from common.s3_service.impl.S3Client import S3Client
+from common.s3_service.models.S3SettingsModel import S3SettingsModel
+from database.db import database, global_categories
+from fastapi import HTTPException, UploadFile
+from sqlalchemy import func, select
 
 S3_BUCKET_NAME = "5075293c-docs_generated"
 S3_FOLDER = "photos"
@@ -127,7 +128,6 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
     ):
         check_query = select(global_categories).where(
             global_categories.c.id == category_id,
-            global_categories.c.is_active.is_(True),
         )
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
@@ -161,7 +161,6 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
     async def delete_global_category(self, category_id: int):
         check_query = select(global_categories).where(
             global_categories.c.id == category_id,
-            global_categories.c.is_active.is_(True),
         )
         existing_category = await database.fetch_one(check_query)
         if not existing_category:
@@ -179,7 +178,6 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
     async def upload_category_image(self, category_id: int, file: UploadFile):
         check_query = select(global_categories).where(
             global_categories.c.id == category_id,
-            global_categories.c.is_active.is_(True),
         )
         existing_category = await database.fetch_one(check_query)
         if not existing_category:

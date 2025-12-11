@@ -1,14 +1,8 @@
 import json
 from xml.sax.saxutils import escape
 
-from fastapi import HTTPException
-
-from database.db import feeds, database
-
 from api.feeds.feed_generator.criterias.filters import FeedCriteriaFilter
-
-
-from api.feeds.schemas import ALLOWED_DB_FIELDS
+from database.db import database, feeds
 from starlette.responses import Response
 
 
@@ -30,7 +24,9 @@ class FeedGenerator:
         if not feed:
             return None
 
-        filter = FeedCriteriaFilter(json.loads(self.feed.criteria), self.feed.cashbox_id)
+        filter = FeedCriteriaFilter(
+            json.loads(self.feed.criteria), self.feed.cashbox_id
+        )
         balance = await filter.get_warehouse_balance()
 
         root_tag = feed["root_tag"]
@@ -64,7 +60,3 @@ class FeedGenerator:
         response = Response(content=xml_str, media_type="application/xml")
         response.headers["Cache-Control"] = "public, max-age=60"
         return response
-
-
-
-

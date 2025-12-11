@@ -1,19 +1,17 @@
 import os
+from datetime import datetime
 from typing import Optional
 
-import requests
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-
-from database.db import database, users_cboxes_relation, cheques
-
-import functions.filter_schemas as filter_schemas
 import api.cheques.schemas as cheque_schemas
-
+import functions.filter_schemas as filter_schemas
+import requests
+from database.db import cheques, database, users_cboxes_relation
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from functions.helpers import get_filters_cheques
-from datetime import datetime
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 router = APIRouter(tags=["FNS-Check"])
+
 
 @router.get("/cheques/{id}/", response_model=cheque_schemas.Cheque)
 async def get_cheque_by_id(token: str, id: int):
@@ -30,7 +28,9 @@ async def get_cheque_by_id(token: str, id: int):
             if article_db:
                 return article_db
             else:
-                raise HTTPException(status_code=404, detail="У вас нет чека с таким id.")
+                raise HTTPException(
+                    status_code=404, detail="У вас нет чека с таким id."
+                )
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
@@ -58,7 +58,6 @@ async def get_cheques(
 
             cheques_db = await database.fetch_all(query)
 
-
             q = (
                 select(func.count(cheques.c.id))
                 .where(cheques.c.cashbox == user.cashbox_id)
@@ -66,14 +65,15 @@ async def get_cheques(
             )
             cheques_db_count = await database.fetch_one(q)
 
-
             return {"result": cheques_db, "count": cheques_db_count.count_1}
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
 
 @router.post("/cheques/", response_model=cheque_schemas.Cheque)
-async def new_cheque(token: str, raw_qr: str = "", qrfile: Optional[UploadFile] = File(None)):
+async def new_cheque(
+    token: str, raw_qr: str = "", qrfile: Optional[UploadFile] = File(None)
+):
     """Создание чека"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
     user = await database.fetch_one(query)
@@ -87,7 +87,9 @@ async def new_cheque(token: str, raw_qr: str = "", qrfile: Optional[UploadFile] 
                 file_bytes = await qrfile.read()
                 req_files = {"qrfile": file_bytes}
             else:
-                raise HTTPException(400, "Значение не получено. Введите или строку, или картинку.")
+                raise HTTPException(
+                    400, "Значение не получено. Введите или строку, или картинку."
+                )
             req = requests.post(
                 "https://proverkacheka.com/api/v1/check/get",
                 data=req_data,
@@ -95,7 +97,10 @@ async def new_cheque(token: str, raw_qr: str = "", qrfile: Optional[UploadFile] 
             )
             data = req.json()
             if data["code"] != 1:
-                raise HTTPException(400, f"Не удалось получить данные по чеку. Код ответа: {data['code']}")
+                raise HTTPException(
+                    400,
+                    f"Не удалось получить данные по чеку. Код ответа: {data['code']}",
+                )
             cheque_data = data["data"]["json"]
 
             created = int(datetime.utcnow().timestamp())
