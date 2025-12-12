@@ -321,6 +321,72 @@ deploy_another_services() {
     /bin/bash -c "python3 notification_consumer.py"
 }
 
+apply_migrations() {
+  echo "Проверка состояния миграций Alembic..."
+
+  TEMP_CONTAINER="alembic_temp_$(date +%s)"
+  docker run -d \
+    --name "$TEMP_CONTAINER" \
+    --network infrastructure \
+    -e POSTGRES_USER="$POSTGRES_USER" \
+    -e POSTGRES_PASS="$POSTGRES_PASS" \
+    -e POSTGRES_HOST="$POSTGRES_HOST" \
+    -e POSTGRES_PORT="$POSTGRES_PORT" \
+    --entrypoint sleep \
+    "$IMAGE_NAME" \
+    300
+
+  until docker exec "$TEMP_CONTAINER" ls /backend/alembic.ini &>/dev/null; do
+    echo "Ожидание запуска временного контейнера..."
+    sleep 2
+  done
+
+  run_alembic() {
+    docker exec "$TEMP_CONTAINER" python -m alembic "$@"
+  }
+
+  echo "Текущий статус миграций:"
+  if ! run_alembic current; then
+    echo "Не удалось определить текущий статус миграций"
+    docker rm -f "$TEMP_CONTAINER" >/dev/null
+    return 1
+  fi
+
+  HEADS=$(run_alembic heads --verbose 2>/dev/null | wc -l)
+  if [ "$HEADS" -gt 1 ]; then
+    echo "Обнаружено несколько head ($HEADS). Выполняем объединение..."
+    run_alembic merge -m "Auto-merge heads during CI/CD deployment" || {
+      echo "Не удалось объединить миграции"
+      docker rm -f "$TEMP_CONTAINER" >/dev/null
+      return 1
+    }
+    echo "Миграции объединены"
+  fi
+
+  CURRENT=$(run_alembic current --verbose 2>/dev/null)
+  HEAD=$(run_alembic heads 2>/dev/null | head -n1 | cut -d' ' -f1)
+
+  if [ -n "$HEAD" ] && [ "$CURRENT" != "$HEAD" ]; then
+    echo "Обнаружены неприменённые миграции. Применяем..."
+    if run_alembic upgrade head; then
+      echo "Все миграции успешно применены"
+    else
+      echo "Ошибка при применении миграций"
+      docker rm -f "$TEMP_CONTAINER" >/dev/null
+      return 1
+    fi
+  else
+    echo "Миграции в актуальном состоянии"
+  fi
+
+  docker rm -f "$TEMP_CONTAINER" >/dev/null
+}
+
+apply_migrations || {
+  echo "Миграции не прошли — отмена деплоя"
+  exit 1
+}
+
 deploy_new_version
 deploy_new_bot_version
 deploy_another_services
