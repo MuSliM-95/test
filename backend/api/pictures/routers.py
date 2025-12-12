@@ -14,8 +14,13 @@ import api.pictures.schemas as schemas
 from database import db
 from database.db import database, pictures
 from functions.filter_schemas import PicturesFiltersQuery
-from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_user_by_token
+from functions.helpers import (
+    datetime_to_timestamp,
+    get_entity_by_id,
+    get_user_by_token,
+)
 from ws_manager import manager
+
 
 # Поддерживаемые MIME-типы и соответствующие расширения
 ALLOWED_CONTENT_TYPES = {
@@ -61,7 +66,7 @@ async def get_picture_by_id(token: str, idx: int):
 
 
 @router.get("/photos/{filename}/")
-async def get_picture_by_filename_endpoint(filename: str, token: str):
+async def get_picture_link_by_id(filename: str, token: str):
     """Получение файла по имени (безопасно, с проверкой прав)"""
     if not re.match(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE):
         raise HTTPException(status_code=400, detail="Недопустимое имя файла")
