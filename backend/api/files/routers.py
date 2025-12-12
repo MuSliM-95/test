@@ -1,5 +1,4 @@
 import io
-import json
 from datetime import datetime
 from os import environ
 from uuid import uuid4
