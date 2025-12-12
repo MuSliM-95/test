@@ -55,6 +55,7 @@ class PromocodeService:
                 "description": "Начисление баллов",
                 "status": True,
                 "external_id": str(promo_id),
+                "is_deleted": False,
                 "created_at": now,
                 "updated_at": now,
             }
