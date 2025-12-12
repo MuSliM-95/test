@@ -91,10 +91,14 @@ services:
       - nginx-proxy
 
   adminer:
-    image: adminer
+    image: adminer:4.8.1
     restart: always
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      # ADMINER_DESIGN: pepa-lined
     networks:
       - nginx-proxy
+      - infrastructure
     depends_on:
       - db
 
