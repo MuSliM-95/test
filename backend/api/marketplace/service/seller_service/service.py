@@ -1,24 +1,20 @@
+import io
 import os
+from os import environ
 from typing import Optional
+from uuid import uuid4
 
 import aioboto3
-import io
-
-from uuid import uuid4
-from os import environ
-
-from fastapi import HTTPException, status, UploadFile
-from sqlalchemy import select, update, func
-from databases import Database
-
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.seller_service.schemas import (
-    SellerUpdateRequest,
     SellerResponse,
+    SellerUpdateRequest,
 )
-from database.db import database, cboxes, users
+from database.db import cboxes, database, users
+from databases import Database
+from fastapi import HTTPException, UploadFile
 from functions.helpers import get_user_by_token
-
+from sqlalchemy import func, select
 
 s3_session = aioboto3.Session()
 s3_data = {
@@ -56,7 +52,6 @@ class MarketplaceSellerService(BaseMarketplaceService):
         user = await get_user_by_token(token)
         cashbox_id = user.cashbox_id
 
-
         # 2. Проверяем, что селлер существует и вытаскиваем admin_id
         cashbox = await db.fetch_one(
             select(
@@ -80,7 +75,9 @@ class MarketplaceSellerService(BaseMarketplaceService):
             new_photo_path = f"photos/seller_{cashbox_id}_{uuid4().hex[:8]}.{file_ext}"
 
             async with s3_session.client(**s3_data) as s3:
-                await s3.upload_fileobj(io.BytesIO(file_bytes), bucket_name, new_photo_path)
+                await s3.upload_fileobj(
+                    io.BytesIO(file_bytes), bucket_name, new_photo_path
+                )
 
         # 4. Обновляем БД (имя/описание/фото)
         async with db.transaction():

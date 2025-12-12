@@ -5,13 +5,14 @@ Revises: eb6139bd2209
 Create Date: 2025-12-02 14:10:41.304447
 
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'bb88229e9ffd'
-down_revision = 'eb6139bd2209'
+revision = "bb88229e9ffd"
+down_revision = "eb6139bd2209"
 branch_labels = None
 depends_on = None
 
@@ -36,7 +37,9 @@ def upgrade() -> None:
             sa.Column("user_id", sa.Integer(), nullable=True),
             sa.Column(
                 "status",
-                sa.Enum("active", "canceled", "deleted", name="status", create_type=False),
+                sa.Enum(
+                    "active", "canceled", "deleted", name="status", create_type=False
+                ),
                 nullable=True,
             ),
             sa.Column(
@@ -88,11 +91,17 @@ def upgrade() -> None:
             sa.Column("nomenclature_id", sa.Integer(), nullable=True),
             sa.Column(
                 "status",
-                sa.Enum("active", "canceled", "deleted", name="status", create_type=False),
+                sa.Enum(
+                    "active", "canceled", "deleted", name="status", create_type=False
+                ),
                 nullable=True,
             ),
-            sa.Column("production_order_id", postgresql.UUID(as_uuid=True), nullable=True),
-            sa.Column("consumption_order_id", postgresql.UUID(as_uuid=True), nullable=True),
+            sa.Column(
+                "production_order_id", postgresql.UUID(as_uuid=True), nullable=True
+            ),
+            sa.Column(
+                "consumption_order_id", postgresql.UUID(as_uuid=True), nullable=True
+            ),
             sa.ForeignKeyConstraint(["nomenclature_id"], ["nomenclature.id"]),
             sa.ForeignKeyConstraint(["tech_card_id"], ["tech_cards.id"]),
             sa.ForeignKeyConstraint(["user_id"], ["relation_tg_cashboxes.id"]),
@@ -134,11 +143,13 @@ def downgrade() -> None:
     op.drop_table("tech_cards")
     # Удаляем ENUM-ы, если они есть
     for enum_name in ["card_type", "status"]:
-        op.execute(f"""
+        op.execute(
+            f"""
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM pg_type WHERE typname = '{enum_name}') THEN
                     DROP TYPE {enum_name};
                 END IF;
             END$$;
-        """)
+        """
+        )

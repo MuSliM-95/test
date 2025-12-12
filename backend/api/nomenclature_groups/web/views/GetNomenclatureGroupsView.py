@@ -1,8 +1,9 @@
 from typing import Annotated
 
+from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import (
+    INomenclatureGroupsReader,
+)
 from fastapi import Query
-
-from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import INomenclatureGroupsReader
 from functions.helpers import get_user_by_token
 
 

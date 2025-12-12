@@ -5,9 +5,18 @@ from enum import Enum as ENUM
 
 import databases
 import sqlalchemy
+from database.enums import (
+    ContragentType,
+    DebitCreditType,
+    Gender,
+    Repeatability,
+    TriggerTime,
+    TriggerType,
+)
 from dotenv import load_dotenv
 from sqlalchemy import (
     ARRAY,
+    BIGINT,
     JSON,
     BigInteger,
     Boolean,
@@ -16,28 +25,18 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
-    SmallInteger,
-    BIGINT,
     text,
-    Index,
 )
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql import func
-
-from database.enums import (
-    Repeatability,
-    DebitCreditType,
-    Gender,
-    ContragentType,
-    TriggerType,
-    TriggerTime,
-)
 
 load_dotenv()
 
@@ -3182,6 +3181,7 @@ chats = sqlalchemy.Table(
     sqlalchemy.Column("last_message_time", DateTime, nullable=True),
     sqlalchemy.Column("last_response_time_seconds", Integer, nullable=True),
     sqlalchemy.Column("metadata", JSON, nullable=True),
+    sqlalchemy.Column("name", String(100), nullable=True),
     sqlalchemy.Column(
         "created_at", DateTime, nullable=False, server_default=func.now()
     ),

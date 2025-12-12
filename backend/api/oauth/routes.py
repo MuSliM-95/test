@@ -1,9 +1,15 @@
-from typing import Annotated
-from .utils import create_access_token, create_refresh_token, oauth2_scheme, decode_jwt, parse_openapi_json, get_jwt_groups
-from fastapi import APIRouter, HTTPException, Depends, Request
-from .shemas import OAuthCustomRequestForm
 from database.db import database, integrations
+from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import JWTError
+
+from .shemas import OAuthCustomRequestForm
+from .utils import (
+    create_access_token,
+    create_refresh_token,
+    decode_jwt,
+    get_jwt_groups,
+    parse_openapi_json,
+)
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 
@@ -13,15 +19,12 @@ async def login(form_data: OAuthCustomRequestForm = Depends()):
     query = integrations.select().where(
         integrations.c.client_secret == form_data.client_secret,
         integrations.c.code == form_data.custom_token,
-        integrations.c.owner == form_data.client_id
+        integrations.c.owner == form_data.client_id,
     )
     integration = await database.fetch_one(query)
     if integration:
         scopes = integration.scopes.split()
-        jwt_data = {
-            "scopes": scopes,
-            "client_id": form_data.client_id
-            }
+        jwt_data = {"scopes": scopes, "client_id": form_data.client_id}
         return {
             "access_token": create_access_token(jwt_data),
             "refresh_token": create_refresh_token(jwt_data),
@@ -37,11 +40,11 @@ async def refresh_response(refresh_token: str, client_id: int):
             return {
                 "access_token": create_access_token({}),
                 "refresh_token": create_refresh_token({}),
-                "scopes": payload["scopes"]
+                "scopes": payload["scopes"],
             }
     except JWTError:
         raise HTTPException(status_code=403, detail="Неккоректные данные")
-    
+
 
 @router.get("/jwt_scopes/")
 async def get_jwt_scopes(request: Request):

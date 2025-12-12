@@ -1,11 +1,10 @@
-
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -59,16 +58,18 @@ class TinkoffApiService:
         if not self.is_test:
             try:
                 tomorrow = datetime.now() + timedelta(hours=24)
-                request_data["RedirectDueDate"] = tomorrow.strftime("%Y-%m-%dT%H:%M:%S+03:00")
+                request_data["RedirectDueDate"] = tomorrow.strftime(
+                    "%Y-%m-%dT%H:%M:%S+03:00"
+                )
             except Exception:
                 pass
 
-        from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
-        
+        from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
         parsed = urlparse(return_url)
         base_path = parsed.path.rstrip("/")
         query_params = parsed.query
-        
+
         use_as_is = False
         if "use_as_is=true" in return_url.lower():
             use_as_is = True
@@ -76,16 +77,43 @@ class TinkoffApiService:
                 params = parse_qs(query_params)
                 params.pop("use_as_is", None)
                 query_params = urlencode(params, doseq=True)
-        
+
         if use_as_is:
-            success_url = urlunparse((parsed.scheme, parsed.netloc, base_path, parsed.params, query_params, parsed.fragment))
+            success_url = urlunparse(
+                (
+                    parsed.scheme,
+                    parsed.netloc,
+                    base_path,
+                    parsed.params,
+                    query_params,
+                    parsed.fragment,
+                )
+            )
             fail_url = success_url
         else:
             success_path = f"{base_path}/success" if base_path else "/success"
             fail_path = f"{base_path}/fail" if base_path else "/fail"
-            
-            success_url = urlunparse((parsed.scheme, parsed.netloc, success_path, parsed.params, query_params, parsed.fragment))
-            fail_url = urlunparse((parsed.scheme, parsed.netloc, fail_path, parsed.params, query_params, parsed.fragment))
+
+            success_url = urlunparse(
+                (
+                    parsed.scheme,
+                    parsed.netloc,
+                    success_path,
+                    parsed.params,
+                    query_params,
+                    parsed.fragment,
+                )
+            )
+            fail_url = urlunparse(
+                (
+                    parsed.scheme,
+                    parsed.netloc,
+                    fail_path,
+                    parsed.params,
+                    query_params,
+                    parsed.fragment,
+                )
+            )
 
         if not notification_url:
             domain = f"{parsed.scheme}://{parsed.netloc}"
@@ -97,7 +125,7 @@ class TinkoffApiService:
 
         token = self._generate_token(request_data)
         request_data["Token"] = token
-        
+
         if data:
             request_data["DATA"] = data
         if receipt:
@@ -166,7 +194,9 @@ class TinkoffApiService:
             request_data["Amount"] = amount
         return await self._make_request("Cancel", request_data)
 
-    async def _make_request(self, method: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _make_request(
+        self, method: str, request_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         request_data["TerminalKey"] = self.terminal_key
         token = self._generate_token(request_data)
         request_data["Token"] = token
@@ -209,19 +239,19 @@ class TinkoffApiService:
     ) -> Dict[str, Any]:
         if items is None:
             items = []
-        
+
         formatted_items = []
         for item in items:
             if "name" not in item:
                 raise ValueError("Item must have 'name' field")
-            
+
             price = int(item.get("price", 0) * 100)  # Конвертируем в копейки
             quantity = item.get("quantity", 1)
             if "amount" in item:
                 amount = int(item["amount"] * 100)
             else:
                 amount = price * quantity
-            
+
             formatted_item = {
                 "Name": item["name"],
                 "Price": price,
@@ -233,20 +263,20 @@ class TinkoffApiService:
                 "MeasurementUnit": item.get("measurement_unit", "шт"),
             }
             formatted_items.append(formatted_item)
-        
+
         receipt = {
             "EmailCompany": email if email else "noreply@tablecrm.com",
             "Taxation": taxation,
             "FfdVersion": ffd_version,
             "Items": formatted_items,
         }
-        
+
         if phone:
             receipt["Phone"] = phone
-        
+
         if customer:
             receipt["Customer"] = customer
-        
+
         return receipt
 
     def map_tinkoff_status_to_internal(self, tinkoff_status: str) -> str:
@@ -263,4 +293,3 @@ class TinkoffApiService:
             "3DS_CHECKED": "pending",
         }
         return status_mapping.get(tinkoff_status, "pending")
-

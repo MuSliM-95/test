@@ -1,19 +1,28 @@
 import json
 
 import aiohttp
+from database.db import (
+    TypeCustomField,
+    amo_custom_fields,
+    amo_install_custom_fields,
+    database,
+)
 from sqlalchemy import or_
-
-from database.db import amo_custom_fields, amo_install_custom_fields, TypeCustomField, database
 
 
 async def get_amo_codes_leads(cashbox_id: int):
     query = (
         amo_custom_fields.select()
-        .outerjoin(amo_install_custom_fields, amo_custom_fields.c.id == amo_install_custom_fields.c.custom_field_id)
-        .where(or_(
-            amo_install_custom_fields.c.cashbox_id == cashbox_id,
-            amo_install_custom_fields.c.id.is_(None)
-        ))
+        .outerjoin(
+            amo_install_custom_fields,
+            amo_custom_fields.c.id == amo_install_custom_fields.c.custom_field_id,
+        )
+        .where(
+            or_(
+                amo_install_custom_fields.c.cashbox_id == cashbox_id,
+                amo_install_custom_fields.c.id.is_(None),
+            )
+        )
         .where(amo_custom_fields.c.type_entity == TypeCustomField.Lead)
     )
     amo_custom_fields_list = await database.fetch_all(query)
@@ -23,11 +32,16 @@ async def get_amo_codes_leads(cashbox_id: int):
 async def get_amo_codes_contacts(cashbox_id: int):
     query = (
         amo_custom_fields.select()
-        .outerjoin(amo_install_custom_fields, amo_custom_fields.c.id == amo_install_custom_fields.c.custom_field_id)
-        .where(or_(
-            amo_install_custom_fields.c.cashbox_id == cashbox_id,
-            amo_install_custom_fields.c.id.is_(None)
-        ))
+        .outerjoin(
+            amo_install_custom_fields,
+            amo_custom_fields.c.id == amo_install_custom_fields.c.custom_field_id,
+        )
+        .where(
+            or_(
+                amo_install_custom_fields.c.cashbox_id == cashbox_id,
+                amo_install_custom_fields.c.id.is_(None),
+            )
+        )
         .where(amo_custom_fields.c.type_entity == TypeCustomField.Contact)
     )
     amo_custom_fields_list = await database.fetch_all(query)
@@ -35,7 +49,7 @@ async def get_amo_codes_contacts(cashbox_id: int):
 
 
 async def create_amo_group_contacts(referer: str, access_token: str):
-    headers = {'Authorization': f'Bearer {access_token}'}
+    headers = {"Authorization": f"Bearer {access_token}"}
     group_id = None
 
     async with aiohttp.ClientSession(headers=headers) as http_session:
@@ -50,12 +64,7 @@ async def create_amo_group_contacts(referer: str, access_token: str):
                             group_id = group["id"]
 
         if not group_id:
-            data = [
-                {
-                    "name": "Tablecrm",
-                    "sort": 2
-                }
-            ]
+            data = [{"name": "Tablecrm", "sort": 2}]
             async with http_session.post(url, data=json.dumps(data)) as groups_resp:
                 groups_resp.raise_for_status()
                 resp_json = await groups_resp.json()
@@ -68,7 +77,7 @@ async def create_amo_group_contacts(referer: str, access_token: str):
 
 
 async def create_amo_group_leads(referer: str, access_token: str):
-    headers = {'Authorization': f'Bearer {access_token}'}
+    headers = {"Authorization": f"Bearer {access_token}"}
     group_id = None
 
     async with aiohttp.ClientSession(headers=headers) as http_session:
@@ -84,12 +93,7 @@ async def create_amo_group_leads(referer: str, access_token: str):
                             group_id = group["id"]
 
         if not group_id:
-            data = [
-                {
-                    "name": "Tablecrm",
-                    "sort": 2
-                }
-            ]
+            data = [{"name": "Tablecrm", "sort": 2}]
             async with http_session.post(url, data=json.dumps(data)) as groups_resp:
                 groups_resp.raise_for_status()
                 resp_json = await groups_resp.json()
@@ -103,7 +107,7 @@ async def create_amo_group_leads(referer: str, access_token: str):
 
 async def post_custom_fields_leads(fields_predata, referer: str, access_token: str):
     field_ids = []
-    headers = {'Authorization': f'Bearer {access_token}'}
+    headers = {"Authorization": f"Bearer {access_token}"}
     async with aiohttp.ClientSession(headers=headers) as http_session:
         url = f"https://{referer}/api/v4/leads/custom_fields"
         request_json = json.dumps(fields_predata)
@@ -119,7 +123,7 @@ async def post_custom_fields_leads(fields_predata, referer: str, access_token: s
 
 async def post_custom_fields_contacts(fields_predata, referer: str, access_token: str):
     field_ids = []
-    headers = {'Authorization': f'Bearer {access_token}'}
+    headers = {"Authorization": f"Bearer {access_token}"}
     async with aiohttp.ClientSession(headers=headers) as http_session:
         url = f"https://{referer}/api/v4/contacts/custom_fields"
         request_json = json.dumps(fields_predata)
@@ -134,12 +138,9 @@ async def post_custom_fields_contacts(fields_predata, referer: str, access_token
 
 
 async def create_custom_fields_leads(cashbox_id: int, referer: str, access_token: str):
-    amo_custom_fields_list = await get_amo_codes_leads(
-        cashbox_id=cashbox_id
-    )
+    amo_custom_fields_list = await get_amo_codes_leads(cashbox_id=cashbox_id)
     amo_codes = await get_custom_fields_codes_leads(
-        referer=referer,
-        access_token=access_token
+        referer=referer, access_token=access_token
     )
     must_create_fields = []
     for amo_custom_field in amo_custom_fields_list:
@@ -147,23 +148,24 @@ async def create_custom_fields_leads(cashbox_id: int, referer: str, access_token
             must_create_fields.append(amo_custom_field)
     if must_create_fields:
         group_id = await create_amo_group_leads(
-            referer=referer,
-            access_token=access_token
+            referer=referer, access_token=access_token
         )
         if group_id:
             fields_predata = []
             for amo_custom_field in must_create_fields:
-                fields_predata.append({
-                    "code": amo_custom_field.code,
-                    "name": amo_custom_field.name,
-                    "type": amo_custom_field.type,
-                    "group_id": group_id
-                })
+                fields_predata.append(
+                    {
+                        "code": amo_custom_field.code,
+                        "name": amo_custom_field.name,
+                        "type": amo_custom_field.type,
+                        "group_id": group_id,
+                    }
+                )
             if fields_predata:
                 field_ids = await post_custom_fields_leads(
                     fields_predata=fields_predata,
                     referer=referer,
-                    access_token=access_token
+                    access_token=access_token,
                 )
                 if field_ids:
                     print(f"КАСТОМНЫЕ ПОЛЯ AMO {referer} УСПЕШНО СОЗДАНЫ")
@@ -171,13 +173,12 @@ async def create_custom_fields_leads(cashbox_id: int, referer: str, access_token
             print(f"ПРИ СОЗДАНИИ КАСТОМНЫХ ПОЛЕЙ AMO {referer} ПРОИЗОШЛА ОШИБКА")
 
 
-async def create_custom_fields_contacts(cashbox_id: int, referer: str, access_token: str):
-    amo_custom_fields_list = await get_amo_codes_contacts(
-        cashbox_id=cashbox_id
-    )
+async def create_custom_fields_contacts(
+    cashbox_id: int, referer: str, access_token: str
+):
+    amo_custom_fields_list = await get_amo_codes_contacts(cashbox_id=cashbox_id)
     amo_codes = await get_custom_fields_codes_contacts(
-        referer=referer,
-        access_token=access_token
+        referer=referer, access_token=access_token
     )
     must_create_fields = []
     for amo_custom_field in amo_custom_fields_list:
@@ -185,23 +186,24 @@ async def create_custom_fields_contacts(cashbox_id: int, referer: str, access_to
             must_create_fields.append(amo_custom_field)
     if must_create_fields:
         group_id = await create_amo_group_contacts(
-            referer=referer,
-            access_token=access_token
+            referer=referer, access_token=access_token
         )
         if group_id:
             fields_predata = []
             for amo_custom_field in must_create_fields:
-                fields_predata.append({
-                    "code": amo_custom_field.code,
-                    "name": amo_custom_field.name,
-                    "type": amo_custom_field.type,
-                    "group_id": group_id
-                })
+                fields_predata.append(
+                    {
+                        "code": amo_custom_field.code,
+                        "name": amo_custom_field.name,
+                        "type": amo_custom_field.type,
+                        "group_id": group_id,
+                    }
+                )
             if fields_predata:
                 field_ids = await post_custom_fields_contacts(
                     fields_predata=fields_predata,
                     referer=referer,
-                    access_token=access_token
+                    access_token=access_token,
                 )
                 if field_ids:
                     print(f"КАСТОМНЫЕ ПОЛЯ AMO {referer} УСПЕШНО СОЗДАНЫ")
@@ -211,8 +213,8 @@ async def create_custom_fields_contacts(cashbox_id: int, referer: str, access_to
 
 async def get_custom_fields_codes_leads(referer: str, access_token: str):
     codes = []
-    custom_fields_url = f'https://{referer}/api/v4/leads/custom_fields'
-    headers = {'Authorization': f'Bearer {access_token}'}
+    custom_fields_url = f"https://{referer}/api/v4/leads/custom_fields"
+    headers = {"Authorization": f"Bearer {access_token}"}
     async with aiohttp.ClientSession(headers=headers) as session:
         async with session.get(custom_fields_url) as response:
             response.raise_for_status()
@@ -225,8 +227,8 @@ async def get_custom_fields_codes_leads(referer: str, access_token: str):
 
 async def get_custom_fields_codes_contacts(referer: str, access_token: str):
     codes = []
-    custom_fields_url = f'https://{referer}/api/v4/contacts/custom_fields'
-    headers = {'Authorization': f'Bearer {access_token}'}
+    custom_fields_url = f"https://{referer}/api/v4/contacts/custom_fields"
+    headers = {"Authorization": f"Bearer {access_token}"}
     async with aiohttp.ClientSession(headers=headers) as session:
         async with session.get(custom_fields_url) as response:
             response.raise_for_status()

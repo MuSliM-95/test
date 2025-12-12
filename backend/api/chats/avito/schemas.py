@@ -1,17 +1,16 @@
-from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
 
 
 class AvitoCredentialsCreate(BaseModel):
     api_key: str
     api_secret: str
+
     class Config:
         json_schema_extra = {
-            "example": {
-                "api_key": "your_client_id",
-                "api_secret": "your_client_secret"
-            }
+            "example": {"api_key": "your_client_id", "api_secret": "your_client_secret"}
         }
 
 
@@ -20,7 +19,7 @@ class AvitoCredentialsResponse(BaseModel):
     channel_id: int
     cashbox_id: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -30,14 +29,14 @@ class AvitoUser(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     rating: Optional[float] = None
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "user_id": "123456",
                 "name": "Иван Петров",
                 "phone": "+79991234567",
-                "rating": 4.5
+                "rating": 4.5,
             }
         }
 
@@ -49,7 +48,7 @@ class AvitoMessage(BaseModel):
     text: str
     created_at: str
     attachments: Optional[list] = None
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -58,29 +57,26 @@ class AvitoMessage(BaseModel):
                 "user": {
                     "user_id": "123456",
                     "name": "Иван Петров",
-                    "phone": "+79991234567"
+                    "phone": "+79991234567",
                 },
                 "text": "Привет, есть товар в наличии?",
                 "created_at": "2025-11-12T10:30:00Z",
-                "attachments": []
+                "attachments": [],
             }
         }
 
 
 class AvitoWebhookEvent(BaseModel):
-    event_type: str  
+    event_type: str
     data: Dict[str, Any]
     timestamp: str
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "event_type": "message_received",
-                "data": {
-                    "message_id": "msg_123456",
-                    "chat_id": "chat_789"
-                },
-                "timestamp": "2025-11-12T10:30:00Z"
+                "data": {"message_id": "msg_123456", "chat_id": "chat_789"},
+                "timestamp": "2025-11-12T10:30:00Z",
             }
         }
 
@@ -101,7 +97,7 @@ class AvitoSyncResponse(BaseModel):
 
 class AvitoWebhookRegisterRequest(BaseModel):
     webhook_url: str
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -201,6 +197,7 @@ class AvitoChatMetadataResponse(BaseModel):
 
 class AvitoOAuthAuthorizeResponse(BaseModel):
     """Ответ с URL для OAuth авторизации"""
+
     authorization_url: str
     state: Optional[str] = None
     message: str = "Перейдите по ссылке для авторизации в Avito"
@@ -208,6 +205,7 @@ class AvitoOAuthAuthorizeResponse(BaseModel):
 
 class AvitoOAuthCallbackResponse(BaseModel):
     """Ответ после успешного OAuth callback"""
+
     success: bool
     message: str
     channel_id: Optional[int] = None

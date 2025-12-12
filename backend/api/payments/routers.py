@@ -2,51 +2,55 @@ import asyncio
 from datetime import datetime
 from typing import List
 
-import pytz
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from sqlalchemy import desc, func, select, distinct, and_
-
 import api.payments.schemas as pay_schemas
 import functions.filter_schemas as filter_schemas
+import pytz
 from api.articles.schemas import Article
 from api.cheques.schemas import Cheque
 from api.contragents.schemas import Contragent
 from api.projects.schemas import Project
 from const import PaymentType
 from database.db import (
-    database,
-    users_cboxes_relation,
-    payments,
-    pboxes,
-    projects,
-    users,
     articles,
     cheques,
     contragents,
-    user_permissions,
-    docs_sales,
+    database,
     docs_purchases,
-    entity_to_entity
+    docs_sales,
+    entity_to_entity,
+    payments,
+    pboxes,
+    projects,
+    user_permissions,
+    users,
+    users_cboxes_relation,
 )
-from functions.helpers import get_filters, check_user_permission, hide_balance_for_non_admin, build_sql_filters
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from functions.helpers import (
+    build_sql_filters,
+    check_user_permission,
+    get_filters,
+    hide_balance_for_non_admin,
+)
 from functions.users import raschet
-from ws_manager import manager
 from producer import queue_notification
+from sqlalchemy import and_, desc, distinct, func, select
+from ws_manager import manager
 
 router = APIRouter(tags=["payments"])
 
 
 @router.get("/payments/", response_model=pay_schemas.GetPaymentsBasic)
 async def read_payments_list(
-        token: str,
-        filters: filter_schemas.PaymentFiltersQuery = Depends(),
-        cu_filters: filter_schemas.CUIntegerFilters = Depends(),
-        offset: int = 0,
-        limit: int = 100,
-        sort: str = "created_at:desc",
-        created_by: str = None,
-        _with: str = None,
-        detail_json: str = "",
+    token: str,
+    filters: filter_schemas.PaymentFiltersQuery = Depends(),
+    cu_filters: filter_schemas.CUIntegerFilters = Depends(),
+    offset: int = 0,
+    limit: int = 100,
+    sort: str = "created_at:desc",
+    created_by: str = None,
+    _with: str = None,
+    detail_json: str = "",
 ):
     """Получение списка платежей (с фильтрами или без)"""
 
@@ -56,7 +60,9 @@ async def read_payments_list(
             pay_dict = dict(pay)
 
             # определяем может ли юзер изменять payment
-            pay_dict["can_be_deleted_or_edited"] = await can_user_edit_payment(cashbox_user, pay_dict)
+            pay_dict["can_be_deleted_or_edited"] = await can_user_edit_payment(
+                cashbox_user, pay_dict
+            )
             pay_dict["repeat"] = {
                 "repeat_parent_id": pay_dict["repeat_parent_id"],
                 "repeat_period": pay_dict["repeat_period"],
@@ -75,15 +81,14 @@ async def read_payments_list(
                 paybox_info = await database.fetch_one(paybox_query)
                 if paybox_info:
                     has_permission = await check_user_permission(
-                        user.id,
-                        user.cashbox_id,
-                        "pboxes",
-                        paybox_info.id
+                        user.id, user.cashbox_id, "pboxes", paybox_info.id
                     )
 
                     if has_permission:
                         paybox_info_dict = dict(paybox_info)
-                        paybox_info_dict = await hide_balance_for_non_admin(user, paybox_info_dict)
+                        paybox_info_dict = await hide_balance_for_non_admin(
+                            user, paybox_info_dict
+                        )
 
                         pay_dict["source_account_name"] = paybox_info_dict["name"]
                         pay_dict["source_account_id"] = paybox_info_dict["id"]
@@ -162,14 +167,22 @@ async def read_payments_list(
 
     has_permission = await check_user_permission(user.id, user.cashbox_id, "payments")
     if not has_permission:
-        raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра платежей")
+        raise HTTPException(
+            status_code=403, detail="Недостаточно прав для просмотра платежей"
+        )
 
     filters = get_filters(payments, filters)
 
     # Дополнительный фильтр для source_account
-    if filters and hasattr(filters, 'source_account') and filters.source_account:
-        source_account_ids = filters.source_account.split(',')
-        source_filter = " AND (payments.paybox IN (" + ",".join(source_account_ids) + ") OR payments.paybox_to IN (" + ",".join(source_account_ids) + "))"
+    if filters and hasattr(filters, "source_account") and filters.source_account:
+        source_account_ids = filters.source_account.split(",")
+        source_filter = (
+            " AND (payments.paybox IN ("
+            + ",".join(source_account_ids)
+            + ") OR payments.paybox_to IN ("
+            + ",".join(source_account_ids)
+            + "))"
+        )
         filters += source_filter
 
     if not user.is_owner:
@@ -178,7 +191,7 @@ async def read_payments_list(
                 user_permissions.c.user_id == user.id,
                 user_permissions.c.cashbox_id == user.cashbox_id,
                 user_permissions.c.section == "payments",
-                user_permissions.c.can_view.is_(True)
+                user_permissions.c.can_view.is_(True),
             )
         )
         allowed_payboxes = await database.fetch_all(allowed_payboxes_query)
@@ -190,13 +203,19 @@ async def read_payments_list(
                     paybox_ids.append(str(perm.paybox_id))
 
             if paybox_ids:
-                paybox_filter = " AND (payments.paybox IN (" + ",".join(paybox_ids) + ") OR payments.paybox_to IN (" + ",".join(paybox_ids) + "))"
+                paybox_filter = (
+                    " AND (payments.paybox IN ("
+                    + ",".join(paybox_ids)
+                    + ") OR payments.paybox_to IN ("
+                    + ",".join(paybox_ids)
+                    + "))"
+                )
                 filters += paybox_filter
 
     sort_list = sort.split(":")
     if not (
-            sort_list[1] in ["desc", "asc"]
-            and sort_list[0] in ["created_at", "updated_at", "date"]
+        sort_list[1] in ["desc", "asc"]
+        and sort_list[0] in ["created_at", "updated_at", "date"]
     ):
         raise HTTPException(
             status_code=400, detail="Вы ввели некорректный параметр сортировки!"
@@ -223,9 +242,9 @@ async def read_payments_list(
                 return {"result": None, "count": 0, "errors": {"message": not_found}}
             query = f"""
                 SELECT *,
-                (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents 
+                (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents
                 WHERE contragents.id = payments.contragent) END) AS contragent_name
-                FROM payments WHERE payments.cashbox = {created_by_user.cashbox_id} AND payments.is_deleted = false AND 
+                FROM payments WHERE payments.cashbox = {created_by_user.cashbox_id} AND payments.is_deleted = false AND
                 payments.parent_id IS NULL {filters} {cu_filters} ORDER BY payments.{sort_list[0]} {order_by_type} LIMIT {limit} OFFSET {offset};"""
             pays = await database.fetch_all(query)
 
@@ -236,23 +255,23 @@ async def read_payments_list(
         c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {created_by_user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters} {cu_filters}"
         count = await database.fetch_one(c)
 
-        return {"result": total_pay_list, "count": dict(count)['count']}  # LOCAL
+        return {"result": total_pay_list, "count": dict(count)["count"]}  # LOCAL
 
         # return {"result": pays_list, "count": count.count} # PROD
 
     else:
         query = f"""
             SELECT *,
-            (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents 
+            (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents
             WHERE contragents.id = payments.contragent) END) AS contragent_name
-            FROM payments 
-            WHERE 
-                payments.cashbox = {user.cashbox_id} 
-                AND payments.is_deleted = false 
-                AND payments.parent_id IS NULL 
-                {filters} 
+            FROM payments
+            WHERE
+                payments.cashbox = {user.cashbox_id}
+                AND payments.is_deleted = false
+                AND payments.parent_id IS NULL
+                {filters}
                 {cu_filters}
-            ORDER BY 
+            ORDER BY
                 payments.{sort_list[0]} {order_by_type},
                 payments.id { 'ASC' if order_by_type == 'ASC' else 'DESC' }
             LIMIT {limit} OFFSET {offset};
@@ -264,7 +283,7 @@ async def read_payments_list(
         c = f"SELECT count(*) FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.is_deleted = false AND payments.parent_id IS NULL {filters} {cu_filters}"
         count = await database.fetch_one(c)
 
-        return {"result": pays_list, "count": dict(count)['count']}  # LOCAL
+        return {"result": pays_list, "count": dict(count)["count"]}  # LOCAL
 
         # return {"result": pays_list, "count": count.count} # PROD
 
@@ -278,27 +297,35 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
     if not user or not user.status:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
-    has_permission = await check_user_permission(user.id, user.cashbox_id, "payments", payment.paybox, True)
+    has_permission = await check_user_permission(
+        user.id, user.cashbox_id, "payments", payment.paybox, True
+    )
     if not has_permission:
-        raise HTTPException(status_code=403, detail="Недостаточно прав для создания платежей")
+        raise HTTPException(
+            status_code=403, detail="Недостаточно прав для создания платежей"
+        )
 
     payment_dict = payment.dict()
 
     if not payment_dict.get("date"):
-        payment_dict['date'] = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        payment_dict["date"] = int(
+            datetime.now()
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            .timestamp()
+        )
 
     if payment_dict.get("preamount") and payment_dict.get("percentamount"):
         amount = payment.preamount * payment.percentamount
         amount_without_tax = amount
 
-        payment_dict['amount'] = amount
-        payment_dict['amount_without_tax'] = amount_without_tax
+        payment_dict["amount"] = amount
+        payment_dict["amount_without_tax"] = amount_without_tax
 
-        del payment_dict['preamount']
-        del payment_dict['percentamount']
+        del payment_dict["preamount"]
+        del payment_dict["percentamount"]
     else:
-        del payment_dict['preamount']
-        del payment_dict['percentamount']
+        del payment_dict["preamount"]
+        del payment_dict["percentamount"]
 
     if payment_dict.get("repeat"):
         payment_dict.update(payment_dict["repeat"])
@@ -374,7 +401,7 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
         if payment.status:
             paybox_to_id = payment.paybox_to
             paybox_dict["balance"] = round(
-                float(paybox_dict["balance"]) - float(payment_dict['amount']), 2
+                float(paybox_dict["balance"]) - float(payment_dict["amount"]), 2
             )
             query = pboxes.select().where(
                 pboxes.c.id == paybox_to_id, pboxes.c.cashbox == user.cashbox_id
@@ -389,7 +416,7 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
 
             pbox_to_dict = dict(pbox_to)
             pbox_to_dict["balance"] = round(
-                float(pbox_to_dict["balance"]) + float(payment_dict['amount']), 2
+                float(pbox_to_dict["balance"]) + float(payment_dict["amount"]), 2
             )
             paybox_q = (
                 pboxes.update()
@@ -401,19 +428,16 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
             )
             await database.execute(paybox_q)
 
-
-
-
     query = payments.insert(values=payment_dict)
     pay_id = await database.execute(query)
 
     if payment.project_id:
         if payment.type == PaymentType.incoming:
             if payment.status:
-                project_dict["incoming"] += payment_dict['amount_without_tax']
+                project_dict["incoming"] += payment_dict["amount_without_tax"]
         if payment.type == PaymentType.outgoing:
             if payment.status:
-                project_dict["outgoing"] += payment_dict['amount_without_tax']
+                project_dict["outgoing"] += payment_dict["amount_without_tax"]
         project_q = (
             projects.update()
             .where(
@@ -469,15 +493,15 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
 
     # date_ts = int(datetime.timestamp(datetime.combine(payment.date, datetime.min.time())))
 
-    if paybox_dict["balance_date"] <= payment_dict['date']:
+    if paybox_dict["balance_date"] <= payment_dict["date"]:
         if payment.status:
             if payment.type == PaymentType.incoming:
                 paybox_dict["balance"] = round(
-                    float(paybox_dict["balance"]) + float(payment_dict['amount']), 2
+                    float(paybox_dict["balance"]) + float(payment_dict["amount"]), 2
                 )
             elif payment.type == PaymentType.outgoing:
                 paybox_dict["balance"] = round(
-                    float(paybox_dict["balance"]) - float(payment_dict['amount']), 2
+                    float(paybox_dict["balance"]) - float(payment_dict["amount"]), 2
                 )
 
     await manager.send_message(
@@ -488,9 +512,7 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
 
     paybox_q = (
         pboxes.update()
-        .where(
-            pboxes.c.id == payment.paybox, pboxes.c.cashbox == user.cashbox_id
-        )
+        .where(pboxes.c.id == payment.paybox, pboxes.c.cashbox == user.cashbox_id)
         .values(paybox_dict)
     )
     await database.execute(paybox_q)
@@ -504,7 +526,7 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
     payments.repeat_seconds, payments.parent_id, payments.stopped, payments.status, payments.tax,
     payments.tax_type, payments.deb_cred, payments.raspilen, payments.contragent, payments.cashbox,
     payments.paybox, payments.paybox_to, payments.account, payments.is_deleted, payments.cheque,
-    payments.docs_sales_id, payments.created_at, payments.updated_at, 
+    payments.docs_sales_id, payments.created_at, payments.updated_at,
     (CASE WHEN payments.contragent IS NULL THEN NULL ELSE (SELECT contragents.name FROM contragents
      WHERE contragents.id = payments.contragent) END) AS contragent_name
     FROM payments WHERE payments.cashbox = {user.cashbox_id} AND payments.id = {pay_id}
@@ -515,8 +537,7 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
         token,
         {"action": "create", "target": "payments", "result": dict(pay_dict)},
     )
-    
-    
+
     return {**payment_dict, **{"data": {"status": "success"}}}
 
 
@@ -568,11 +589,15 @@ async def read_payment(token: str, id: int):
 
 async def can_user_edit_payment(cashbox_user, payment) -> bool:
     # return (cashbox_user.payment_past_edit_days is None) or (datetime.utcnow().timestamp() - payment.get("created_at") <= timedelta(days=cashbox_user.payment_past_edit_days).total_seconds())
-    return (cashbox_user.payment_past_edit_days is None) or (datetime.now(pytz.timezone(cashbox_user.timezone)).date() - datetime.fromtimestamp(payment.get("created_at")).date()).days < cashbox_user.payment_past_edit_days
+    return (cashbox_user.payment_past_edit_days is None) or (
+        datetime.now(pytz.timezone(cashbox_user.timezone)).date()
+        - datetime.fromtimestamp(payment.get("created_at")).date()
+    ).days < cashbox_user.payment_past_edit_days
+
 
 @router.put("/payments/{id}/", response_model=pay_schemas.PaymentInListWithData)
 async def update_payment(
-        token: str, id: int, payment: pay_schemas.PaymentEdit, bg_tasks: BackgroundTasks
+    token: str, id: int, payment: pay_schemas.PaymentEdit, bg_tasks: BackgroundTasks
 ):
     """Обновление данных платежа по ID
 
@@ -600,10 +625,15 @@ async def update_payment(
             payment_db = await database.fetch_one(payment_q)
 
             if not payment_db:
-                raise HTTPException(status_code=404, detail="Выбранный платеж не найден")
+                raise HTTPException(
+                    status_code=404, detail="Выбранный платеж не найден"
+                )
 
             if not (await can_user_edit_payment(user, payment_db)):
-                raise HTTPException(status_code=403, detail="Вы не можете изменять настолько старый платеж")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Вы не можете изменять настолько старый платеж",
+                )
 
             update_dict: dict = payment.dict(exclude_unset=True)
             if update_dict.get("repeat"):
@@ -769,10 +799,15 @@ async def delete_payment(token: str, payment_id: int):
             payment = await database.fetch_one(q)
 
             if not payment:
-                raise HTTPException(status_code=404, detail="Выбранный платеж не найден")
+                raise HTTPException(
+                    status_code=404, detail="Выбранный платеж не найден"
+                )
 
             if not (await can_user_edit_payment(user, payment)):
-                raise HTTPException(status_code=403, detail="Вы не можете изменять настолько старый платеж")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Вы не можете изменять настолько старый платеж",
+                )
 
             if payment.cashbox == user.cashbox_id and payment.account == user.user:
 
@@ -842,7 +877,7 @@ async def delete_payment(token: str, payment_id: int):
                     )
                 )
                 await database.execute(q)
-                
+
                 if payment.project_id:
                     if payment.status:
                         query = projects.select().where(
@@ -910,10 +945,10 @@ async def delete_payment(token: str, payment_id: int):
 
 @router.post("/payments_split/{id}/")
 async def raspil_platezha(
-        token: str,
-        id: int,
-        childs: List[pay_schemas.PaymentChildren],
-        bg_tasks: BackgroundTasks,
+    token: str,
+    id: int,
+    childs: List[pay_schemas.PaymentChildren],
+    bg_tasks: BackgroundTasks,
 ):
     """Распил платежа по ID"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -985,7 +1020,7 @@ async def raspil_platezha(
 
 @router.put("/payments_split/")
 async def update_childs_payments(
-        token: str, payments_list: List[pay_schemas.ChildrenEdit], bg_tasks: BackgroundTasks
+    token: str, payments_list: List[pay_schemas.ChildrenEdit], bg_tasks: BackgroundTasks
 ):
     """Обновление дочерних платежей если родительский распилен"""
     query = users_cboxes_relation.select(users_cboxes_relation.c.token == token)
@@ -1145,12 +1180,7 @@ async def read_payments_meta(token: str, limit: int = 100, offset: int = 0):
 
 
 @router.put("/payments/{id}/attachment/", response_model=pay_schemas.PaymentInList)
-async def attach_payment(
-    token: str,
-    id: int,
-    sale_id: int = 0,
-    purchase_id: int = 0
-):
+async def attach_payment(token: str, id: int, sale_id: int = 0, purchase_id: int = 0):
     """Прикрепление платежа к документам продажи и закупки"""
 
     query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
@@ -1161,12 +1191,11 @@ async def attach_payment(
     if bool(sale_id) == bool(purchase_id):
         raise HTTPException(
             status_code=400,
-            detail="Укажите только одно значение: либо sale_id, либо purchase_id"
+            detail="Укажите только одно значение: либо sale_id, либо purchase_id",
         )
 
     query = payments.select().where(
-        payments.c.id == id,
-        payments.c.cashbox == user.cashbox_id
+        payments.c.id == id, payments.c.cashbox == user.cashbox_id
     )
     payment_db = await database.fetch_one(query)
     if not payment_db:
@@ -1174,8 +1203,7 @@ async def attach_payment(
 
     if sale_id:
         doc_query = docs_sales.select().where(
-            docs_sales.c.id == sale_id,
-            docs_sales.c.cashbox == user.cashbox_id
+            docs_sales.c.id == sale_id, docs_sales.c.cashbox == user.cashbox_id
         )
         doc = await database.fetch_one(doc_query)
         if not doc:
@@ -1183,7 +1211,7 @@ async def attach_payment(
     elif purchase_id:
         doc_query = docs_purchases.select().where(
             docs_purchases.c.id == purchase_id,
-            docs_purchases.c.cashbox == user.cashbox_id
+            docs_purchases.c.cashbox == user.cashbox_id,
         )
         doc = await database.fetch_one(doc_query)
         if not doc:
@@ -1192,10 +1220,10 @@ async def attach_payment(
     entity_values = {
         "cashbox_id": user.cashbox_id,
         "type": "payments_docs_sales" if sale_id else "payments_docs_purchases",
-        "from_entity": 5,                        
-        "to_entity": 7 if sale_id else 1,        
-        "from_id": id,                         
-        "to_id": sale_id or purchase_id,      
+        "from_entity": 5,
+        "to_entity": 7 if sale_id else 1,
+        "from_id": id,
+        "to_id": sale_id or purchase_id,
         "status": True,
         "delinked": False,
     }
@@ -1214,7 +1242,6 @@ async def attach_payment(
 
     await database.execute(entity_to_entity.insert().values(entity_values))
 
-
     await database.execute(
         payments.update()
         .where(payments.c.id == id)
@@ -1227,7 +1254,9 @@ async def attach_payment(
         entity_to_entity.select().where(
             entity_to_entity.c.from_id == id,
             entity_to_entity.c.cashbox_id == user.cashbox_id,
-            entity_to_entity.c.type.in_(["payments_docs_sales", "payments_docs_purchases"])
+            entity_to_entity.c.type.in_(
+                ["payments_docs_sales", "payments_docs_purchases"]
+            ),
         )
     )
 
@@ -1239,7 +1268,6 @@ async def attach_payment(
         elif e["type"] == "payments_docs_purchases":
             docs_purchases_id = e["to_id"]
 
-
     notification_data = {
         "type": "payment_attachment",
         "payment_id": id,
@@ -1250,7 +1278,6 @@ async def attach_payment(
         "timestamp": payment_db["updated_at"],
     }
     await queue_notification(notification_data)
-
 
     payment_dict = dict(payment_db)
     payment_dict["docs_sales_id"] = docs_sales_id

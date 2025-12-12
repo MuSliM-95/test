@@ -5,29 +5,33 @@ Revises: 3df9a9052a94
 Create Date: 2025-09-09 14:26:26.463112
 
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'c9625a6c9c31'
-down_revision = '3df9a9052a94'
+revision = "c9625a6c9c31"
+down_revision = "3df9a9052a94"
 branch_labels = None
 depends_on = None
 
 ENUM_NAMES = ["card_type", "status"]
 
+
 def upgrade() -> None:
     # Удаляем ENUM-ы, если они есть
     for enum_name in ENUM_NAMES:
-        op.execute(f"""
+        op.execute(
+            f"""
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM pg_type WHERE typname = '{enum_name}') THEN
                     DROP TYPE {enum_name};
                 END IF;
             END$$;
-        """)
+        """
+        )
 
     op.create_table(
         "tech_cards",
@@ -144,6 +148,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
+
 def downgrade() -> None:
     op.drop_table("tech_operation_payments")
     op.drop_table("tech_operation_components")
@@ -152,11 +157,13 @@ def downgrade() -> None:
     op.drop_table("tech_cards")
     # Удаляем ENUM-ы, если они есть
     for enum_name in ENUM_NAMES:
-        op.execute(f"""
+        op.execute(
+            f"""
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM pg_type WHERE typname = '{enum_name}') THEN
                     DROP TYPE {enum_name};
                 END IF;
             END$$;
-        """)
+        """
+        )

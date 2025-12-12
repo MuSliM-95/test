@@ -1,10 +1,10 @@
-from sqlalchemy import Column, Integer, Enum, ForeignKey, DateTime, Float, String
-from sqlalchemy.sql import func
-
-from sqlalchemy.orm import relationship
-from database.db import Base
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from database.db import Base
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 
 class TechOperationDB(Base):

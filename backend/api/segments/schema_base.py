@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, root_validator, validator
 
@@ -7,7 +7,7 @@ from pydantic import BaseModel, root_validator, validator
 class UpdateSettings(BaseModel):
     interval_minutes: int
 
-    @validator('interval_minutes')
+    @validator("interval_minutes")
     def validate_interval_minutes(cls, v):
         if v < 5:
             raise ValueError("Интервал не может быть менее 5 минут")
@@ -19,7 +19,6 @@ class SegmentBaseCreate(BaseModel):
     type_of_update: Literal["cron", "request"]
     update_settings: Optional[UpdateSettings]
 
-
     is_archived: bool
 
     @root_validator(pre=True)
@@ -30,7 +29,8 @@ class SegmentBaseCreate(BaseModel):
 
         if update_type == "cron" and settings is None:
             raise ValueError(
-                "Поле 'update_settings' обязательно при type_of_update='cron'")
+                "Поле 'update_settings' обязательно при type_of_update='cron'"
+            )
         return values
 
     @classmethod
@@ -48,8 +48,11 @@ class SegmentBaseCreate(BaseModel):
         elif isinstance(data, list):
             cleaned_list = [cls._remove_empty_fields(item) for item in data]
             # Удаляем только полностью пустые элементы
-            return [item for item in cleaned_list if
-                    item != {} and item != [] and item is not None]
+            return [
+                item
+                for item in cleaned_list
+                if item != {} and item != [] and item is not None
+            ]
 
         # Базовые значения сохраняем всегда: 0, False, "", и т.д.
         return data
@@ -69,7 +72,7 @@ class DateRange(BaseModel):
     lte_seconds_ago: Optional[int]
     is_none: Optional[bool]
 
-    @validator('gte', 'lte')
+    @validator("gte", "lte")
     def validate_date_format(cls, v):
         try:
             datetime.strptime(v, "%Y-%m-%d").date()

@@ -1,6 +1,12 @@
-from typing import Union, Optional
-from pydantic import BaseModel, validator
-from phonenumbers import NumberParseException, parse, is_valid_number, format_number, PhoneNumberFormat
+from typing import Union
+
+from phonenumbers import (
+    NumberParseException,
+    PhoneNumberFormat,
+    format_number,
+    is_valid_number,
+    parse,
+)
 
 
 class RuPhone(str):
@@ -16,7 +22,11 @@ class RuPhone(str):
     @classmethod
     def validate(cls, value) -> Union[str, None]:
         # Обработка различных типов None-значений
-        if value is None or value == "" or (isinstance(value, str) and value.strip() == ""):
+        if (
+            value is None
+            or value == ""
+            or (isinstance(value, str) and value.strip() == "")
+        ):
             return None
 
         # Если уже RuPhone, возвращаем как строку
@@ -27,7 +37,7 @@ class RuPhone(str):
         try:
             value_str = str(value)
         except Exception:
-            raise TypeError('string required')
+            raise TypeError("string required")
 
         # Пустая строка после конвертации
         if not value_str or value_str.strip() == "":
@@ -35,24 +45,24 @@ class RuPhone(str):
 
         try:
             # Очистка номера от лишних символов
-            cleaned = ''.join(filter(str.isdigit, value_str))
+            cleaned = "".join(filter(str.isdigit, value_str))
 
             # Если пусто после очистки
             if not cleaned:
                 return None
 
             # Нормализация российских номеров
-            if cleaned.startswith('8'):
-                cleaned = '7' + cleaned[1:]
-            elif not cleaned.startswith('7') and len(cleaned) == 10:
+            if cleaned.startswith("8"):
+                cleaned = "7" + cleaned[1:]
+            elif not cleaned.startswith("7") and len(cleaned) == 10:
                 # 10 цифр без кода страны - считаем российским
-                cleaned = '7' + cleaned
-            elif not cleaned.startswith('7'):
+                cleaned = "7" + cleaned
+            elif not cleaned.startswith("7"):
                 # Другие варианты оставляем как есть
                 pass
 
             # Форматируем с +
-            formatted = f"+{cleaned}" if not cleaned.startswith('+') else cleaned
+            formatted = f"+{cleaned}" if not cleaned.startswith("+") else cleaned
 
             # Парсим номер
             try:

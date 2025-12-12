@@ -1,12 +1,14 @@
 from api.manufacturers import schemas
-from database.db import manufacturers, database
-from functions.helpers import get_user_by_token, datetime_to_timestamp
+from database.db import database, manufacturers
+from functions.helpers import datetime_to_timestamp, get_user_by_token
 from ws_manager import manager
 
 
 class CreateManufacturersView:
 
-    async def __call__(self, token: str, manufacturers_data: schemas.ManufacturerCreateMass):
+    async def __call__(
+        self, token: str, manufacturers_data: schemas.ManufacturerCreateMass
+    ):
         """Создание производителя"""
         user = await get_user_by_token(token)
 
@@ -19,12 +21,8 @@ class CreateManufacturersView:
             manufacturer_id = await database.execute(query)
             inserted_ids.add(manufacturer_id)
 
-        query = (
-            manufacturers.select()
-            .where(
-                manufacturers.c.owner == user.id,
-                manufacturers.c.id.in_(inserted_ids)
-            )
+        query = manufacturers.select().where(
+            manufacturers.c.owner == user.id, manufacturers.c.id.in_(inserted_ids)
         )
         manufacturers_db = await database.fetch_all(query)
         manufacturers_db = [*map(datetime_to_timestamp, manufacturers_db)]

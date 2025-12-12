@@ -2,37 +2,59 @@ import json
 import uuid
 from os import environ
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Response
+from api.apple_wallet_card_settings.schemas import (
+    WalletCardSettings,
+    WalletCardSettingsCreate,
+    WalletCardSettingsUpdate,
+)
+from api.apple_wallet_card_settings.utils import create_default_apple_wallet_setting
+from common.s3_service.impl.S3Client import S3Client
+from common.s3_service.models.S3SettingsModel import S3SettingsModel
+from database.db import (
+    apple_wallet_card_settings,
+    database,
+    loyality_cards,
+    users_cboxes_relation,
+)
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
+from producer import publish_apple_wallet_pass_update
 from sqlalchemy import select
 from starlette.staticfiles import StaticFiles
 
-from api.apple_wallet.utils import update_apple_wallet_pass
-from api.apple_wallet_card_settings.schemas import WalletCardSettings, WalletCardSettingsCreate, \
-    WalletCardSettingsUpdate
-from api.apple_wallet_card_settings.utils import create_default_apple_wallet_setting
-from database.db import users_cboxes_relation, database, apple_wallet_card_settings, loyality_cards
-from common.s3_service.impl.S3Client import S3Client
-from common.s3_service.models.S3SettingsModel import S3SettingsModel
-from producer import publish_apple_wallet_pass_update
-
-router = APIRouter(prefix='/apple_wallet_card_settings', tags=['apple_wallet_card_settings'])
-router.mount('/backend/static_files', StaticFiles(directory='/backend/static_files'), name='static_files')
+router = APIRouter(
+    prefix="/apple_wallet_card_settings", tags=["apple_wallet_card_settings"]
+)
+router.mount(
+    "/backend/static_files",
+    StaticFiles(directory="/backend/static_files"),
+    name="static_files",
+)
 
 BUCKET_NAME = "5075293c-docs_generated"
 S3_FOLDER = "photos"
 
+
 def get_s3_client() -> S3Client:
-    return S3Client(S3SettingsModel(
-        aws_access_key_id=environ.get("S3_ACCESS"),
-        aws_secret_access_key=environ.get("S3_SECRET"),
-        endpoint_url=environ.get("S3_URL")
-    ))
+    return S3Client(
+        S3SettingsModel(
+            aws_access_key_id=environ.get("S3_ACCESS"),
+            aws_secret_access_key=environ.get("S3_SECRET"),
+            endpoint_url=environ.get("S3_URL"),
+        )
+    )
+
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     # Простая валидация типа (при необходимости расширите)
-    if file.content_type not in ("image/png", "image/jpeg", "image/svg+xml", "image/webp", "application/octet-stream"):
+    if file.content_type not in (
+        "image/png",
+        "image/jpeg",
+        "image/svg+xml",
+        "image/webp",
+        "application/octet-stream",
+    ):
         # допускаем generic binary если нужно
         # при желании вернуть 415 Unsupported Media Type
         return Response(status_code=415)
@@ -40,7 +62,7 @@ async def upload_file(file: UploadFile = File(...)):
     print(1)
     # Генерируем уникальное имя файла с сохранением расширения
     unique_name = f"{uuid.uuid4().hex}-{file.filename.split('.')[0]}.{file.filename.split('.')[-1]}"
-    s3_key = f'{S3_FOLDER}/{unique_name}'
+    s3_key = f"{S3_FOLDER}/{unique_name}"
 
     try:
         # Читаем файл в байты
@@ -53,9 +75,12 @@ async def upload_file(file: UploadFile = File(...)):
         # Возвращаем путь в S3
         return JSONResponse(content={"path": s3_key})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload file to S3: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to upload file to S3: {str(e)}"
+        )
 
-@router.get('', response_model=WalletCardSettings)
+
+@router.get("", response_model=WalletCardSettings)
 async def get_apple_wallet_card_settings(token: str):
     user_query = users_cboxes_relation.select().where(
         users_cboxes_relation.c.token == token
@@ -65,9 +90,9 @@ async def get_apple_wallet_card_settings(token: str):
     if not user:
         raise HTTPException(status_code=401, detail="Неверный токен")
 
-    settings_query = select(
-        apple_wallet_card_settings.c.data
-    ).where(apple_wallet_card_settings.c.cashbox_id == user.cashbox_id)
+    settings_query = select(apple_wallet_card_settings.c.data).where(
+        apple_wallet_card_settings.c.cashbox_id == user.cashbox_id
+    )
     settings = await database.fetch_one(settings_query)
 
     if not settings:
@@ -75,7 +100,8 @@ async def get_apple_wallet_card_settings(token: str):
 
     return WalletCardSettings(**json.loads(settings.data))
 
-@router.post('', response_model=WalletCardSettings)
+
+@router.post("", response_model=WalletCardSettings)
 async def create_apple_wallet_card_settings(token: str, settings: WalletCardSettings):
     user_query = users_cboxes_relation.select().where(
         users_cboxes_relation.c.token == token
@@ -85,15 +111,17 @@ async def create_apple_wallet_card_settings(token: str, settings: WalletCardSett
     if not user:
         raise HTTPException(status_code=401, detail="Неверный токен")
 
-    setting_stmt = apple_wallet_card_settings.insert().values(
-        WalletCardSettingsCreate(
-            cashbox_id=user.cashbox_id,
-            data=settings
-        ).dict()
-    ).returning(apple_wallet_card_settings.c.data)
+    setting_stmt = (
+        apple_wallet_card_settings.insert()
+        .values(
+            WalletCardSettingsCreate(cashbox_id=user.cashbox_id, data=settings).dict()
+        )
+        .returning(apple_wallet_card_settings.c.data)
+    )
     settings = await database.execute(setting_stmt)
 
     return WalletCardSettings(**json.loads(settings))
+
 
 @router.patch("", response_model=WalletCardSettings)
 async def update_apple_wallet_card_settings(token: str, settings: WalletCardSettings):
@@ -108,14 +136,12 @@ async def update_apple_wallet_card_settings(token: str, settings: WalletCardSett
 
     # Подготовить обновлённые данные
     update_data = WalletCardSettingsUpdate(
-        cashbox_id=user.cashbox_id,
-        data=settings.dict(exclude_unset=True)
+        cashbox_id=user.cashbox_id, data=settings.dict(exclude_unset=True)
     ).dict()
 
     # Обновить настройки в БД
     settings_stmt = (
-        apple_wallet_card_settings
-        .update()
+        apple_wallet_card_settings.update()
         .values(**update_data)
         .where(apple_wallet_card_settings.c.cashbox_id == user.cashbox_id)
         .returning(apple_wallet_card_settings.c.data)

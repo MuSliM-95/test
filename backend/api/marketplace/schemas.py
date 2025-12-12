@@ -1,12 +1,13 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 
 class MarketplaceLocation(BaseModel):
     """Модель локации для маркетплейса"""
+
     id: int
     name: str
     address: Optional[str] = None
@@ -23,6 +24,7 @@ class MarketplaceLocation(BaseModel):
 
 class MarketplaceLocationList(BaseModel):
     """Список локаций маркетплейса"""
+
     result: List[MarketplaceLocation]
     count: int
     page: int
@@ -33,6 +35,7 @@ class UtmEntityType(Enum):
     docs_sales = "docs_sales"
     view_events = "view_events"
     favorites = "favorites"
+
 
 class BaseMarketplaceUtm(BaseModel):
     entity_type: UtmEntityType

@@ -1,7 +1,7 @@
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, validator
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, validator
 
 
 class ChannelCreate(BaseModel):
@@ -34,6 +34,7 @@ class ChannelResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class ChatCreate(BaseModel):
     channel_id: int
     external_chat_id: str
@@ -54,7 +55,7 @@ class ChatUpdate(BaseModel):
     last_message_time: Optional[datetime] = None
     last_response_time_seconds: Optional[int] = None
 
-    @validator('first_message_time', 'last_message_time', pre=True)
+    @validator("first_message_time", "last_message_time", pre=True)
     def convert_datetime(cls, v):
         if v is None:
             return None
@@ -97,7 +98,6 @@ class ChatResponse(BaseModel):
     contact: Optional[ContactInfo] = None
 
 
-
 class MessageCreate(BaseModel):
     chat_id: int
     sender_type: str
@@ -125,8 +125,10 @@ class MessageResponse(BaseModel):
     updated_at: datetime
     sender_avatar: Optional[str] = None
     source: Optional[str] = None
+    image_url: Optional[str] = None
+    file_url: Optional[str] = None
 
-    @validator('created_at', 'updated_at', pre=True)
+    @validator("created_at", "updated_at", pre=True)
     def convert_datetime(cls, v):
         if v is None:
             return None
@@ -138,7 +140,7 @@ class MessageResponse(BaseModel):
 
 
 class ChainClientRequest(BaseModel):
-    phone: str
+    phone: Optional[str] = None
     name: Optional[str] = None
 
 
@@ -171,7 +173,7 @@ class MessagesList(BaseModel):
     limit: int
     date: Optional[datetime] = None
 
-    @validator('date', pre=True)
+    @validator("date", pre=True)
     def convert_datetime(cls, v):
         if v is None:
             return None
@@ -184,6 +186,7 @@ class MessagesList(BaseModel):
 
 class ManagerInChat(BaseModel):
     """Информация о менеджере, подключенном к чату"""
+
     user_id: int
     user_type: str
     connected_at: str
@@ -191,6 +194,7 @@ class ManagerInChat(BaseModel):
 
 class ManagersInChatResponse(BaseModel):
     """Ответ со списком менеджеров в чате"""
+
     chat_id: int
     managers: List[ManagerInChat]
     total: int

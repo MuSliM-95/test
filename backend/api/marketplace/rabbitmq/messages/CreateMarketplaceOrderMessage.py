@@ -1,14 +1,17 @@
-from typing import List, Optional, Any, Dict
-
-from pydantic import Field
+from typing import Any, Dict, List, Optional
 
 from api.docs_sales.schemas import DeliveryInfoSchema
-from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood, CreateOrderUtm
+from api.marketplace.service.orders_service.schemas import (
+    CreateOrderUtm,
+    MarketplaceOrderGood,
+)
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
+from pydantic import Field
 
 
 class OrderGoodMessage(MarketplaceOrderGood):
     organization_id: int
+
 
 class CreateMarketplaceOrderMessage(BaseModelMessage):
     cashbox_id: int

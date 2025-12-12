@@ -1,7 +1,7 @@
 from typing import Optional
 
-from database.db import docs_sales_settings, database
-from sqlalchemy import select
+from database.db import database, docs_sales_settings
+
 
 class SettingsRepository:
     @staticmethod
@@ -9,7 +9,9 @@ class SettingsRepository:
         if not settings_ids:
             return {}
 
-        query = docs_sales_settings.select().where(docs_sales_settings.c.id.in_(settings_ids))
+        query = docs_sales_settings.select().where(
+            docs_sales_settings.c.id.in_(settings_ids)
+        )
         rows = await database.fetch_all(query)
 
         settings_map: dict[int, dict] = {}

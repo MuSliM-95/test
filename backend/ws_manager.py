@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, List
 
 from fastapi import WebSocket
 
@@ -17,10 +17,9 @@ class ConnectionManager:
 
     async def send_message(self, token: str, message: dict):
         try:
-            matches = [
-                x for x in self.active_connections if x["token"] == token]
+            matches = [x for x in self.active_connections if x["token"] == token]
             for ws in matches:
-                await ws['socket'].send_json(message)
+                await ws["socket"].send_json(message)
         except Exception as e:
             print(e)
 

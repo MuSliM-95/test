@@ -1,7 +1,7 @@
-from typing import Union, Optional, List
+import datetime
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
-import datetime
 
 
 class Event(BaseModel):

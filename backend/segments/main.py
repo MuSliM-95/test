@@ -1,19 +1,24 @@
+import asyncio
 import json
 from datetime import datetime
 
-from database.db import segments, database, SegmentStatus, users_cboxes_relation, SegmentObjectType
-
-from segments.logic.logic import SegmentLogic
-from segments.query.queries import SegmentCriteriaQuery
+from database.db import (
+    SegmentObjectType,
+    SegmentStatus,
+    database,
+    segments,
+)
 from segments.actions.actions import SegmentActions
-
-from segments.logic.collect_data import ContragentsData
-
-from segments.logger import logger
-from segments.websockets import notify
-from segments.query.queries import get_token_by_segment_id, fetch_contragent_by_id
 from segments.helpers.functions import format_contragent_text_notifications
-import asyncio
+from segments.logger import logger
+from segments.logic.collect_data import ContragentsData
+from segments.logic.logic import SegmentLogic
+from segments.query.queries import (
+    SegmentCriteriaQuery,
+    fetch_contragent_by_id,
+    get_token_by_segment_id,
+)
+from segments.websockets import notify
 
 
 class Segments:
@@ -26,21 +31,23 @@ class Segments:
 
     async def async_init(self):
         self.segment_obj = await database.fetch_one(
-            segments.select().where(segments.c.id == self.segment_id))
+            segments.select().where(segments.c.id == self.segment_id)
+        )
         self.logic = SegmentLogic(self.segment_obj)
         self.query = SegmentCriteriaQuery(
-            self.segment_obj.cashbox_id,
-            json.loads(self.segment_obj.criteria)
+            self.segment_obj.cashbox_id, json.loads(self.segment_obj.criteria)
         )
         self.actions = SegmentActions(self.segment_obj)
 
     async def refresh_segment_obj(self):
         self.segment_obj = await database.fetch_one(
-            segments.select().where(segments.c.id == self.segment_obj.id))
+            segments.select().where(segments.c.id == self.segment_obj.id)
+        )
 
     async def update_segment_datetime(self):
         await database.execute(
-            segments.update().where(segments.c.id == self.segment_id)
+            segments.update()
+            .where(segments.c.id == self.segment_id)
             .values(
                 updated_at=datetime.now(),
                 previous_update_at=self.segment_obj.updated_at,
@@ -50,13 +57,15 @@ class Segments:
 
     async def set_status_in_progress(self):
         await database.execute(
-            segments.update().where(segments.c.id == self.segment_id)
+            segments.update()
+            .where(segments.c.id == self.segment_id)
             .values(status=SegmentStatus.in_process.value)
         )
 
     async def set_status_calculated(self):
         await database.execute(
-            segments.update().where(segments.c.id == self.segment_id)
+            segments.update()
+            .where(segments.c.id == self.segment_id)
             .values(status=SegmentStatus.calculated.value)
         )
 
@@ -88,14 +97,21 @@ class Segments:
                     continue
                 name = getattr(row, "name", None) or row.get("name")
                 phone = getattr(row, "phone", None) or row.get("phone")
-                text = format_contragent_text_notifications("new_contragent", self.segment_obj.name, name or "", phone or "")
+                text = format_contragent_text_notifications(
+                    "new_contragent", self.segment_obj.name, name or "", phone or ""
+                )
                 payload = {
                     "type": "contragent_added",
                     "text": text,
-                    "contragent": {"id": cid, "name": name, "phone": phone}
+                    "contragent": {"id": cid, "name": name, "phone": phone},
                 }
                 notify_tasks.append(
-                    notify(ws_token=token, event="segment_member_added", segment_id=self.segment_id, payload=payload)
+                    notify(
+                        ws_token=token,
+                        event="segment_member_added",
+                        segment_id=self.segment_id,
+                        payload=payload,
+                    )
                 )
 
             # удалённые
@@ -107,14 +123,24 @@ class Segments:
                 if row:
                     name = getattr(row, "name", None) or row.get("name")
                     phone = getattr(row, "phone", None) or row.get("phone")
-                text = format_contragent_text_notifications("removed_contragent", self.segment_obj.name, name or "Неизвестно", phone or "Неизвестно")
+                text = format_contragent_text_notifications(
+                    "removed_contragent",
+                    self.segment_obj.name,
+                    name or "Неизвестно",
+                    phone or "Неизвестно",
+                )
                 payload = {
                     "type": "contragent_removed",
                     "text": text,
-                    "contragent": {"id": cid, "name": name, "phone": phone}
+                    "contragent": {"id": cid, "name": name, "phone": phone},
                 }
                 notify_tasks.append(
-                    notify(ws_token=token, event="segment_member_removed", segment_id=self.segment_id, payload=payload)
+                    notify(
+                        ws_token=token,
+                        event="segment_member_removed",
+                        segment_id=self.segment_id,
+                        payload=payload,
+                    )
                 )
 
             if notify_tasks:
@@ -125,9 +151,13 @@ class Segments:
             await self.actions.start_actions()
             await self.update_segment_datetime()
             await self.set_status_calculated()
-            logger.info(f'Segment {self.segment_id} updated successfully. Start - {start}. Took {datetime.now() - start}')
+            logger.info(
+                f"Segment {self.segment_id} updated successfully. Start - {start}. Took {datetime.now() - start}"
+            )
         except Exception as e:
-            logger.exception(f"Ошибка при обновлении сегмента {self.segment_obj.id}: {e}")
+            logger.exception(
+                f"Ошибка при обновлении сегмента {self.segment_obj.id}: {e}"
+            )
 
     async def collect_data(self):
         data_obj = ContragentsData(self.segment_obj)
@@ -144,36 +174,49 @@ async def update_segment_task(segment_id: int):
     payload = {
         "type": "recalc_start",
         "segment_name": segment.segment_obj.name,
-        "segment_id": segment_id
+        "segment_id": segment_id,
     }
-    await notify(ws_token=token, event="recalc_start", segment_id=segment_id, payload=payload)
-
+    await notify(
+        ws_token=token, event="recalc_start", segment_id=segment_id, payload=payload
+    )
 
     if getattr(segment.segment_obj, "is_deleted", False):
         logger.info(f"Segment {segment_id} is deleted; skip update.")
         payload = {
             "type": "recalc_fail_410",
             "segment_name": segment.segment_obj.name,
-            "segment_id": segment_id
+            "segment_id": segment_id,
         }
-        await notify(ws_token=token, event="recalc_fail_410", segment_id=segment_id, payload=payload)
+        await notify(
+            ws_token=token,
+            event="recalc_fail_410",
+            segment_id=segment_id,
+            payload=payload,
+        )
         return
-    
 
     if segment.segment_obj:
         await segment.update_segment()
         payload = {
             "type": "recalc_finish",
             "segment_name": segment.segment_obj.name,
-            "segment_id": segment_id
+            "segment_id": segment_id,
         }
-        await notify(ws_token=token, event="recalc_finish", segment_id=segment_id, payload=payload)
+        await notify(
+            ws_token=token,
+            event="recalc_finish",
+            segment_id=segment_id,
+            payload=payload,
+        )
     else:
         payload = {
             "type": "recalc_fail_404",
             "segment_name": segment.segment_obj.name,
-            "segment_id": segment_id
+            "segment_id": segment_id,
         }
-        await notify(ws_token=token, event="recalc_fail_404", segment_id=segment_id, payload=payload)
-
-
+        await notify(
+            ws_token=token,
+            event="recalc_fail_404",
+            segment_id=segment_id,
+            payload=payload,
+        )

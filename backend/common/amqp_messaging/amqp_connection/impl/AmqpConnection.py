@@ -2,16 +2,14 @@ import asyncio
 from typing import Dict
 
 from aio_pika import connect_robust
-from aio_pika.abc import AbstractRobustConnection, AbstractRobustChannel
+from aio_pika.abc import AbstractRobustChannel, AbstractRobustConnection
 
 from ...models.RabbitMqSettings import RabbitMqSettings
 
+
 class AmqpConnection:
 
-    def __init__(
-        self,
-        settings: RabbitMqSettings
-    ):
+    def __init__(self, settings: RabbitMqSettings):
         self.__settings: RabbitMqSettings = settings
         self.__connection: AbstractRobustConnection | None = None
 
@@ -24,7 +22,7 @@ class AmqpConnection:
             login=self.__settings.rabbitmq_user,
             password=self.__settings.rabbitmq_pass,
             virtualhost=self.__settings.rabbitmq_vhost,
-            loop=asyncio.get_running_loop()
+            loop=asyncio.get_running_loop(),
         )
         await connection.connect()
         self.__connection = connection

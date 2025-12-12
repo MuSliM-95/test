@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ class MarketplaceLocation(BaseModel):
     distance: Optional[float] = None
     avg_rating: Optional[float] = None
     reviews_count: Optional[int] = 0
+
 
 class LocationsListRequest(BaseModel):
     lat: Optional[float]

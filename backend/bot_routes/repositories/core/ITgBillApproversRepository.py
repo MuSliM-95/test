@@ -2,10 +2,11 @@ from typing import List, Union
 
 from bot_routes.models.TgBillApproversModels import (
     TgBillApproversCreateModel,
-    TgBillApproversUpdateModel,
+    TgBillApproversExtendedModel,
     TgBillApproversModel,
-    TgBillApproversExtendedModel
+    TgBillApproversUpdateModel,
 )
+
 
 class ITgBillApproversRepository:
 
@@ -27,12 +28,17 @@ class ITgBillApproversRepository:
     async def get_by_id(self, id: int) -> Union[TgBillApproversModel, None]:
         raise NotImplementedError
 
-    async def get_approve_by_bill_id_and_approver_id(self, bill_id: int, approve_id: int) -> Union[TgBillApproversModel, None]:
-        raise NotImplementedError
-    
-    async def get_approvers_by_bill_id(self, bill_id: int) -> List[TgBillApproversModel]:
-        raise NotImplementedError
-    
-    async def get_approvers_extended_by_bill_id(self, bill_id: int) -> List[TgBillApproversExtendedModel]:
+    async def get_approve_by_bill_id_and_approver_id(
+        self, bill_id: int, approve_id: int
+    ) -> Union[TgBillApproversModel, None]:
         raise NotImplementedError
 
+    async def get_approvers_by_bill_id(
+        self, bill_id: int
+    ) -> List[TgBillApproversModel]:
+        raise NotImplementedError
+
+    async def get_approvers_extended_by_bill_id(
+        self, bill_id: int
+    ) -> List[TgBillApproversExtendedModel]:
+        raise NotImplementedError
