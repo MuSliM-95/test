@@ -327,10 +327,9 @@ class AvitoClient:
         unread_only: bool = False,
         item_ids: Optional[List[int]] = None,
     ) -> List[Dict[str, Any]]:
-        limit = min(limit, 100)
         user_id = await self._get_user_id()
 
-        params = {"limit": limit, "offset": offset}
+        params = {"offset": offset}
         if chat_types:
             params["chat_types"] = ",".join(chat_types)
         if unread_only:
@@ -353,12 +352,11 @@ class AvitoClient:
     async def get_messages(
         self, chat_id: str, limit: int = 50, offset: int = 0
     ) -> List[Dict[str, Any]]:
-        limit = min(limit, 100)
         user_id = await self._get_user_id()
         response = await self._make_request(
             "GET",
-            f"/v3/accounts/{user_id}/chats/{chat_id}/messages/",
-            params={"limit": limit, "offset": offset},
+            f"/v3/accounts/{user_id}/chats/{chat_id}/messages",
+            params={"offset": offset},
         )
         if isinstance(response, list):
             return response
