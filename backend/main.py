@@ -45,6 +45,7 @@ from api.employee_shifts.routers import router as employee_shifts_router
 from api.events.routers import router as events_router
 from api.feeds.routers import router as feeds_router
 from api.fifo_settings.routers import router as fifo_settings_router
+from api.files.routers import router as files_router
 from api.functions.routers import router as entity_functions_router
 from api.gross_profit_docs.routers import router as gross_profit_docs_router
 from api.installs.routers import router as installs_router
@@ -139,7 +140,6 @@ from api.payments.routers import (
 )
 from api.pboxes.routers import router as pboxes_router
 from api.pictures.routers import router as pictures_router
-from api.files.routers import router as files_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.projects.routers import router as projects_router
