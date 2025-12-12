@@ -7,7 +7,6 @@ from common.utils.logger import log_quota_exceeded
 from botocore.exceptions import ClientError
 
 from fastapi import FastAPI, Request, Query
-from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -181,7 +180,6 @@ from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
 
 from jobs.jobs import scheduler
 
-from fastapi import Request
 from api.balances.transactions_routers import tinkoff_callback
 
 # sentry_sdk.init(
@@ -336,7 +334,7 @@ async def avito_oauth_callback_legacy(
         from api.chats.avito.avito_routes import avito_oauth_callback
         result = await avito_oauth_callback(code=code, state=state, token=token)
         return result
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
         raise
@@ -540,30 +538,30 @@ async def startup():
         try:
             from api.chats.avito.avito_init import init_avito_credentials
             await init_avito_credentials()
-        except Exception as e:
+        except Exception:
             pass
 
     try:
         await chat_consumer.start()
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
 
     try:
         await avito_consumer.start()
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
 
     try:
         await DefaultImagesUploader().upload_all()
-    except Exception as e:
+    except Exception:
         pass
 
     try:
         if not scheduler.running:
             scheduler.start()
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
 
@@ -577,5 +575,5 @@ async def shutdown():
     try:
         if scheduler.running:
             scheduler.shutdown()
-    except Exception as e:
+    except Exception:
         pass
