@@ -1035,20 +1035,19 @@ files = sqlalchemy.Table(
     sqlalchemy.Column("title", String, nullable=True),
     sqlalchemy.Column("description", Text, nullable=True),
     sqlalchemy.Column("tags", JSON, nullable=True),
-    sqlalchemy.Column("url", String, nullable=False),  # путь в S3: files/2025/12/10/123/abc123.pdf
+    sqlalchemy.Column(
+        "url", String, nullable=False
+    ),  # путь в S3: files/2025/12/10/123/abc123.pdf
     sqlalchemy.Column("size", Integer, nullable=True),
     sqlalchemy.Column("mime_type", String, nullable=False),
     sqlalchemy.Column("extension", String(10), nullable=False),
     sqlalchemy.Column(
-        "owner",
-        Integer,
-        ForeignKey(
-            "relation_tg_cashboxes.id"
-        ),
-        nullable=False
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
     ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
-    sqlalchemy.Column("is_deleted", Boolean, nullable=False, server_default=sqlalchemy.false()),
+    sqlalchemy.Column(
+        "is_deleted", Boolean, nullable=False, server_default=sqlalchemy.false()
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column(
         "updated_at",

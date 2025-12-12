@@ -17,7 +17,11 @@ class TagList(BaseModel):
             if not isinstance(tag, str):
                 raise ValueError("Each tag must be a string")
             tag = tag.strip().lower()
-            if not tag or len(tag) > 50 or not tag.replace("-", "").replace("_", "").isalnum():
+            if (
+                not tag
+                or len(tag) > 50
+                or not tag.replace("-", "").replace("_", "").isalnum()
+            ):
                 raise ValueError(f"Invalid tag: {tag}")
             cleaned.append(tag)
         return cleaned
@@ -38,16 +42,14 @@ class FileUpdate(BaseModel):
 class FileFiltersQuery(BaseModel):
     search: Optional[str] = Field(None, max_length=100)
     tags: Optional[str] = Field(
-        None,
-        description="Comma-separated tags: invoice,paid,2025"
+        None, description="Comma-separated tags: invoice,paid,2025"
     )
     created_from: Optional[int] = Field(None, ge=0)
     created_to: Optional[int] = Field(None, ge=0)
     updated_from: Optional[int] = Field(None, ge=0)
     updated_to: Optional[int] = Field(None, ge=0)
     sort: Literal[
-        "created_at_asc", "created_at_desc",
-        "updated_at_asc", "updated_at_desc"
+        "created_at_asc", "created_at_desc", "updated_at_asc", "updated_at_desc"
     ] = "created_at_desc"
 
 

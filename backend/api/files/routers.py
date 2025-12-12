@@ -40,13 +40,11 @@ ALLOWED_CONTENT_TYPES = {
     "text/csv": "csv",
     "application/json": "json",
     "application/zip": "zip",
-
     # Изображения (чеки, сканы счетов и т.д.)
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
     "image/png": "png",
     "image/gif": "gif",
-
     # Медиа
     "text/x-diff": "diff",
     "audio/mpeg": "mp3",
@@ -71,7 +69,7 @@ def _get_sort_column(sort: str):
 async def upload_file(
     token: str,
     file: UploadFile = File(...),
-    data: str = Query(..., description="JSON with title, description, tags")
+    data: str = Query(..., description="JSON with title, description, tags"),
 ):
     """
     Загрузить файл с метаданными.
@@ -136,7 +134,9 @@ async def upload_file(
         file_db = await database.fetch_one(query)
         result = datetime_to_timestamp(file_db)
 
-        await manager.send_message(token, {"action": "create", "target": "files", "result": result})
+        await manager.send_message(
+            token, {"action": "create", "target": "files", "result": result}
+        )
         return result
 
     except Exception:
@@ -154,7 +154,7 @@ async def list_files(
     token: str,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
-    filters: FileFiltersQuery = Depends()
+    filters: FileFiltersQuery = Depends(),
 ):
     user = await get_user_by_token(token)
 
@@ -165,10 +165,9 @@ async def list_files(
 
     if filters.search:
         pattern = f"%{filters.search}%"
-        conditions.append(or_(
-            files.c.title.ilike(pattern),
-            files.c.description.ilike(pattern)
-        ))
+        conditions.append(
+            or_(files.c.title.ilike(pattern), files.c.description.ilike(pattern))
+        )
 
     if filters.tags:
         for tag in [t.strip().lower() for t in filters.tags.split(",") if t.strip()]:
@@ -206,9 +205,7 @@ async def list_files(
 async def get_file(token: str, file_id: int):
     user = await get_user_by_token(token)
     query = files.select().where(
-        files.c.id == file_id,
-        files.c.owner == user.id,
-        files.c.is_deleted.is_not(True)
+        files.c.id == file_id, files.c.owner == user.id, files.c.is_deleted.is_not(True)
     )
     file = await database.fetch_one(query)
     if not file:
@@ -238,14 +235,14 @@ async def update_file(token: str, file_id: int, update: FileUpdate):
     if update_data:
         update_data["updated_at"] = datetime.now(ZoneInfo("Europe/Moscow"))
         await database.execute(
-            files.update()
-            .where(files.c.id == file_id)
-            .values(update_data)
+            files.update().where(files.c.id == file_id).values(update_data)
         )
 
     updated = await database.fetch_one(files.select().where(files.c.id == file_id))
     result = datetime_to_timestamp(updated)
-    await manager.send_message(token, {"action": "update", "target": "files", "result": result})
+    await manager.send_message(
+        token, {"action": "update", "target": "files", "result": result}
+    )
     return result
 
 
@@ -262,11 +259,11 @@ async def delete_file(token: str, file_id: int):
         raise HTTPException(404, "Файл не найден")
 
     await database.execute(
-        files.update()
-        .where(files.c.id == file_id)
-        .values(is_deleted=True)
+        files.update().where(files.c.id == file_id).values(is_deleted=True)
     )
 
     result = datetime_to_timestamp({**dict(file), "is_deleted": True})
-    await manager.send_message(token, {"action": "delete", "target": "files", "result": result})
+    await manager.send_message(
+        token, {"action": "delete", "target": "files", "result": result}
+    )
     return result
