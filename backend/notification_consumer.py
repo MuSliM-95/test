@@ -6,8 +6,14 @@ from asyncio import sleep
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
 from aiogram import Bot
-from bot import store_bot_message
 from database.db import OrderStatus, database
+
+# Опциональный импорт store_bot_message
+try:
+    from bot import store_bot_message
+except Exception as e:
+    print(f"Warning: Could not import store_bot_message: {e}")
+    store_bot_message = None
 
 bot = Bot(os.environ.get("TG_TOKEN"), parse_mode="HTML")
 
@@ -58,13 +64,14 @@ async def send_notification(recipient_id: str, text: str, retry_count: int = 3) 
             )
 
             try:
-                await store_bot_message(
-                    tg_message_id=sent_message.message_id,
-                    tg_user_or_chat=recipient_id,
-                    from_or_to=str(bot.id),
-                    body=text,
-                )
-                print(f"Message stored in database for recipient {recipient_id}")
+                if store_bot_message:
+                    await store_bot_message(
+                        tg_message_id=sent_message.message_id,
+                        tg_user_or_chat=recipient_id,
+                        from_or_to=str(bot.id),
+                        body=text,
+                    )
+                    print(f"Message stored in database for recipient {recipient_id}")
             except Exception as db_error:
                 print(f"Warning: Could not save message to database: {db_error}")
 
@@ -260,8 +267,11 @@ async def consume():
     """
     print("Starting notification consumer...")
 
-    await database.connect()
+    # Проверяем, подключена ли БД (может быть уже подключена в main.py)
+    if not database.is_connected:
+        await database.connect()
 
+    connection = None
     try:
         connection = await aio_pika.connect_robust(
             host=os.getenv("RABBITMQ_HOST"),
@@ -279,15 +289,20 @@ async def consume():
 
         await queue.consume(on_message)
 
-        print(f"Waiting for messages in queue '{queue_name}'")
-        await asyncio.Future()
+        print(
+            f"Notification consumer started. Waiting for messages in queue '{queue_name}'"
+        )
+
+        # Бесконечный цикл вместо await asyncio.Future() для работы в фоновой задаче
+        while True:
+            await asyncio.sleep(1)
 
     except Exception as e:
-        print(f"Error in consumer: {e}")
+        print(f"Error in notification consumer: {e}")
+        import traceback
 
+        traceback.print_exc()
     finally:
-        await safe_db_disconnect()
-
         if connection is not None:
             try:
                 await connection.close()

@@ -3181,6 +3181,7 @@ chats = sqlalchemy.Table(
     sqlalchemy.Column("last_message_time", DateTime, nullable=True),
     sqlalchemy.Column("last_response_time_seconds", Integer, nullable=True),
     sqlalchemy.Column("metadata", JSON, nullable=True),
+    sqlalchemy.Column("name", String(100), nullable=True),
     sqlalchemy.Column(
         "created_at", DateTime, nullable=False, server_default=func.now()
     ),

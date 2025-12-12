@@ -387,6 +387,35 @@ async def create_chat(
         metadata=metadata,
     )
     chat_id = await database.execute(query)
+
+    try:
+        from producer import send_new_chat_notification
+
+        channel = await get_channel(channel_id)
+        channel_name = channel.get("name") if channel else None
+
+        chat_contact = (
+            await get_chat_contact(chat_contact_id) if chat_contact_id else None
+        )
+        contact_name = chat_contact.get("name") if chat_contact else name
+
+        ad_title = None
+        if metadata and isinstance(metadata, dict):
+            ad_title = metadata.get("ad_title") or metadata.get("name")
+
+        await send_new_chat_notification(
+            cashbox_id=cashbox_id,
+            chat_id=chat_id,
+            contact_name=contact_name,
+            channel_name=channel_name,
+            ad_title=ad_title,
+        )
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to send new chat notification: {e}", exc_info=True)
+
     return await get_chat(chat_id)
 
 
@@ -677,15 +706,19 @@ async def get_chat(chat_id: int):
 async def get_chat_by_external_id(
     channel_id: int, external_chat_id: str, cashbox_id: int
 ):
-    chat = await database.fetch_one(
-        chats.select().where(
+    query = (
+        select([chats.c.id])
+        .where(
             and_(
                 chats.c.channel_id == channel_id,
                 chats.c.external_chat_id == external_chat_id,
                 chats.c.cashbox_id == cashbox_id,
             )
         )
+        .limit(1)
     )
+
+    chat = await database.fetch_one(query)
     if chat:
         return await get_chat(chat["id"])
     return None
@@ -781,8 +814,13 @@ async def get_chats(
     if search:
         search_condition = or_(
             chat_contacts.c.name.ilike(f"%{search}%"),
-            chat_contacts.c.phone.ilike(f"%{search}%"),
-            chats.c.external_chat_id.ilike(f"%{search}%"),
+            chats.c.metadata.op("->>")("name").ilike(f"%{search}%"),
+            chats.c.metadata.op("->>")("ad_title").ilike(f"%{search}%"),
+            chats.c.metadata.op("->")("context")
+            .op("->")("value")
+            .op("->>")("title")
+            .ilike(f"%{search}%"),
+            chats.c.metadata.op("->")("value").op("->>")("title").ilike(f"%{search}%"),
         )
         conditions.append(search_condition)
 
@@ -809,7 +847,7 @@ async def get_chats(
         elif sort_by == "name":
             sort_column = chat_contacts.c.name
 
-        if sort_column:
+        if sort_column is not None:
             if sort_order and sort_order.lower() == "asc":
                 query = query.order_by(sort_column.asc().nulls_last())
             else:
@@ -1401,6 +1439,10 @@ async def chain_client(
 
         contragent_data = {"chat_ids": [chat_id], "primary_channel": channel_type}
 
+        from datetime import datetime as dt
+
+        current_timestamp = int(dt.now().timestamp())
+
         insert_query = contragents.insert().values(
             name=contragent_name,
             phone=phone,
@@ -1410,6 +1452,8 @@ async def chain_client(
             external_id=None,
             contragent_type="Покупатель",
             data=contragent_data,
+            created_at=current_timestamp,
+            updated_at=current_timestamp,
         )
         contragent_id = await database.execute(insert_query)
         message_result = "New contragent created and linked to chat contact"

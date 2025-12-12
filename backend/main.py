@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 import os
 import time
 
+logger = logging.getLogger(__name__)
 from api.analytics.routers import router as analytics_router
 from api.apple_wallet.routers import router as apple_wallet_router
 from api.apple_wallet_card_settings.routers import (
@@ -140,6 +142,7 @@ from api.pictures.routers import router as pictures_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.projects.routers import router as projects_router
+from api.promocodes.routers import router as promocodes_router
 from api.reports.routers import router as reports_router
 from api.segments.routers import router as segments_router
 from api.segments_tags.routers import router as segments_tags_router
@@ -231,6 +234,7 @@ from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
     YookasssaAmoTableCrmRepository,
 )
 from apps.yookassa.web.InstallOauthWeb import InstallYookassaOauthWeb
+from botocore.exceptions import ClientError
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
@@ -238,6 +242,7 @@ from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from common.s3_service.impl.S3ServiceFactory import S3ServiceFactory
 from common.s3_service.models.S3SettingsModel import S3SettingsModel
 from common.utils.ioc.ioc import ioc
+from common.utils.logger import log_quota_exceeded
 from database.db import database
 from database.fixtures import init_db
 from fastapi import FastAPI, Query, Request
@@ -324,6 +329,7 @@ app.include_router(loyality_transactions)
 app.include_router(loyality_settings)
 app.include_router(cashbox_settings_router)
 app.include_router(segments_tags_router)
+app.include_router(promocodes_router)
 
 app.include_router(int_router)
 app.include_router(oauth_router)
@@ -539,9 +545,11 @@ async def write_event_middleware(request: Request, call_next):
             status_code=response.status_code,
         )
         return response
-    except Exception as e:
-        await _write_event(request=request, body=body, time_start=time_start)
-        raise e
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "QuotaExceeded":
+            log_quota_exceeded()
+        else:
+            logger.exception("S3 ClientError")
 
 
 @app.on_event("startup")
@@ -632,6 +640,16 @@ async def startup():
 
     try:
         await avito_consumer.start()
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+
+    try:
+        # Запускаем notification_consumer в фоновой задаче
+        from notification_consumer import consume
+
+        asyncio.create_task(consume())
     except Exception as e:
         import traceback
 

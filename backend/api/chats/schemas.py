@@ -125,6 +125,8 @@ class MessageResponse(BaseModel):
     updated_at: datetime
     sender_avatar: Optional[str] = None
     source: Optional[str] = None
+    image_url: Optional[str] = None
+    file_url: Optional[str] = None
 
     @validator("created_at", "updated_at", pre=True)
     def convert_datetime(cls, v):
@@ -138,7 +140,7 @@ class MessageResponse(BaseModel):
 
 
 class ChainClientRequest(BaseModel):
-    phone: str
+    phone: Optional[str] = None
     name: Optional[str] = None
 
 

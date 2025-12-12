@@ -425,7 +425,7 @@ async def alt_get_warehouse_balances(
                 {"name": category.name, "key": category.id, "children": cat_childrens}
             )
 
-    none_childrens = [item for item in res if item["category"] == None]
+    none_childrens = [item for item in res if item["category"] is None]
     res_with_cats.append(
         {"name": "Без категории", "key": 0, "children": none_childrens}
     )

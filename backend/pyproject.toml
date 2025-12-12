@@ -30,8 +30,6 @@ ignore = [
     "N803",  # Argument name should be lowercase (Имена аргументов)
     "N806",  # Variable in function should be lowercase (Переменные внутри функций)
     "N815",  # Variable in class scope should not be mixedCase (Переменные в классах)
-    "F821",  # Undefined name
-    "E711",  # Comparison to `None` should be `cond is None`
 ]
 
 # Настройки сортировки импортов внутри Ruff

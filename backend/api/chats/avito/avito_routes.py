@@ -273,7 +273,7 @@ async def connect_avito_channel(
         webhook_error_message = None
         webhook_url = None
         try:
-            webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
+            webhook_url = "https://dev.tablecrm.com/api/v1/avito/hook"
 
             if not webhook_url:
                 webhook_error_message = "AVITO_DEFAULT_WEBHOOK_URL not set in .env file"
@@ -773,13 +773,11 @@ async def get_avito_chat_messages(
                                     or sizes.get("640x480")
                                     or (list(sizes.values())[0] if sizes else None)
                                 )
-                                message_text = (
-                                    f"[Image: {image_url if image_url else 'No URL'}]"
-                                )
+                                message_text = ""
                             else:
-                                message_text = "[Image message]"
+                                message_text = ""
                         else:
-                            message_text = "[Image message]"
+                            message_text = ""
                     elif message_type_str == "item":
                         item_data = content.get("item", {})
                         message_text = (
@@ -1488,7 +1486,7 @@ async def sync_avito_messages(user=Depends(get_current_user)):
                                             "text", "[Системное сообщение]"
                                         )
                                     elif message_type_str == "image":
-                                        message_text = "[Изображение]"
+                                        message_text = ""
                                     elif message_type_str == "item":
                                         item_data = content.get("item", {})
                                         message_text = f"Объявление: {item_data.get('title', '[Объявление]')}"
@@ -2290,7 +2288,7 @@ async def update_all_avito_webhooks(user=Depends(get_current_user)):
                 "results": [],
             }
 
-        webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
+        webhook_url = "https://dev.tablecrm.com/api/v1/avito/hook"
 
         logger.info(f"Using webhook URL for update-all: {webhook_url}")
         updated_count = 0
@@ -2558,7 +2556,7 @@ async def avito_oauth_callback(
         webhook_error_message = None
         webhook_url = None
         try:
-            webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
+            webhook_url = "https://dev.tablecrm.com/api/v1/avito/hook"
 
             if webhook_url:
                 client = await create_avito_client(
