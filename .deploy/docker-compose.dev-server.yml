@@ -91,12 +91,13 @@ services:
       - nginx-proxy
 
   adminer:
-    image: dockette/adminer:full
+    # https://github.com/dockette/adminer/tree/master
+    image: dockette/adminer:postgres
     restart: always
     environment:
-      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DEFAULT_SERVER: ${POSTGRES_HOST}
       ADMINER_DESIGN: pepa-linha-dark
-      ADMINER_PLUGINS: "designs tables-filter dump-json version-noverify edit-calendar"
+      ADMINER_PLUGINS: "designs tables-filter dump-json version-noverify edit-calendar config highlight-monaco pretty-json-column "
     networks:
       - nginx-proxy
       - infrastructure
