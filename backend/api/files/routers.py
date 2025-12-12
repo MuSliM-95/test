@@ -110,7 +110,7 @@ async def upload_file(
         raise HTTPException(502, "Не удалось сохранить файл")
 
     # Сохранение в БД
-    tags_json = json.dumps(file_meta.tags) if file_meta.tags else None
+    tags_json = file_meta.tags.json() if file_meta.tags else None
     values = {
         "title": file_meta.title,
         "description": file_meta.description,
@@ -231,7 +231,7 @@ async def update_file(token: str, file_id: int, update: FileUpdate):
     if update.description is not None:
         update_data["description"] = update.description
     if update.tags is not None:
-        update_data["tags"] = json.dumps(update.tags)
+        update_data["tags"] = update.tags.json()
     if update_data:
         update_data["updated_at"] = datetime.now(ZoneInfo("Europe/Moscow"))
         await database.execute(
