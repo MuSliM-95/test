@@ -21,7 +21,6 @@ from functions.helpers import (
 )
 from ws_manager import manager
 
-
 # Поддерживаемые MIME-типы и соответствующие расширения
 ALLOWED_CONTENT_TYPES = {
     "image/jpeg": "jpg",
