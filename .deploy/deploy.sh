@@ -29,7 +29,7 @@ update_upstream_conf() {
 }
 
 deploy_new_version() {
-  current_ports=$(docker ps --filter "name=$SERVICE_NAME" --format '{{.Ports}}' | grep -o '0\.0\.0\.0:[0-9]\+' | grep -o '[0-9]\+' || true)
+  current_ports=$(docker ps --filter "name=$SERVICE_NAME" --format '{{.Ports}}' | grep -o '0\.0\.0\.0:[0-9]\+' | awk -F: '{print $2}' || true)
 
   if [[ " $current_ports " =~ "8000" ]]; then
     NEW_PORT=8002
