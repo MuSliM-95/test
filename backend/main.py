@@ -139,6 +139,7 @@ from api.payments.routers import (
 )
 from api.pboxes.routers import router as pboxes_router
 from api.pictures.routers import router as pictures_router
+from api.files.routers import router as files_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.projects.routers import router as projects_router
@@ -314,6 +315,7 @@ app.include_router(price_types_router)
 app.include_router(prices_router)
 app.include_router(nomenclature_router)
 app.include_router(pictures_router)
+app.include_router(files_router)
 app.include_router(entity_functions_router)
 app.include_router(units_router)
 app.include_router(docs_sales_router)
