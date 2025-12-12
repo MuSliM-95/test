@@ -1,27 +1,21 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
+import io
 import re
-
-import aiofiles
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from fastapi.responses import Response
-from uuid import uuid4
+from datetime import datetime
 from os import environ
+from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import aioboto3
-import io
-
-from database import db
-from database.db import database, pictures
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
+from sqlalchemy import func, select
 
 import api.pictures.schemas as schemas
+from database import db
+from database.db import database, pictures
 from functions.filter_schemas import PicturesFiltersQuery
-
-from functions.helpers import datetime_to_timestamp, get_entity_by_id
-from functions.helpers import get_user_by_token
-
+from functions.helpers import datetime_to_timestamp, get_entity_by_id, get_user_by_token
 from ws_manager import manager
-from sqlalchemy import select, func
 
 # Поддерживаемые MIME-типы и соответствующие расширения
 ALLOWED_CONTENT_TYPES = {
