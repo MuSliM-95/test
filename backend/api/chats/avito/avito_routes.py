@@ -2287,7 +2287,7 @@ async def update_all_avito_webhooks(user=Depends(get_current_user)):
                 "failed_channels": 0,
                 "results": [],
             }
-        
+
         webhook_url = "https://dev.tablecrm.com/api/v1/avito/hook"
 
         logger.info(f"Using webhook URL for update-all: {webhook_url}")
