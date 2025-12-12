@@ -357,7 +357,7 @@ class AvitoClient:
         user_id = await self._get_user_id()
         response = await self._make_request(
             "GET",
-            f"/v3/accounts/{user_id}/chats/{chat_id}/messages",
+            f"/v3/accounts/{user_id}/chats/{chat_id}/messages/",
             params={"limit": limit, "offset": offset},
         )
         if isinstance(response, list):
