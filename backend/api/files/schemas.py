@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Literal
-from datetime import datetime
 
 
 class TagList(BaseModel):

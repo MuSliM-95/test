@@ -5,7 +5,6 @@ import io
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
-from fastapi.responses import Response
 from sqlalchemy import select, func, and_, or_
 
 from database.db import database, files
@@ -140,7 +139,7 @@ async def upload_file(
         await manager.send_message(token, {"action": "create", "target": "files", "result": result})
         return result
 
-    except Exception as db_err:
+    except Exception:
         # Откат из S3
         try:
             async with s3_session.client(**s3_data) as s3:
