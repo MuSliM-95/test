@@ -80,7 +80,7 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_BACKUPS_SECRETKEY}
       S3_BUCKET: apps3tablecrm-default-bucket
       S3_PREFIX: backups/mastertablecrm
-      POSTGRES_HOST: db
+      POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_DATABASE: cash_2
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
@@ -91,11 +91,12 @@ services:
       - nginx-proxy
 
   adminer:
-    image: adminer:4.8.1
+    image: dockette/adminer:full
     restart: always
     environment:
       ADMINER_DEFAULT_SERVER: db
-      # ADMINER_DESIGN: pepa-lined
+      ADMINER_DESIGN: pepa-linha-dark
+      ADMINER_PLUGINS: "designs tables-filter dump-json version-noverify edit-calendar"
     networks:
       - nginx-proxy
       - infrastructure
