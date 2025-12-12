@@ -1,5 +1,6 @@
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Literal
 
 
 class TagList(BaseModel):

@@ -1,24 +1,24 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
-import json
 import io
+import json
+from datetime import datetime
+from os import environ
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
-from sqlalchemy import select, func, and_, or_
-
+import aioboto3
 from database.db import database, files
-from functions.helpers import get_user_by_token, datetime_to_timestamp
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import and_, func, or_, select
 from ws_manager import manager
 
 from .schemas import (
-    FileCreate, FileUpdate, FileFiltersQuery,
-    FileResponse, FileListResponse
+    FileCreate,
+    FileFiltersQuery,
+    FileListResponse,
+    FileResponse,
+    FileUpdate,
 )
-
-import aioboto3
-from os import environ
-
 
 s3_session = aioboto3.Session()
 s3_data = {
