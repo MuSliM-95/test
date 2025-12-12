@@ -44,7 +44,7 @@ class PromocodeService:
         # Создание транзакции
         transaction_query = loyality_transactions.insert().values(
             {
-                "type": "promocode",
+                "type": "accrual",
                 "amount": amount,
                 "loyality_card_id": card_id,
                 "loyality_card_number": card_number,
