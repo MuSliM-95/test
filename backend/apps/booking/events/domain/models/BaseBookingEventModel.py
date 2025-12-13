@@ -1,7 +1,8 @@
 from typing import Optional
 
-from database.db import BookingEventStatus
 from pydantic import BaseModel
+
+from database.db import BookingEventStatus
 
 
 class BaseBookingEventModel(BaseModel):

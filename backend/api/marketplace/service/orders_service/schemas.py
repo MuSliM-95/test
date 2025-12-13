@@ -1,8 +1,9 @@
 from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
+
 from api.docs_sales.schemas import DeliveryInfoSchema
 from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
-from pydantic import BaseModel, Field
 
 
 class MarketplaceOrderGood(BaseModel):

@@ -1,6 +1,9 @@
 import math
 from typing import Optional
 
+from fastapi import HTTPException
+from sqlalchemy import select
+
 from api.marketplace.schemas import BaseMarketplaceUtm
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import (
@@ -10,8 +13,6 @@ from database.db import (
     nomenclature,
     warehouses,
 )
-from fastapi import HTTPException
-from sqlalchemy import select
 
 
 class BaseMarketplaceService:

@@ -1,11 +1,12 @@
+from fastapi import FastAPI
+from starlette import status
+
 from api.nomenclature import schemas
 from api.nomenclature.infrastructure.readers.impl.NomenclatureReader import (
     NomenclatureReader,
 )
 from api.nomenclature.web.views.GetNomenclatureByIdView import GetNomenclatureByIdView
 from api.prices.infrastructure.readers.impl.PricesReader import PricesReader
-from fastapi import FastAPI
-from starlette import status
 
 
 class InstallNomenclatureWeb:

@@ -1,3 +1,5 @@
+from sqlalchemy import select
+
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import (
     INomenclatureReader,
 )
@@ -8,7 +10,6 @@ from database.db import (
     nomenclature_groups_value,
     units,
 )
-from sqlalchemy import select
 
 
 class NomenclatureReader(INomenclatureReader):

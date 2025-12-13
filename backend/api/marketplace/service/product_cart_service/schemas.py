@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import List, Optional
 
-from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
 from pydantic import BaseModel
+
+from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
 
 
 class MarketplaceGetCartRequest(BaseModel):

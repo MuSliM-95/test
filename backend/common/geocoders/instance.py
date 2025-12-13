@@ -1,7 +1,8 @@
 import os
 
-from common.geocoders.impl.geoapify import Geoapify
 from dotenv import load_dotenv
+
+from common.geocoders.impl.geoapify import Geoapify
 
 load_dotenv()
 

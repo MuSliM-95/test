@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from api.marketplace.service.qr_service.constants import QrEntityTypes
 from pydantic import BaseModel
+
+from api.marketplace.service.qr_service.constants import QrEntityTypes
 
 
 class QRResolveResponse(BaseModel):

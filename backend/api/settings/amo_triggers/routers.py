@@ -1,10 +1,11 @@
 import uuid
 
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func, select, update
+
 from database.db import amo_bots, amo_install_table_cashboxes, database, table_triggers
 from database.enums import TriggerTime
-from fastapi import APIRouter, Depends, HTTPException, Request
 from functions.helpers import get_user_by_token
-from sqlalchemy import func, select, update
 
 from . import schemas
 

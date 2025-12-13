@@ -1,3 +1,7 @@
+from fastapi import HTTPException
+from sqlalchemy import and_
+from starlette import status
+
 from apps.amocrm.installer.infrastructure.models.InsertWidgetInstallerInfoModel import (
     InsertWidgetInstallerInfoModel,
 )
@@ -17,9 +21,6 @@ from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepo
     IWidgetInstallerRepository,
 )
 from database.db import amo_install_widget_installer, database
-from fastapi import HTTPException
-from sqlalchemy import and_
-from starlette import status
 
 
 class WidgetInstallerRepository(IWidgetInstallerRepository):

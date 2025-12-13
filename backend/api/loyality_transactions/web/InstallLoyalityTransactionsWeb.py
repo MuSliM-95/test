@@ -1,11 +1,12 @@
 from typing import List, Optional, Union
 
+from fastapi import FastAPI
+from starlette import status
+
 from api.loyality_transactions import schemas
 from api.loyality_transactions.web.views.CreateLoyalityTransactionsView import (
     CreateLoyalityTransactionsView,
 )
-from fastapi import FastAPI
-from starlette import status
 
 
 class InstallLoyalityTransactionsWeb:
