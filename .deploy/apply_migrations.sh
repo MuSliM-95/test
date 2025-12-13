@@ -6,13 +6,14 @@ POSTGRES_PASS=${POSTGRES_PASS:-secret}
 POSTGRES_HOST=${POSTGRES_HOST:-db}
 POSTGRES_PORT=${POSTGRES_PORT:-5432}
 IMAGE_NAME=${IMAGE_NAME:-tablecrm_backend:latest}
+NETWORK_NAME=${NETWORK_NAME:-infrastructure}
 
 echo "Применяем миграции Alembic..."
 
 TEMP_CONTAINER="alembic_temp_$(date +%s)"
 docker run -d \
   --name "$TEMP_CONTAINER" \
-  --network infrastructure \
+  --network "$NETWORK_NAME" \
   -e POSTGRES_USER="$POSTGRES_USER" \
   -e POSTGRES_PASS="$POSTGRES_PASS" \
   -e POSTGRES_HOST="$POSTGRES_HOST" \
@@ -30,22 +31,19 @@ run_alembic() {
   docker exec "$TEMP_CONTAINER" python -m alembic "$@"
 }
 
-HEADS=$(run_alembic heads --verbose 2>/dev/null | wc -l)
-if [ "$HEADS" -gt 1 ]; then
-  echo "Обнаружено несколько head ($HEADS). Выполняем объединение..."
-  run_alembic merge -m "Auto-merge heads during CI/CD deployment"
+# Получаем все head
+HEADS=$(run_alembic heads --verbose 2>/dev/null | grep -o '^[a-f0-9]\+' | tr '\n' ' ')
+
+if [ -n "$HEADS" ] && [ $(echo "$HEADS" | wc -w) -gt 1 ]; then
+  echo "Обнаружено несколько head: $HEADS. Выполняем объединение..."
+  # Объединяем ВСЕ head в одну миграцию
+  run_alembic merge -m "Auto-merge $(echo "$HEADS" | wc -w) heads" $HEADS
   echo "Миграции объединены"
 fi
 
-CURRENT=$(run_alembic current --verbose 2>/dev/null)
-HEAD=$(run_alembic heads 2>/dev/null | head -n1 | cut -d' ' -f1)
-
-if [ -n "$HEAD" ] && [ "$CURRENT" != "$HEAD" ]; then
-  echo "Обнаружены неприменённые миграции. Применяем..."
-  run_alembic upgrade head
-  echo "Все миграции успешно применены"
-else
-  echo "Миграции в актуальном состоянии"
-fi
+# Применяем все миграции
+echo "Применяем миграции..."
+run_alembic upgrade head
+echo "Все миграции успешно применены"
 
 docker rm -f "$TEMP_CONTAINER" >/dev/null
