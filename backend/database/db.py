@@ -5,14 +5,6 @@ from enum import Enum as ENUM
 
 import databases
 import sqlalchemy
-from database.enums import (
-    ContragentType,
-    DebitCreditType,
-    Gender,
-    Repeatability,
-    TriggerTime,
-    TriggerType,
-)
 from dotenv import load_dotenv
 from sqlalchemy import (
     ARRAY,
@@ -33,10 +25,20 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql import func
+
+from database.enums import (
+    ContragentType,
+    DebitCreditType,
+    Gender,
+    Repeatability,
+    TriggerTime,
+    TriggerType,
+)
 
 load_dotenv()
 
@@ -253,7 +255,6 @@ yookassa_payments = sqlalchemy.Table(
         onupdate=func.now(),
     ),
 )
-
 
 booking_tags = sqlalchemy.Table(
     "booking_tags",
@@ -1020,6 +1021,35 @@ pictures = sqlalchemy.Table(
         "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
     ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+)
+
+files = sqlalchemy.Table(
+    "files",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column("title", String, nullable=True),
+    sqlalchemy.Column("description", Text, nullable=True),
+    sqlalchemy.Column("tags", JSONB, nullable=True),
+    sqlalchemy.Column(
+        "url", String, nullable=False
+    ),  # путь в S3: files/2025/12/10/123/abc123.pdf
+    sqlalchemy.Column("size", Integer, nullable=True),
+    sqlalchemy.Column("mime_type", String, nullable=False),
+    sqlalchemy.Column("extension", String(10), nullable=False),
+    sqlalchemy.Column(
+        "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
+    ),
+    sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
+    sqlalchemy.Column(
+        "is_deleted", Boolean, nullable=False, server_default=sqlalchemy.false()
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column(
         "updated_at",
