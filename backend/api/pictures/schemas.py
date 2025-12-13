@@ -13,6 +13,7 @@ class Picture(BaseModel):
     entity_id: int
     is_main: Optional[bool]
     url: str
+    public_url: str
     size: Optional[int]
     updated_at: int
     created_at: int

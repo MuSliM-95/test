@@ -5,10 +5,11 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import aioboto3
-from database.db import database, files
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from functions.helpers import datetime_to_timestamp, get_user_by_token
 from sqlalchemy import and_, func, or_, select
+
+from database.db import database, files
+from functions.helpers import datetime_to_timestamp, get_user_by_token
 from ws_manager import manager
 
 from .schemas import (
@@ -49,6 +50,12 @@ ALLOWED_CONTENT_TYPES = {
     "audio/mpeg": "mp3",
     "video/mp4": "mp4",
 }
+
+
+def build_public_url(file_key: str) -> str:
+    base = environ.get("S3_PUBLIC_URL") or environ.get("S3_URL")
+    return f"{base}/{bucket_name}/{file_key}"
+
 
 router = APIRouter(tags=["files"])
 
@@ -132,6 +139,7 @@ async def upload_file(
         query = files.select().where(files.c.id == file_id)
         file_db = await database.fetch_one(query)
         result = datetime_to_timestamp(file_db)
+        result["public_url"] = build_public_url(result["url"])
 
         await manager.send_message(
             token, {"action": "create", "target": "files", "result": result}
@@ -170,7 +178,7 @@ async def list_files(
 
     if filters.tags:
         for tag in [t.strip().lower() for t in filters.tags.split(",") if t.strip()]:
-            conditions.append(files.c.tags.like(f'%"{tag}"%'))
+            conditions.append(files.c.tags.contains([tag]))
 
     def ts_to_dt(ts: int):
         return datetime.fromtimestamp(ts, tz=ZoneInfo("UTC"))
@@ -192,7 +200,10 @@ async def list_files(
         .offset(offset)
     )
     db_files = await database.fetch_all(query)
-    db_files = [datetime_to_timestamp(f) for f in db_files]
+    db_files = [
+        {**datetime_to_timestamp(f), "public_url": build_public_url(f["url"])}
+        for f in db_files
+    ]
 
     count_query = select(func.count(files.c.id)).where(and_(*conditions))
     total = await database.fetch_one(count_query)
@@ -209,7 +220,9 @@ async def get_file(token: str, file_id: int):
     file = await database.fetch_one(query)
     if not file:
         raise HTTPException(404, "Файл не найден")
-    return datetime_to_timestamp(file)
+    result = datetime_to_timestamp(file)
+    result["public_url"] = build_public_url(result["url"])
+    return result
 
 
 @router.patch("/files/{file_id}/", response_model=FileResponse)
@@ -242,6 +255,7 @@ async def update_file(token: str, file_id: int, update: FileUpdate):
     await manager.send_message(
         token, {"action": "update", "target": "files", "result": result}
     )
+    result["public_url"] = build_public_url(result["url"])
     return result
 
 

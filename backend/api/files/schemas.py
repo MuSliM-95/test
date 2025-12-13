@@ -59,6 +59,7 @@ class FileResponse(BaseModel):
     description: Optional[str]
     tags: Optional[List[str]]
     url: str
+    public_url: str
     size: Optional[int]
     mime_type: str
     extension: str

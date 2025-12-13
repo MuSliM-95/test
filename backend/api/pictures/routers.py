@@ -6,18 +6,19 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import aioboto3
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
+from sqlalchemy import func, select
+
 import api.pictures.schemas as schemas
 from database import db
 from database.db import database, pictures
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import Response
 from functions.filter_schemas import PicturesFiltersQuery
 from functions.helpers import (
     datetime_to_timestamp,
     get_entity_by_id,
     get_user_by_token,
 )
-from sqlalchemy import func, select
 from ws_manager import manager
 
 # Поддерживаемые MIME-типы и соответствующие расширения
@@ -28,6 +29,12 @@ ALLOWED_CONTENT_TYPES = {
     "image/gif": "gif",
     "application/pdf": "pdf",
 }
+
+
+def build_public_url(file_key: str) -> str:
+    base = environ.get("S3_PUBLIC_URL") or environ.get("S3_URL")
+    return f"{base}/{bucket_name}/{file_key}"
+
 
 router = APIRouter(tags=["pictures"])
 
@@ -60,6 +67,7 @@ async def get_picture_by_id(token: str, idx: int):
     user = await get_user_by_token(token)
     picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
     picture_db = datetime_to_timestamp(picture_db)
+    picture_db["public_url"] = build_public_url(picture_db["url"])
     return picture_db
 
 
@@ -152,7 +160,10 @@ async def get_pictures(
     )
 
     pictures_db = await database.fetch_all(query)
-    pictures_db = [*map(datetime_to_timestamp, pictures_db)]
+    pictures_db = [
+        {**datetime_to_timestamp(p), "public_url": build_public_url(p["url"])}
+        for p in pictures_db
+    ]
 
     query = select(func.count(pictures.c.id)).where(
         pictures.c.owner == user.id,
@@ -245,6 +256,7 @@ async def new_picture(
             )
 
         picture_db = datetime_to_timestamp(picture_db)
+        picture_db["public_url"] = build_public_url(picture_db["url"])
 
         await manager.send_message(
             token,
@@ -291,6 +303,7 @@ async def edit_picture(
         picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
 
     picture_db = datetime_to_timestamp(picture_db)
+    picture_db["public_url"] = build_public_url(picture_db["url"])
 
     await manager.send_message(
         token,
