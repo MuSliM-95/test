@@ -1,7 +1,8 @@
-from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
-from common.utils.ioc.ioc import ioc
 from fastapi import FastAPI
 from starlette import status
+
+from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
+from common.utils.ioc.ioc import ioc
 
 from ...booking.infrastructure.repositories.core.IBookingRepository import (
     IBookingRepository,

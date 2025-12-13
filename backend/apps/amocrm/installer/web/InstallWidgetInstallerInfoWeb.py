@@ -1,3 +1,6 @@
+from fastapi import FastAPI
+from starlette import status
+
 from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import (
     IWidgetInstallerRepository,
 )
@@ -11,8 +14,6 @@ from apps.amocrm.installer.web.view.PatchWidgetInstallerInfoView import (
     PatchWidgetInstallerInfoView,
 )
 from common.utils.ioc.ioc import ioc
-from fastapi import FastAPI
-from starlette import status
 
 
 class InstallWidgetInstallerInfoWeb:

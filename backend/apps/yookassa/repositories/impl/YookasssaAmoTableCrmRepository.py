@@ -1,3 +1,5 @@
+from sqlalchemy import select
+
 from apps.yookassa.repositories.core.IYookasssaAmoTableCrmRepository import (
     IYookasssaAmoTableCrmRepository,
 )
@@ -7,7 +9,6 @@ from database.db import (
     amo_leads_docs_sales_mapping,
     database,
 )
-from sqlalchemy import select
 
 
 class YookasssaAmoTableCrmRepository(IYookasssaAmoTableCrmRepository):

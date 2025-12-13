@@ -1,3 +1,5 @@
+from asyncpg import PostgresError, UniqueViolationError
+
 from api.nomenclature_groups.infrastructure.exceptions.GroupAlreadyHaveIsMainError import (
     GroupAlreadyHaveIsMainError,
 )
@@ -7,7 +9,6 @@ from api.nomenclature_groups.infrastructure.exceptions.NomenclatureIdAlreadyExis
 from api.nomenclature_groups.infrastructure.functions.core.IAddNomenclatureToGroupFunction import (
     IAddNomenclatureToGroupFunction,
 )
-from asyncpg import PostgresError, UniqueViolationError
 from database.db import database, nomenclature_groups_value
 
 

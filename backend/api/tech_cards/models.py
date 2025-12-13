@@ -1,6 +1,5 @@
 import uuid
 
-from database.db import Base
 from sqlalchemy import (
     Boolean,
     Column,
@@ -14,6 +13,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
+from database.db import Base
 
 
 class TechCardDB(Base):

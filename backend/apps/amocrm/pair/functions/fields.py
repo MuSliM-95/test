@@ -1,13 +1,14 @@
 import json
 
 import aiohttp
+from sqlalchemy import or_
+
 from database.db import (
     TypeCustomField,
     amo_custom_fields,
     amo_install_custom_fields,
     database,
 )
-from sqlalchemy import or_
 
 
 async def get_amo_codes_leads(cashbox_id: int):

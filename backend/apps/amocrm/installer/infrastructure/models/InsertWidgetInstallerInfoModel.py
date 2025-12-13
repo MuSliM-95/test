@@ -1,7 +1,8 @@
 from typing import Optional
 
-from database.db import InstalledByRole
 from pydantic import BaseModel
+
+from database.db import InstalledByRole
 
 
 class InsertWidgetInstallerInfoModel(BaseModel):

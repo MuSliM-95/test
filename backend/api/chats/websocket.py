@@ -3,10 +3,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+
 from api.chats import crud
 from api.chats.auth import get_current_user
 from api.chats.producer import chat_producer
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 
 router = APIRouter(prefix="/chats", tags=["chats-ws"])
 

@@ -1,3 +1,6 @@
+from fastapi import HTTPException
+from starlette import status
+
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import (
     INomenclatureReader,
 )
@@ -19,9 +22,7 @@ from api.nomenclature_groups.web.models.AddNomenclatureToGroupModel import (
 from api.nomenclature_groups.web.models.ResponseAddNomenclatureToGroup import (
     ResponseAddNomenclatureToGroup,
 )
-from fastapi import HTTPException
 from functions.helpers import get_user_by_token
-from starlette import status
 
 
 class AddNomenclatureToGroupView:

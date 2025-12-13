@@ -1,6 +1,7 @@
 import aiohttp
-from database.db import database, tochka_bank_accounts, tochka_bank_credentials
 from sqlalchemy import select
+
+from database.db import database, tochka_bank_accounts, tochka_bank_credentials
 
 
 class TochkaBankError(Exception):

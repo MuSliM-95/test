@@ -1,9 +1,10 @@
 from typing import Optional
 
-from database.db import database, users_cboxes_relation
 from fastapi import Header, HTTPException, Query, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+
+from database.db import database, users_cboxes_relation
 
 security_scheme = HTTPBearer(auto_error=False)
 

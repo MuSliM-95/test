@@ -1,10 +1,13 @@
 import os
 
-# Добавляем импорт для обновления времени смен
-from api.employee_shifts.websocket_service import send_shift_time_updates
 from apscheduler.jobstores.base import JobLookupError
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pytz import utc
+from sqlalchemy.exc import DatabaseError
+
+# Добавляем импорт для обновления времени смен
+from api.employee_shifts.websocket_service import send_shift_time_updates
 from database.db import (
     engine_job_store,
 )
@@ -15,8 +18,6 @@ from jobs.check_account.job import check_account
 from jobs.module_bank_job.job import module_bank_update_transaction
 from jobs.segment_jobs.job import segment_update
 from jobs.tochka_bank_job.job import tochka_update_transaction
-from pytz import utc
-from sqlalchemy.exc import DatabaseError
 
 scheduler = AsyncIOScheduler(
     {"apscheduler.job_defaults.max_instances": 25}, timezone=utc

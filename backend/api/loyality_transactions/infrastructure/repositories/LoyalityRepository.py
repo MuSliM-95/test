@@ -1,5 +1,6 @@
-from database.db import database, entity_to_entity, loyality_transactions
 from sqlalchemy import Integer, and_, case, cast, func, select
+
+from database.db import database, entity_to_entity, loyality_transactions
 
 
 class LoyalityRepository:

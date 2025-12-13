@@ -1,7 +1,8 @@
+from sqlalchemy.sql import select
+
 from database.db import SegmentObjectType, contragents, database, segment_objects
 from segments.constants import SegmentChangeType
 from segments.helpers.collect_obj_ids import collect_objects
-from sqlalchemy.sql import select
 
 
 class ContragentsData:

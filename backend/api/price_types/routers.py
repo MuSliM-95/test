@@ -1,15 +1,16 @@
 from typing import Optional
 
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import func, select
+
 import api.price_types.schemas as schemas
 from database.db import database, price_types
-from fastapi import APIRouter, HTTPException, Query
 from functions.helpers import (
     datetime_to_timestamp,
     get_entity_by_id,
     get_user_by_token,
     raise_bad_request,
 )
-from sqlalchemy import func, select
 from ws_manager import manager
 
 router = APIRouter(tags=["price_types"])

@@ -1,5 +1,6 @@
-from database.db import contragents, docs_sales, docs_sales_delivery_info
 from sqlalchemy import desc, func, select
+
+from database.db import contragents, docs_sales, docs_sales_delivery_info
 
 
 class DocsSalesListRepository:
