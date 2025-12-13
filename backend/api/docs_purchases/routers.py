@@ -1,5 +1,3 @@
-import datetime
-
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import asc, desc, func, select
 
@@ -10,10 +8,8 @@ from database.db import (
     docs_purchases,
     docs_purchases_goods,
     docs_warehouse,
-    entity_to_entity,
     nomenclature,
     organizations,
-    payments,
     price_types,
     units,
     users_cboxes_relation,
@@ -313,44 +309,6 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
             .values({"sum": items_sum})
         )
         await database.execute(query)
-
-        # --- Автоматическое создание платежа по закупке ---
-        if items_sum > 0 and instance_values.get("contragent"):
-            now_ts = int(datetime.datetime.now().timestamp())
-
-            payment_body = {
-                "contragent": instance_values["contragent"],
-                "type": "outgoing",
-                "name": f"Оплата по закупке {instance_id}",
-                "amount_without_tax": items_sum,
-                "amount": items_sum,
-                "paybox": None,
-                "tags": instance_values.get("tags", ""),
-                "date": now_ts,
-                "account": user.user,
-                "cashbox": user.cashbox_id,
-                "is_deleted": False,
-                "created_at": now_ts,
-                "updated_at": now_ts,
-                "status": True,
-                "stopped": True,
-                "docs_sales_id": None,
-            }
-
-            payment_id = await database.execute(payments.insert().values(payment_body))
-
-            entity_values = {
-                "cashbox_id": user.cashbox_id,
-                "type": "payments_docs_purchases",
-                "from_entity": 5,  # платеж
-                "to_entity": 1,  # docs_purchases
-                "from_id": payment_id,
-                "to_id": instance_id,
-                "status": True,
-                "delinked": False,
-            }
-
-            await database.execute(entity_to_entity.insert().values(entity_values))
 
         goods_res = []
         for good in goods:

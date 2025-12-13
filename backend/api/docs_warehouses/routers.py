@@ -375,8 +375,7 @@ async def update(token: str, docs_warehouse_data: schemas.EditMass):
                 exceptions.append(f"Документ {instance_values['id']}: {e.detail}")
                 continue
 
-        goods: list = instance_values.get("goods") or []
-        goods = await filter_out_service_goods(goods)
+        goods: list = instance_values.get("goods")
         try:
             del instance_values["goods"]
         except KeyError:

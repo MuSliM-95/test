@@ -29,7 +29,7 @@ update_upstream_conf() {
 }
 
 deploy_new_version() {
-  current_ports=$(docker ps --filter "name=$SERVICE_NAME" --format '{{.Ports}}' | grep -o '0\.0\.0\.0:[0-9]\+' | awk -F: '{print $2}' || true)
+  current_ports=$(docker ps --filter "name=$SERVICE_NAME" --format '{{.Ports}}' | grep -o '0\.0\.0\.0:[0-9]\+' | grep -o '[0-9]\+')
 
   if [[ " $current_ports " =~ "8000" ]]; then
     NEW_PORT=8002
@@ -118,7 +118,7 @@ deploy_new_version() {
 }
 
 deploy_new_bot_version() {
-  current_bots=$(docker ps --filter "name=${BOT_SERVICE_NAME}" --format '{{.Names}}' | grep -E "${BOT_CONTAINER_NAME_PREFIX}_[0-9]+" || true)
+  current_bots=$(docker ps --filter "name=${BOT_SERVICE_NAME}" --format '{{.Names}}' | grep -E "${BOT_CONTAINER_NAME_PREFIX}_[0-9]+")
 
   if [[ -z "$current_bots" ]]; then
     NEW_BOT_NAME="${BOT_CONTAINER_NAME_PREFIX}_1"
@@ -170,8 +170,8 @@ deploy_new_bot_version() {
 }
 
 deploy_another_services() {
-  docker stop "worker" || true
-  docker rm "worker" || true
+  docker stop "worker"
+  docker rm "worker"
 
   docker run -d \
     --name "worker" \
@@ -208,8 +208,8 @@ deploy_another_services() {
     "$IMAGE_NAME" \
     /bin/bash -c "python3 worker.py"
 
-  docker stop "backend_jobs" || true
-  docker rm "backend_jobs" || true
+  docker stop "backend_jobs"
+  docker rm "backend_jobs"
 
   docker run -d \
     --name "backend_jobs" \
@@ -246,8 +246,8 @@ deploy_another_services() {
     "$IMAGE_NAME" \
     /bin/bash -c "python3 start_jobs.py"
 
-  docker stop "message_consumer_task" || true
-  docker rm "message_consumer_task" || true
+  docker stop "message_consumer_task"
+  docker rm "message_consumer_task"
 
   docker run -d \
     --name "message_consumer_task" \
@@ -283,8 +283,8 @@ deploy_another_services() {
     "$IMAGE_NAME" \
     /bin/bash -c "python3 message_consumer.py"
 
-  docker stop "notification_consumer_task" || true
-  docker rm "notification_consumer_task" || true
+  docker stop "notification_consumer_task"
+  docker rm "notification_consumer_task"
 
   docker run -d \
     --name "notification_consumer_task" \
