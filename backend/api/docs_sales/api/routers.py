@@ -1907,8 +1907,8 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
         query = f"""
             SELECT
                 sales.*,
-                {', '.join(f'warehouse.{c.name} AS warehouse_{c.name}' for c in warehouses.c)},
-                {', '.join(f'contragent.{c.name} AS contragent_{c.name}' for c in contragents.c)}
+                {", ".join(f"warehouse.{c.name} AS warehouse_{c.name}" for c in warehouses.c)},
+                {", ".join(f"contragent.{c.name} AS contragent_{c.name}" for c in contragents.c)}
             FROM docs_sales sales
             LEFT JOIN warehouses warehouse ON warehouse.id = sales.warehouse
             LEFT JOIN contragents contragent ON contragent.id = sales.contragent
@@ -1925,7 +1925,7 @@ async def verify_hash_and_get_order(hash: str, order_id: int, role: str):
         query = f"""
             select
                 "goods".*,
-                {', '.join(f'nomenclature.{c.name} AS nomenclature_{c.name}' for c in nomenclature.c)},
+                {", ".join(f"nomenclature.{c.name} AS nomenclature_{c.name}" for c in nomenclature.c)},
                 "pictures"."id" AS "picture_id",
                 "pictures"."url" AS "picture_url",
                 "pictures"."is_main" AS "picture_is_main",
