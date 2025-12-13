@@ -130,7 +130,21 @@ build-up-docker-job-dev:
     - echo "Stopping old containers..."
     - docker compose down --remove-orphans || true
 
-    - echo "Starting new deployment..."
+    - echo "Starting DB and infrastructure..."
+    - docker compose up -d db rabbitmq  # только БД и зависимости
+    - echo "Passing variables for migrations..."
+    - export IMAGE_NAME=tablecrm_backend:latest
+    - export NETWORK_NAME=infrastructure
+    - export POSTGRES_HOST=db
+    - export POSTGRES_USER="$POSTGRES_USER"
+    - export POSTGRES_PASS="$POSTGRES_PASS"
+    - export POSTGRES_PORT="$POSTGRES_PORT"
+
+    - echo "Applying migrations..."
+    - chmod +x .deploy/apply_migrations.sh
+    - .deploy/apply_migrations.sh
+
+    - echo "Starting full deployment..."
     - docker compose up -d --force-recreate
 
     - echo "Deployment successful"

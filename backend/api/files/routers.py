@@ -5,10 +5,11 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import aioboto3
-from database.db import database, files
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from functions.helpers import datetime_to_timestamp, get_user_by_token
 from sqlalchemy import and_, func, or_, select
+
+from database.db import database, files
+from functions.helpers import datetime_to_timestamp, get_user_by_token
 from ws_manager import manager
 
 from .schemas import (
@@ -109,11 +110,11 @@ async def upload_file(
         raise HTTPException(502, "Не удалось сохранить файл")
 
     # Сохранение в БД
-    tags_json = file_meta.tags.json() if file_meta.tags else None
+    tags_list = file_meta.tags.__root__ if file_meta.tags else None
     values = {
         "title": file_meta.title,
         "description": file_meta.description,
-        "tags": tags_json,
+        "tags": tags_list,
         "url": file_key,
         "size": len(file_bytes),
         "mime_type": file.content_type,
@@ -230,7 +231,7 @@ async def update_file(token: str, file_id: int, update: FileUpdate):
     if update.description is not None:
         update_data["description"] = update.description
     if update.tags is not None:
-        update_data["tags"] = update.tags.json()
+        update_data["tags"] = update.tags.__root__
     if update_data:
         update_data["updated_at"] = datetime.now(ZoneInfo("Europe/Moscow"))
         await database.execute(
