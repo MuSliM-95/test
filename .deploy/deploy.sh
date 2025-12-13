@@ -352,16 +352,15 @@ apply_migrations() {
     return 1
   fi
 
-  HEADS=$(run_alembic heads --verbose 2>/dev/null | wc -l)
-  if [ "$HEADS" -gt 1 ]; then
-    echo "Обнаружено несколько head ($HEADS). Выполняем объединение..."
-    run_alembic merge -m "Auto-merge heads during CI/CD deployment" || {
-      echo "Не удалось объединить миграции"
-      docker rm -f "$TEMP_CONTAINER" >/dev/null
-      return 1
-    }
-    echo "Миграции объединены"
-  fi
+  # Получаем все head как строку хешей
+HEAD_REVISIONS=$(run_alembic heads --verbose 2>/dev/null | grep -o '^[a-f0-9]\+' | tr '\n' ' ')
+NUM_HEADS=$(echo "$HEAD_REVISIONS" | wc -w)
+
+if [ "$NUM_HEADS" -gt 1 ]; then
+  echo "Обнаружено несколько head ($NUM_HEADS): $HEAD_REVISIONS. Выполняем объединение..."
+  run_alembic merge -m "Auto-merge $(echo "$NUM_HEADS" | tr -d ' ') heads during deploy" $HEAD_REVISIONS
+  echo " Миграции объединены"
+fi
 
   CURRENT=$(run_alembic current --verbose 2>/dev/null)
   HEAD=$(run_alembic heads 2>/dev/null | head -n1 | cut -d' ' -f1)
