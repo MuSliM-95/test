@@ -137,52 +137,52 @@ def upgrade() -> None:
         nullable=False,
         autoincrement=True,
     )
-    # --- конец исправления ---
-    op.drop_index("ix_booking_events_photo_id", table_name="booking_events_photo")
-    op.drop_index("idx_categories_name_trgm", table_name="categories")
-    op.create_foreign_key(None, "categories", "pictures", ["photo_id"], ["id"])
-    op.drop_index(
-        "ix_channel_credentials_channel_cashbox", table_name="channel_credentials"
-    )
-    op.drop_index("ix_channel_credentials_is_active", table_name="channel_credentials")
-    op.drop_index("ix_chat_contacts_channel_id", table_name="chat_contacts")
-    op.drop_index("ix_chat_contacts_contragent_id", table_name="chat_contacts")
-    op.add_column("chats", sa.Column("name", sa.String(length=100), nullable=True))
-    op.drop_index("ix_chats_chat_contact_id", table_name="chats")
-    op.drop_index("idx_contragents_id_phone_cashbox", table_name="contragents")
-    op.drop_index("idx_contragents_tags_contragent_tag", table_name="contragents_tags")
-    op.drop_index("idx_docs_sales_cashbox_contragent_sum", table_name="docs_sales")
-    op.drop_index(
-        "idx_docs_sales_cashbox_dated_id_not_deleted", table_name="docs_sales"
-    )
-    op.drop_index("idx_docs_sales_contragent_aggregate", table_name="docs_sales")
-    op.drop_index("idx_docs_sales_contragent_cashbox_deleted", table_name="docs_sales")
-    op.drop_index("idx_docs_sales_id_cashbox_not_deleted", table_name="docs_sales")
-    op.drop_index("idx_docs_sales_sum_include", table_name="docs_sales")
-    op.drop_index(
-        "idx_docs_sales_delivery_docs_address", table_name="docs_sales_delivery_info"
-    )
-    op.drop_index(
-        "idx_docs_sales_delivery_info_delivery_date_docs_sales_id",
-        table_name="docs_sales_delivery_info",
-    )
-    op.drop_index(
-        "idx_docs_sales_goods_docs_nomenclature", table_name="docs_sales_goods"
-    )
-    op.drop_index("idx_docs_sales_goods_nomenclature_id", table_name="docs_sales_goods")
-    op.drop_index("idx_docs_sales_tags_docs_name", table_name="docs_sales_tags")
-    op.drop_index("idx_global_categories_external_id", table_name="global_categories")
-    op.drop_index("idx_global_categories_is_active", table_name="global_categories")
-    op.drop_index("idx_global_categories_parent_id", table_name="global_categories")
-    op.drop_index("idx_loyality_cards_contragent_balance", table_name="loyality_cards")
-    op.drop_index(
-        "idx_loyality_cards_contragent_balance_filtered", table_name="loyality_cards"
-    )
-    op.drop_index(
-        "idx_loyality_transactions_card_created", table_name="loyality_transactions"
-    )
-    op.drop_index("idx_nomenclature_category", table_name="nomenclature")
-    op.drop_index("idx_nomenclature_category_id", table_name="nomenclature")
+
+    # op.drop_index("ix_booking_events_photo_id", table_name="booking_events_photo")
+    # op.drop_index("idx_categories_name_trgm", table_name="categories")
+    # op.create_foreign_key(None, "categories", "pictures", ["photo_id"], ["id"])
+    # op.drop_index(
+    #     "ix_channel_credentials_channel_cashbox", table_name="channel_credentials"
+    # )
+    # op.drop_index("ix_channel_credentials_is_active", table_name="channel_credentials")
+    # op.drop_index("ix_chat_contacts_channel_id", table_name="chat_contacts")
+    # op.drop_index("ix_chat_contacts_contragent_id", table_name="chat_contacts")
+    # op.add_column("chats", sa.Column("name", sa.String(length=100), nullable=True))
+    # op.drop_index("ix_chats_chat_contact_id", table_name="chats")
+    # op.drop_index("idx_contragents_id_phone_cashbox", table_name="contragents")
+    # op.drop_index("idx_contragents_tags_contragent_tag", table_name="contragents_tags")
+    # op.drop_index("idx_docs_sales_cashbox_contragent_sum", table_name="docs_sales")
+    # op.drop_index(
+    #     "idx_docs_sales_cashbox_dated_id_not_deleted", table_name="docs_sales"
+    # )
+    # op.drop_index("idx_docs_sales_contragent_aggregate", table_name="docs_sales")
+    # op.drop_index("idx_docs_sales_contragent_cashbox_deleted", table_name="docs_sales")
+    # op.drop_index("idx_docs_sales_id_cashbox_not_deleted", table_name="docs_sales")
+    # op.drop_index("idx_docs_sales_sum_include", table_name="docs_sales")
+    # op.drop_index(
+    #     "idx_docs_sales_delivery_docs_address", table_name="docs_sales_delivery_info"
+    # )
+    # op.drop_index(
+    #     "idx_docs_sales_delivery_info_delivery_date_docs_sales_id",
+    #     table_name="docs_sales_delivery_info",
+    # )
+    # op.drop_index(
+    #     "idx_docs_sales_goods_docs_nomenclature", table_name="docs_sales_goods"
+    # )
+    # op.drop_index("idx_docs_sales_goods_nomenclature_id", table_name="docs_sales_goods")
+    # op.drop_index("idx_docs_sales_tags_docs_name", table_name="docs_sales_tags")
+    # op.drop_index("idx_global_categories_external_id", table_name="global_categories")
+    # op.drop_index("idx_global_categories_is_active", table_name="global_categories")
+    # op.drop_index("idx_global_categories_parent_id", table_name="global_categories")
+    # op.drop_index("idx_loyality_cards_contragent_balance", table_name="loyality_cards")
+    # op.drop_index(
+    #     "idx_loyality_cards_contragent_balance_filtered", table_name="loyality_cards"
+    # )
+    # op.drop_index(
+    #     "idx_loyality_transactions_card_created", table_name="loyality_transactions"
+    # )
+    # op.drop_index("idx_nomenclature_category", table_name="nomenclature")
+    # op.drop_index("idx_nomenclature_category_id", table_name="nomenclature")
     op.create_index(op.f("ix_segments_tags_id"), "segments_tags", ["id"], unique=False)
     op.create_foreign_key(
         None, "tech_operation_components", "nomenclature", ["nomeclature_id"], ["id"]
