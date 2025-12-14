@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import aioboto3
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 
 import api.pictures.schemas as schemas
@@ -31,9 +31,9 @@ ALLOWED_CONTENT_TYPES = {
 }
 
 
-def build_public_url(file_key: str) -> str:
-    base = environ.get("S3_PUBLIC_URL") or environ.get("S3_URL")
-    return f"{base}/{bucket_name}/{file_key}"
+def build_public_url(picture_id: int) -> str:
+    base = environ.get("APP_URL").rstrip("/")
+    return f"{base}/api/v1/pictures/{picture_id}/content"
 
 
 router = APIRouter(tags=["pictures"])
@@ -67,7 +67,7 @@ async def get_picture_by_id(token: str, idx: int):
     user = await get_user_by_token(token)
     picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
     picture_db = datetime_to_timestamp(picture_db)
-    picture_db["public_url"] = build_public_url(picture_db["url"])
+    picture_db["public_url"] = build_public_url(idx)
     return picture_db
 
 
@@ -161,7 +161,7 @@ async def get_pictures(
 
     pictures_db = await database.fetch_all(query)
     pictures_db = [
-        {**datetime_to_timestamp(p), "public_url": build_public_url(p["url"])}
+        {**datetime_to_timestamp(p), "public_url": build_public_url(p["id"])}
         for p in pictures_db
     ]
 
@@ -256,7 +256,7 @@ async def new_picture(
             )
 
         picture_db = datetime_to_timestamp(picture_db)
-        picture_db["public_url"] = build_public_url(picture_db["url"])
+        picture_db["public_url"] = build_public_url(picture_id)
 
         await manager.send_message(
             token,
@@ -303,7 +303,7 @@ async def edit_picture(
         picture_db = await get_entity_by_id(pictures, idx, user.cashbox_id)
 
     picture_db = datetime_to_timestamp(picture_db)
-    picture_db["public_url"] = build_public_url(picture_db["url"])
+    picture_db["public_url"] = build_public_url(idx)
 
     await manager.send_message(
         token,
@@ -311,6 +311,20 @@ async def edit_picture(
     )
 
     return picture_db
+
+
+@router.get("/pictures/{picture_id}/content")
+async def get_picture_content(token: str, picture_id: int):
+    user = await get_user_by_token(token)
+    picture = await get_entity_by_id(pictures, picture_id, user.cashbox_id)
+
+    async with s3_session.client(**s3_data) as s3:
+        presigned_url = await s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": picture["url"]},
+            ExpiresIn=3600,
+        )
+    return RedirectResponse(presigned_url)
 
 
 @router.delete("/pictures/{idx}/", response_model=schemas.Picture)

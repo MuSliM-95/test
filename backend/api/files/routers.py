@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 import aioboto3
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import RedirectResponse
 from sqlalchemy import and_, func, or_, select
 
 from database.db import database, files
@@ -52,9 +53,9 @@ ALLOWED_CONTENT_TYPES = {
 }
 
 
-def build_public_url(file_key: str) -> str:
-    base = environ.get("S3_PUBLIC_URL") or environ.get("S3_URL")
-    return f"{base}/{bucket_name}/{file_key}"
+def build_public_url(file_id: int) -> str:
+    base = environ.get("APP_URL").rstrip("/")
+    return f"{base}/api/v1/files/{file_id}/content"
 
 
 router = APIRouter(tags=["files"])
@@ -139,7 +140,7 @@ async def upload_file(
         query = files.select().where(files.c.id == file_id)
         file_db = await database.fetch_one(query)
         result = datetime_to_timestamp(file_db)
-        result["public_url"] = build_public_url(result["url"])
+        result["public_url"] = build_public_url(file_id)
 
         await manager.send_message(
             token, {"action": "create", "target": "files", "result": result}
@@ -201,7 +202,7 @@ async def list_files(
     )
     db_files = await database.fetch_all(query)
     db_files = [
-        {**datetime_to_timestamp(f), "public_url": build_public_url(f["url"])}
+        {**datetime_to_timestamp(f), "public_url": build_public_url(f["id"])}
         for f in db_files
     ]
 
@@ -221,7 +222,7 @@ async def get_file(token: str, file_id: int):
     if not file:
         raise HTTPException(404, "Файл не найден")
     result = datetime_to_timestamp(file)
-    result["public_url"] = build_public_url(result["url"])
+    result["public_url"] = build_public_url(file_id)
     return result
 
 
@@ -255,7 +256,7 @@ async def update_file(token: str, file_id: int, update: FileUpdate):
     await manager.send_message(
         token, {"action": "update", "target": "files", "result": result}
     )
-    result["public_url"] = build_public_url(result["url"])
+    result["public_url"] = build_public_url(file_id)
     return result
 
 
@@ -280,3 +281,25 @@ async def delete_file(token: str, file_id: int):
         token, {"action": "delete", "target": "files", "result": result}
     )
     return result
+
+
+from fastapi.responses import RedirectResponse
+
+
+@router.get("/files/{file_id}/content")
+async def get_file_content(token: str, file_id: int):
+    user = await get_user_by_token(token)
+    query = files.select().where(
+        files.c.id == file_id, files.c.owner == user.id, files.c.is_deleted.is_not(True)
+    )
+    file = await database.fetch_one(query)
+    if not file:
+        raise HTTPException(404, "Файл не найден или доступ запрещён")
+
+    async with s3_session.client(**s3_data) as s3:
+        presigned_url = await s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": file["url"]},
+            ExpiresIn=3600,  # 1 час
+        )
+    return RedirectResponse(presigned_url)
