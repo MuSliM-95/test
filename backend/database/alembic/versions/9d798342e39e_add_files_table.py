@@ -119,6 +119,17 @@ def upgrade() -> None:
         )
     )
 
+    conn.execute(
+        sa.text(
+            """
+        UPDATE categories
+        SET photo_id = NULL
+        WHERE photo_id IS NOT NULL
+          AND photo_id NOT IN (SELECT id FROM pictures WHERE id IS NOT NULL)
+    """
+        )
+    )
+
     op.alter_column(
         "booking_events_photo",
         "id",
