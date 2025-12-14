@@ -72,26 +72,25 @@ async def get_picture_by_id(token: str, idx: int):
 
 
 @router.get("/photos/{filename}/")
-async def get_picture_link_by_id(filename: str, token: str):
-    """Получение файла по имени (безопасно, с проверкой прав)"""
-    if not re.match(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE):
+async def get_picture_by_filename(filename: str):
+    """Публичный доступ к фото по имени файла (обратная совместимость со старыми URL)"""
+    # Разрешаем имена как у старых файлов: nomenclature_39663_78d9b9b5.jpg
+    if not re.match(
+        r"^[a-zA-Z0-9_\-\.]+\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE
+    ):
         raise HTTPException(status_code=400, detail="Недопустимое имя файла")
 
-    user = await get_user_by_token(token)
-    picture = await get_picture_by_filename(filename, user.cashbox_id)
-
-    if not picture:
-        raise HTTPException(status_code=404, detail="Файл не найден")
+    file_key = f"photos/{filename}"
 
     async with s3_session.client(**s3_data) as s3:
         try:
-            s3_obj = await s3.get_object(Bucket=bucket_name, Key=picture.url)
+            s3_obj = await s3.get_object(Bucket=bucket_name, Key=file_key)
             body = await s3_obj["Body"].read()
         except Exception as e:
-            print(f"S3 error: {e}")
-            raise HTTPException(status_code=500, detail="Ошибка при загрузке файла")
+            print(f"S3 error for {file_key}: {e}")
+            raise HTTPException(status_code=404, detail="Файл не найден")
 
-    # Определяем media_type
+    # Определяем MIME-type
     if filename.lower().endswith(".png"):
         media_type = "image/png"
     elif filename.lower().endswith(".gif"):
@@ -105,29 +104,25 @@ async def get_picture_link_by_id(filename: str, token: str):
 
 
 @router.get("/photos/link/{filename}/")
-async def get_picture_link_by_filename_endpoint(filename: str, token: str):
-    """Получение пресайгнутой ссылки по имени файла"""
-    if not re.match(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE):
-        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+async def get_picture_link_by_filename_endpoint(filename: str):
+    """Публичная пресайгнутая ссылка по имени файла (обратная совместимость)"""
+    if not re.match(
+        r"^[a-zA-Z0-9_\-\.]+\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE
+    ):
+        raise HTTPException(400, "Недопустимое имя файла")
 
-    user = await get_user_by_token(token)
-    picture = await get_picture_by_filename(filename, user.cashbox_id)
-
-    if not picture:
-        raise HTTPException(status_code=404, detail="Файл не найден")
+    file_key = f"photos/{filename}"
 
     async with s3_session.client(**s3_data) as s3:
         try:
             url = await s3.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": bucket_name, "Key": picture.url},
-                ExpiresIn=3600,  # 1 час
+                Params={"Bucket": bucket_name, "Key": file_key},
+                ExpiresIn=3600,
             )
         except Exception as e:
-            print(f"S3 presign error: {e}")
-            raise HTTPException(
-                status_code=500, detail="Не удалось сгенерировать ссылку"
-            )
+            print(f"S3 presign error for {file_key}: {e}")
+            raise HTTPException(500, "Не удалось сгенерировать ссылку")
 
     return {"data": {"url": url}}
 
