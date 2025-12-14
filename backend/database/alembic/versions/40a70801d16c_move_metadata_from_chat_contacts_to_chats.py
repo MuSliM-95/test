@@ -23,59 +23,40 @@ def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
 
-    # Проверяем, есть ли поле metadata в chats
+    # Убедимся, что metadata есть в chats (на всякий случай)
     chats_columns = [col["name"] for col in inspector.get_columns("chats")]
     if "metadata" not in chats_columns:
-        # Добавляем поле metadata в chats
         op.add_column(
             "chats",
-            sa.Column(
-                "metadata", postgresql.JSON(astext_type=sa.Text()), nullable=True
-            ),
+            sa.Column("metadata", postgresql.JSONB(), nullable=True)
         )
 
-    # Переносим метадату из chat_contacts в chats
-    # Для каждого чата берем метадату из связанного контакта
-    if (
-        "chat_contacts" in inspector.get_table_names()
-        and "chats" in inspector.get_table_names()
-    ):
+    # Проверяем, существует ли колонка metadata в chat_contacts
+    chat_contacts_columns = [col["name"] for col in inspector.get_columns("chat_contacts")]
+    if "metadata" not in chat_contacts_columns:
+        # Колонки нет — переносить нечего. Выходим тихо.
+        return
+
+    # Только если колонка есть — переносим
+    if "chats" in inspector.get_table_names() and "chat_contacts" in inspector.get_table_names():
         chats_with_contacts = conn.execute(
-            sa.text(
-                """
-            SELECT c.id, cc.metadata
-            FROM chats c
-            JOIN chat_contacts cc ON c.chat_contact_id = cc.id
-            WHERE cc.metadata IS NOT NULL
-        """
-            )
+            sa.text("""
+                SELECT c.id, cc.metadata
+                FROM chats c
+                JOIN chat_contacts cc ON c.chat_contact_id = cc.id
+                WHERE cc.metadata IS NOT NULL
+            """)
         ).fetchall()
 
-        for chat_row in chats_with_contacts:
-            chat_id, contact_metadata = chat_row
+        for chat_id, contact_metadata in chats_with_contacts:
             if contact_metadata:
-                # Обновляем метадату в чате
-                # Преобразуем dict в JSON строку для PostgreSQL
-                if isinstance(contact_metadata, dict):
-                    metadata_json = json.dumps(contact_metadata)
-                else:
-                    metadata_json = contact_metadata
-                # Используем cast для преобразования в jsonb
+                # Передаём напрямую — SQLAlchemy сам обработает JSONB
                 conn.execute(
-                    sa.text(
-                        """
-                    UPDATE chats
-                    SET metadata = CAST(:metadata AS jsonb)
-                    WHERE id = :chat_id
-                """
-                    ),
-                    {"metadata": metadata_json, "chat_id": chat_id},
+                    sa.text("UPDATE chats SET metadata = :meta WHERE id = :chat_id"),
+                    {"meta": contact_metadata, "chat_id": chat_id}
                 )
 
-    # Удаляем поле metadata из chat_contacts
-    chat_contacts_columns = [
-        col["name"] for col in inspector.get_columns("chat_contacts")
-    ]
+    # Удаляем колонку, если она ещё есть
     if "metadata" in chat_contacts_columns:
         op.drop_column("chat_contacts", "metadata")
 
