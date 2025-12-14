@@ -83,9 +83,9 @@ def upgrade() -> None:
     )
     op.create_unique_constraint(None, "amo_lead_statuses", ["pipeline_id", "amo_id"])
     op.create_unique_constraint(None, "amo_leads", ["amo_install_group_id", "amo_id"])
-    op.drop_constraint(
-        "amo_table_contacts_amo_id_fkey", "amo_table_contacts", type_="foreignkey"
-    )
+    # op.drop_constraint(
+    #     "amo_table_contacts_amo_id_fkey", "amo_table_contacts", type_="foreignkey"
+    # )
     op.create_foreign_key(
         None, "amo_table_contacts", "amo_contacts", ["amo_id"], ["id"]
     )
@@ -332,14 +332,14 @@ def downgrade() -> None:
         autoincrement=True,
     )
     op.drop_constraint(None, "amo_table_contacts", type_="foreignkey")
-    op.create_foreign_key(
-        "amo_table_contacts_amo_id_fkey",
-        "amo_table_contacts",
-        "amo_contacts",
-        ["amo_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
+    # op.create_foreign_key(
+    #     "amo_table_contacts_amo_id_fkey",
+    #     "amo_table_contacts",
+    #     "amo_contacts",
+    #     ["amo_id"],
+    #     ["id"],
+    #     ondelete="CASCADE",
+    # )
     op.drop_constraint(None, "amo_leads", type_="unique")
     op.drop_constraint(None, "amo_lead_statuses", type_="unique")
     op.drop_constraint(None, "amo_lead_pipelines", type_="unique")
