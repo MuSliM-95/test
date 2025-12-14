@@ -1,10 +1,11 @@
+from sqlalchemy import and_, func, literal_column, select
+
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.locations_service.schemas import (
     LocationsListRequest,
     LocationsListResponse,
 )
 from database.db import database, marketplace_rating_aggregates, warehouses
-from sqlalchemy import and_, func, literal_column, select
 
 
 class MarketplaceLocationsService(BaseMarketplaceService):

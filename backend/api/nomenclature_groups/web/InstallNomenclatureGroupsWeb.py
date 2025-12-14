@@ -1,5 +1,8 @@
 from typing import List
 
+from fastapi import FastAPI
+from starlette import status
+
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import (
     INomenclatureReader,
 )
@@ -67,8 +70,6 @@ from api.nomenclature_groups.web.views.PatchNomenclatureGroupView import (
     PatchNomenclatureGroupView,
 )
 from common.utils.ioc.ioc import ioc
-from fastapi import FastAPI
-from starlette import status
 
 
 class InstallNomenclatureGroupsWeb:

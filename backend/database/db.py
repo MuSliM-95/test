@@ -5,14 +5,6 @@ from enum import Enum as ENUM
 
 import databases
 import sqlalchemy
-from database.enums import (
-    ContragentType,
-    DebitCreditType,
-    Gender,
-    Repeatability,
-    TriggerTime,
-    TriggerType,
-)
 from dotenv import load_dotenv
 from sqlalchemy import (
     ARRAY,
@@ -38,6 +30,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql import func
+
+from database.enums import (
+    ContragentType,
+    DebitCreditType,
+    Gender,
+    Repeatability,
+    TriggerTime,
+    TriggerType,
+)
 
 load_dotenv()
 

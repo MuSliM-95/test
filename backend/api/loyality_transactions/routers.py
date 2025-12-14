@@ -1,6 +1,9 @@
 import asyncio
 from datetime import datetime
 
+from fastapi import APIRouter, Depends
+from sqlalchemy import case, desc, func, select, update
+
 import api.loyality_transactions.schemas as schemas
 from database.db import (
     async_session_maker,
@@ -8,7 +11,6 @@ from database.db import (
     loyality_cards,
     loyality_transactions,
 )
-from fastapi import APIRouter, Depends
 from functions.helpers import (
     datetime_to_timestamp,
     get_entity_by_id_and_created_by,
@@ -16,7 +18,6 @@ from functions.helpers import (
     get_filters_transactions,
     get_user_by_token,
 )
-from sqlalchemy import case, desc, func, select, update
 from ws_manager import manager
 
 router = APIRouter(tags=["loyality_transactions"])

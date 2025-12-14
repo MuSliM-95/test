@@ -1,5 +1,6 @@
-from apps.yookassa.services.core.IYookassaApiService import IYookassaApiService
 from fastapi import HTTPException
+
+from apps.yookassa.services.core.IYookassaApiService import IYookassaApiService
 from functions.helpers import get_user_by_token
 
 

@@ -1,6 +1,7 @@
 from asyncpg import UniqueViolationError
-from database.db import database, fifo_settings
 from fastapi import APIRouter, HTTPException
+
+from database.db import database, fifo_settings
 from functions.helpers import datetime_to_timestamp, get_user_by_token
 from ws_manager import manager
 

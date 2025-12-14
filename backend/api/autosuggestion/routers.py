@@ -1,6 +1,7 @@
+from fastapi import APIRouter
+
 from api.autosuggestion.schemas import AutosuggestResponse
 from common.geocoders.instance import geocoder
-from fastapi import APIRouter
 
 router = APIRouter(prefix="/autosuggestions", tags=["autosuggestions"])
 

@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 import websockets
+
 from database.db import (
     cashbox_settings,
     cboxes,

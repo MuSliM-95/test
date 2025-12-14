@@ -1,6 +1,8 @@
 from typing import Any, Mapping, Optional
 
 from aio_pika import IncomingMessage
+from sqlalchemy import select
+
 from api.chats.producer import (
     ChatMessageModel,
     ChatTypingEventModel,
@@ -10,7 +12,6 @@ from api.chats.producer import (
 from api.chats.websocket import cashbox_manager, chat_manager
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
 from database.db import chats, database
-from sqlalchemy import select
 
 
 class ChatMessageHandler(IEventHandler):

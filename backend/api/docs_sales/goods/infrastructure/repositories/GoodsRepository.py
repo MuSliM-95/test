@@ -1,7 +1,8 @@
 from collections import defaultdict
 
-from database.db import database, docs_sales_goods, nomenclature, units
 from sqlalchemy import Integer, cast, func, select
+
+from database.db import database, docs_sales_goods, nomenclature, units
 
 
 class GoodsRepository:

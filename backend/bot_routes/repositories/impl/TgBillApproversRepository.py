@@ -1,5 +1,8 @@
 from typing import List, Union
 
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+
 from bot_routes.models.TgBillApproversModels import (
     TgBillApproversCreateModel,
     TgBillApproversExtendedModel,
@@ -9,8 +12,6 @@ from bot_routes.models.TgBillApproversModels import (
 from bot_routes.repositories.core.ITgBillApproversRepository import (
     ITgBillApproversRepository,
 )
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 
 
 class TgBillApproversRepository(ITgBillApproversRepository):

@@ -1,3 +1,6 @@
+from fastapi import APIRouter
+from sqlalchemy import asc, func, select, text
+
 from database.db import (
     database,
     docs_sales,
@@ -7,9 +10,7 @@ from database.db import (
     pboxes,
     users_cboxes_relation,
 )
-from fastapi import APIRouter
 from functions.helpers import get_user_by_token
-from sqlalchemy import asc, func, select, text
 
 from . import schemas
 

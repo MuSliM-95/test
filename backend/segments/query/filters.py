@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import and_, exists, func, or_, select, text
+from sqlalchemy.sql import Select
+
 from database.db import (
     OrderStatus,
     categories,
@@ -16,8 +19,6 @@ from database.db import (
     tags,
 )
 from segments.ranges import apply_date_range, apply_range
-from sqlalchemy import and_, exists, func, or_, select, text
-from sqlalchemy.sql import Select
 
 
 def orders_filters(query: Select, order_filters: dict, sub) -> Select:

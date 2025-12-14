@@ -1,6 +1,8 @@
 import time
 from typing import Optional
 
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+
 from api.marketplace.service.favorites_service.schemas import (
     CreateFavoritesUtm,
     FavoriteListResponse,
@@ -57,7 +59,6 @@ from api.marketplace.service.view_event_service.schemas import (
     ViewEventsUtm,
 )
 from api.marketplace.utils import get_marketplace_service
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
 
