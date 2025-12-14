@@ -103,7 +103,7 @@ def upgrade() -> None:
         sa.text(
             """
         SELECT setval('booking_events_photo_id_seq',
-            COALESCE((SELECT MAX(id) FROM booking_events_photo), 0)
+            COALESCE((SELECT MAX(id) FROM booking_events_photo), 1)
         );
     """
         )
