@@ -1,5 +1,3 @@
-from fastapi import Depends
-
 from apps.booking.events.domain.models.SearchEventFiltersModel import (
     SearchEventFiltersModel,
 )
@@ -10,6 +8,7 @@ from apps.booking.events.functions.core.IEventsGetFunction import IEventsGetFunc
 from apps.booking.events.infrastructure.services.core.IBookingEventsService import (
     IBookingEventsService,
 )
+from fastapi import Depends
 from functions.helpers import get_user_by_token
 
 

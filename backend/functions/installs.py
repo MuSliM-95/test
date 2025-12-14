@@ -1,5 +1,4 @@
 from asyncpg.exceptions import UniqueViolationError
-
 from database.db import database, installs, links, users_cboxes_relation
 
 

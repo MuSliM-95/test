@@ -5,12 +5,6 @@ import os
 import time
 
 logger = logging.getLogger(__name__)
-from botocore.exceptions import ClientError
-from fastapi import FastAPI, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from starlette.types import Message
-
 from api.analytics.routers import router as analytics_router
 from api.apple_wallet.routers import router as apple_wallet_router
 from api.apple_wallet_card_settings.routers import (
@@ -51,6 +45,7 @@ from api.employee_shifts.routers import router as employee_shifts_router
 from api.events.routers import router as events_router
 from api.feeds.routers import router as feeds_router
 from api.fifo_settings.routers import router as fifo_settings_router
+from api.files.routers import router as files_router
 from api.functions.routers import router as entity_functions_router
 from api.gross_profit_docs.routers import router as gross_profit_docs_router
 from api.installs.routers import router as installs_router
@@ -145,7 +140,6 @@ from api.payments.routers import (
 )
 from api.pboxes.routers import router as pboxes_router
 from api.pictures.routers import router as pictures_router
-from api.files.routers import router as files_router
 from api.price_types.routers import router as price_types_router
 from api.prices.routers import router as prices_router
 from api.projects.routers import router as projects_router
@@ -241,6 +235,7 @@ from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
     YookasssaAmoTableCrmRepository,
 )
 from apps.yookassa.web.InstallOauthWeb import InstallYookassaOauthWeb
+from botocore.exceptions import ClientError
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
@@ -251,12 +246,16 @@ from common.utils.ioc.ioc import ioc
 from common.utils.logger import log_quota_exceeded
 from database.db import database
 from database.fixtures import init_db
+from fastapi import FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from functions.events import write_event
 
 # import sentry_sdk
 from functions.users import get_user_id_cashbox_id_by_token
 from jobs.jobs import scheduler
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
+from starlette.types import Message
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",

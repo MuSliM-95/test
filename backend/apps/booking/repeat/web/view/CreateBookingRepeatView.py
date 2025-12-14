@@ -1,17 +1,16 @@
 import uuid
 
-from fastapi import HTTPException
-from sqlalchemy import and_, select
-from starlette import status
-from starlette.requests import Request
-
 from apps.booking.repeat.models.BaseBookingRepeatMessageModel import (
     BaseBookingRepeatMessage,
 )
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
 from database.db import amo_leads, booking, booking_tags, database
+from fastapi import HTTPException
 from functions.helpers import get_user_by_token
+from sqlalchemy import and_, select
+from starlette import status
+from starlette.requests import Request
 
 
 class CreateBookingRepeatView:

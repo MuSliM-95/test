@@ -1,8 +1,7 @@
-from sqlalchemy import func, select
-
 from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from database.db import database, manufacturers, pictures
 from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import func, select
 
 
 class GetManufacturersView:

@@ -1,6 +1,3 @@
-from fastapi import FastAPI
-from starlette import status
-
 from api.categories import schemas
 from api.categories.web.views.GetAllCategoriesView import GetAllCategoriesView
 from api.categories.web.views.GetCategoriesChildrenByIdView import (
@@ -9,6 +6,8 @@ from api.categories.web.views.GetCategoriesChildrenByIdView import (
 from api.categories.web.views.GetCategoriesTreeView import GetCategoriesTreeView
 from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from common.utils.ioc.ioc import ioc
+from fastapi import FastAPI
+from starlette import status
 
 
 class InstallCategoriesWeb:

@@ -1,8 +1,5 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import func, select
-
 from api.balances.schemas import AccountInfo, BalanceCreate
 from const import BLOCKED, DEMO, PAID
 from database.db import (
@@ -12,6 +9,8 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import func, select
 from texts import url_link_pay
 
 router = APIRouter(tags=["account"])

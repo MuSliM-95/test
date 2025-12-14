@@ -1,6 +1,5 @@
-from sqlalchemy.dialects.postgresql import insert
-
 from database.db import database
+from sqlalchemy.dialects.postgresql import insert
 
 
 async def insert_in_batches(table, data, batch_size=10000):

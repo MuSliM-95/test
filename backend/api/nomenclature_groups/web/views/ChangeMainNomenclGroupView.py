@@ -1,13 +1,12 @@
-from fastapi import HTTPException
-from starlette import status
-
 from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import (
     IChangeMainNomenclGroupFunction,
 )
 from api.nomenclature_groups.infrastructure.readers.core.INomenclatureGroupsReader import (
     INomenclatureGroupsReader,
 )
+from fastapi import HTTPException
 from functions.helpers import get_user_by_token
+from starlette import status
 
 
 class ChangeMainNomenclGroupView:

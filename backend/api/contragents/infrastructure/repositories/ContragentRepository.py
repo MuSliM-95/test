@@ -1,8 +1,7 @@
 from collections import defaultdict
 
-from sqlalchemy import select
-
 from database.db import SegmentObjectType, database, segment_objects
+from sqlalchemy import select
 
 
 class ContragentRepository:

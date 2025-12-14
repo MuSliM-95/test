@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from pydantic import BaseModel
-
 from database.enums import TriggerTime, TriggerType
+from pydantic import BaseModel
 
 
 class Filtersamobot(BaseModel):

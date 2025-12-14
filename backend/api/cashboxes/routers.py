@@ -1,13 +1,12 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import asc, desc
-
 import api.users.schemas as user_schemas
 import functions.filter_schemas as filter_schemas
 from api.cashboxes.schemas import CashboxUpdate
 from database.db import cboxes, database, users, users_cboxes_relation
+from fastapi import APIRouter, Depends, HTTPException
 from functions.helpers import get_filters_users, raise_wrong_token
+from sqlalchemy import asc, desc
 from ws_manager import manager
 
 router = APIRouter(tags=["cboxes"])

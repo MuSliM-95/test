@@ -1,11 +1,10 @@
 from typing import Annotated
 
-from fastapi import Query
-
 from api.nomenclature_attributes.infrastructure.readers.core.INomenclatureAttributesReader import (
     INomenclatureAttributesReader,
 )
 from api.nomenclature_attributes.web.models.schemas import AttributeCreateResponse
+from fastapi import Query
 from functions.helpers import get_user_by_token
 
 

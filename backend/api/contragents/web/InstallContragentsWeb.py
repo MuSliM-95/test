@@ -1,7 +1,6 @@
+from api.contragents.web.views.CreateContragentsView import CreateContragentsView
 from fastapi import FastAPI
 from starlette import status
-
-from api.contragents.web.views.CreateContragentsView import CreateContragentsView
 
 
 class InstallContragentsWeb:

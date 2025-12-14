@@ -2,10 +2,9 @@ from datetime import date
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
-
 from common.schemas import RuPhone
 from database.enums import ContragentType, Gender
+from pydantic import BaseModel
 
 
 class Contragent_types(str, Enum):

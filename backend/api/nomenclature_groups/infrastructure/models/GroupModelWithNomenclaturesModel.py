@@ -1,10 +1,9 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
-
 from api.nomenclature_groups.infrastructure.models.NomenclatureGroupModel import (
     NomenclatureGroupModel,
 )
+from pydantic import BaseModel
 
 
 class Nomenclature(BaseModel):

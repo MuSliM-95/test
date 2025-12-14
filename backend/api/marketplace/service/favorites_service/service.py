@@ -1,7 +1,3 @@
-from fastapi import HTTPException
-from pydantic import BaseModel
-from sqlalchemy import and_, desc, func, select
-
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.favorites_service.schemas import (
     CreateFavoritesUtm,
@@ -10,6 +6,9 @@ from api.marketplace.service.favorites_service.schemas import (
     FavoriteResponse,
 )
 from database.db import database, favorites_nomenclatures, nomenclature
+from fastapi import HTTPException
+from pydantic import BaseModel
+from sqlalchemy import and_, desc, func, select
 
 
 class MarketplaceFavoritesService(BaseMarketplaceService):

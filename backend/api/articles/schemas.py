@@ -1,9 +1,8 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel
-
 from database.enums import DebitCreditType
+from pydantic import BaseModel
 
 
 class ExpensesFor(str, Enum):

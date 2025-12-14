@@ -1,9 +1,8 @@
 from typing import Any, List, Mapping, Optional
 
-from pydantic import BaseModel, Field
-
 from api.nomenclature.schemas import NomenclatureCreate
 from database.db import BookingEventStatus, BookingStatus, DocSalesStatus, Tariff
+from pydantic import BaseModel, Field
 
 
 class NomenclatureBookingCreate(BaseModel):

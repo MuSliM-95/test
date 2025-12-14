@@ -1,13 +1,12 @@
 import os
 from typing import Annotated, Optional
 
-from fastapi import Query
-from sqlalchemy import func, select
-
 from api.categories.routers import build_hierarchy
 from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from database.db import categories, database, nomenclature, pictures
+from fastapi import Query
 from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import func, select
 
 
 class GetCategoriesTreeView:

@@ -1,5 +1,3 @@
-from sqlalchemy import select
-
 from common.s3_service.core.IS3ServiceFactory import IS3ServiceFactory
 from database.db import (
     booking,
@@ -9,6 +7,7 @@ from database.db import (
     database,
     pictures,
 )
+from sqlalchemy import select
 
 from ...domain.models.ResponseGetBookingEventModel import ResponseGetBookingEventsModel
 from ..core.IEventsGetFunction import IEventsGetFunction

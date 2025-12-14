@@ -1,7 +1,6 @@
+from database.db import database, integrations
 from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import JWTError
-
-from database.db import database, integrations
 
 from .shemas import OAuthCustomRequestForm
 from .utils import (

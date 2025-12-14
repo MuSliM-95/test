@@ -1,13 +1,12 @@
 from datetime import datetime
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import asc, desc, func, select
-
 import api.articles.schemas as article_schemas
 import functions.filter_schemas as filter_schemas
 from database.db import articles, database, users_cboxes_relation
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from functions.helpers import check_article_exists, get_filters_articles
+from sqlalchemy import asc, desc, func, select
 from ws_manager import manager
 
 router = APIRouter(tags=["articles"])

@@ -1,9 +1,8 @@
-from sqlalchemy import and_, asc, desc, func, select, update
-
 from apps.booking.booking.infrastructure.repositories.core.IBookingRepository import (
     IBookingRepository,
 )
 from database.db import booking, booking_nomenclature, database
+from sqlalchemy import and_, asc, desc, func, select, update
 
 
 class BookingRepository(IBookingRepository):
