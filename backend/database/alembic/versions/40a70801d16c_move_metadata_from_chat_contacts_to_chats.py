@@ -26,26 +26,30 @@ def upgrade() -> None:
     # Убедимся, что metadata есть в chats (на всякий случай)
     chats_columns = [col["name"] for col in inspector.get_columns("chats")]
     if "metadata" not in chats_columns:
-        op.add_column(
-            "chats",
-            sa.Column("metadata", postgresql.JSONB(), nullable=True)
-        )
+        op.add_column("chats", sa.Column("metadata", postgresql.JSONB(), nullable=True))
 
     # Проверяем, существует ли колонка metadata в chat_contacts
-    chat_contacts_columns = [col["name"] for col in inspector.get_columns("chat_contacts")]
+    chat_contacts_columns = [
+        col["name"] for col in inspector.get_columns("chat_contacts")
+    ]
     if "metadata" not in chat_contacts_columns:
         # Колонки нет — переносить нечего. Выходим тихо.
         return
 
     # Только если колонка есть — переносим
-    if "chats" in inspector.get_table_names() and "chat_contacts" in inspector.get_table_names():
+    if (
+        "chats" in inspector.get_table_names()
+        and "chat_contacts" in inspector.get_table_names()
+    ):
         chats_with_contacts = conn.execute(
-            sa.text("""
+            sa.text(
+                """
                 SELECT c.id, cc.metadata
                 FROM chats c
                 JOIN chat_contacts cc ON c.chat_contact_id = cc.id
                 WHERE cc.metadata IS NOT NULL
-            """)
+            """
+            )
         ).fetchall()
 
         for chat_id, contact_metadata in chats_with_contacts:
@@ -53,7 +57,7 @@ def upgrade() -> None:
                 # Передаём напрямую — SQLAlchemy сам обработает JSONB
                 conn.execute(
                     sa.text("UPDATE chats SET metadata = :meta WHERE id = :chat_id"),
-                    {"meta": contact_metadata, "chat_id": chat_id}
+                    {"meta": contact_metadata, "chat_id": chat_id},
                 )
 
     # Удаляем колонку, если она ещё есть
