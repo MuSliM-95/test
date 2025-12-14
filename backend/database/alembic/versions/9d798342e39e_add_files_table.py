@@ -83,6 +83,7 @@ def upgrade() -> None:
     )
     op.create_unique_constraint(None, "amo_lead_statuses", ["pipeline_id", "amo_id"])
     op.create_unique_constraint(None, "amo_leads", ["amo_install_group_id", "amo_id"])
+
     # op.drop_constraint(
     #     "amo_table_contacts_amo_id_fkey", "amo_table_contacts", type_="foreignkey"
     # )
@@ -137,7 +138,7 @@ def upgrade() -> None:
         nullable=False,
         autoincrement=True,
     )
-
+    # TODO - нужно раскомментировать и запустить в off-peak часы
     # op.drop_index("ix_booking_events_photo_id", table_name="booking_events_photo")
     # op.drop_index("idx_categories_name_trgm", table_name="categories")
     # op.create_foreign_key(None, "categories", "pictures", ["photo_id"], ["id"])
