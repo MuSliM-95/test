@@ -1,12 +1,13 @@
 from datetime import datetime
 from typing import Union
 
-import api.templates.schemas as schemas
-from database.db import areas, database, doc_templates, entity_to_entity, pages
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
-from functions.helpers import get_user_by_token
 from sqlalchemy import or_, select
+
+import api.templates.schemas as schemas
+from database.db import areas, database, doc_templates, entity_to_entity, pages
+from functions.helpers import get_user_by_token
 
 router = APIRouter(tags=["doctemplates"])
 

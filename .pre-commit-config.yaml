@@ -11,11 +11,11 @@ repos:
     rev: v0.14.7
     hooks:
       - id: ruff
-        args: [ --fix , "--config", "backend/pyproject.toml"]
+        args: [ --fix ]
         files: ^backend/
 
   - repo: https://github.com/psf/black
     rev: 25.11.0
     hooks:
       - id: black
-        args: ["--config", "backend/pyproject.toml"]
+        files: ^backend/

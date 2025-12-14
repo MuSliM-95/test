@@ -6,7 +6,7 @@ include = '\.pyi?$'
 
 # Настройки Ruff (Линтер)
 [tool.ruff]
-src = ["backend"]
+src = ["."]
 # Глобальные настройки
 line-length = 88 # Должно совпадать с Black
 target-version = "py39"

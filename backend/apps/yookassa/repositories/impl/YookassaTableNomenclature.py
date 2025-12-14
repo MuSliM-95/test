@@ -1,8 +1,9 @@
+from sqlalchemy import select
+
 from apps.yookassa.repositories.core.IYookassaTableNomenclature import (
     IYookassaTableNomenclature,
 )
 from database.db import database, nomenclature
-from sqlalchemy import select
 
 
 class YookassaTableNomenclature(IYookassaTableNomenclature):

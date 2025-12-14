@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from api.marketplace.service.review_service.constants import ReviewEntityTypes
 from pydantic import BaseModel, Field
+
+from api.marketplace.service.review_service.constants import ReviewEntityTypes
 
 
 class CreateReviewRequest(BaseModel):

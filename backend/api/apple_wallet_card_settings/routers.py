@@ -2,6 +2,11 @@ import json
 import uuid
 from os import environ
 
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from starlette.staticfiles import StaticFiles
+
 from api.apple_wallet_card_settings.schemas import (
     WalletCardSettings,
     WalletCardSettingsCreate,
@@ -16,11 +21,7 @@ from database.db import (
     loyality_cards,
     users_cboxes_relation,
 )
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
-from fastapi.responses import JSONResponse
 from producer import publish_apple_wallet_pass_update
-from sqlalchemy import select
-from starlette.staticfiles import StaticFiles
 
 router = APIRouter(
     prefix="/apple_wallet_card_settings", tags=["apple_wallet_card_settings"]

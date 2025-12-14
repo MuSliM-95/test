@@ -3,6 +3,10 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
+from fastapi import HTTPException
+from sqlalchemy import and_, asc, cast, desc, func, literal_column, select
+from sqlalchemy.dialects.postgresql import JSONB
+
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.products_list_service.schemas import (
     AvailableWarehouse,
@@ -34,9 +38,6 @@ from database.db import (
     warehouse_balances,
     warehouses,
 )
-from fastapi import HTTPException
-from sqlalchemy import and_, asc, cast, desc, func, literal_column, select
-from sqlalchemy.dialects.postgresql import JSONB
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):

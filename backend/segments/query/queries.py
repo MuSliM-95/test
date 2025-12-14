@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from sqlalchemy import select
+
 from database.db import (
     SegmentObjectType,
     contragents,
@@ -13,7 +15,6 @@ from database.db import (
 )
 from segments.logger import logger
 from segments.query import filters as filter_query
-from sqlalchemy import select
 
 FILTER_PRIORYTY_TAGS = {
     "self": 1,

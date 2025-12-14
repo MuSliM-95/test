@@ -1,6 +1,9 @@
 import uuid
 from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
 from api.deps import get_db, get_user_by_token
 from api.tech_cards.models import TechCardDB
 from api.tech_cards.schemas import TechCardStatus
@@ -14,8 +17,6 @@ from api.tech_operations.schemas import (
     TechOperationComponentCreate,
     TechOperationCreate,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/tech_operations", tags=["tech_operations"])
 

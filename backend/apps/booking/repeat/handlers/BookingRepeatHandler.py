@@ -3,6 +3,9 @@ import uuid
 from datetime import datetime
 from typing import Any, Mapping
 
+from dateutil.relativedelta import relativedelta
+from sqlalchemy import and_, insert, or_, select
+
 from api.docs_sales.api.routers import create
 from api.docs_sales.schemas import Create, CreateMass, Item
 from apps.amocrm.leads.models.NewLeadBaseModelMessage import NewLeadBaseModelMessage
@@ -25,8 +28,6 @@ from database.db import (
     nomenclature,
     payments,
 )
-from dateutil.relativedelta import relativedelta
-from sqlalchemy import and_, insert, or_, select
 
 
 class BookingRepeatEvent(IEventHandler[BaseBookingRepeatMessage]):

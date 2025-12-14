@@ -4,6 +4,7 @@ import logging
 from os import environ
 
 import aio_pika
+
 from const import report_queue_name
 from database.db import database
 from functions.goods_distribution import distribute

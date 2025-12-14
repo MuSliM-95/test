@@ -9,6 +9,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 sys.path.insert(0, "/backend")
+from backend.main import app
 from database.db import (
     cboxes,
     contragents,
@@ -17,8 +18,6 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
-
-from backend.main import app
 
 
 def generate_random_string(length=8):

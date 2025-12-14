@@ -2,10 +2,11 @@ import hashlib
 import os
 import uuid
 
-from database.db import database, feeds
 from fastapi import APIRouter, HTTPException
-from functions.helpers import get_user_by_token
 from starlette.responses import Response
+
+from database.db import database, feeds
+from functions.helpers import get_user_by_token
 
 from . import schemas
 from .feed_generator.generator import FeedGenerator

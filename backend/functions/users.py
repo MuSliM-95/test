@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from database.db import database, pboxes, projects, users, users_cboxes_relation
 from sqlalchemy import select
+
+from database.db import database, pboxes, projects, users, users_cboxes_relation
 from ws_manager import manager
 
 
