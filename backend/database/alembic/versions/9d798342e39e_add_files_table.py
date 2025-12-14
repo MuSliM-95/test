@@ -89,6 +89,36 @@ def upgrade() -> None:
     op.create_foreign_key(
         None, "amo_table_contacts", "amo_contacts", ["amo_id"], ["id"]
     )
+    # Исправление для booking_events_photo.id
+    conn = op.get_bind()
+    conn.execute(
+        sa.text(
+            """
+        CREATE SEQUENCE IF NOT EXISTS booking_events_photo_id_seq;
+    """
+        )
+    )
+
+    conn.execute(
+        sa.text(
+            """
+        SELECT setval('booking_events_photo_id_seq',
+            COALESCE((SELECT MAX(id) FROM booking_events_photo), 0)
+        );
+    """
+        )
+    )
+
+    conn.execute(
+        sa.text(
+            """
+        UPDATE booking_events_photo
+        SET id = nextval('booking_events_photo_id_seq')
+        WHERE id IS NULL;
+    """
+        )
+    )
+
     op.alter_column(
         "booking_events_photo",
         "id",
@@ -96,6 +126,7 @@ def upgrade() -> None:
         nullable=False,
         autoincrement=True,
     )
+    # --- конец исправления ---
     op.drop_index("ix_booking_events_photo_id", table_name="booking_events_photo")
     op.drop_index("idx_categories_name_trgm", table_name="categories")
     op.create_foreign_key(None, "categories", "pictures", ["photo_id"], ["id"])
