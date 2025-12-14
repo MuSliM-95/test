@@ -1,11 +1,10 @@
 from typing import List
 
-from sqlalchemy import and_, select
-
 from api.nomenclature_attributes.infrastructure.functions.core.IDeleteNomenclatureAttributesFunction import (
     IDeleteNomenclatureAttributesFunction,
 )
 from database.db import database, nomenclature_attributes, nomenclature_attributes_value
+from sqlalchemy import and_, select
 
 
 class DeleteNomenclatureAttributesFunction(IDeleteNomenclatureAttributesFunction):

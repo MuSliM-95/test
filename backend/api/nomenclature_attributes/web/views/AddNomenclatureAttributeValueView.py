@@ -1,10 +1,5 @@
 from collections import defaultdict
 
-from asyncpg import UniqueViolationError
-from fastapi import HTTPException
-from sqlalchemy import select
-from starlette import status
-
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import (
     INomenclatureReader,
 )
@@ -12,8 +7,12 @@ from api.nomenclature_attributes.infrastructure.readers.core.INomenclatureAttrib
     INomenclatureAttributesReader,
 )
 from api.nomenclature_attributes.web.models import schemas
+from asyncpg import UniqueViolationError
 from database.db import database, nomenclature_attributes_value
+from fastapi import HTTPException
 from functions.helpers import get_user_by_token
+from sqlalchemy import select
+from starlette import status
 
 
 class AddNomenclatureAttributeValueView:

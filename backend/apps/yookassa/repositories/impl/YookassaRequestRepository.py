@@ -4,7 +4,6 @@ from typing import Optional
 
 import aiohttp
 from aiohttp import BasicAuth
-
 from apps.yookassa.models.OauthBaseModel import OauthSettings
 from apps.yookassa.models.PaymentModel import PaymentBaseModel, PaymentCreateModel
 from apps.yookassa.models.WebhookBaseModel import WebhookBaseModel, WebhookViewModel

@@ -2,7 +2,6 @@ import asyncio
 from datetime import datetime
 
 import aiohttp
-
 from database.db import (
     amo_install,
     amo_install_table_cashboxes,

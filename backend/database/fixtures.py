@@ -1,13 +1,12 @@
 import json
 
-from sqlalchemy import event, text
-
 from database.db import (
     entity_or_function,
     global_categories,
     payments,
     units,
 )
+from sqlalchemy import event, text
 
 
 def prepopulate_global_categories(target, connection, **kwargs):

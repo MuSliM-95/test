@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select
-
 import texts
 from api.payments.schemas import PaymentType
 from bot import bot
@@ -14,6 +12,7 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
+from sqlalchemy import func, select
 
 
 async def make_transaction(

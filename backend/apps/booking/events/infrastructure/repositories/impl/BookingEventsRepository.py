@@ -1,7 +1,5 @@
 from typing import Any, List, Mapping
 
-from sqlalchemy import and_, select
-
 from apps.booking.events.domain.models.CreateBookingEventModel import (
     CreateBookingEventModel,
 )
@@ -15,6 +13,7 @@ from database.db import (
     booking_nomenclature,
     database,
 )
+from sqlalchemy import and_, select
 
 from ..core.IBookingEventsRepository import IBookingEventsRepository
 

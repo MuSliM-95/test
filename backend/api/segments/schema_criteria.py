@@ -1,8 +1,7 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, validator
-
 from api.segments.schema_base import DateRange, Range
+from pydantic import BaseModel, validator
 
 
 class PurchaseCriteria(BaseModel):

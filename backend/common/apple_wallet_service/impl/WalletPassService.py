@@ -2,9 +2,6 @@ import json
 import os
 import tempfile
 
-from py_pkpass.models import Barcode, BarcodeFormat, Field, Pass, StoreCard
-from sqlalchemy import select
-
 from api.apple_wallet_card_settings.schemas import WalletCardSettings
 from api.apple_wallet_card_settings.utils import create_default_apple_wallet_setting
 from common.apple_wallet_service.impl.models import PassParamsModel
@@ -20,6 +17,8 @@ from database.db import (
     loyality_cards,
     organizations,
 )
+from py_pkpass.models import Barcode, BarcodeFormat, Field, Pass, StoreCard
+from sqlalchemy import select
 
 # load_dotenv()
 

@@ -1,9 +1,8 @@
-from sqlalchemy import and_, select
-
 from apps.booking.nomenclature.infrastructure.repositories.core.IBookingNomenclatureRepository import (
     IBookingNomenclatureRepository,
 )
 from database.db import booking, booking_nomenclature, database
+from sqlalchemy import and_, select
 
 
 class BookingNomenclatureRepository(IBookingNomenclatureRepository):

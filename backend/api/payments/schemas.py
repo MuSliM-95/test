@@ -1,9 +1,8 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, validator
-
 from functions.helpers import sanitize_float
+from pydantic import BaseModel, validator
 
 
 class RepeatPeriod(str, Enum):

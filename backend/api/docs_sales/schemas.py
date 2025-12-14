@@ -3,11 +3,10 @@ from enum import Enum
 from typing import List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, conint, validator
-
 from database.db import OrderStatus
 from database.enums import Repeatability
 from functions.helpers import sanitize_float
+from pydantic import BaseModel, conint, validator
 
 
 class Item(BaseModel):

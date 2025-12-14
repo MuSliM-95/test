@@ -1,7 +1,5 @@
 from typing import Literal, Optional
 
-from sqlalchemy import and_, select
-
 from apps.amocrm.tools.models.AmoInstallInfoModel import AmoInstallInfoModel
 from database.db import (
     amo_install,
@@ -10,6 +8,7 @@ from database.db import (
     amo_settings_load_types,
     database,
 )
+from sqlalchemy import and_, select
 
 
 async def get_install_by_cashbox(

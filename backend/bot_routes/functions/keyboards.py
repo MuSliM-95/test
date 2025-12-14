@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Any, List
 
 from aiogram import types
-
 from bot_routes.functions.callbacks import (
     bills_callback,
     change_payment_date_bill_callback,

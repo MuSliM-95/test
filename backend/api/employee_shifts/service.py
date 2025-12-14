@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from sqlalchemy import and_, select
-
 from database.db import database, employee_shifts, users_cboxes_relation
+from sqlalchemy import and_, select
 
 from .schemas import ShiftStatus
 

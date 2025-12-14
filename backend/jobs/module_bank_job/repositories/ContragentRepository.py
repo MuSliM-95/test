@@ -1,6 +1,5 @@
-from sqlalchemy import and_
-
 from database.db import async_session_maker, contragents
+from sqlalchemy import and_
 
 
 class ContragentRepository:

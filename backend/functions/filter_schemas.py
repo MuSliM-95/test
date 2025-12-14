@@ -1,8 +1,7 @@
 from typing import Optional
 
-from pydantic import BaseModel
-
 from database.enums import DebitCreditType
+from pydantic import BaseModel
 
 
 class PaymentFiltersQuery(BaseModel):

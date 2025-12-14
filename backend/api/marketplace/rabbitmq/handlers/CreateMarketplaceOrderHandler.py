@@ -3,9 +3,6 @@ import json
 from typing import Any, Mapping, Optional
 
 from aio_pika import IncomingMessage
-from fastapi import HTTPException
-from sqlalchemy import select
-
 from api.docs_sales.api.routers import delivery_info as create_delivery_info
 from api.docs_sales.schemas import (
     Create as CreateDocsSales,
@@ -25,6 +22,8 @@ from api.marketplace.service.orders_service.schemas import (
 )
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
 from database.db import database, prices, users_cboxes_relation
+from fastapi import HTTPException
+from sqlalchemy import select
 
 
 class CreateMarketplaceOrderHandler(IEventHandler[CreateMarketplaceOrderMessage]):

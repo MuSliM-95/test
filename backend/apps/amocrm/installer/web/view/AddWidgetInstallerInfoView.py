@@ -1,7 +1,4 @@
 import asyncpg
-from fastapi import HTTPException
-from starlette import status
-
 from apps.amocrm.installer.infrastructure.models.InsertWidgetInstallerInfoModel import (
     InsertWidgetInstallerInfoModel,
 )
@@ -10,7 +7,9 @@ from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepo
 )
 from apps.amocrm.installer.web.models.AddInstallerInfoModel import AddInstallerInfoModel
 from database.db import InstalledByRole
+from fastapi import HTTPException
 from functions.helpers import get_user_by_token
+from starlette import status
 
 
 class AddWidgetInstallerInfoView:

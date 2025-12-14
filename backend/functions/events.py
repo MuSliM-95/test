@@ -1,6 +1,5 @@
-from sqlalchemy import desc, func, select
-
 from database.db import database, events
+from sqlalchemy import desc, func, select
 from ws_manager import manager
 
 

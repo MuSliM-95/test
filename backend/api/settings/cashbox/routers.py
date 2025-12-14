@@ -1,10 +1,9 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select, update
-
 from database.db import cashbox_settings, database
+from fastapi import APIRouter, Depends, HTTPException, Request
 from functions.helpers import get_user_by_token
+from sqlalchemy import select, update
 
 from . import schemas
 

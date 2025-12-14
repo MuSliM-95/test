@@ -1,12 +1,11 @@
 from datetime import datetime
 from typing import Optional, Union
 
-from pydantic import BaseModel
-
 from api.segments.schema_actions import SegmentActions
 from api.segments.schema_base import SegmentBaseCreate
 from api.segments.schema_criteria import SegmentCriteria
 from api.segments.segment_result import SegmentContragentData
+from pydantic import BaseModel
 
 SegmentData = Union[SegmentContragentData,]
 

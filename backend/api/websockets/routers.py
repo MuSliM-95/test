@@ -1,8 +1,7 @@
 import json
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
-
 from database.db import database, users, users_cboxes_relation
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from ws_manager import manager
 
 router = APIRouter(tags=["ws"])
