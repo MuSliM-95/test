@@ -1,6 +1,7 @@
 from typing import Any, Mapping, Optional
 
 from aio_pika import IncomingMessage
+
 from api.docs_sales.messages.RecalculateLoyaltyPointsMessageModel import (
     RecalculateLoyaltyPointsMessageModel,
 )

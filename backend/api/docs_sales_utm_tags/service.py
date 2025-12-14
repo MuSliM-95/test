@@ -1,10 +1,11 @@
-from api.docs_sales_utm_tags import schemas
-from database.db import database, docs_sales, docs_sales_utm_tags
 from fastapi import HTTPException
-from functions.helpers import get_user_by_token
 from sqlalchemy import and_, select
 from starlette import status
 from starlette.responses import Response
+
+from api.docs_sales_utm_tags import schemas
+from database.db import database, docs_sales, docs_sales_utm_tags
+from functions.helpers import get_user_by_token
 
 
 class DocsSalesUTMTagsService:

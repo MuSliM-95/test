@@ -1,8 +1,9 @@
+from sqlalchemy import and_
+
 from api.nomenclature_groups.infrastructure.functions.core.IPatchNomenclatureGroupFunction import (
     IPatchNomenclatureGroupFunction,
 )
 from database.db import database, nomenclature_groups
-from sqlalchemy import and_
 
 
 class PatchNomenclatureGroupFunction(IPatchNomenclatureGroupFunction):

@@ -1,3 +1,6 @@
+from fastapi import HTTPException
+from sqlalchemy import and_, select
+
 from api.nomenclature_attributes.web.models import schemas
 from database.db import (
     database,
@@ -5,9 +8,7 @@ from database.db import (
     nomenclature_attributes,
     nomenclature_attributes_value,
 )
-from fastapi import HTTPException
 from functions.helpers import get_user_by_token
-from sqlalchemy import and_, select
 
 
 class GetNomenclatureAttributesView:

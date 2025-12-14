@@ -1,9 +1,10 @@
 import logging
 from datetime import datetime
 
+from sqlalchemy import and_, select
+
 from api.chats.avito.avito_factory import create_avito_client, save_token_callback
 from database.db import channel_credentials, channels, database
-from sqlalchemy import and_, select
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,5 @@
 import aiohttp
+
 from apps.amocrm.install.infrastructure.core.IAmoCRMAuthenticationService import (
     IAmoCRMAuthenticationService,
 )

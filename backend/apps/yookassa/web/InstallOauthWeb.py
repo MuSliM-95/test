@@ -1,3 +1,5 @@
+from fastapi import FastAPI, status
+
 from apps.yookassa.functions.impl.GetOauthCredentialFunction import (
     GetOauthCredentialFunction,
 )
@@ -33,7 +35,6 @@ from apps.yookassa.web.view.GetPaymentApiView import GetPaymentApiView
 from apps.yookassa.web.view.GetWebhookListView import GetWebhookListView
 from apps.yookassa.web.view.RevokeTokenOauthView import RevokeTokenOauthView
 from common.utils.ioc.ioc import ioc
-from fastapi import FastAPI, status
 
 
 class InstallYookassaOauthWeb:

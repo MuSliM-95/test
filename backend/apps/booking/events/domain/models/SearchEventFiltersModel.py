@@ -1,7 +1,8 @@
+from pydantic import BaseModel
+
 from apps.booking.events.domain.models.BaseSearchEventFiltersModel import (
     BaseSearchEventFiltersModel,
 )
-from pydantic import BaseModel
 
 
 class SearchEventFiltersModel(BaseModel):

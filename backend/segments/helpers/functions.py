@@ -1,6 +1,8 @@
 import asyncio
 import json
 
+from sqlalchemy import select
+
 from api.docs_sales.api.routers import generate_and_save_order_links
 from database.db import (
     contragents,
@@ -15,7 +17,6 @@ from database.db import (
     users_cboxes_relation,
     warehouses,
 )
-from sqlalchemy import select
 
 
 def format_contragent_text_notifications(

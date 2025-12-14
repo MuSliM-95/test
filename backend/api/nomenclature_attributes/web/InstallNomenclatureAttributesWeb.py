@@ -1,5 +1,8 @@
 from typing import List
 
+from fastapi import FastAPI
+from starlette import status
+
 from api.nomenclature.infrastructure.readers.core.INomenclatureReader import (
     INomenclatureReader,
 )
@@ -36,8 +39,6 @@ from api.nomenclature_attributes.web.views.GetNomenclatureAttributesView import 
     GetNomenclatureAttributesView,
 )
 from common.utils.ioc.ioc import ioc
-from fastapi import FastAPI
-from starlette import status
 
 
 class InstallNomenclatureAttributesWeb:

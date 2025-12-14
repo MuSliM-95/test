@@ -2,10 +2,11 @@ import re
 from enum import Enum
 from typing import List, Optional
 
+from pydantic import BaseModel, Field, validator
+
 from api.prices.schemas import PriceGetWithNomenclature
 from api.warehouse_balances.schemas import WarehouseWithNomenclature
 from database.db import NomenclatureCashbackType
-from pydantic import BaseModel, Field, validator
 
 
 class NomenclatureType(str, Enum):

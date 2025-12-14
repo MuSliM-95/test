@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Optional
 
-from api.promocodes.models import PromocodeType
 from pydantic import BaseModel, Field, validator
+
+from api.promocodes.models import PromocodeType
 
 
 class PromoActivateRequest(BaseModel):

@@ -7,13 +7,15 @@ from datetime import datetime
 from io import BytesIO
 from typing import Optional
 
-import texts
 from aiogram import Bot, Dispatcher, F, Router, types
 from aiogram.client.session import aiohttp
 from aiogram.dispatcher.filters.command import CommandObject
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher.fsm.context import FSMContext
 from aiogram.types import ContentType, PhotoSize
+from sqlalchemy import and_
+
+import texts
 from api.articles.routers import new_article
 from api.articles.schemas import ArticleCreate
 from api.contragents.routers import create_contragent
@@ -43,7 +45,6 @@ from database.db import (
 from functions.cboxes import create_cbox, join_cbox
 from functions.helpers import gen_token
 from producer import produce_message
-from sqlalchemy import and_
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(os.environ.get("TG_TOKEN"), parse_mode="HTML")

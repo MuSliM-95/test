@@ -1,3 +1,6 @@
+from fastapi import HTTPException
+from sqlalchemy.sql import and_, case, func, select
+
 from database.db import (
     OperationType,
     contragents,
@@ -13,9 +16,7 @@ from database.db import (
     warehouse_register_movement,
     warehouses,
 )
-from fastapi import HTTPException
 from functions.helpers import get_user_by_token
-from sqlalchemy.sql import and_, case, func, select
 
 
 async def filter_out_service_goods(goods: list) -> list:

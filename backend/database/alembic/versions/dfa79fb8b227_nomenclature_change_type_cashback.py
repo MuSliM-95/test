@@ -8,6 +8,7 @@ Create Date: 2025-06-29 22:03:57.299778
 
 import sqlalchemy as sa
 from alembic import op
+
 from database.db import NomenclatureCashbackType
 
 # revision identifiers, used by Alembic.

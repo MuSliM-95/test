@@ -1,6 +1,5 @@
 import enum
 
-from database.db import Base
 from sqlalchemy import (
     Boolean,
     Column,
@@ -12,6 +11,8 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.sql import func
+
+from database.db import Base
 
 
 class PromocodeType(str, enum.Enum):
