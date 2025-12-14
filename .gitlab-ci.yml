@@ -39,8 +39,9 @@ lint-backend:
   before_script:
     - pip install -r backend/requirements-dev.txt
   script:
-    - ruff check backend --config backend/pyproject.toml
-    - black --check backend --config backend/pyproject.toml
+    - cd backend
+    - ruff check . --config pyproject.toml
+    - black --check . --config pyproject.toml
 
 smoke-test-job:
   stage: test
