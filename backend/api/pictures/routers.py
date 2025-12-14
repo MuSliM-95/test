@@ -314,15 +314,21 @@ async def edit_picture(
 
 
 @router.get("/pictures/{picture_id}/content")
-async def get_picture_content(token: str, picture_id: int):
-    user = await get_user_by_token(token)
-    picture = await get_entity_by_id(pictures, picture_id, user.cashbox_id)
+async def get_picture_content(picture_id: int):
+    """Публичный доступ к фото товара (без токена)"""
+    query = pictures.select().where(
+        pictures.c.id == picture_id,
+        pictures.c.is_deleted.is_not(True),
+    )
+    picture = await database.fetch_one(query)
+    if not picture:
+        raise HTTPException(404, "Фотография не найдена")
 
     async with s3_session.client(**s3_data) as s3:
         presigned_url = await s3.generate_presigned_url(
             "get_object",
             Params={"Bucket": bucket_name, "Key": picture["url"]},
-            ExpiresIn=3600,
+            ExpiresIn=3600,  # 1 час — достаточно для кэширования
         )
     return RedirectResponse(presigned_url)
 
