@@ -1,8 +1,9 @@
+from sqlalchemy import and_, update
+
 from api.nomenclature_groups.infrastructure.functions.core.IChangeMainNomenclGroupFunction import (
     IChangeMainNomenclGroupFunction,
 )
 from database.db import database, nomenclature_groups_value
-from sqlalchemy import and_, update
 
 
 class ChangeMainNomenclGroupFunction(IChangeMainNomenclGroupFunction):

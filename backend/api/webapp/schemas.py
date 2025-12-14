@@ -1,9 +1,10 @@
 from typing import List, Optional
 
+from pydantic import BaseModel
+
 from api.pictures.schemas import Picture
 from api.price_types.schemas import PriceType
 from api.warehouses.schemas import Warehouse
-from pydantic import BaseModel
 
 
 class PriceInList(BaseModel):

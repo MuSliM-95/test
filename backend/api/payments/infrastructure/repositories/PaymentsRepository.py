@@ -1,5 +1,6 @@
-from database.db import database, entity_to_entity, payments
 from sqlalchemy import and_, func, select
+
+from database.db import database, entity_to_entity, payments
 
 
 class PaymentsRepository:

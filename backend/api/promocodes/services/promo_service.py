@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from database.db import database, loyality_cards, loyality_transactions
 from sqlalchemy import select
+
+from database.db import database, loyality_cards, loyality_transactions
 
 
 class PromocodeService:

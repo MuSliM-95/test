@@ -3,11 +3,12 @@ import re
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import and_, select
+
 from api.chats import crud
 from api.chats.avito.avito_factory import create_avito_client, save_token_callback
 from api.chats.avito.avito_handler import AvitoHandler
 from database.db import channel_credentials, channels, chat_messages, chats, database
-from sqlalchemy import and_, select
 
 logger = logging.getLogger(__name__)
 

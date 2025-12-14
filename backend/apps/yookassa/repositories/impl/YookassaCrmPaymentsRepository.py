@@ -1,8 +1,9 @@
+from sqlalchemy import select, update
+
 from apps.yookassa.repositories.core.IYookassaCrmPaymentsRepository import (
     IYookassaCrmPaymentsRepository,
 )
 from database.db import database, docs_sales, payments
-from sqlalchemy import select, update
 
 
 class YookassaCrmPaymentsRepository(IYookassaCrmPaymentsRepository):

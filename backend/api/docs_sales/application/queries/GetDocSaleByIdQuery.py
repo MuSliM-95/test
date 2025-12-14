@@ -1,6 +1,8 @@
 import asyncio
 from typing import Any, Dict
 
+from fastapi import HTTPException
+
 from api.contragents.infrastructure.repositories.ContragentRepository import (
     ContragentRepository,
 )
@@ -25,7 +27,6 @@ from api.settings.infrastructure.repositories.SettingsRepository import (
 )
 from api.users.infrastructure.repositories.UsersRepository import UsersRepository
 from database.db import database
-from fastapi import HTTPException
 from functions.helpers import datetime_to_timestamp
 
 

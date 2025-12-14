@@ -3,6 +3,7 @@ import json
 import logging
 
 import aio_pika
+
 from const import distribution_queue_name
 from database.db import database
 from functions.goods_distribution import distribute

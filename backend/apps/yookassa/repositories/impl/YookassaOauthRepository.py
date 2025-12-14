@@ -1,5 +1,7 @@
 from typing import List, Union
 
+from sqlalchemy import insert, select, update
+
 from apps.yookassa.models.OauthBaseModel import (
     OauthBaseModel,
     OauthUpdateModel,
@@ -9,7 +11,6 @@ from apps.yookassa.repositories.core.IYookassaOauthRepository import (
     IYookassaOauthRepository,
 )
 from database.db import database, warehouses, yookassa_install
-from sqlalchemy import insert, select, update
 
 
 class YookassaOauthRepository(IYookassaOauthRepository):

@@ -1,7 +1,8 @@
 from aiogram.dispatcher.fsm.context import FSMContext
-from database.db import cboxes, database, pboxes, tochka_bank_accounts, users
 from sqlalchemy import select
 from sqlalchemy.orm import aliased
+
+from database.db import cboxes, database, pboxes, tochka_bank_accounts, users
 
 
 async def get_tochka_bank_accounts_by_chat_owner(chat_owner_id: int):

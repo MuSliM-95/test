@@ -1,5 +1,8 @@
 from datetime import datetime
 
+from fastapi import HTTPException
+from sqlalchemy import and_, select
+
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.qr_service.constants import QrEntityTypes
 from api.marketplace.service.qr_service.schemas import QRResolveResponse
@@ -12,8 +15,6 @@ from database.db import (
     warehouse_hash,
     warehouses,
 )
-from fastapi import HTTPException
-from sqlalchemy import and_, select
 
 
 class MarketplaceQrService(BaseMarketplaceService):

@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
 from pydantic import BaseModel
+
+from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
 
 
 class ViewEventEntityType(str):
