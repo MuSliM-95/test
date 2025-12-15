@@ -1,6 +1,12 @@
+import uuid
+
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import asc, desc, func, select
 
+from api.docs_purchases.rabbitmq.messages.CreatePurchaseAutoExpenseMessage import (
+    CreatePurchaseAutoExpenseMessage,
+)
+from api.docs_purchases.rabbitmq.utils import get_rabbitmq_factory
 from api.docs_warehouses.utils import create_warehouse_docs
 from database.db import (
     contracts,
@@ -253,6 +259,7 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
             query = docs_purchases_goods.insert().values(item)
             await database.execute(query)
             items_sum += item["price"] * item["quantity"]
+
             if instance_values.get("warehouse") is not None:
                 query = (
                     warehouse_balances.select()
@@ -303,6 +310,8 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
                     }
                 )
                 await database.execute(query)
+
+        # обновляем сумму закупки
         query = (
             docs_purchases.update()
             .where(docs_purchases.c.id == instance_id)
@@ -310,42 +319,56 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
         )
         await database.execute(query)
 
+        # warehouse doc (как у тебя уже сделано)
         goods_res = []
         for good in goods:
+            nomenclature_id = int(good["nomenclature"])
             nomenclature_db = await database.fetch_one(
-                nomenclature.select().where(nomenclature.c.id == good["nomenclature"])
+                nomenclature.select().where(nomenclature.c.id == nomenclature_id)
             )
-            if nomenclature_db.type == "product":
+            if nomenclature_db and nomenclature_db.type == "product":
                 goods_res.append(
                     {
                         "price_type": 1,
                         "price": 0,
                         "quantity": good["quantity"],
-                        "unit": good["unit"],
-                        "nomenclature": good["nomenclature"],
+                        "unit": good.get("unit"),
+                        "nomenclature": nomenclature_id,
                     }
                 )
 
         body = {
             "number": None,
             "dated": instance_values["dated"],
-            "docs_purchases": None,
+            "docs_purchases": instance_id,
+            "docs_sales_id": None,
             "to_warehouse": None,
             "organization": instance_values["organization"],
             "status": False,
             "contragent": instance_values["contragent"],
             "operation": "incoming",
-            "comment": instance_values["comment"],
+            "comment": instance_values.get("comment"),
             "warehouse": instance_values["warehouse"],
-            "docs_sales_id": instance_id,
             "goods": goods_res,
         }
 
-        body["docs_purchases"] = None
-        body["number"] = None
-        body["to_warehouse"] = None
         await create_warehouse_docs(token, body, user.cashbox_id)
 
+        # --- RabbitMQ: авто-расход по закупке ---
+        rabbit_factory = get_rabbitmq_factory()
+        rabbitmq_factory = await rabbit_factory()
+        rabbitmq_messaging = await rabbitmq_factory()
+
+        await rabbitmq_messaging.publish(
+            CreatePurchaseAutoExpenseMessage(
+                message_id=uuid.uuid4(),
+                token=token,
+                cashbox_id=user.cashbox_id,
+                purchase_id=instance_id,
+            ),
+            routing_key="purchase.auto_expense",
+        )
+        # --- end RabbitMQ ---
     q = (
         docs_purchases.select()
         .where(

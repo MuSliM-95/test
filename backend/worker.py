@@ -7,6 +7,12 @@ from api.apple_wallet.handlers.AppleWalletCardUpdateHandler import (
 from api.apple_wallet.messages.AppleWalletCardUpdateMessage import (
     AppleWalletCardUpdateMessage,
 )
+from api.docs_purchases.rabbitmq.handlers.CreatePurchaseAutoExpenseHandler import (
+    CreatePurchaseAutoExpenseHandler,
+)
+from api.docs_purchases.rabbitmq.messages.CreatePurchaseAutoExpenseMessage import (
+    CreatePurchaseAutoExpenseMessage,
+)
 from api.docs_sales.handlers.RecalculateFinancialsHandler import (
     RecalculateFinancialsHandler,
 )
@@ -85,6 +91,9 @@ async def startup():
     await rabbitmq_messaging.subscribe(
         CreateMarketplaceOrderMessage, CreateMarketplaceOrderHandler()
     )
+    await rabbitmq_messaging.subscribe(
+        CreatePurchaseAutoExpenseMessage, CreatePurchaseAutoExpenseHandler()
+    )
 
     await rabbitmq_messaging.install(
         [
@@ -97,6 +106,7 @@ async def startup():
             QueueSettingsModel(queue_name="teach_card_operation", prefetch_count=1),
             QueueSettingsModel(queue_name="apple_wallet_card_update", prefetch_count=1),
             QueueSettingsModel(queue_name="create_marketplace_order", prefetch_count=1),
+            QueueSettingsModel(queue_name="purchase.auto_expense", prefetch_count=1),
         ]
     )
     await asyncio.Future()
