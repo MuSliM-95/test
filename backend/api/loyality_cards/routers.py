@@ -6,8 +6,7 @@ import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException
 from fuzzywuzzy import fuzz
 from phonenumbers import geocoder, region_code_for_number
-from sqlalchemy import func, or_, select
-
+from sqlalchemy import func, or_, select, and_
 import api.loyality_cards.schemas as schemas
 from api.apple_wallet.utils import update_apple_wallet_pass
 from common.apple_wallet_service.impl.WalletPassService import (
@@ -456,6 +455,30 @@ async def new_loyality_card(
             loyality_cards.c.is_deleted.is_not(True),
         )
         card = await database.fetch_one(q)
+        q = loyality_cards.select().where(
+            and_(
+                loyality_cards.c.card_number == loyality_cards_values["card_number"],
+                loyality_cards.c.cashbox_id == user.cashbox_id,
+            ),
+        )
+        card_in_db = await database.execute(q)
+        if card_in_db:
+            raise HTTPException(
+                status_code=403,
+                detail="запись существует",
+            )
+        q = loyality_cards.select().where(
+            and_(
+                loyality_cards.c.card_number == loyality_cards_values["card_number"],
+                loyality_cards.c.cashbox_id == user.cashbox_id,
+            ),
+        )
+        card_in_db = await database.execute(q)
+        if card_in_db:
+            raise HTTPException(
+                status_code=403,
+                detail="запись существует",
+            )
 
         if card:
             inserted_ids.add(card.id)
