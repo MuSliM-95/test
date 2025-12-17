@@ -42,12 +42,13 @@ def serialize_shift_data(shift_data: dict) -> dict:
     return serialized
 
 
-async def log_shift_event(shift_response: ShiftResponse):
+async def log_shift_event(relation_id: int, cashbox_id: int, status: ShiftStatus):
+    """Логируем событие смены по relation_id (users_cboxes_relation.id)."""
     query = employee_shifts_events.insert(
         ShiftEventCreate(
-            relation_id=shift_response.user_id,
-            cashbox_id=shift_response.cashbox_id,
-            shift_status=shift_response.status,
+            relation_id=relation_id,
+            cashbox_id=cashbox_id,
+            shift_status=status,
             event_start=datetime.now(),
         ).dict()
     )
@@ -88,7 +89,7 @@ async def start_shift(token: str):
 
     now = datetime.utcnow()
     shift_data = ShiftData(
-        user_id=user.user,
+        user_id=user.id,
         cashbox_id=user.cashbox_id,
         shift_start=now,
         shift_end=None,
@@ -143,11 +144,18 @@ async def start_shift(token: str):
             )
         )
 
-    shift_response = ShiftResponse(**dict(new_shift))
+    new_shift_dict = dict(new_shift)
+    # В БД employee_shifts.user_id хранится relation_id, а наружу хотим отдавать users.id
+    new_shift_dict["user_id"] = user.user
+    shift_response = ShiftResponse(**new_shift_dict)
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)
 
-    await log_shift_event(shift_response)
+    await log_shift_event(
+        relation_id=new_shift.user_id,
+        cashbox_id=new_shift.cashbox_id,
+        status=new_shift.status,
+    )
 
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -156,7 +164,7 @@ async def start_shift(token: str):
             "action": "start_shift",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id,
         },
     )
@@ -222,11 +230,17 @@ async def end_shift(token: str):
         )
     )
 
-    shift_response = ShiftResponse(**dict(updated_shift))
+    updated_shift_dict = dict(updated_shift)
+    updated_shift_dict["user_id"] = user.user
+    shift_response = ShiftResponse(**updated_shift_dict)
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)
 
-    await log_shift_event(shift_response)
+    await log_shift_event(
+        relation_id=updated_shift.user_id,
+        cashbox_id=updated_shift.cashbox_id,
+        status=updated_shift.status,
+    )
 
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -235,7 +249,7 @@ async def end_shift(token: str):
             "action": "end_shift",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id,
         },
     )
@@ -304,11 +318,17 @@ async def create_break(token: str, duration_minutes: int):
         )
     )
 
-    shift_response = ShiftResponse(**dict(updated_shift))
+    updated_shift_dict = dict(updated_shift)
+    updated_shift_dict["user_id"] = user.user
+    shift_response = ShiftResponse(**updated_shift_dict)
     shift_response_dict = shift_response.dict()
     serialized_data = serialize_shift_data(shift_response_dict)
 
-    await log_shift_event(shift_response)
+    await log_shift_event(
+        relation_id=updated_shift.user_id,
+        cashbox_id=updated_shift.cashbox_id,
+        status=updated_shift.status,
+    )
 
     # Отправляем веб-сокет уведомление пользователю
     await manager.send_message(
@@ -317,7 +337,7 @@ async def create_break(token: str, duration_minutes: int):
             "action": "start_break",
             "target": "employee_shifts",
             "result": serialized_data,
-            "user_id": user.id,
+            "user_id": user.user,
             "cashbox_id": user.cashbox_id,
         },
     )
@@ -413,6 +433,8 @@ async def get_shift_status(token: str):
 
     # Если произошло автоматическое обновление, отправляем уведомление
     if auto_updated:
+        # В ответе и уведомлениях возвращаем users.id
+        current_shift_data["user_id"] = user.user
         shift_response = ShiftResponse(**current_shift_data)
         shift_response_dict = shift_response.dict()
         serialized_data = serialize_shift_data(shift_response_dict)
@@ -423,7 +445,7 @@ async def get_shift_status(token: str):
                 "action": "auto_end_break",
                 "target": "employee_shifts",
                 "result": serialized_data,
-                "user_id": user.id,
+                "user_id": user.user,
                 "cashbox_id": user.cashbox_id,
             },
         )
@@ -438,6 +460,8 @@ async def get_shift_status(token: str):
         # Обновляем статистику для админов
         await send_statistics_update(user.cashbox_id)
 
+    # Перед формированием финального ответа также подменяем user_id на users.id
+    current_shift_data["user_id"] = user.user
     return ShiftStatusResponse(
         is_on_shift=current_shift_data["status"]
         in [ShiftStatus.on_shift, ShiftStatus.on_break],

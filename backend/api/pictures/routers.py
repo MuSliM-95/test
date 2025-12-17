@@ -104,7 +104,7 @@ async def get_picture_by_filename(filename: str):
 
 
 @router.get("/photos/link/{filename}/")
-async def get_picture_link_by_filename_endpoint(filename: str):
+async def get_picture_link_by_id(filename: str):
     """Публичная пресайгнутая ссылка по имени файла (обратная совместимость)"""
     if not re.match(
         r"^[a-zA-Z0-9_\-\.]+\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE
