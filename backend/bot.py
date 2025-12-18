@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -183,18 +182,24 @@ async def get_open_app_link(token: str) -> types.InlineKeyboardMarkup:
 
 
 async def welcome_and_share_number(message: types.Message):
-    await message.answer(text=texts.welcome.format(username=message.from_user.username))
+    msg_id = (
+        await message.answer(
+            text=texts.welcome.format(username=message.from_user.username)
+        )
+    ).message_id
     await store_bot_message(
-        tg_message_id=message.message_id + 1,
+        tg_message_id=msg_id,
         tg_user_or_chat=str(message.chat.id),
         from_or_to=str(bot.id),
         body=texts.welcome.format(username=message.from_user.username),
     )
-    await message.answer(
-        text=texts.complete_register, reply_markup=SHARE_NUMBER_KEYBOARD
-    )
+    msg_id = (
+        await message.answer(
+            text=texts.complete_register, reply_markup=SHARE_NUMBER_KEYBOARD
+        )
+    ).message_id
     await store_bot_message(
-        tg_message_id=message.message_id + 1,
+        tg_message_id=msg_id,
         tg_user_or_chat=str(message.chat.id),
         from_or_to=str(bot.id),
         body=texts.complete_register,
@@ -310,19 +315,31 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             token = await generate_new_user_access_token_for_cashbox(
                 user_id=user.id, cashbox_id=users_cbox.id
             )
-            answer = texts.change_token.format(token=token, url=app_url)
+            answer_1 = texts.change_token_1
+            answer_2 = texts.change_token_2.format(token=token, url=app_url)
         else:
             # В ином случае создаем новый cashbox
             token = (await create_cbox(user)).token
-            answer = texts.create_cbox.format(token=token, url=app_url)
+            answer_1 = texts.change_token_1
+            answer_2 = texts.create_cbox_2.format(token=token, url=app_url)
+
+        msg_id = (
+            await message.answer(
+                text=answer_1, reply_markup=types.ReplyKeyboardRemove()
+            )
+        ).message_id
 
         # Возвращаем ссылку на открытие приложения
-        await message.answer(text=answer, reply_markup=await get_open_app_link(token))
+        msg_id = (
+            await message.answer(
+                text=answer_2, reply_markup=await get_open_app_link(token)
+            )
+        ).message_id
         await store_bot_message(
-            tg_message_id=message.message_id + 1,
+            tg_message_id=msg_id,
             tg_user_or_chat=str(message.chat.id),
             from_or_to=str(bot.id),
-            body=answer,
+            body=answer_2,
         )
 
     if user and command_args:
@@ -858,7 +875,7 @@ async def confirm_broadcast_message(message: types.Message, state: FSMContext):
         await state.set_state(DeliveryForm.submit)
 
 
-async def prepare_registration(message):
+async def prepare_registration(message: types.Message):
     """Prepares data for the user registration"""
     created = int(datetime.utcnow().timestamp())
 
@@ -938,6 +955,15 @@ async def create_balance(cashbox_id, message, tariff=None):
 async def reg_user_create(message: types.Message, state: FSMContext):
     await store_user_message(message)
     if message.contact:
+        if (message.contact.user_id != message.from_user.id) or (
+            not message.reply_to_message
+        ):
+            msg_id = (await message.answer(texts.get_phone_by_btn)).message_id
+            await store_bot_message(
+                msg_id, str(message.chat.id), str(bot.id), texts.get_phone_by_btn
+            )
+            return
+
         tariff_query = tariffs.select().where(tariffs.c.actual is True)
         tariff = await database.fetch_one(tariff_query)
 
@@ -949,11 +975,22 @@ async def reg_user_create(message: types.Message, state: FSMContext):
         user = await database.fetch_one(query)
         rel = await create_cbox(user)
 
-        answer = texts.create_cbox.format(token=rel.token, url=app_url)
-        await message.answer(
-            text=answer, reply_markup=await get_open_app_link(rel.token)
+        msg_id = (
+            await message.answer(
+                text=texts.create_cbox_1, reply_markup=types.ReplyKeyboardRemove()
+            )
+        ).message_id
+        await store_bot_message(
+            msg_id, str(message.chat.id), str(bot.id), texts.create_cbox_1
         )
-        await store_bot_message(message.message_id + 1, message.chat.id, bot.id, answer)
+
+        answer = texts.create_cbox_2.format(token=rel.token, url=app_url)
+        msg_id = (
+            await message.answer(
+                text=answer, reply_markup=await get_open_app_link(rel.token)
+            )
+        ).message_id
+        await store_bot_message(msg_id, str(message.chat.id), str(bot.id), answer)
         await create_balance(rel.cashbox_id, message, tariff)
 
         # Уведомление ADMIN_ID о новой регистрации
@@ -982,18 +1019,44 @@ async def reg_user_create(message: types.Message, state: FSMContext):
 async def reg_user_join(message: types.Message, state: FSMContext):
     await store_user_message(message)
     if message.contact:
+        if (message.contact.user_id != message.from_user.id) or (
+            not message.reply_to_message
+        ):
+            msg_id = (await message.answer(texts.get_phone_by_btn)).message_id
+            await store_bot_message(
+                msg_id, message.chat.id, bot.id, texts.get_phone_by_btn
+            )
+            return
+
         created, user_query = await prepare_registration(message)
 
         user_create_record = await database.fetch_one(user_query)
         data = await state.get_data()
         if data.get("cbox"):
             rel = await join_cbox(user_create_record, data["cbox"])
-            answer = texts.invite_cbox.format(token=rel.token, url=app_url)
-            await message.answer(
-                text=answer, reply_markup=await get_open_app_link(rel.token)
-            )
+            msg_id = (
+                await message.answer(
+                    text=texts.invite_cbox_1, reply_markup=types.ReplyKeyboardRemove()
+                )
+            ).message_id
             await store_bot_message(
-                message.message_id + 1, message.chat.id, bot.id, answer
+                tg_message_id=msg_id,
+                tg_user_or_chat=str(message.chat.id),
+                from_or_to=str(bot.id),
+                body=texts.invite_cbox_1,
+            )
+
+            answer = texts.invite_cbox_2.format(token=rel.token, url=app_url)
+            msg_id = (
+                await message.answer(
+                    text=answer, reply_markup=await get_open_app_link(rel.token)
+                )
+            ).message_id
+            await store_bot_message(
+                tg_message_id=msg_id,
+                tg_user_or_chat=str(message.chat.id),
+                from_or_to=str(bot.id),
+                body=answer,
             )
             await state.clear()
         elif data.get("ref_id"):
@@ -1008,12 +1071,29 @@ async def reg_user_join(message: types.Message, state: FSMContext):
             user = await database.fetch_one(query)
             rel = await create_cbox(user)
 
-            answer = texts.create_cbox.format(token=rel.token, url=app_url)
-            await message.answer(
-                text=answer, reply_markup=await get_open_app_link(rel.token)
-            )
+            msg_id = (
+                await message.answer(
+                    text=texts.create_cbox_1, reply_markup=types.ReplyKeyboardRemove()
+                )
+            ).message_id
             await store_bot_message(
-                message.message_id + 1, message.chat.id, bot.id, answer
+                tg_message_id=msg_id,
+                tg_user_or_chat=str(message.chat.id),
+                from_or_to=str(bot.id),
+                body=texts.create_cbox_1,
+            )
+
+            answer = texts.create_cbox_2.format(token=rel.token, url=app_url)
+            msg_id = (
+                await message.answer(
+                    text=answer, reply_markup=await get_open_app_link(rel.token)
+                )
+            ).message_id
+            await store_bot_message(
+                tg_message_id=msg_id,
+                tg_user_or_chat=str(message.chat.id),
+                from_or_to=str(bot.id),
+                body=answer,
             )
             await create_balance(rel.cashbox_id, message, tariff)
 
@@ -1135,15 +1215,27 @@ async def group_to_supegroup_migration(message: types.Message):
     await database.execute(query)
 
 
-@router_comm.message(lambda message: re.fullmatch(r"(\+7|8)", message.text), state="*")
-async def handle_phone_number(message: types.Message, state: FSMContext):
+@router_comm.message(Form.start, F.text)
+async def handle_start_text(message: types.Message, state: FSMContext):
     await store_user_message(message)
-    await message.reply(texts.get_phone_by_btn)
+    msg_id = (await message.reply(texts.get_phone_by_btn)).message_id
     await store_bot_message(
-        message.message_id + 1,
-        message.chat.id,
-        bot.id,
-        "Вы указали номер телефона. Нажмите на кнопку, чтобы отправить его.",
+        msg_id,
+        str(message.chat.id),
+        str(bot.id),
+        texts.get_phone_by_btn,
+    )
+
+
+@router_comm.message(Form.join, F.text)
+async def handle_join_text(message: types.Message, state: FSMContext):
+    await store_user_message(message)
+    msg_id = (await message.reply(texts.get_phone_by_btn)).message_id
+    await store_bot_message(
+        msg_id,
+        str(message.chat.id),
+        str(bot.id),
+        texts.get_phone_by_btn,
     )
 
 

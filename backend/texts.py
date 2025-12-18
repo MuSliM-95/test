@@ -1,8 +1,10 @@
 welcome = """Добро пожаловать, {username}."""
 app_url_with_token = """https://{base_url}?token={token}"""
 url_link_pay = """t.me/tablecrmhelperpbot?start=user{user_id}cashbox{cashbox_id}"""
-invite_cbox = """Вы успешно были приглашены в кассу!
 
+invite_cbox_1 = """Вы успешно были приглашены в кассу!"""
+
+invite_cbox_2 = """
 Ваш токен: <code>{token}</code>
 
 Вот ссылка для авторизации через браузер: <a href='https://{url}?token={token}'>{url}</a>
@@ -23,7 +25,9 @@ complete_register = """Пожалуйста, завершите регистра
 Номер телефона нужен для защиты вашего аккаунта.
 """
 
-change_token = """Вы успешно сменили токен!
+change_token_1 = """Вы успешно сменили токен!"""
+
+change_token_2 = """
 
 Ваш новый токен: <code>{token}</code>
 
@@ -31,9 +35,9 @@ change_token = """Вы успешно сменили токен!
 
 """
 
-create_cbox = """Вы успешно создали кассу!
+create_cbox_1 = """Вы успешно создали кассу!"""
 
-Ваш токен: <code>{token}</code>
+create_cbox_2 = """Ваш токен: <code>{token}</code>
 
 Вот ссылка для авторизации через браузер: <a href='https://{url}?token={token}'>{url}</a>
 
