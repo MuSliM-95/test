@@ -437,13 +437,16 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
             .values(instance_values)
         )
         await database.execute(query)
+
         instance_id = instance_values["id"]
         updated_ids.add(instance_id)
+
         if goods:
             query = docs_purchases_goods.delete().where(
                 docs_purchases_goods.c.docs_purchases_id == instance_id
             )
             await database.execute(query)
+
             items_sum = 0
             for item in goods:
                 item["docs_purchases_id"] = instance_id
@@ -458,6 +461,7 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
                         except HTTPException as e:
                             exceptions.append(str(item) + " " + e.detail)
                             continue
+
                 if item.get("unit") is not None:
                     if item["unit"] not in units_cache:
                         try:
@@ -466,9 +470,12 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
                         except HTTPException as e:
                             exceptions.append(str(item) + " " + e.detail)
                             continue
+
                 query = docs_purchases_goods.insert().values(item)
                 await database.execute(query)
+
                 items_sum += item["price"] * item["quantity"]
+
                 if instance_values.get("warehouse") is not None:
                     query = (
                         warehouse_balances.select()
@@ -533,6 +540,78 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
             )
             await database.execute(query)
 
+            # --- sync warehouse incoming doc for purchase (prevent drift on edit) ---
+            try:
+                purchase_db = await database.fetch_one(
+                    docs_purchases.select().where(
+                        docs_purchases.c.id == instance_id,
+                        docs_purchases.c.cashbox == user.cashbox_id,
+                        docs_purchases.c.is_deleted.is_not(True),
+                    )
+                )
+
+                if purchase_db and purchase_db.warehouse is not None:
+                    goods_rows = await database.fetch_all(
+                        docs_purchases_goods.select().where(
+                            docs_purchases_goods.c.docs_purchases_id == instance_id
+                        )
+                    )
+
+                    goods_res = []
+                    for g in goods_rows:
+                        nomenclature_id = int(g["nomenclature"])
+                        nomenclature_db = await database.fetch_one(
+                            nomenclature.select().where(
+                                nomenclature.c.id == nomenclature_id
+                            )
+                        )
+                        if nomenclature_db and nomenclature_db.type == "product":
+                            goods_res.append(
+                                {
+                                    "price_type": 1,
+                                    "price": 0,
+                                    "quantity": g["quantity"],
+                                    "unit": g.get("unit"),
+                                    "nomenclature": nomenclature_id,
+                                }
+                            )
+
+                    if goods_res:
+                        body = {
+                            "number": None,
+                            "dated": purchase_db.dated,
+                            "docs_purchases": instance_id,
+                            "docs_sales_id": None,
+                            "to_warehouse": None,
+                            "organization": purchase_db.organization,
+                            "status": False,
+                            "contragent": purchase_db.contragent,
+                            "operation": "incoming",
+                            "comment": purchase_db.comment,
+                            "warehouse": purchase_db.warehouse,
+                            "goods": goods_res,
+                        }
+
+                        existing_wh = await database.fetch_one(
+                            docs_warehouse.select()
+                            .where(
+                                docs_warehouse.c.cashbox == user.cashbox_id,
+                                docs_warehouse.c.is_deleted.is_not(True),
+                                docs_warehouse.c.operation == "incoming",
+                                docs_warehouse.c.docs_purchases == instance_id,
+                            )
+                            .order_by(desc(docs_warehouse.c.id))
+                        )
+                        if existing_wh and existing_wh.status is True:
+                            body["status"] = True
+
+                        await create_warehouse_docs(token, body, user.cashbox_id)
+
+            except Exception as e:
+                print(
+                    f"[docs_purchases] failed to sync incoming docs_warehouse for purchase={instance_id}: {e}"
+                )
+            # --- end sync ---
             # doc_warehouse = await database.fetch_one(docs_warehouse.select().where(docs_warehouse.c.docs_sales_id == instance_id).order_by(desc(docs_warehouse.c.id)))
 
             # goods_res = []
