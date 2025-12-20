@@ -318,7 +318,62 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
             .values({"sum": items_sum})
         )
         await database.execute(query)
+        # --- sync warehouse incoming doc for purchase (prevent drift on edit) ---
+        purchase_db = await database.fetch_one(
+            docs_purchases.select().where(
+                docs_purchases.c.id == instance_id,
+                docs_purchases.c.is_deleted.is_not(True),
+                docs_purchases.c.cashbox == user.cashbox_id,
+            )
+        )
 
+        # синкаем склад только если у закупки указан склад
+        if purchase_db and purchase_db.warehouse is not None:
+            # возьмём текущий складской док, чтобы не менять его статус наугад
+            doc_warehouse = await database.fetch_one(
+                docs_warehouse.select()
+                .where(
+                    docs_warehouse.c.docs_purchases == instance_id,
+                    docs_warehouse.c.operation == "incoming",
+                    docs_warehouse.c.is_deleted.is_not(True),
+                )
+                .order_by(desc(docs_warehouse.c.id))
+            )
+
+            goods_res = []
+            for good in goods:
+                nomenclature_id = int(good["nomenclature"])
+                nomenclature_db = await database.fetch_one(
+                    nomenclature.select().where(nomenclature.c.id == nomenclature_id)
+                )
+                if nomenclature_db and nomenclature_db.type == "product":
+                    goods_res.append(
+                        {
+                            "price_type": 1,
+                            "price": 0,
+                            "quantity": good["quantity"],
+                            "unit": good.get("unit"),
+                            "nomenclature": nomenclature_id,
+                        }
+                    )
+
+            body = {
+                "number": None,
+                "dated": purchase_db.dated,
+                "docs_purchases": instance_id,
+                "docs_sales_id": None,
+                "to_warehouse": None,
+                "organization": purchase_db.organization,
+                "status": (doc_warehouse.status if doc_warehouse else False),
+                "contragent": purchase_db.contragent,
+                "operation": "incoming",
+                "comment": purchase_db.comment,
+                "warehouse": purchase_db.warehouse,
+                "goods": goods_res,
+            }
+
+            await create_warehouse_docs(token, body, user.cashbox_id)
+        # --- end sync ---
         # warehouse doc (как у тебя уже сделано)
         goods_res = []
         for good in goods:
