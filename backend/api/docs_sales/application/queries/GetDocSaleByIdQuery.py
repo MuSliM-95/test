@@ -97,17 +97,13 @@ class GetDocSaleByIdQuery:
         item["paid_rubles"] = round(payment_value.get("total_amount", 0), 2)
 
         loyality_value = results_map["loyality_map"].get(key_transaction, {})
+
         item["paid_loyality"] = round(loyality_value.get("total_amount", 0), 2)
         item["has_loyality_card"] = bool(loyality_value.get("has_link"))
 
-        # ВАЖНО: has_contragent должен быть вычислен ДО выбора color_status
-        contragent_id = item.get("contragent")
-        item["has_contragent"] = bool(contragent_id)
-        item["contragent_segments"] = results_map.get("contagents_map") or []
-
         if item["has_loyality_card"]:
             item["color_status"] = "green"
-        elif item["has_contragent"]:
+        elif item.get("has_contragent"):
             item["color_status"] = "blue"
         else:
             item["color_status"] = "default"
@@ -116,10 +112,15 @@ class GetDocSaleByIdQuery:
         paid_rubles = item.get("paid_rubles", 0)
         item["paid_doc"] = round(paid_loyality + paid_rubles, 2)
 
+        contragent_id = item.get("contragent")
+        item["has_contragent"] = bool(contragent_id)
+        item["contragent_segments"] = results_map.get("contagents_map") or []
+
         item["settings"] = results_map.get("settings_map") or {}
 
         for field_name in ("assigned_picker", "assigned_courier"):
             user_id = item.get(field_name)
+
             if isinstance(user_id, int):
                 user = results_map.get("users_map").get(user_id)
                 item[field_name] = {
