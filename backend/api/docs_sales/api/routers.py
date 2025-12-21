@@ -9,10 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, desc, func, select
 
 from api.docs_sales import schemas
-from api.docs_sales.application.queries import (
-    GetDocSaleByIdQuery,
+from api.docs_sales.application.queries.GetDocSaleByIdQuery import GetDocSaleByIdQuery
+from api.docs_sales.application.queries.GetDocsSalesListByCreatedDateQuery import (
     GetDocsSalesListByCreatedDateQuery,
+)
+from api.docs_sales.application.queries.GetDocsSalesListByDeliveryDateQuery import (
     GetDocsSalesListByDeliveryDateQuery,
+)
+from api.docs_sales.application.queries.GetDocsSalesListQuery import (
     GetDocsSalesListQuery,
 )
 from api.docs_sales.notify_service import (
