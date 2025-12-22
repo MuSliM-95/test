@@ -1,7 +1,16 @@
-from sqlalchemy import text
+from datetime import datetime
 
-from api.docs_warehouses.utils import create_warehouse_docs
-from database.db import database, docs_purchases, docs_purchases_goods, nomenclature
+from sqlalchemy import and_, text
+
+from database.db import (
+    database,
+    docs_purchases,
+    docs_purchases_goods,
+    nomenclature,
+    payments,
+    pboxes,
+    users_cboxes_relation,
+)
 
 
 class CreatePurchaseAutoExpenseHandler:
@@ -101,20 +110,194 @@ class CreatePurchaseAutoExpenseHandler:
             )
             return
 
-        body = {
-            "number": None,
-            "dated": purchase["dated"],
-            "docs_purchases": purchase_id,
-            "docs_sales_id": None,
-            "to_warehouse": None,
-            "organization": purchase["organization"],
-            "status": False,
+        # ---- AUTO PAYMENT EXPENSE (NOT warehouse outgoing) ----
+        external_id = f"purchase:{purchase_id}:auto_expense"
+        amount = float(purchase["sum"] or 0)
+        now_ts = int(datetime.utcnow().timestamp())
+        should_post = bool(purchase["status"])
+
+        # account берём так же, как create_payment(): user.user из users_cboxes_relation по token
+        user_row = await database.fetch_one(
+            users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
+        )
+        if not user_row or not user_row.get("status"):
+            print(
+                f"[purchase-auto-expense] user by token not found/disabled for purchase={purchase_id}"
+            )
+            return
+        account_id = user_row["user"]
+
+        # paybox: берём "default" если есть, иначе первый по id
+        paybox = await database.fetch_one(
+            pboxes.select().where(
+                and_(
+                    pboxes.c.cashbox == cashbox_id,
+                    pboxes.c.name == "default",
+                )
+            )
+        )
+        if not paybox:
+            paybox = await database.fetch_one(
+                pboxes.select()
+                .where(pboxes.c.cashbox == cashbox_id)
+                .order_by(pboxes.c.id.asc())
+            )
+        if not paybox:
+            print(
+                f"[purchase-auto-expense] paybox not found for cashbox={cashbox_id} purchase={purchase_id}"
+            )
+            return
+
+        paybox_id = int(paybox["id"])
+        paybox_balance = float(paybox["balance"] or 0)
+        balance_date = paybox["balance_date"]
+
+        existing = await database.fetch_one(
+            payments.select()
+            .where(
+                and_(
+                    payments.c.cashbox == cashbox_id,
+                    payments.c.external_id == external_id,
+                    payments.c.is_deleted.is_not(True),
+                )
+            )
+            .order_by(payments.c.id.desc())
+        )
+
+        def _should_affect_balance() -> bool:
+            if balance_date is None:
+                return False
+            try:
+                return int(balance_date) <= int(purchase["dated"])
+            except Exception:
+                return False
+
+        if existing:
+            old_status = bool(existing["status"])
+            old_amount = float(existing["amount"] or 0)
+
+            upd = (
+                payments.update()
+                .where(payments.c.id == existing["id"])
+                .values(
+                    {
+                        "type": "outgoing",
+                        "amount": amount,
+                        "amount_without_tax": amount,
+                        "status": should_post,
+                        "updated_at": now_ts,
+                        "docs_purchases_id": purchase_id,
+                        "contragent": purchase["contragent"],
+                        "contract_id": purchase["contract"],
+                        "date": int(purchase["dated"]),
+                        "paybox": paybox_id,
+                        "account": account_id,
+                        "tags": existing["tags"] or "",
+                    }
+                )
+            )
+            await database.execute(upd)
+
+            if _should_affect_balance() and old_status != should_post:
+                delta = 0.0
+                if should_post and not old_status:
+                    delta = -amount
+                elif old_status and not should_post:
+                    delta = +old_amount
+
+                if delta != 0.0:
+                    new_balance = round(paybox_balance + delta, 2)
+                    await database.execute(
+                        pboxes.update()
+                        .where(
+                            and_(
+                                pboxes.c.id == paybox_id,
+                                pboxes.c.cashbox == cashbox_id,
+                            )
+                        )
+                        .values({"balance": new_balance, "updated_at": now_ts})
+                    )
+
+            # Если платеж уже был проведён и остаётся проведённым, но сумма изменилась —
+            # корректируем баланс на разницу (чтобы не было дрейфа)
+            if (
+                _should_affect_balance()
+                and old_status
+                and should_post
+                and amount != old_amount
+            ):
+                delta = -(
+                    amount - old_amount
+                )  # было списано old_amount, стало нужно списать amount
+                new_balance = round(paybox_balance + delta, 2)
+                await database.execute(
+                    pboxes.update()
+                    .where(
+                        and_(
+                            pboxes.c.id == paybox_id,
+                            pboxes.c.cashbox == cashbox_id,
+                        )
+                    )
+                    .values({"balance": new_balance, "updated_at": now_ts})
+                )
+
+            print(
+                f"[purchase-auto-expense] OK (updated) purchase={purchase_id} payment={existing['id']}"
+            )
+            return
+
+        payment_dict = {
+            "type": "outgoing",
+            "name": None,
+            "external_id": external_id,
+            "article": None,
+            "project_id": None,
+            "article_id": None,
+            "tags": "",
+            "amount": amount,
+            "amount_without_tax": amount,
+            "description": purchase["comment"],
+            "date": int(purchase["dated"]),
+            "repeat_freq": None,
+            "parent_id": None,
+            "repeat_parent_id": None,
+            "repeat_period": None,
+            "repeat_first": None,
+            "repeat_last": None,
+            "repeat_number": None,
+            "repeat_day": None,
+            "repeat_month": None,
+            "repeat_seconds": None,
+            "repeat_weekday": None,
+            "stopped": False,
+            "status": should_post,
+            "tax": None,
+            "tax_type": None,
+            "deb_cred": False,
+            "raspilen": False,
             "contragent": purchase["contragent"],
-            "operation": "outgoing",
-            "comment": purchase["comment"],
-            "warehouse": purchase["warehouse"],
-            "goods": goods_res,
+            "cashbox": cashbox_id,
+            "paybox": paybox_id,
+            "paybox_to": None,
+            "account": account_id,
+            "is_deleted": False,
+            "cheque": None,
+            "docs_sales_id": None,
+            "contract_id": purchase["contract"],
+            "docs_purchases_id": purchase_id,
+            "created_at": now_ts,
+            "updated_at": now_ts,
         }
 
-        await create_warehouse_docs(token, body, cashbox_id)
-        print(f"[purchase-auto-expense] OK purchase={purchase_id}")
+        pay_id = await database.execute(payments.insert(values=payment_dict))
+
+        if should_post and _should_affect_balance():
+            new_balance = round(paybox_balance - amount, 2)
+            await database.execute(
+                pboxes.update()
+                .where(and_(pboxes.c.id == paybox_id, pboxes.c.cashbox == cashbox_id))
+                .values({"balance": new_balance, "updated_at": now_ts})
+            )
+
+        print(f"[purchase-auto-expense] OK purchase={purchase_id} payment={pay_id}")
+        # ---- end AUTO PAYMENT EXPENSE ----
