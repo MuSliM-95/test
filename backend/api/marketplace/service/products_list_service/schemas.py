@@ -127,6 +127,10 @@ class MarketplaceProductsRequest(BaseModel):
     rating_from: Optional[int] = None
     rating_to: Optional[int] = None
 
+    seller_name: Optional[str] = None
+    seller_id: Optional[int] = None
+    seller_phone: Optional[str] = None
+
 
 product_buttons_text: dict[str, dict[str, str]] = {
     "product": {

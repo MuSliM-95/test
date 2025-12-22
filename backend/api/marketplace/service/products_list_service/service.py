@@ -654,6 +654,18 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             conditions.append(
                 marketplace_rating_aggregates.c.avg_rating <= request.rating_to
             )
+        if request.seller_name:
+            conditions.append(
+                func.lower(cboxes.c.name).ilike(f"%{request.seller_name.lower()}%")
+            )
+        if request.seller_id:
+            conditions.append(cboxes.c.id == request.seller_id)
+        if request.seller_phone:
+            conditions.append(
+                func.lower(users.c.phone_number).ilike(
+                    f"%{request.seller_phone.lower()}%"
+                )
+            )
 
         query = query.where(and_(*conditions))
 
