@@ -16,6 +16,7 @@ from api.marketplace.service.products_list_service.schemas import (
     MarketplaceProductList,
     MarketplaceProductsRequest,
     MarketplaceSort,
+    product_buttons_text,
 )
 from database.db import (
     categories,
@@ -809,6 +810,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             product_dict["seller_photo"] = self.__transform_photo_route(
                 product_dict["seller_photo"]
             )
+
+            product_button_text = product_buttons_text.get(product["type"]) or {}
+            product_dict["button_text"] = product_button_text.get("name")
+            product_dict["button_logic"] = product_button_text.get("logic")
 
             products.append(MarketplaceProduct(**product_dict))
 
