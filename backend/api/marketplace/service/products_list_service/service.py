@@ -745,6 +745,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 stock_subquery.c.nomenclature_id == nomenclature.c.id,
                 isouter=True,
             )
+            .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
+            .join(users, users.c.id == cboxes.c.admin)
             .where(and_(*conditions))
         )
         count_result = await database.fetch_one(count_query)
