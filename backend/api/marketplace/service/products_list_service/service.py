@@ -79,7 +79,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 )
                 .label("rn"),
             )
-            .where(prices.c.is_deleted.is_not(True))
+            .select_from(
+                prices.join(price_types, price_types.c.id == prices.c.price_type)
+            )
+            .where(
+                prices.c.is_deleted.is_not(True),
+                price_types.c.name == "chatting",
+            )
             .subquery()
         )
 
@@ -416,7 +422,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             )
             .where(
                 # Учитываем только неудаленные цены
-                prices.c.is_deleted.is_not(True)
+                prices.c.is_deleted.is_not(True),
+                # Берём только цены типа "chatting"
+                price_types.c.name == "chatting",
             )
             .subquery()
         )
