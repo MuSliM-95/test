@@ -1,8 +1,7 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
-
 from common.schemas import RuPhone
+from pydantic import BaseModel
 
 
 class LoyalityCardFilters(BaseModel):

@@ -1,6 +1,3 @@
-from fastapi import HTTPException
-from starlette import status
-
 from apps.amocrm.installer.infrastructure.models.PatchWidgetInstallerInfoModel import (
     PatchWidgetInstallerInfoModel,
 )
@@ -10,7 +7,9 @@ from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepo
 from apps.amocrm.installer.web.models.PatchInstallerInfoModel import (
     PatchInstallerInfoModel,
 )
+from fastapi import HTTPException
 from functions.helpers import get_user_by_token
+from starlette import status
 
 
 class PatchWidgetInstallerInfoView:

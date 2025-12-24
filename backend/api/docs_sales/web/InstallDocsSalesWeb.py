@@ -1,9 +1,8 @@
-from fastapi import FastAPI
-from starlette import status
-
 from api.docs_sales.web.views.CreateDocsSalesView import CreateDocsSalesView
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.utils.ioc.ioc import ioc
+from fastapi import FastAPI
+from starlette import status
 
 
 class InstallDocsSalesWeb:

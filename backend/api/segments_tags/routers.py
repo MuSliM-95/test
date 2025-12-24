@@ -1,12 +1,11 @@
 from typing import List
 
-from fastapi import APIRouter, Body, HTTPException, status
-from sqlalchemy import and_, select
-from sqlalchemy.dialects.postgresql import insert
-
 from api.tags import schemas as tags_schemas
 from database.db import database, segments, segments_tags, tags
+from fastapi import APIRouter, Body, HTTPException, status
 from functions.helpers import get_user_by_token
+from sqlalchemy import and_, select
+from sqlalchemy.dialects.postgresql import insert
 
 router = APIRouter(prefix="/segments/{idx}/tags", tags=["segmentsTags"])
 

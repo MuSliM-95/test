@@ -81,9 +81,8 @@ def extract_cashbox_id_from_webhook(webhook_data: Dict[str, Any]) -> Optional[in
 async def get_cashbox_id_for_avito_webhook(
     webhook_data: Dict[str, Any],
 ) -> Optional[int]:
-    from sqlalchemy import and_, select
-
     from database.db import channel_credentials, channels, chats, database
+    from sqlalchemy import and_, select
 
     try:
         payload = webhook_data.get("payload", {})

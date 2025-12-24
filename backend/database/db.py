@@ -5,6 +5,14 @@ from enum import Enum as ENUM
 
 import databases
 import sqlalchemy
+from database.enums import (
+    ContragentType,
+    DebitCreditType,
+    Gender,
+    Repeatability,
+    TriggerTime,
+    TriggerType,
+)
 from dotenv import load_dotenv
 from sqlalchemy import (
     ARRAY,
@@ -22,6 +30,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
     text,
 )
@@ -30,15 +39,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql import func
-
-from database.enums import (
-    ContragentType,
-    DebitCreditType,
-    Gender,
-    Repeatability,
-    TriggerTime,
-    TriggerType,
-)
 
 load_dotenv()
 
@@ -918,6 +918,8 @@ warehouses = sqlalchemy.Table(
     sqlalchemy.Column("external_id", String),
     sqlalchemy.Column("name", String, nullable=False),
     sqlalchemy.Column("type", String),
+    sqlalchemy.Column("shop_schedule", JSONB, nullable=True),
+    sqlalchemy.Column("delivery_schedule", JSONB, nullable=True),
     sqlalchemy.Column("description", String),
     sqlalchemy.Column("address", String),
     sqlalchemy.Column("latitude", Float),
@@ -3483,4 +3485,46 @@ marketplace_view_events = sqlalchemy.Table(
     ),
     sqlalchemy.Column("event", String, nullable=False, server_default="view"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+)
+
+favorites_nomenclatures = sqlalchemy.Table(
+    "favorites_nomenclatures",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
+    sqlalchemy.Column(
+        "nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False
+    ),
+    sqlalchemy.Column(
+        "contagent_id", Integer, ForeignKey("contragents.id"), nullable=False
+    ),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+)
+
+
+cashbox_schedule = sqlalchemy.Table(
+    "cashbox_schedule",
+    metadata,
+    sqlalchemy.Column("id", Integer, primary_key=True),
+    sqlalchemy.Column("cashbox_id", Integer, nullable=False, index=True),
+    sqlalchemy.Column("type", String(16), nullable=False),
+    sqlalchemy.Column("day_of_week", Integer, nullable=False),
+    sqlalchemy.Column("time_from", Time, nullable=True),
+    sqlalchemy.Column("time_to", Time, nullable=True),
+    sqlalchemy.Column("is_closed", Boolean, nullable=False, server_default="false"),
+    sqlalchemy.UniqueConstraint(
+        "cashbox_id",
+        "type",
+        "day_of_week",
+        name="uq_cashbox_schedule_day",
+    ),
+    sqlalchemy.CheckConstraint(
+        "day_of_week >= 0 AND day_of_week <= 6",
+        name="ck_cashbox_schedule_day",
+    ),
 )

@@ -1,10 +1,9 @@
 import base64
 import os
 
+from apps.yookassa.services.core.IOauthService import IOauthService
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
-
-from apps.yookassa.services.core.IOauthService import IOauthService
 
 
 class CallbackOauthView:

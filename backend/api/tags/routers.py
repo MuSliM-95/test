@@ -1,14 +1,13 @@
 from typing import List
 
+from api.tags import schemas
 from asyncpg import UniqueViolationError
+from database.db import database, tags
 from fastapi import APIRouter, HTTPException
+from functions.helpers import get_user_by_token
 from sqlalchemy import and_
 from starlette import status
 from starlette.responses import Response
-
-from api.tags import schemas
-from database.db import database, tags
-from functions.helpers import get_user_by_token
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 

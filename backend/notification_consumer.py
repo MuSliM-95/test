@@ -6,7 +6,6 @@ from asyncio import sleep
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
 from aiogram import Bot
-
 from database.db import OrderStatus, database
 
 # Опциональный импорт store_bot_message

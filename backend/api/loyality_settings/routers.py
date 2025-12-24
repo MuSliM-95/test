@@ -1,12 +1,11 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import func, select
-
 import api.loyality_settings.schemas as schemas
 from database.db import database, loyality_settings
+from fastapi import APIRouter, HTTPException
 from functions.helpers import get_user_by_token
+from sqlalchemy import func, select
 from ws_manager import manager
 
 router = APIRouter(tags=["loyality_settings"])

@@ -61,9 +61,8 @@ class AvitoHandler:
             existing_chat = None
             avito_channel = None
             if chat_id_external:
-                from sqlalchemy import and_, select
-
                 from database.db import channels, chats, database
+                from sqlalchemy import and_, select
 
                 query = (
                     select([chats.c.id, chats.c.channel_id, chats.c.cashbox_id])
@@ -98,9 +97,8 @@ class AvitoHandler:
 
             # Если чат не найден и channel_id не передан, пытаемся определить канал по user_id
             if not avito_channel and user_id:
-                from sqlalchemy import and_, select
-
                 from database.db import channel_credentials
+                from sqlalchemy import and_, select
 
                 query = (
                     select([channel_credentials.c.channel_id])
@@ -745,9 +743,8 @@ class AvitoHandler:
     ) -> Optional[Dict[str, Any]]:
         try:
             if channel_type == "AVITO":
-                from sqlalchemy import and_, select
-
                 from database.db import channels, chats, database
+                from sqlalchemy import and_, select
 
                 existing_chat_query = (
                     select([chats.c.id, chats.c.channel_id, chats.c.cashbox_id])

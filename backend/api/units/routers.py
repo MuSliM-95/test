@@ -1,8 +1,7 @@
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import func, select
-
 import api.units.schemas as schemas
 from database.db import database, units
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import func, select
 
 router = APIRouter(tags=["units"])
 

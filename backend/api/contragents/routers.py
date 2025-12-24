@@ -1,16 +1,10 @@
 from datetime import datetime
 from typing import List, Union
 
-import phonenumbers
-from asyncpg import ForeignKeyViolationError
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
-from phonenumbers import geocoder
-from sqlalchemy import asc, cast, desc, func, literal_column, select
-from sqlalchemy.dialects.postgresql import JSONB
-
 import api.contragents.schemas as ca_schemas
 import functions.filter_schemas as filter_schemas
+import phonenumbers
+from asyncpg import ForeignKeyViolationError
 from database.db import (
     contragents,
     contragents_tags,
@@ -18,7 +12,12 @@ from database.db import (
     tags,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from functions.helpers import build_filters, get_filters_ca
+from phonenumbers import geocoder
+from sqlalchemy import asc, cast, desc, func, literal_column, select
+from sqlalchemy.dialects.postgresql import JSONB
 from ws_manager import manager
 
 router = APIRouter(tags=["contragents"])

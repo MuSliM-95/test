@@ -2,9 +2,6 @@ import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import HTTPException
-from sqlalchemy import and_
-
 from api.contragents.infrastructure.repositories.ContragentRepository import (
     ContragentRepository,
 )
@@ -36,7 +33,9 @@ from api.settings.infrastructure.repositories.SettingsRepository import (
 )
 from api.users.infrastructure.repositories.UsersRepository import UsersRepository
 from database.db import database
+from fastapi import HTTPException
 from functions.helpers import datetime_to_timestamp
+from sqlalchemy import and_
 
 
 class GetDocsSalesListByDeliveryDateQuery:

@@ -2,8 +2,6 @@ import re
 from datetime import datetime, timedelta
 
 import aiohttp
-from sqlalchemy import and_, select
-
 from database.db import (
     async_session_maker,
     contragents,
@@ -17,6 +15,7 @@ from database.db import (
     users_cboxes_relation,
 )
 from jobs.module_bank_job.repositories.ContragentRepository import ContragentRepository
+from sqlalchemy import and_, select
 
 
 async def extract_number(text):

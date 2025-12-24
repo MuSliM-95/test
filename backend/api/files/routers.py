@@ -5,12 +5,11 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import aioboto3
+from database.db import database, files
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import RedirectResponse
-from sqlalchemy import and_, func, or_, select
-
-from database.db import database, files
 from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import and_, func, or_, select
 from ws_manager import manager
 
 from .schemas import (

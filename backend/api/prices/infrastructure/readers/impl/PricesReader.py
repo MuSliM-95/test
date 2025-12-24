@@ -1,7 +1,6 @@
-from sqlalchemy import select
-
 from api.prices.infrastructure.readers.core.IPricesReader import IPricesReader
 from database.db import database, price_types, prices
+from sqlalchemy import select
 
 
 class PricesReader(IPricesReader):

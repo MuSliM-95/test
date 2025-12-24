@@ -1,9 +1,8 @@
 from datetime import datetime
 from typing import List
 
-from pydantic import BaseModel
-
 from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
+from pydantic import BaseModel
 
 
 class FavoriteRequest(BaseModel):

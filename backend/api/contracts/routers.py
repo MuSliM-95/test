@@ -1,10 +1,8 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import func, select
-
 import api.contracts.schemas as schemas
 from database.db import contracts, database, organizations
+from fastapi import APIRouter, HTTPException
 from functions.helpers import (
     check_contragent_exists,
     check_entity_exists,
@@ -12,6 +10,7 @@ from functions.helpers import (
     get_entity_by_id,
     get_user_by_token,
 )
+from sqlalchemy import func, select
 from ws_manager import manager
 
 router = APIRouter(tags=["contracts"])

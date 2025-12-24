@@ -1,8 +1,6 @@
 from typing import Any, Mapping, Optional
 
 from aio_pika import IncomingMessage
-from sqlalchemy import select
-
 from api.docs_sales.messages.TechCardWarehouseOperationMessage import (
     TechCardWarehouseOperationMessage,
 )
@@ -10,6 +8,7 @@ from api.tech_cards.models import TechCardDB
 from api.tech_operations.models import TechOperationComponentDB, TechOperationDB
 from common.amqp_messaging.common.core.EventHandler import IEventHandler
 from database.db import database, warehouse_balances
+from sqlalchemy import select
 
 
 class TechCardWarehouseOperationHandler(

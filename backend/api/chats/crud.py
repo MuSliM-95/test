@@ -3,9 +3,6 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import HTTPException
-from sqlalchemy import String, and_, cast, desc, func, or_, select
-
 from database.db import (
     channel_credentials,
     channels,
@@ -15,6 +12,8 @@ from database.db import (
     contragents,
     database,
 )
+from fastapi import HTTPException
+from sqlalchemy import String, and_, cast, desc, func, or_, select
 
 
 async def create_channel(

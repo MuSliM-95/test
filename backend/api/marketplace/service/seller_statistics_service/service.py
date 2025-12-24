@@ -1,7 +1,5 @@
 import os
 
-from sqlalchemy import Integer, and_, cast, desc, func, select
-
 from database.db import (
     cboxes,
     database,
@@ -12,6 +10,7 @@ from database.db import (
     warehouse_balances,
     warehouses,
 )
+from sqlalchemy import Integer, and_, cast, desc, func, select
 
 from .schemas import SellerStatisticsItem, SellerStatisticsResponse
 

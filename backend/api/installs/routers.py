@@ -2,9 +2,8 @@ import hashlib
 import os
 import time
 
-from fastapi import APIRouter, HTTPException
-
 from api.installs.schemas import Install, InstallCreate, InstallSettings
+from fastapi import APIRouter, HTTPException
 from functions.installs import (
     add_md5_to_install,
     create_install,

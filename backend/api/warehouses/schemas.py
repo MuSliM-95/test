@@ -1,17 +1,21 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
 
 class WarehouseCreate(BaseModel):
     name: str
-    type: Optional[str]
-    description: Optional[str]
-    address: Optional[str]
-    phone: Optional[str]
-    parent: Optional[int]
-    is_public: Optional[bool]
+    type: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    parent: Optional[int] = None
+    is_public: Optional[bool] = None
+
     status: bool = True
+
+    shop_schedule: Optional[Dict[str, Any]] = None
+    delivery_schedule: Optional[Dict[str, Any]] = None
 
     class Config:
         orm_mode = True
@@ -24,29 +28,45 @@ class WarehouseCreateMass(BaseModel):
         orm_mode = True
 
 
-class WarehouseEdit(WarehouseCreate):
-    name: Optional[str]
-    status: Optional[bool]
+class WarehouseUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    parent: Optional[int] = None
+    is_public: Optional[bool] = None
+    status: Optional[bool] = None
+
+    shop_schedule: Optional[Dict[str, Any]] = None
+    delivery_schedule: Optional[Dict[str, Any]] = None
+
+    class Config:
+        orm_mode = True
+
+
+class WarehouseEdit(WarehouseUpdate):
+    pass
 
 
 class Warehouse(WarehouseCreate):
     id: int
-    updated_at: int
-    created_at: int
-    longitude: Optional[float]
     latitude: Optional[float]
+    longitude: Optional[float]
+    created_at: int
+    updated_at: int
 
     class Config:
         orm_mode = True
 
 
 class WarehouseList(BaseModel):
-    __root__: Optional[List[Warehouse]]
+    __root__: List[Warehouse]
 
     class Config:
         orm_mode = True
 
 
 class WarehouseListGet(BaseModel):
-    result: Optional[List[Warehouse]]
+    result: List[Warehouse]
     count: int

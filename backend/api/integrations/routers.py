@@ -1,7 +1,6 @@
+from database.db import database, integrations, pictures, users_cboxes_relation
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import func, select
-
-from database.db import database, integrations, pictures, users_cboxes_relation
 
 from ..oauth.utils import generate_rand_hex, ouath_response
 from .shemas import CreateApp, ShowIntegrationGet, UpdateIntegration

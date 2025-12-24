@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends
-from starlette import status
-
 from api.docs_sales_utm_tags import schemas
 from api.docs_sales_utm_tags.service import DocsSalesUTMTagsService
+from fastapi import APIRouter, Depends
+from starlette import status
 
 router = APIRouter(tags=["docs_sales"])
 

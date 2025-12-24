@@ -1,9 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
-
 from database.db import TgBillApproveStatus
+from pydantic import BaseModel
 
 
 class TgBillApproversBaseModel(BaseModel):

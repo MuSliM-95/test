@@ -1,6 +1,3 @@
-from fastapi import HTTPException
-from sqlalchemy import and_, func, select
-
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.view_event_service.schemas import (
     CreateViewEventRequest,
@@ -11,6 +8,8 @@ from api.marketplace.service.view_event_service.schemas import (
     ViewEventsUtm,
 )
 from database.db import database, marketplace_view_events, nomenclature, warehouses
+from fastapi import HTTPException
+from sqlalchemy import and_, func, select
 
 
 class MarketplaceViewEventService(BaseMarketplaceService):

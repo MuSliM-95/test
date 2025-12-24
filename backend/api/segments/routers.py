@@ -2,13 +2,12 @@ import asyncio
 import json
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Response
-from sqlalchemy import func
-
 from api.segments import schemas
 from database.db import SegmentStatus, database, segments
+from fastapi import APIRouter, HTTPException, Response
 from functions.helpers import deep_sanitize, get_user_by_token
 from segments.main import Segments, update_segment_task
+from sqlalchemy import func
 
 router = APIRouter(tags=["segments"])
 

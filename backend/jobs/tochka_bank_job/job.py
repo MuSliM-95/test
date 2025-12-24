@@ -3,8 +3,6 @@ import re
 from datetime import datetime, timedelta
 
 import aiohttp
-from sqlalchemy import and_, select
-
 from database.db import (
     contragents,
     database,
@@ -18,6 +16,7 @@ from database.db import (
     users_cboxes_relation,
 )
 from functions.helpers import get_statement, init_statement
+from sqlalchemy import and_, select
 
 
 async def refresh_token(cred_id: int):

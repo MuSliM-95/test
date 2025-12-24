@@ -1,7 +1,5 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
-
 from apps.amocrm.pair.functions.fields import (
     create_custom_fields_contacts,
     create_custom_fields_leads,
@@ -13,6 +11,7 @@ from database.db import (
     database,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, HTTPException
 from functions.helpers import gen_token
 from ws_manager import manager
 

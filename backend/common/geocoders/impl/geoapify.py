@@ -2,7 +2,6 @@ import asyncio
 from typing import Union
 
 import aiohttp
-
 from common.geocoders.core.base_instance import BaseGeocoder
 from common.geocoders.schemas import GeocoderSearchResponse
 from common.geocoders.utils import AsyncLRU
@@ -15,8 +14,8 @@ class Geoapify(BaseGeocoder):
 
     def __new__(cls, api_key: Union[str, None] = None):
         if cls._instance is None:
-            if not api_key:
-                raise ValueError("Geoapify API key is required")
+            # if not api_key:
+            #     raise ValueError("Geoapify API key is required")
             cls._instance = super().__new__(cls)
             cls._instance.api_key = api_key
             cls._instance.autocomplete_url = (

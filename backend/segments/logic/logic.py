@@ -1,11 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import and_, update
-
 from database.db import SegmentObjectType, database, segment_objects
 from segments.constants import SegmentChangeType
 from segments.helpers.batch_insert import insert_in_batches
 from segments.helpers.collect_obj_ids import collect_objects
+from sqlalchemy import and_, update
 
 
 class SegmentLogic:

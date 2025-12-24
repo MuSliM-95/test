@@ -1,151 +1,138 @@
-services:
-  worker:
-    build: ../backend
-    image: tablecrm_backend:latest
-    restart: always
-    command: bash -c "python3 worker.py"
-    network_mode: host
-    volumes:
-      - ../backend:/backend
-      - ../certs:/certs
-    environment:
-      APP_URL: ${APP_URL}
-      S3_ACCESS: ${S3_ACCESS}
-      S3_SECRET: ${S3_SECRET}
-      S3_URL: ${S3_URL}
-      TG_TOKEN: ${TG_TOKEN}
-      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
-      ACCOUNT_INTERVAL: ${ACCOUNT_INTERVAL}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASS: ${POSTGRES_PASS}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      XDG_RUNTIME_DIR: ./tmp
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASS: ${RABBITMQ_PASS}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-      APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
-      APPLE_TEAM_ID: ${APPLE_TEAM_ID}
-      APPLE_CERTIFICATE_PATH: ${APPLE_CERTIFICATE_PATH}
-      APPLE_KEY_PATH: ${APPLE_KEY_PATH}
-      APPLE_WWDR_PATH: ${APPLE_WWDR_PATH}
-      APPLE_NOTIFICATION_PATH: ${APPLE_NOTIFICATION_PATH}
-      APPLE_NOTIFICATION_KEY: ${APPLE_NOTIFICATION_KEY}
-      PKPASS_PASSWORD: ${PKPASS_PASSWORD}
+version: "3.9"
 
+services:
   backend:
     build: ../backend
     image: tablecrm_backend:latest
+    container_name: tablecrm-backend
     restart: always
-    command: bash -c "alembic upgrade head && uvicorn main:app --host=0.0.0.0 --port 9000 --log-level=info --reload"
-    network_mode: host
+    command: >
+      bash -c "
+      alembic upgrade head &&
+      uvicorn main:app
+      --host 0.0.0.0
+      --port 9000
+      --log-level info
+      "
+    ports:
+      - "9000:9000"
     volumes:
       - ../backend:/backend
       - ../photos:/backend/photos
       - ../certs:/certs
-    expose:
-      - 9000
+    env_file:
+      - ../.env
     environment:
-      APP_URL: ${APP_URL}
-      S3_ACCESS: ${S3_ACCESS}
-      S3_SECRET: ${S3_SECRET}
-      S3_URL: ${S3_URL}
-      TG_TOKEN: ${TG_TOKEN}
-      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
-      ACCOUNT_INTERVAL: ${ACCOUNT_INTERVAL}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASS: ${POSTGRES_PASS}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      XDG_RUNTIME_DIR: ./tmp
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASS: ${RABBITMQ_PASS}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: ${RABBITMQ_PORT}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
-      GEOAPIFY_SECRET: ${GEOAPIFY_SECRET}
-      APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
-      APPLE_TEAM_ID: ${APPLE_TEAM_ID}
-      APPLE_CERTIFICATE_PATH: ${APPLE_CERTIFICATE_PATH}
-      APPLE_KEY_PATH: ${APPLE_KEY_PATH}
-      APPLE_WWDR_PATH: ${APPLE_WWDR_PATH}
-      APPLE_NOTIFICATION_PATH: ${APPLE_NOTIFICATION_PATH}
-      APPLE_NOTIFICATION_KEY: ${APPLE_NOTIFICATION_KEY}
-      PKPASS_PASSWORD: ${PKPASS_PASSWORD}
+      XDG_RUNTIME_DIR: /backend/tmp
+    depends_on:
+      - db
+      - rabbitmq
+      - scality
+    networks:
+      - tablecrm
+
+  worker:
+    image: tablecrm_backend:latest
+    container_name: tablecrm-worker
+    restart: always
+    command: python3 worker.py
+    volumes:
+      - ../backend:/backend
+      - ../certs:/certs
+    env_file:
+      - ../.env
+    networks:
+      - tablecrm
+    depends_on:
+      - backend
 
   teleg_bot:
     image: tablecrm_backend:latest
+    container_name: tablecrm-bot
     restart: always
     command: python3 bot.py
-    network_mode: host
     volumes:
       - ../backend:/backend
       - ../photos:/backend/photos
+    env_file:
+      - ../.env
+    networks:
+      - tablecrm
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:14-alpine
+    container_name: tablecrm-db
+    restart: always
     environment:
-      APP_URL: ${APP_URL}
-      TG_TOKEN: ${TG_TOKEN}
-      CHEQUES_TOKEN: ${CHEQUES_TOKEN}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASS: ${POSTGRES_PASS}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      S3_ACCESS: ${S3_ACCESS}
-      S3_SECRET: ${S3_SECRET}
-      S3_URL: ${S3_URL}
+      POSTGRES_USER: example
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: example
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tablecrm
+
+  rabbitmq:
+    image: rabbitmq:3.8.16-management
+    container_name: tablecrm-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - tablecrm
+
+  scality:
+    image: scality/s3server:latest
+    container_name: tablecrm-s3
+    restart: always
+    ports:
+      - "8000:8000"
+    networks:
+      - tablecrm
 
   prometheus:
     image: prom/prometheus:latest
-    network_mode: host
+    container_name: tablecrm-prometheus
     restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.enable-lifecycle'
-    depends_on:
-      - backend
+    networks:
+      - tablecrm
 
   grafana:
     image: grafana/grafana:latest
-    network_mode: host
+    container_name: tablecrm-grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - ../.env
     environment:
-      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
     volumes:
       - ../monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ../monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana
+    networks:
+      - tablecrm
     depends_on:
       - prometheus
-      - backend
 
-  node-exporter:
-    image: prom/node-exporter:latest
-    network_mode: host
-    restart: unless-stopped
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--path.rootfs=/rootfs'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
+networks:
+  tablecrm:
+    driver: bridge
 
 volumes:
   grafana-data:
   prometheus-data:
+  postgres-data:

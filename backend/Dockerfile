@@ -42,6 +42,7 @@ COPY --chown=appuser:appuser . .
 # в контейнер томах (/photos) (может отказаться от bind монтирования в пользу volumes)
 # USER appuser
 
-ENTRYPOINT ["/usr/bin/tini", "--", "docker-entrypoint.sh"]
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
