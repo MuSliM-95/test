@@ -140,9 +140,9 @@ build-up-docker-job-dev:
     - export POSTGRES_PASS="$POSTGRES_PASS"
     - export POSTGRES_PORT="$POSTGRES_PORT"
 
-    - echo "Applying migrations..."
-    - chmod +x .deploy/apply_migrations.sh
-    - .deploy/apply_migrations.sh
+    # - echo "Applying migrations..."
+    # - chmod +x .deploy/apply_migrations.sh
+    # - .deploy/apply_migrations.sh
 
     - echo "Starting full deployment..."
     - docker compose up -d --force-recreate
