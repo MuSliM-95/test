@@ -1,5 +1,4 @@
 from fastapi import HTTPException
-from pydantic import BaseModel
 from sqlalchemy import and_, desc, func, select
 
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
@@ -9,7 +8,9 @@ from api.marketplace.service.favorites_service.schemas import (
     FavoriteRequest,
     FavoriteResponse,
 )
-from database.db import database, favorites_nomenclatures, nomenclature
+from database.db import database, marketplace_favorites, nomenclature
+
+ENTITY_TYPE_NOMENCLATURE = "nomenclature"
 
 
 class MarketplaceFavoritesService(BaseMarketplaceService):
@@ -23,14 +24,20 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         # Fetch favorites with pagination
         favorites_query = (
             select(
-                favorites_nomenclatures.c.id,
-                favorites_nomenclatures.c.nomenclature_id,
-                favorites_nomenclatures.c.contagent_id,
-                favorites_nomenclatures.c.created_at,
-                favorites_nomenclatures.c.updated_at,
+                marketplace_favorites.c.id,
+                marketplace_favorites.c.phone,
+                marketplace_favorites.c.entity_type,
+                marketplace_favorites.c.entity_id,
+                marketplace_favorites.c.created_at,
+                marketplace_favorites.c.updated_at,
             )
-            .where(favorites_nomenclatures.c.contagent_id == contragent_id)
-            .order_by(desc(favorites_nomenclatures.c.created_at))
+            .where(
+                and_(
+                    marketplace_favorites.c.phone == contragent_phone,
+                    marketplace_favorites.c.entity_type == ENTITY_TYPE_NOMENCLATURE,
+                )
+            )
+            .order_by(desc(marketplace_favorites.c.created_at))
             .limit(size)
             .offset(offset)
         )
@@ -39,8 +46,13 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         # Count total favorites
         count_query = (
             select(func.count())
-            .select_from(favorites_nomenclatures)
-            .where(favorites_nomenclatures.c.contagent_id == contragent_id)
+            .select_from(marketplace_favorites)
+            .where(
+                and_(
+                    marketplace_favorites.c.phone == contragent_phone,
+                    marketplace_favorites.c.entity_type == ENTITY_TYPE_NOMENCLATURE,
+                )
+            )
         )
         total_count = await database.fetch_val(count_query)
 
@@ -48,8 +60,8 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         result = [
             FavoriteResponse(
                 id=row.id,
-                nomenclature_id=row.nomenclature_id,
-                contagent_id=row.contagent_id,
+                nomenclature_id=row.entity_id,  # entity_id хранит id номенклатуры
+                phone=row.phone,
                 created_at=row.created_at,
                 updated_at=row.updated_at,
             )
@@ -63,18 +75,17 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
     async def add_to_favorites(
         self, favorite_request: FavoriteRequest, utm: CreateFavoritesUtm
     ) -> FavoriteResponse:
-        class FavoriteNomenclatureCreate(BaseModel):
-            nomenclature_id: int
-            contagent_id: int
+        phone = favorite_request.contragent_phone
+        nomenclature_id = favorite_request.nomenclature_id
+        entity_type = ENTITY_TYPE_NOMENCLATURE
+        entity_id = nomenclature_id
 
-        await self._validate_contragent(
-            favorite_request.contragent_phone, favorite_request.nomenclature_id
-        )
+        await self._validate_contragent(phone, nomenclature_id)
+
         product_query = select(nomenclature.c.id).where(
             and_(
-                nomenclature.c.id == favorite_request.nomenclature_id,
-                nomenclature.c.is_deleted
-                == False,  # TODO: добавить проверку на публичность price_type
+                nomenclature.c.id == nomenclature_id,
+                nomenclature.c.is_deleted == False,
             )
         )
         entity = await database.fetch_one(product_query)
@@ -83,15 +94,13 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
                 status_code=404, detail="Товар не найден или не доступен"
             )
 
-        contragent_id = await self._get_contragent_id_by_phone(
-            favorite_request.contragent_phone
-        )
+        await self._ensure_marketplace_client(phone)
 
-        existing_query = select(favorites_nomenclatures.c.id).where(
+        existing_query = select(marketplace_favorites.c.id).where(
             and_(
-                favorites_nomenclatures.c.nomenclature_id
-                == favorite_request.nomenclature_id,
-                favorites_nomenclatures.c.contagent_id == contragent_id,
+                marketplace_favorites.c.phone == phone,
+                marketplace_favorites.c.entity_type == entity_type,
+                marketplace_favorites.c.entity_id == entity_id,
             )
         )
         existing_favorite = await database.fetch_one(existing_query)
@@ -100,61 +109,60 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
                 status_code=409, detail="Элемент уже добавлен в избранное"
             )
 
-        insert_data = FavoriteNomenclatureCreate(
-            nomenclature_id=favorite_request.nomenclature_id, contagent_id=contragent_id
-        ).dict()
         favorite_id = await database.execute(
-            favorites_nomenclatures.insert().values(**insert_data)
+            marketplace_favorites.insert().values(
+                phone=phone,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
         )
 
         created_favorite_query = select(
-            favorites_nomenclatures.c.id,
-            favorites_nomenclatures.c.nomenclature_id,
-            favorites_nomenclatures.c.contagent_id,
-            favorites_nomenclatures.c.created_at,
-            favorites_nomenclatures.c.updated_at,
-        ).where(favorites_nomenclatures.c.id == favorite_id)
+            marketplace_favorites.c.id,
+            marketplace_favorites.c.phone,
+            marketplace_favorites.c.entity_type,
+            marketplace_favorites.c.entity_id,
+            marketplace_favorites.c.created_at,
+            marketplace_favorites.c.updated_at,
+        ).where(marketplace_favorites.c.id == favorite_id)
         created_favorite = await database.fetch_one(created_favorite_query)
 
-        # добавляем utm
         await self._add_utm(created_favorite.id, utm)
 
-        return FavoriteResponse.from_orm(created_favorite)
+        return FavoriteResponse(
+            id=created_favorite.id,
+            nomenclature_id=created_favorite.entity_id,
+            phone=created_favorite.phone,
+            created_at=created_favorite.created_at,
+            updated_at=created_favorite.updated_at,
+        )
 
     async def remove_from_favorites(
-        self, nomenclature_id: int, contragent_phone: str
+        self, favorite_id: int, contragent_phone: str
     ) -> dict:
-        """
-        Удаляет запись из избранного, если она принадлежит указанному контрагенту.
-        """
-        await self._validate_contragent(contragent_phone, nomenclature_id)
-
-        contragent_id = await self._get_contragent_id_by_phone(contragent_phone)
-
-        # Проверяем, существует ли такая запись и принадлежит ли она контрагенту
-        check_query = (
-            select(favorites_nomenclatures.c.id)
-            .join(
-                nomenclature,
-                nomenclature.c.id == favorites_nomenclatures.c.nomenclature_id,
-            )
-            .where(
-                and_(
-                    nomenclature.c.id == nomenclature_id,
-                    favorites_nomenclatures.c.contagent_id == contragent_id,
-                )
+        favorite_query = select(
+            marketplace_favorites.c.id,
+            marketplace_favorites.c.phone,
+            marketplace_favorites.c.entity_type,
+            marketplace_favorites.c.entity_id,
+        ).where(
+            and_(
+                marketplace_favorites.c.id == favorite_id,
+                marketplace_favorites.c.phone == contragent_phone,
+                marketplace_favorites.c.entity_type == ENTITY_TYPE_NOMENCLATURE,
             )
         )
-        existing = await database.fetch_one(check_query)
-        if not existing:
+        favorite = await database.fetch_one(favorite_query)
+        if not favorite:
             raise HTTPException(
                 status_code=404,
                 detail="Запись в избранном не найдена или не принадлежит указанному пользователю",
             )
 
-        # Удаляем запись
-        delete_query = favorites_nomenclatures.delete().where(
-            favorites_nomenclatures.c.id == existing.id
+        await self._validate_contragent(contragent_phone, favorite.entity_id)
+
+        delete_query = marketplace_favorites.delete().where(
+            marketplace_favorites.c.id == favorite.id
         )
         await database.execute(delete_query)
 

@@ -3054,18 +3054,76 @@ feeds_tags = sqlalchemy.Table(
     sqlalchemy.UniqueConstraint("tag_id", "feed_id", name="unique_tag_id_feed_id"),
 )
 
-marketplace_contragent_cart = sqlalchemy.Table(
-    "marketplace_contragent_cart",
+marketplace_clients_list = sqlalchemy.Table(
+    "marketplace_clients_list",
+    metadata,
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column("phone", String, nullable=False, unique=True, index=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+)
+
+marketplace_favorites = sqlalchemy.Table(
+    "marketplace_favorites",
     metadata,
     sqlalchemy.Column(
         "id", BigInteger, primary_key=True, index=True, autoincrement=True
     ),
     sqlalchemy.Column(
-        "contragent_id",
-        Integer,
-        ForeignKey("contragents.id"),
+        "phone",
+        String,
+        ForeignKey(
+            "marketplace_clients_list.phone", ondelete="CASCADE", onupdate="CASCADE"
+        ),
         nullable=False,
-        unique=True,
+        index=True,
+    ),
+    sqlalchemy.Column("entity_type", String(50), nullable=False),
+    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    UniqueConstraint(
+        "phone",
+        "entity_type",
+        "entity_id",
+        name="uq_marketplace_favorites_client_entity",
+    ),
+)
+
+marketplace_carts = sqlalchemy.Table(
+    "marketplace_carts",
+    metadata,
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "phone",
+        String,
+        ForeignKey(
+            "marketplace_clients_list.phone", ondelete="CASCADE", onupdate="CASCADE"
+        ),
+        nullable=False,
+        unique=True,  # один активный cart на телефон
+        index=True,
+    ),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
     ),
 )
 
@@ -3085,7 +3143,7 @@ marketplace_cart_goods = sqlalchemy.Table(
     sqlalchemy.Column(
         "cart_id",
         BigInteger,
-        ForeignKey("marketplace_contragent_cart.id"),
+        ForeignKey("marketplace_carts.id", ondelete="CASCADE"),
         nullable=False,
     ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -3101,6 +3159,57 @@ marketplace_cart_goods = sqlalchemy.Table(
         "cart_id",
         name="ux_marketplace_cart_goods_nomenclature_id_warehouse_id_cart_id",
     ),
+)
+
+marketplace_orders = sqlalchemy.Table(
+    "marketplace_orders",
+    metadata,
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "phone",
+        String,
+        ForeignKey(
+            "marketplace_clients_list.phone", ondelete="RESTRICT", onupdate="CASCADE"
+        ),
+        nullable=False,
+        index=True,
+    ),
+    sqlalchemy.Column("status", String(32), nullable=False, server_default="created"),
+    sqlalchemy.Column("delivery_info", JSONB, nullable=False),
+    sqlalchemy.Column(
+        "additional_data", JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    ),
+    sqlalchemy.Column("error", Text, nullable=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    sqlalchemy.Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+)
+
+marketplace_searches = sqlalchemy.Table(
+    "marketplace_searches",
+    metadata,
+    sqlalchemy.Column(
+        "id", BigInteger, primary_key=True, index=True, autoincrement=True
+    ),
+    sqlalchemy.Column(
+        "phone",
+        String,
+        ForeignKey(
+            "marketplace_clients_list.phone", ondelete="SET NULL", onupdate="CASCADE"
+        ),
+        nullable=True,
+        index=True,
+    ),
+    sqlalchemy.Column("query", Text, nullable=False),
+    sqlalchemy.Column("filters", JSONB, nullable=True),
+    sqlalchemy.Column("results_count", Integer, nullable=True),
+    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
 
 global_categories = sqlalchemy.Table(
@@ -3320,7 +3429,7 @@ marketplace_utm_tags = sqlalchemy.Table(
         "id", BigInteger, primary_key=True, index=True, autoincrement=True
     ),
     sqlalchemy.Column("entity_type", String, nullable=True),
-    sqlalchemy.Column("entity_id", Integer, nullable=False),
+    sqlalchemy.Column("entity_id", BigInteger, nullable=False),
     sqlalchemy.Column("utm_source", String, nullable=True),
     sqlalchemy.Column("utm_medium", String, nullable=True),
     sqlalchemy.Column("utm_campaign", String, nullable=True),
@@ -3332,6 +3441,9 @@ marketplace_utm_tags = sqlalchemy.Table(
     sqlalchemy.Column("utm_leadid", String, nullable=True),
     sqlalchemy.Column("utm_yclientid", String, nullable=True),
     sqlalchemy.Column("utm_gaclientid", String, nullable=True),
+    sqlalchemy.Column(
+        "created_at", DateTime(timezone=True), server_default=func.now(), nullable=False
+    ),
 )
 
 marketplace_reviews = sqlalchemy.Table(
@@ -3371,23 +3483,4 @@ marketplace_view_events = sqlalchemy.Table(
     ),
     sqlalchemy.Column("event", String, nullable=False, server_default="view"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-)
-
-favorites_nomenclatures = sqlalchemy.Table(
-    "favorites_nomenclatures",
-    metadata,
-    sqlalchemy.Column("id", Integer, primary_key=True, index=True),
-    sqlalchemy.Column(
-        "nomenclature_id", Integer, ForeignKey("nomenclature.id"), nullable=False
-    ),
-    sqlalchemy.Column(
-        "contagent_id", Integer, ForeignKey("contragents.id"), nullable=False
-    ),
-    sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    sqlalchemy.Column(
-        "updated_at",
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-    ),
 )

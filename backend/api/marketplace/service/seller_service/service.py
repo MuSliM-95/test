@@ -39,7 +39,7 @@ class MarketplaceSellerService(BaseMarketplaceService):
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
         base_url = os.getenv("APP_URL")
-        return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+        return f"https://{base_url}/api/v1/{photo_path.lstrip('/')}"
 
     async def update_seller_profile(
         self,

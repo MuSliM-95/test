@@ -17,16 +17,15 @@ from .schemas import SellerStatisticsItem, SellerStatisticsResponse
 
 
 class MarketplaceSellerStatisticsService:
-
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
         base_url = os.getenv("APP_URL")
         photo_url = photo_path.lstrip("/")
 
         if "seller" in photo_url:
-            return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+            return f"https://{base_url}/api/v1/{photo_path.lstrip('/')}"
         else:
-            return f'https://{base_url}/{photo_path.lstrip("/")}'
+            return f"https://{base_url}/{photo_path.lstrip('/')}"
 
     async def get_sellers_statistics(self) -> SellerStatisticsResponse:
         # 1. Получаем всех актуальных селлеров (balance > 0)

@@ -15,6 +15,8 @@ class OrderGoodMessage(MarketplaceOrderGood):
 
 
 class CreateMarketplaceOrderMessage(BaseModelMessage):
+    marketplace_order_id: int
+    phone: str
     cashbox_id: int
     contragent_id: int
     goods: List[OrderGoodMessage]

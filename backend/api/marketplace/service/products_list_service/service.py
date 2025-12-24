@@ -48,12 +48,11 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         photo_url = photo_path.lstrip("/")
 
         if "seller" in photo_url:
-            return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+            return f"https://{base_url}/api/v1/{photo_path.lstrip('/')}"
         else:
-            return f'https://{base_url}/{photo_path.lstrip("/")}'
+            return f"https://{base_url}/{photo_path.lstrip('/')}"
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
-
         current_timestamp = int(datetime.now().timestamp())
 
         ranked_prices_subquery = (
