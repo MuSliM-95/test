@@ -1,9 +1,10 @@
+from fastapi import HTTPException
+from starlette import status
+
 from apps.amocrm.installer.infrastructure.repositories.core.IWidgetInstallerRepository import (
     IWidgetInstallerRepository,
 )
-from fastapi import HTTPException
 from functions.helpers import get_user_by_token
-from starlette import status
 
 
 class GetWidgetInstallerInfoView:

@@ -11,13 +11,13 @@ case "$CMD" in
     uvicorn)
         log "Uvicorn server mode detected"
 
-        export LOG_LEVEL="${LOG_LEVEL:-info}"
-        export ACCESS_LOG="${ACCESS_LOG:-1}"
+        export LOG_LEVEL=${LOG_LEVEL:-info}
+        export ACCESS_LOG=${ACCESS_LOG:-1}
 
         log "Running Alembic migrations..."
         alembic upgrade head
 
-        CMD_LINE="uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+        CMD_LINE="uvicorn main:app --host 0.0.0.0 --port 8000"
         CMD_LINE="$CMD_LINE --log-level ${LOG_LEVEL}"
 
         if [ "$ACCESS_LOG" = "1" ] || [ "$ACCESS_LOG" = "true" ]; then
@@ -27,11 +27,11 @@ case "$CMD" in
         fi
 
         if [ -n "${LOG_CONFIG:-}" ]; then
-            CMD_LINE="$CMD_LINE --log-config ${LOG_CONFIG}"
+            CMD_LINE="$CMD_LINE --log-config $LOG_CONFIG"
         fi
 
         if [ -n "${UVICORN_WORKERS:-}" ]; then
-            CMD_LINE="$CMD_LINE --workers ${UVICORN_WORKERS}"
+            CMD_LINE="$CMD_LINE --workers $UVICORN_WORKERS"
         fi
 
         if [ "${UVICORN_PROXY_HEADERS:-false}" = "true" ]; then
@@ -40,18 +40,6 @@ case "$CMD" in
 
         log "Starting server: $CMD_LINE"
         exec sh -c "$CMD_LINE"
-        ;;
-
-    celery)
-        log "Celery worker mode detected"
-        shift
-        exec celery "$@"
-        ;;
-
-    python)
-        log "Python script mode detected"
-        shift
-        exec python "$@"
         ;;
 
     *)

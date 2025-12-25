@@ -1,10 +1,11 @@
+from asyncpg import PostgresError, UniqueViolationError
+
 from api.nomenclature_attributes.infrastructure.exceptions.NomenclatureAttributeNameAlreadyExistError import (
     NomenclatureAttributeNameAlreadyExistError,
 )
 from api.nomenclature_attributes.infrastructure.functions.core.IInsertNomenclatureAttributesFunction import (
     IInsertNomenclatureAttributesFunction,
 )
-from asyncpg import PostgresError, UniqueViolationError
 from database.db import database, nomenclature_attributes
 
 

@@ -1,6 +1,9 @@
 import os
 from datetime import datetime
 
+from fastapi import APIRouter, HTTPException, Request, Response
+from sqlalchemy import String, cast, select
+
 from api.apple_wallet.schemas import DeviceRegistration, SerialNumbersList
 from common.apple_wallet_service.impl.WalletNotificationService import (
     WalletNotificationService,
@@ -14,8 +17,6 @@ from database.db import (
     loyality_cards,
     users_cboxes_relation,
 )
-from fastapi import APIRouter, HTTPException, Request, Response
-from sqlalchemy import String, cast, select
 
 router = APIRouter(tags=["apple-wallet"])
 

@@ -8,14 +8,15 @@ from uuid import uuid4
 import aioboto3
 import pdfkit
 import qrcode
-from api.docs_generate.schemas import ReGenerateList, TypeDoc
-from database.db import database, doc_generated, doc_templates
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
-from functions.helpers import get_user_by_token
 from jinja2 import Template
 from jinja2.filters import FILTERS
 from sqlalchemy import desc
+
+from api.docs_generate.schemas import ReGenerateList, TypeDoc
+from database.db import database, doc_generated, doc_templates
+from functions.helpers import get_user_by_token
 
 
 def render_qrcode(value):

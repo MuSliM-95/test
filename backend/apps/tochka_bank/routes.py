@@ -1,6 +1,12 @@
 from datetime import datetime
 
 import aiohttp
+
+# from jobs.jobs import scheduler
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import RedirectResponse
+from sqlalchemy import and_, select
+
 from apps.tochka_bank.schemas import AccountUpdate
 from database.db import (
     database,
@@ -11,13 +17,8 @@ from database.db import (
     tochka_bank_credentials,
     users_cboxes_relation,
 )
-
-# from jobs.jobs import scheduler
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import RedirectResponse
 from functions.helpers import get_user_by_token
 from jobs.tochka_bank_job.job import tochka_update_transaction
-from sqlalchemy import and_, select
 from ws_manager import manager
 
 router = APIRouter(tags=["Tochka bank"])

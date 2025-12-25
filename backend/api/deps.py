@@ -1,8 +1,9 @@
 from collections.abc import Generator
 
-from database.db import engine, users_cboxes_relation
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+
+from database.db import engine, users_cboxes_relation
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -2,8 +2,13 @@ from datetime import datetime
 from random import randint
 from typing import Optional
 
-import api.loyality_cards.schemas as schemas
 import phonenumbers
+from fastapi import APIRouter, Depends, HTTPException
+from fuzzywuzzy import fuzz
+from phonenumbers import geocoder, region_code_for_number
+from sqlalchemy import Numeric, and_, cast, func, literal, or_, select
+
+import api.loyality_cards.schemas as schemas
 from api.apple_wallet.utils import update_apple_wallet_pass
 from common.apple_wallet_service.impl.WalletPassService import (
     WalletPassGeneratorService,
@@ -17,7 +22,6 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
-from fastapi import APIRouter, Depends, HTTPException
 from functions.helpers import (
     add_status,
     build_filters,
@@ -30,9 +34,6 @@ from functions.helpers import (
     get_filters_cards,
     get_user_by_token,
 )
-from fuzzywuzzy import fuzz
-from phonenumbers import geocoder, region_code_for_number
-from sqlalchemy import Numeric, and_, cast, func, literal, or_, select
 from ws_manager import manager
 
 router = APIRouter(tags=["loyality_cards"])

@@ -8,6 +8,7 @@ Create Date: 2025-12-12 19:39:37.326473
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "9d798342e39e"
@@ -56,6 +57,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_files_id"), "files", ["id"], unique=False)
+    op.drop_index("ix_promocodes_id", table_name="promocodes")
+    op.drop_table("promocodes")
     op.drop_index("ix_diadok_install_id", table_name="diadok_install")
     op.drop_table("diadok_install")
     op.create_unique_constraint(
@@ -80,6 +83,12 @@ def upgrade() -> None:
     )
     op.create_unique_constraint(None, "amo_lead_statuses", ["pipeline_id", "amo_id"])
     op.create_unique_constraint(None, "amo_leads", ["amo_install_group_id", "amo_id"])
+    op.drop_constraint(
+        "amo_table_contacts_amo_id_fkey", "amo_table_contacts", type_="foreignkey"
+    )
+    op.create_foreign_key(
+        None, "amo_table_contacts", "amo_contacts", ["amo_id"], ["id"]
+    )
     op.alter_column(
         "booking_events_photo",
         "id",
@@ -87,6 +96,51 @@ def upgrade() -> None:
         nullable=False,
         autoincrement=True,
     )
+    op.drop_index("ix_booking_events_photo_id", table_name="booking_events_photo")
+    op.drop_index("idx_categories_name_trgm", table_name="categories")
+    op.create_foreign_key(None, "categories", "pictures", ["photo_id"], ["id"])
+    op.drop_index(
+        "ix_channel_credentials_channel_cashbox", table_name="channel_credentials"
+    )
+    op.drop_index("ix_channel_credentials_is_active", table_name="channel_credentials")
+    op.drop_index("ix_chat_contacts_channel_id", table_name="chat_contacts")
+    op.drop_index("ix_chat_contacts_contragent_id", table_name="chat_contacts")
+    op.add_column("chats", sa.Column("name", sa.String(length=100), nullable=True))
+    op.drop_index("ix_chats_chat_contact_id", table_name="chats")
+    op.drop_index("idx_contragents_id_phone_cashbox", table_name="contragents")
+    op.drop_index("idx_contragents_tags_contragent_tag", table_name="contragents_tags")
+    op.drop_index("idx_docs_sales_cashbox_contragent_sum", table_name="docs_sales")
+    op.drop_index(
+        "idx_docs_sales_cashbox_dated_id_not_deleted", table_name="docs_sales"
+    )
+    op.drop_index("idx_docs_sales_contragent_aggregate", table_name="docs_sales")
+    op.drop_index("idx_docs_sales_contragent_cashbox_deleted", table_name="docs_sales")
+    op.drop_index("idx_docs_sales_id_cashbox_not_deleted", table_name="docs_sales")
+    op.drop_index("idx_docs_sales_sum_include", table_name="docs_sales")
+    op.drop_index(
+        "idx_docs_sales_delivery_docs_address", table_name="docs_sales_delivery_info"
+    )
+    op.drop_index(
+        "idx_docs_sales_delivery_info_delivery_date_docs_sales_id",
+        table_name="docs_sales_delivery_info",
+    )
+    op.drop_index(
+        "idx_docs_sales_goods_docs_nomenclature", table_name="docs_sales_goods"
+    )
+    op.drop_index("idx_docs_sales_goods_nomenclature_id", table_name="docs_sales_goods")
+    op.drop_index("idx_docs_sales_tags_docs_name", table_name="docs_sales_tags")
+    op.drop_index("idx_global_categories_external_id", table_name="global_categories")
+    op.drop_index("idx_global_categories_is_active", table_name="global_categories")
+    op.drop_index("idx_global_categories_parent_id", table_name="global_categories")
+    op.drop_index("idx_loyality_cards_contragent_balance", table_name="loyality_cards")
+    op.drop_index(
+        "idx_loyality_cards_contragent_balance_filtered", table_name="loyality_cards"
+    )
+    op.drop_index(
+        "idx_loyality_transactions_card_created", table_name="loyality_transactions"
+    )
+    op.drop_index("idx_nomenclature_category", table_name="nomenclature")
+    op.drop_index("idx_nomenclature_category_id", table_name="nomenclature")
     op.create_index(op.f("ix_segments_tags_id"), "segments_tags", ["id"], unique=False)
     op.create_foreign_key(
         None, "tech_operation_components", "nomenclature", ["nomeclature_id"], ["id"]
@@ -123,13 +177,168 @@ def downgrade() -> None:
     )
     op.drop_constraint(None, "tech_operation_components", type_="foreignkey")
     op.drop_index(op.f("ix_segments_tags_id"), table_name="segments_tags")
+    op.create_index(
+        "idx_nomenclature_category_id", "nomenclature", ["category", "id"], unique=False
+    )
+    op.create_index(
+        "idx_nomenclature_category", "nomenclature", ["category", "id"], unique=False
+    )
+    op.create_index(
+        "idx_loyality_transactions_card_created",
+        "loyality_transactions",
+        ["loyality_card_id", "created_at"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_loyality_cards_contragent_balance_filtered",
+        "loyality_cards",
+        ["contragent_id", "balance"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_loyality_cards_contragent_balance",
+        "loyality_cards",
+        ["contragent_id", "balance"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_global_categories_parent_id",
+        "global_categories",
+        ["parent_id"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_global_categories_is_active",
+        "global_categories",
+        ["is_active"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_global_categories_external_id",
+        "global_categories",
+        ["external_id"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_tags_docs_name",
+        "docs_sales_tags",
+        ["docs_sales_id", "name"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_goods_nomenclature_id",
+        "docs_sales_goods",
+        ["docs_sales_id", "nomenclature"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_goods_docs_nomenclature",
+        "docs_sales_goods",
+        ["docs_sales_id", "nomenclature"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_delivery_info_delivery_date_docs_sales_id",
+        "docs_sales_delivery_info",
+        ["delivery_date", "docs_sales_id"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_delivery_docs_address",
+        "docs_sales_delivery_info",
+        ["docs_sales_id", "delivery_date"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_sum_include", "docs_sales", ["contragent"], unique=False
+    )
+    op.create_index(
+        "idx_docs_sales_id_cashbox_not_deleted",
+        "docs_sales",
+        ["id", "cashbox"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_contragent_cashbox_deleted",
+        "docs_sales",
+        ["contragent", "cashbox"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_contragent_aggregate",
+        "docs_sales",
+        ["contragent", "id", "sum", "created_at"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_cashbox_dated_id_not_deleted",
+        "docs_sales",
+        ["cashbox", "dated", "id"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_docs_sales_cashbox_contragent_sum",
+        "docs_sales",
+        ["cashbox", "contragent", "sum", "created_at"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_contragents_tags_contragent_tag",
+        "contragents_tags",
+        ["contragent_id", "tag_id"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_contragents_id_phone_cashbox",
+        "contragents",
+        ["id", "phone", "cashbox"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_chats_chat_contact_id", "chats", ["chat_contact_id"], unique=False
+    )
+    op.drop_column("chats", "name")
+    op.create_index(
+        "ix_chat_contacts_contragent_id",
+        "chat_contacts",
+        ["contragent_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_chat_contacts_channel_id", "chat_contacts", ["channel_id"], unique=False
+    )
+    op.create_index(
+        "ix_channel_credentials_is_active",
+        "channel_credentials",
+        ["is_active"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_channel_credentials_channel_cashbox",
+        "channel_credentials",
+        ["channel_id", "cashbox_id"],
+        unique=False,
+    )
     op.drop_constraint(None, "categories", type_="foreignkey")
+    op.create_index("idx_categories_name_trgm", "categories", ["name"], unique=False)
+    op.create_index(
+        "ix_booking_events_photo_id", "booking_events_photo", ["id"], unique=False
+    )
     op.alter_column(
         "booking_events_photo",
         "id",
         existing_type=sa.INTEGER(),
         nullable=True,
         autoincrement=True,
+    )
+    op.drop_constraint(None, "amo_table_contacts", type_="foreignkey")
+    op.create_foreign_key(
+        "amo_table_contacts_amo_id_fkey",
+        "amo_table_contacts",
+        "amo_contacts",
+        ["amo_id"],
+        ["id"],
+        ondelete="CASCADE",
     )
     op.drop_constraint(None, "amo_leads", type_="unique")
     op.drop_constraint(None, "amo_lead_statuses", type_="unique")
@@ -172,6 +381,82 @@ def downgrade() -> None:
         sa.PrimaryKeyConstraint("id", name="diadok_install_pkey"),
     )
     op.create_index("ix_diadok_install_id", "diadok_install", ["id"], unique=False)
+    op.create_table(
+        "promocodes",
+        sa.Column("id", sa.INTEGER(), autoincrement=True, nullable=False),
+        sa.Column("code", sa.VARCHAR(), autoincrement=False, nullable=False),
+        sa.Column(
+            "points_amount",
+            postgresql.DOUBLE_PRECISION(precision=53),
+            autoincrement=False,
+            nullable=False,
+        ),
+        sa.Column(
+            "type",
+            postgresql.ENUM("ONE_TIME", "PERMANENT", name="promocodetype"),
+            autoincrement=False,
+            nullable=False,
+        ),
+        sa.Column("max_usages", sa.INTEGER(), autoincrement=False, nullable=True),
+        sa.Column(
+            "current_usages",
+            sa.INTEGER(),
+            server_default=sa.text("0"),
+            autoincrement=False,
+            nullable=False,
+        ),
+        sa.Column("organization_id", sa.INTEGER(), autoincrement=False, nullable=False),
+        sa.Column("distributor_id", sa.INTEGER(), autoincrement=False, nullable=True),
+        sa.Column("creator_id", sa.INTEGER(), autoincrement=False, nullable=False),
+        sa.Column(
+            "valid_after",
+            postgresql.TIMESTAMP(timezone=True),
+            autoincrement=False,
+            nullable=True,
+        ),
+        sa.Column(
+            "valid_until",
+            postgresql.TIMESTAMP(timezone=True),
+            autoincrement=False,
+            nullable=True,
+        ),
+        sa.Column("is_active", sa.BOOLEAN(), autoincrement=False, nullable=False),
+        sa.Column(
+            "deleted_at",
+            postgresql.TIMESTAMP(timezone=True),
+            autoincrement=False,
+            nullable=True,
+        ),
+        sa.Column(
+            "created_at",
+            postgresql.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            autoincrement=False,
+            nullable=True,
+        ),
+        sa.Column(
+            "updated_at",
+            postgresql.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            autoincrement=False,
+            nullable=True,
+        ),
+        sa.ForeignKeyConstraint(
+            ["creator_id"], ["tg_accounts.id"], name="promocodes_creator_id_fkey"
+        ),
+        sa.ForeignKeyConstraint(
+            ["distributor_id"],
+            ["contragents.id"],
+            name="promocodes_distributor_id_fkey",
+        ),
+        sa.ForeignKeyConstraint(
+            ["organization_id"],
+            ["organizations.id"],
+            name="promocodes_organization_id_fkey",
+        ),
+        sa.PrimaryKeyConstraint("id", name="promocodes_pkey"),
+    )
+    op.create_index("ix_promocodes_id", "promocodes", ["id"], unique=False)
     op.drop_index(op.f("ix_files_id"), table_name="files")
     op.drop_table("files")
     # ### end Alembic commands ###

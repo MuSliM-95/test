@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta
 
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import and_, desc, func, or_, select
+
 from api.users.schemas import (
     CBUsersListShortWithShifts,
     ShiftStatistics,
@@ -12,8 +15,6 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import and_, desc, func, or_, select
 from ws_manager import manager
 
 from .schemas import (

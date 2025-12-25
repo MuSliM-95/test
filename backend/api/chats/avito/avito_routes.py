@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 from typing import Optional
 
+from fastapi import Query, Request
+
 from api.chats import crud
 from api.chats.auth import get_current_user_for_avito as get_current_user
 from api.chats.avito.avito_client import AvitoAPIError, AvitoClient
@@ -39,7 +41,6 @@ from api.chats.avito.schemas import (
     AvitoWebhookUpdateResponse,
 )
 from database.db import channel_credentials, channels, chats, database
-from fastapi import Query, Request
 
 router = APIRouter(prefix="/chats/avito", tags=["chats-avito"])
 
@@ -633,8 +634,9 @@ async def get_avito_chat_messages(
             internal_chat_id = int(chat_id)
             chat = await crud.get_chat(internal_chat_id)
         except ValueError:
-            from database.db import channels
             from sqlalchemy import and_, select
+
+            from database.db import channels
 
             query = (
                 select(
@@ -963,8 +965,9 @@ async def get_avito_applicant_phone(chat_id: str, user=Depends(get_current_user)
             internal_chat_id = int(chat_id)
             chat = await crud.get_chat(internal_chat_id)
         except ValueError:
-            from database.db import channels
             from sqlalchemy import and_, select
+
+            from database.db import channels
 
             query = (
                 select(
@@ -1201,8 +1204,9 @@ async def get_avito_chat_metadata(chat_id: str, user=Depends(get_current_user)):
             internal_chat_id = int(chat_id)
             chat = await crud.get_chat(internal_chat_id)
         except ValueError:
-            from database.db import channels
             from sqlalchemy import and_, select
+
+            from database.db import channels
 
             query = (
                 select(

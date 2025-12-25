@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from sqlalchemy import and_, case, func, select
+
 from database.db import (
     categories,
     database,
@@ -11,7 +13,6 @@ from database.db import (
     prices,
     warehouse_register_movement,
 )
-from sqlalchemy import and_, case, func, select
 
 
 class FeedCriteriaFilter:

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from sqlalchemy import and_, text
+
 from database.db import (
     database,
     docs_purchases,
@@ -9,7 +11,6 @@ from database.db import (
     pboxes,
     users_cboxes_relation,
 )
-from sqlalchemy import and_, text
 
 
 class CreatePurchaseAutoExpenseHandler:

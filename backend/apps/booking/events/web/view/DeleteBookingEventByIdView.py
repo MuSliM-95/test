@@ -1,9 +1,10 @@
 from typing import List
 
+from fastapi import Body
+
 from apps.booking.events.infrastructure.services.core.IBookingEventsService import (
     IBookingEventsService,
 )
-from fastapi import Body
 from functions.helpers import get_user_by_token
 
 

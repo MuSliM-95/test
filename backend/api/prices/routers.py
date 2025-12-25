@@ -1,5 +1,9 @@
 from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import parse_obj_as
+from sqlalchemy import desc, func, select
+
 import api.prices.schemas as schemas
 from database.db import (
     categories,
@@ -11,7 +15,6 @@ from database.db import (
     prices,
     units,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query
 from functions.filter_schemas import PricesFiltersQuery
 from functions.helpers import (
     check_entity_exists,
@@ -20,8 +23,6 @@ from functions.helpers import (
     get_user_by_token,
     raise_bad_request,
 )
-from pydantic import parse_obj_as
-from sqlalchemy import desc, func, select
 from ws_manager import manager
 
 router = APIRouter(tags=["prices"])

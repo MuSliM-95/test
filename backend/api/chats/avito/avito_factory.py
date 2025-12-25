@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
+
 from database.db import channel_credentials, database
 
 from .avito_client import AvitoClient

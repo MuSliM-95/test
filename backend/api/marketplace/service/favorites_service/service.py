@@ -1,3 +1,6 @@
+from fastapi import HTTPException
+from sqlalchemy import and_, desc, func, select
+
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.favorites_service.schemas import (
     CreateFavoritesUtm,
@@ -6,8 +9,6 @@ from api.marketplace.service.favorites_service.schemas import (
     FavoriteResponse,
 )
 from database.db import database, marketplace_favorites, nomenclature
-from fastapi import HTTPException
-from sqlalchemy import and_, desc, func, select
 
 ENTITY_TYPE_NOMENCLATURE = "nomenclature"
 

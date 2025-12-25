@@ -5,6 +5,12 @@ import os
 import time
 
 logger = logging.getLogger(__name__)
+from botocore.exceptions import ClientError
+from fastapi import FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.types import Message
+
 from api.analytics.routers import router as analytics_router
 from api.apple_wallet.routers import router as apple_wallet_router
 from api.apple_wallet_card_settings.routers import (
@@ -235,7 +241,6 @@ from apps.yookassa.repositories.impl.YookasssaAmoTableCrmRepository import (
     YookasssaAmoTableCrmRepository,
 )
 from apps.yookassa.web.InstallOauthWeb import InstallYookassaOauthWeb
-from botocore.exceptions import ClientError
 from common.amqp_messaging.common.core.IRabbitFactory import IRabbitFactory
 from common.amqp_messaging.common.impl.RabbitFactory import RabbitFactory
 from common.amqp_messaging.models.RabbitMqSettings import RabbitMqSettings
@@ -246,15 +251,12 @@ from common.utils.ioc.ioc import ioc
 from common.utils.logger import log_quota_exceeded
 from database.db import database
 from database.fixtures import init_db
-from fastapi import FastAPI, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from functions.events import write_event
 
 # import sentry_sdk
 from functions.users import get_user_id_cashbox_id_by_token
+from jobs.jobs import scheduler
 from scripts.upload_default_apple_wallet_images import DefaultImagesUploader
-from starlette.types import Message
 
 # sentry_sdk.init(
 #     dsn="https://92a9c03cbf3042ecbb382730706ceb1b@sentry.tablecrm.com/4",
@@ -266,12 +268,13 @@ from starlette.types import Message
 # )
 
 app = FastAPI(
+    root_path="/api/v1",
     title="TABLECRM API",
     description="Документация API TABLECRM",
     version="1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    # docs_url="/docs",
+    # redoc_url="/redoc",
+    # openapi_url="/openapi.json"
 )
 
 app.add_middleware(GZipMiddleware)
@@ -328,7 +331,6 @@ app.include_router(loyality_cards)
 app.include_router(loyality_transactions)
 app.include_router(loyality_settings)
 app.include_router(cashbox_settings_router)
-
 app.include_router(segments_tags_router)
 app.include_router(promocodes_router)
 
@@ -661,13 +663,13 @@ async def startup():
     except Exception as e:
         pass
 
-    # try:
-    #     if not scheduler.running:
-    #         scheduler.start()
-    # except Exception as e:
-    #     import traceback
-    #
-    #     traceback.print_exc()
+    try:
+        if not scheduler.running:
+            scheduler.start()
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
 
 
 @app.on_event("shutdown")
@@ -676,8 +678,8 @@ async def shutdown():
     await chat_consumer.stop()
     await avito_consumer.stop()
 
-    # try:
-    #     if scheduler.running:
-    #         scheduler.shutdown()
-    # except Exception as e:
-    #     pass
+    try:
+        if scheduler.running:
+            scheduler.shutdown()
+    except Exception as e:
+        pass

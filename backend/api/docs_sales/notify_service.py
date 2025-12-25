@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import aio_pika
+
 from bot import bot, store_bot_message
 
 

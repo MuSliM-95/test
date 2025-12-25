@@ -1,10 +1,11 @@
 from typing import List, Set
 
+from sqlalchemy import and_, select
+
 from api.nomenclature_attributes.infrastructure.readers.core.INomenclatureAttributesReader import (
     INomenclatureAttributesReader,
 )
 from database.db import database, nomenclature_attributes, nomenclature_attributes_value
-from sqlalchemy import and_, select
 
 
 class NomenclatureAttributesReader(INomenclatureAttributesReader):

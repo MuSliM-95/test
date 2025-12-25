@@ -1,6 +1,9 @@
 from datetime import datetime
 from typing import Optional
 
+from fastapi import HTTPException
+from sqlalchemy import and_, delete, select, update
+
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
 from api.marketplace.service.product_cart_service.schemas import (
@@ -16,8 +19,6 @@ from database.db import (
     marketplace_carts,
     nomenclature,
 )
-from fastapi import HTTPException
-from sqlalchemy import and_, delete, select, update
 
 
 class MarketplaceCartService(BaseMarketplaceService):
