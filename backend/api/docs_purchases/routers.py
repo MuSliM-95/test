@@ -329,8 +329,8 @@ async def create(token: str, docs_purchases_data: schemas.CreateMass):
             if nomenclature_db and nomenclature_db.type == "product":
                 goods_res.append(
                     {
-                        "price_type": 1,
-                        "price": 0,
+                        "price_type": good.get("price_type") or 1,
+                        "price": good.get("price") or 0,
                         "quantity": good["quantity"],
                         "unit": good.get("unit"),
                         "nomenclature": nomenclature_id,
@@ -568,8 +568,8 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
                         if nomenclature_db and nomenclature_db.type == "product":
                             goods_res.append(
                                 {
-                                    "price_type": 1,
-                                    "price": 0,
+                                    "price_type": g.get("price_type") or 1,
+                                    "price": g.get("price") or 0,
                                     "quantity": g["quantity"],
                                     "unit": g.get("unit"),
                                     "nomenclature": nomenclature_id,
@@ -602,8 +602,11 @@ async def update(token: str, docs_purchases_data: schemas.EditMass):
                             )
                             .order_by(desc(docs_warehouse.c.id))
                         )
-                        if existing_wh and existing_wh.status is True:
-                            body["status"] = True
+                        if existing_wh:
+                            body["id"] = existing_wh.id
+                            body["number"] = existing_wh.number
+                            if existing_wh.status is True:
+                                body["status"] = True
 
                         await create_warehouse_docs(token, body, user.cashbox_id)
 
