@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import and_, select
 
+from common.decorators import ensure_db_connection
 from database.db import database, employee_shifts, users_cboxes_relation
 from ws_manager import manager
 
@@ -21,6 +22,7 @@ def serialize_datetime_fields(data: dict) -> dict:
     return serialized
 
 
+@ensure_db_connection
 async def send_shift_time_updates():
     """
     Отправляет обновления времени для всех активных смен
@@ -88,7 +90,8 @@ async def send_shift_time_updates():
             if shift.token:
                 await manager.send_message(shift.token, update_data)
 
-        print(f"Sent time updates for {len(active_shifts)} active shifts")
+        if active_shifts:
+            print(f"Sent time updates for {len(active_shifts)} active shifts")
 
     except Exception as e:
         print(f"Error sending shift time updates: {e}")

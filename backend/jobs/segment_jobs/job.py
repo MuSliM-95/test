@@ -3,6 +3,7 @@ import time
 from sqlalchemy import Integer, and_, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
+from common.decorators import ensure_db_connection
 from database.db import database, segments
 from segments.logger import logger
 from segments.main import update_segment_task
@@ -35,6 +36,7 @@ async def get_segment_ids():
     return [row.id for row in rows]
 
 
+@ensure_db_connection
 async def segment_update():
     segment_ids = await get_segment_ids()
     start = time.time()

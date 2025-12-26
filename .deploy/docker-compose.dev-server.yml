@@ -86,7 +86,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
       PGDUMP_EXTRA_OPTS: '--exclude-table-data=events'
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - nginx-proxy
 
@@ -102,7 +103,8 @@ services:
       - nginx-proxy
       - infrastructure
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   backend:
     build:
@@ -115,8 +117,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       LOG_LEVEL: debug
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
@@ -192,7 +196,8 @@ services:
     restart: always
     command: bash -c "python3 start_jobs.py"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       LOG_LEVEL: debug
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
@@ -226,8 +231,11 @@ services:
     volumes:
       - /photos:/backend/photos
     depends_on:
-      - backend
-      - rabbitmq
+      backend:
+        condition:
+          service_started
+      rabbitmq:
+        condition: service_healthy
     environment:
       LOG_LEVEL: debug
       APP_URL: ${APP_URL}
