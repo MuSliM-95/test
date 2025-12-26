@@ -59,6 +59,7 @@ services:
       - pgdata-new:/var/lib/postgresql/data
       - ./postgresql.conf:/etc/postgresql.conf:ro
       - ./initdb:/docker-entrypoint-initdb.d
+      - ./db-healthcheck.sh:/healthcheck.sh:ro
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
