@@ -63,6 +63,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
       POSTGRES_DB: cash_2
+    healthcheck:
+      test: ["CMD-SHELL", "/healthcheck.sh"]
+      interval: 20s
+      timeout: 3s
+      retries: 5
+      start_interval: 5s
+      start_period: 5s
     networks:
       - nginx-proxy
       - infrastructure
