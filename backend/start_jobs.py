@@ -1,16 +1,36 @@
 import asyncio
-import atexit
+import logging
 
-from jobs.jobs import scheduler
+from database.db import database  # Импорт базы данных
+from jobs.jobs import scheduler  # Импорт настроенного планировщика
 
-IS_RUN_STATE = True
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def my_any_func():
-    scheduler.shutdown()
+async def main():
+    logger.info("Starting Job Scheduler...")
+
+    # 1. Глобальное подключение к БД при старте
+    if not database.is_connected:
+        await database.connect()
+        logger.info("Database connected globally.")
+    scheduler.start()
+
+    try:
+        while True:
+            await asyncio.sleep(1)
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Stopping scheduler...")
+        scheduler.shutdown()
+    finally:
+        if database.is_connected:
+            await database.disconnect()
+            logger.info("Database disconnected.")
 
 
 if __name__ == "__main__":
-    atexit.register(my_any_func)
-    scheduler.start()
-    asyncio.get_event_loop().run_forever()
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass
