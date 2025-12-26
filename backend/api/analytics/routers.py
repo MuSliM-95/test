@@ -8,7 +8,13 @@ from sqlalchemy import func, select
 import api.analytics.schemas as analytics_schemas
 import functions.filter_schemas as filter_schemas
 from const import PaymentType
-from database.db import database, loyality_cards, users, users_cboxes_relation
+from database.db import (
+    contragents,
+    database,
+    loyality_cards,
+    users,
+    users_cboxes_relation,
+)
 from functions.helpers import get_filters_analytics
 
 router = APIRouter(tags=["analytics"])
@@ -186,3 +192,114 @@ async def analytics(
             return res
 
     raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
+
+
+@router.get("/analytics/contragents-duplicates/")
+async def contragents_duplicates_analytics(
+    token: str,
+    date_from: int,
+    date_to: int,
+    offset: int = 0,
+    limit: int = 100,
+    sort_asc: bool = True,
+):
+    user = await database.fetch_one(
+        users_cboxes_relation.select(users_cboxes_relation.c.token == token)
+    )
+    if not user or not user.status:
+        raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
+
+    start_date = datetime.fromtimestamp(date_from)
+    end_date = datetime.fromtimestamp(date_to)
+
+    """
+    Ищет дубли по номеру телефона контрагента среди карт лояльности
+    """
+    query_cards_duplicate = (
+        select(
+            contragents.c.phone.label("phone"),
+            func.count(loyality_cards.c.id).label("cards_count"),
+            func.array_agg(loyality_cards.c.created_at).label("cards_created_at"),
+        )
+        .select_from(
+            loyality_cards.join(
+                contragents,
+                loyality_cards.c.contragent_id == contragents.c.id,
+            )
+        )
+        .where(
+            loyality_cards.c.is_deleted.is_(False),
+            contragents.c.is_deleted.is_(False),
+            loyality_cards.c.created_at >= start_date,
+            loyality_cards.c.created_at <= end_date,
+        )
+        .group_by(contragents.c.phone)
+        .having(func.count(loyality_cards.c.id) > 1)
+        .limit(limit)
+        .offset(offset)
+    )
+
+    cards_duplicate_rows = await database.fetch_all(query_cards_duplicate)
+    cards_duplicate_result = []
+    for r in cards_duplicate_rows:
+        sorted_dates = sorted(
+            r.cards_created_at,
+            reverse=not sort_asc,
+        )
+
+        cards_duplicate_result.append(
+            {
+                "phone": r.phone,
+                "cards_count": r.cards_count,
+                "cards_created_at": [dt.isoformat() for dt in sorted_dates],
+            }
+        )
+    total_cards_duplicates = sum([p["cards_count"] for p in cards_duplicate_result])
+
+    """
+    Ищет дубли по номеру телефона среди контрагентов
+    """
+    query_contragents_duplicate = (
+        select(
+            contragents.c.phone.label("phone"),
+            func.count(func.distinct(contragents.c.id)).label("contragents_count"),
+            func.array_agg(func.to_timestamp(contragents.c.created_at)).label(
+                "contragents_created_at"
+            ),
+        )
+        .select_from(contragents)
+        .where(
+            contragents.c.is_deleted.is_(False),
+            contragents.c.created_at >= date_from,
+            contragents.c.created_at <= date_to,
+        )
+        .group_by(contragents.c.phone)
+        .having(func.count(func.distinct(contragents.c.id)) > 1)
+        .limit(limit)
+        .offset(offset)
+    )
+    contragents_duplicate_rows = await database.fetch_all(query_contragents_duplicate)
+    contragents_duplicate_result = []
+    for r in contragents_duplicate_rows:
+        sorted_dates = sorted(
+            r.contragents_created_at,
+            reverse=not sort_asc,
+        )
+
+        contragents_duplicate_result.append(
+            {
+                "phone": r.phone,
+                "contragents_count": r.contragents_count,
+                "contragents_created_at": [dt.isoformat() for dt in sorted_dates],
+            }
+        )
+    total_contragents_duplicates = sum(
+        [p["contragents_count"] for p in contragents_duplicate_result]
+    )
+
+    return {
+        "total_cards_duplicates": total_cards_duplicates,
+        "loyality_cards_duplicates": cards_duplicate_result,
+        "total_contragents_duplicates": total_contragents_duplicates,
+        "contragents_duplicates": contragents_duplicate_result,
+    }
