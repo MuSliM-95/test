@@ -115,6 +115,8 @@ class NomenclatureGet(NomenclatureCreate):
     group_name: Optional[str]
     is_main: Optional[bool]
     chatting_percent: Optional[int] = Field(None, gt=0, le=100)
+    qr_hash: Optional[str] = None
+    qr_url: Optional[str] = None
     updated_at: int
     created_at: int
 

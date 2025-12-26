@@ -1,16 +1,14 @@
+import hashlib
+import io
 import time
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import segno
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.params import Body, Query
-from sqlalchemy import (
-    and_,
-    case,
-    func,
-    or_,
-    select,
-)
+from fastapi.responses import StreamingResponse
+from sqlalchemy import and_, case, func, insert, or_, select
 from starlette import status
 
 import api.nomenclature.schemas as schemas
@@ -185,6 +183,74 @@ async def delete_barcode_to_nomenclature(
     await database.execute(query)
 
 
+@router.get("/nomenclature/{idx}/qr", response_class=StreamingResponse)
+async def get_nomenclature_qr(
+    token: str,
+    idx: int,
+    size: int = Query(300, description="Размер QR-кода в пикселях", ge=100, le=1000),
+):
+    """Генерация QR-кода для товара"""
+    user = await get_user_by_token(token)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+    nomenclature_db_dict = dict(nomenclature_db)
+    hash_query = select(nomenclature_hash.c.hash).where(
+        nomenclature_hash.c.nomenclature_id == idx
+    )
+    hash_record = await database.fetch_one(hash_query)
+    if not hash_record:
+        hash_base = f"{nomenclature_db_dict['id']}:{nomenclature_db_dict.get('name', '')}:{nomenclature_db_dict.get('article', '')}"
+        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        await database.execute(
+            insert(nomenclature_hash).values(
+                nomenclature_id=idx, hash=hash_string, created_at=datetime.now()
+            )
+        )
+    else:
+        hash_string = hash_record["hash"]
+    qr_content = f"NOM:{nomenclature_db_dict['id']}:{hash_string}"
+    qr = segno.make_qr(qr_content, error="H")
+    svg_buffer = io.BytesIO()
+    scale = max(3, size // 50)
+    qr.save(svg_buffer, kind="svg", scale=scale, border=2)
+    svg_buffer.seek(0)
+    filename = f"nomenclature_{idx}_qr.svg"
+    return StreamingResponse(
+        svg_buffer,
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/nomenclature/{idx}/qr/data")
+async def get_nomenclature_qr_data(token: str, idx: int):
+    """Получить хеш для товара"""
+    user = await get_user_by_token(token)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+    nomenclature_db_dict = dict(nomenclature_db)
+    hash_query = select(nomenclature_hash.c.hash).where(
+        nomenclature_hash.c.nomenclature_id == idx
+    )
+    hash_record = await database.fetch_one(hash_query)
+    if not hash_record:
+        hash_base = f"{nomenclature_db_dict['id']}:{nomenclature_db_dict.get('name', '')}:{nomenclature_db_dict.get('article', '')}"
+        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        await database.execute(
+            insert(nomenclature_hash).values(
+                nomenclature_id=idx, hash=hash_string, created_at=datetime.now()
+            )
+        )
+    else:
+        hash_string = hash_record["hash"]
+    return {
+        "nomenclature_id": nomenclature_db_dict["id"],
+        "name": nomenclature_db_dict.get("name"),
+        "article": nomenclature_db_dict.get("article"),
+        "hash": hash_string,
+        "qr_content": f"NOM:{nomenclature_db_dict['id']}:{hash_string}",
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
 @router.post("/nomenclatures/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature_by_ids(
     token: str,
@@ -287,6 +353,7 @@ async def get_nomenclature_by_ids(
 
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(
+    request: Request,
     token: str,
     name: Optional[str] = None,
     barcode: Optional[str] = None,
@@ -301,6 +368,7 @@ async def get_nomenclature(
         False, description="Включить атрибуты номенклатуры в ответ"
     ),
     with_photos: bool = Query(False, description="Включить фото номенклатуры в ответ"),
+    with_hash: bool = Query(False, description="Включить QR хеш в ответ"),
     only_main_from_group: bool = False,
     min_price: Optional[float] = Query(
         None, description="Минимальная цена для фильтрации"
@@ -313,6 +381,7 @@ async def get_nomenclature(
 ):
     start_time = time.time()
     """Получение списка категорий"""
+    base_url = str(request.base_url).rstrip("/")
     user = await get_user_by_token(token)
 
     if name and barcode:
@@ -334,6 +403,12 @@ async def get_nomenclature(
             cu_filter_data[f] = datetime.fromtimestamp(filters_data[f])
 
     filters = build_filters(nomenclature, cu_filter_data)
+    hash_subquery = None
+    if with_hash:
+        hash_subquery = select(
+            nomenclature_hash.c.nomenclature_id,
+            nomenclature_hash.c.hash.label("qr_hash"),
+        ).alias("hash_subquery")
     price_subquery = None
     if min_price is not None or max_price is not None:
         price_subquery = (
@@ -359,7 +434,15 @@ async def get_nomenclature(
             full=True,
         )
     )
-
+    query = query.group_by(nomenclature.c.id, units.c.convent_national_view)
+    if with_hash and hash_subquery is not None:
+        query = query.join(
+            hash_subquery,
+            hash_subquery.c.nomenclature_id == nomenclature.c.id,
+            isouter=True,
+        )
+        query = query.add_columns(hash_subquery.c.qr_hash)
+        query = query.group_by(hash_subquery.c.qr_hash)
     if price_subquery is not None:
         query = query.join(
             price_subquery,
@@ -587,7 +670,35 @@ async def get_nomenclature(
             photos_list = await database.fetch_all(photos_query)
             photos_list = [*map(datetime_to_timestamp, photos_list)]
             nomenclature_info["photos"] = photos_list
-
+        if with_hash:
+            final_hash_string = None
+            if nomenclature_info.get("qr_hash"):
+                final_hash_string = nomenclature_info["qr_hash"]
+            else:
+                hash_query = select(nomenclature_hash.c.hash).where(
+                    nomenclature_hash.c.nomenclature_id == nomenclature_info["id"]
+                )
+                hash_record = await database.fetch_one(hash_query)
+                if hash_record:
+                    final_hash_string = hash_record["hash"]
+                else:
+                    hash_base = f"{nomenclature_info['id']}:{nomenclature_info.get('name', '')}:{nomenclature_info.get('article', '')}"
+                    final_hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[
+                        :16
+                    ]
+                    await database.execute(
+                        insert(nomenclature_hash).values(
+                            nomenclature_id=nomenclature_info["id"],
+                            hash=final_hash_string,
+                            created_at=datetime.now(),
+                        )
+                    )
+            nomenclature_info["qr_hash"] = (
+                f"NOM:{nomenclature_info['id']}:{final_hash_string}"
+            )
+            nomenclature_info["qr_url"] = (
+                f"{base_url}/nomenclature/{nomenclature_info['id']}/qr?token={token}"
+            )
     return {"result": nomenclature_db, "count": nomenclature_db_count}
 
 
@@ -655,6 +766,24 @@ async def new_nomenclature(
         )
         nomenclature_db = await database.fetch_all(query)
         nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+
+    if inserted_ids:
+        hash_values_to_insert = []
+        for nom in nomenclature_db:
+            nom_id = nom["id"]
+            hash_base = f"{nom_id}:{nom.get('name', '')}:{nom.get('article', '')}"
+            hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+            hash_values_to_insert.append(
+                {
+                    "nomenclature_id": nom_id,
+                    "hash": hash_string,
+                    "created_at": datetime.now(),
+                }
+            )
+        if hash_values_to_insert:
+            await database.execute_many(
+                insert(nomenclature_hash), hash_values_to_insert
+            )
 
     await manager.send_message(
         token,
