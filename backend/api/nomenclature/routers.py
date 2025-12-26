@@ -14,9 +14,13 @@ from sqlalchemy import (
 from starlette import status
 
 import api.nomenclature.schemas as schemas
+from api.marketplace.service.public_categories.public_categories_service import (
+    MarketplacePublicCategoriesService,
+)
 from database.db import (
     categories,
     database,
+    global_categories,
     manufacturers,
     nomenclature,
     nomenclature_attributes,
@@ -44,6 +48,8 @@ from functions.helpers import (
 from ws_manager import manager
 
 router = APIRouter(tags=["nomenclature"])
+
+public_categories_service = MarketplacePublicCategoriesService()
 
 
 @router.patch("/nomenclature/barcode")
@@ -285,6 +291,8 @@ async def get_nomenclature(
     name: Optional[str] = None,
     barcode: Optional[str] = None,
     category: Optional[int] = None,
+    global_category_id: Optional[int] = None,
+    global_category_name: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     with_prices: bool = False,
@@ -396,6 +404,17 @@ async def get_nomenclature(
         )
         conditions.append(nomenclature.c.id.in_(join_barcode))
 
+    if global_category_id is not None:
+        conditions.append(nomenclature.c.global_category_id == global_category_id)
+
+    if global_category_name:
+        query = query.join(
+            global_categories,
+            global_categories.c.id == nomenclature.c.global_category_id,
+            isouter=False,
+        )
+        conditions.append(global_categories.c.name.ilike(f"%{global_category_name}%"))
+
     if min_price is not None:
         conditions.append(price_subquery.c.min_price >= min_price)
     if max_price is not None:
@@ -461,6 +480,13 @@ async def get_nomenclature(
                     select(nomenclature_groups_value.c.nomenclature_id)
                 ),
             )
+        )
+
+    if global_category_name:
+        count_query = count_query.join(
+            global_categories,
+            global_categories.c.id == nomenclature.c.global_category_id,
+            isouter=False,
         )
 
     count_query = count_query.where(and_(*conditions))
@@ -614,6 +640,11 @@ async def new_nomenclature(
                         exceptions.append(str(nomenclature_values) + " " + e.detail)
                         continue
 
+            if nomenclature_values.get("global_category_id") is not None:
+                await public_categories_service.ensure_global_category_exists(
+                    nomenclature_values["global_category_id"]
+                )
+
             query = nomenclature.insert().values(nomenclature_values)
             nomenclature_id = await database.execute(query)
             inserted_ids.add(nomenclature_id)
@@ -665,6 +696,11 @@ async def edit_nomenclature(
         if nomenclature_values.get("unit") is not None:
             await check_unit_exists(nomenclature_values["unit"])
 
+        if nomenclature_values.get("global_category_id") is not None:
+            await public_categories_service.ensure_global_category_exists(
+                nomenclature_values["global_category_id"]
+            )
+
         query = (
             nomenclature.update()
             .where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
@@ -712,6 +748,11 @@ async def edit_nomenclature_mass(
                 )
             if nomenclature_values.get("unit") is not None:
                 await check_unit_exists(nomenclature_values["unit"])
+
+            if nomenclature_values.get("global_category_id") is not None:
+                await public_categories_service.ensure_global_category_exists(
+                    nomenclature_values["global_category_id"]
+                )
 
             query = (
                 nomenclature.update()

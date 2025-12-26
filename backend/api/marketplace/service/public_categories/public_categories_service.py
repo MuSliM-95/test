@@ -223,3 +223,12 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             "filename": unique_filename,
             "message": (f"Изображение успешно загружено для категории {category_id}"),
         }
+
+    async def ensure_global_category_exists(self, category_id: int) -> None:
+        query = select(global_categories.c.id).where(
+            global_categories.c.id == category_id,
+            global_categories.c.is_active.is_(True),
+        )
+        category = await database.fetch_one(query)
+        if not category:
+            raise HTTPException(status_code=404, detail="Категория не найдена")

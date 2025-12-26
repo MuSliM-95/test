@@ -32,6 +32,7 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
+    global_category_id: Optional[int] = None
     chatting_percent: Optional[int] = Field(default=None, le=100, gt=0)
     cashback_type: Optional[NomenclatureCashbackType] = (
         NomenclatureCashbackType.lcard_cashback
