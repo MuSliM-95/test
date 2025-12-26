@@ -197,8 +197,8 @@ async def analytics(
 @router.get("/analytics/contragents-duplicates/")
 async def contragents_duplicates_analytics(
     token: str,
-    date_from: int,
-    date_to: int,
+    date_from: Optional[int] = None,
+    date_to: Optional[int] = None,
     offset: int = 0,
     limit: int = 100,
     sort_asc: bool = True,
@@ -209,8 +209,17 @@ async def contragents_duplicates_analytics(
     if not user or not user.status:
         raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
 
-    start_date = datetime.fromtimestamp(date_from)
-    end_date = datetime.fromtimestamp(date_to)
+    start_date = datetime.fromtimestamp(date_from) if date_from else None
+    end_date = datetime.fromtimestamp(date_to) if date_to else None
+
+    filters_cards = [
+        loyality_cards.c.is_deleted.is_(False),
+        contragents.c.is_deleted.is_(False),
+    ]
+    if start_date:
+        filters_cards.append(loyality_cards.c.created_at >= start_date)
+    if end_date:
+        filters_cards.append(loyality_cards.c.created_at <= end_date)
 
     """
     Ищет дубли по номеру телефона контрагента среди карт лояльности
@@ -227,12 +236,7 @@ async def contragents_duplicates_analytics(
                 loyality_cards.c.contragent_id == contragents.c.id,
             )
         )
-        .where(
-            loyality_cards.c.is_deleted.is_(False),
-            contragents.c.is_deleted.is_(False),
-            loyality_cards.c.created_at >= start_date,
-            loyality_cards.c.created_at <= end_date,
-        )
+        .where(*filters_cards)
         .group_by(contragents.c.phone)
         .having(func.count(loyality_cards.c.id) > 1)
         .limit(limit)
@@ -259,6 +263,12 @@ async def contragents_duplicates_analytics(
     """
     Ищет дубли по номеру телефона среди контрагентов
     """
+    filters_contragents = [contragents.c.is_deleted.is_(False)]
+    if date_from:
+        filters_contragents.append(contragents.c.created_at >= date_from)
+    if date_to:
+        filters_contragents.append(contragents.c.created_at <= date_to)
+
     query_contragents_duplicate = (
         select(
             contragents.c.phone.label("phone"),
@@ -268,11 +278,7 @@ async def contragents_duplicates_analytics(
             ),
         )
         .select_from(contragents)
-        .where(
-            contragents.c.is_deleted.is_(False),
-            contragents.c.created_at >= date_from,
-            contragents.c.created_at <= date_to,
-        )
+        .where(*filters_contragents)
         .group_by(contragents.c.phone)
         .having(func.count(func.distinct(contragents.c.id)) > 1)
         .limit(limit)
