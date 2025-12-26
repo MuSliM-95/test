@@ -50,6 +50,7 @@ DEPLOYMENT*.md
 DOCUMENTATION_INDEX.md
 INDEX.md
 FINAL_SUMMARY.md
+*.txt
 
 # Backend scripts and tests
 backend/scripts/

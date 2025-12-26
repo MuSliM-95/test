@@ -5,6 +5,7 @@ from databases.backends.postgres import Record
 from sqlalchemy import and_, select, text
 
 from api.loyality_transactions.routers import raschet_bonuses
+from common.decorators import ensure_db_connection
 from database.db import database, loyality_cards, loyality_transactions
 
 
@@ -141,8 +142,8 @@ class AutoBurn:
         )
 
 
+@ensure_db_connection
 async def autoburn():
-    await database.connect()
     print("Запуск AutoBurn")
     card_list = await AutoBurn.get_cards()
     for card in card_list:

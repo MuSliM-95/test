@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 
+from common.decorators import ensure_db_connection
 from const import DEMO, PAID
 from database.db import accounts_balances, database, tariffs
 from functions.account import make_account
 
 
+@ensure_db_connection
 async def check_account():
-    await database.connect()
-
     balances = await database.fetch_all(accounts_balances.select())
     for balance in balances:
         if balance.tariff_type == DEMO:
