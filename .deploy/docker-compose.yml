@@ -90,7 +90,8 @@ services:
     networks:
       - nginx-proxy
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   node-exporter:
     image: prom/node-exporter:latest
