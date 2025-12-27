@@ -131,6 +131,14 @@ class MarketplaceProductsRequest(BaseModel):
     seller_id: Optional[int] = None
     seller_phone: Optional[str] = None
 
+    name: Optional[str] = None
+    description_long: Optional[str] = None
+    id: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    seo_keywords: Optional[str] = None
+    nomenclature_attributes: Optional[str] = None
+
 
 product_buttons_text: dict[str, dict[str, str]] = {
     "product": {

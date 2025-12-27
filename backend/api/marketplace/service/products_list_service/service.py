@@ -447,7 +447,28 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .subquery()
         )
 
-        # --- КОНЕЦ: Подзапрос для выбора актуальной цены ---
+        # --- НАЧАЛО: Подзапрос для поиска по атрибутам ---
+        # Создаём подзапрос только если есть значение для поиска по атрибутам
+        attrs_subquery = None
+        if request.nomenclature_attributes:
+            attrs_subquery = (
+                select(nomenclature_attributes_value.c.nomenclature_id)
+                .select_from(
+                    nomenclature_attributes_value.join(
+                        nomenclature_attributes,
+                        nomenclature_attributes.c.id
+                        == nomenclature_attributes_value.c.attribute_id,
+                    )
+                )
+                .where(
+                    func.lower(nomenclature_attributes_value.c.value).ilike(
+                        f"%{request.nomenclature_attributes.lower()}%"
+                    )
+                )
+                .distinct()
+                .subquery()
+            )
+        # --- КОНЕЦ: Подзапрос для поиска по атрибутам ---
 
         # --- Балансы по складам ---
 
@@ -636,6 +657,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             )
         )
 
+        if request.nomenclature_attributes:
+            query = query.join(
+                attrs_subquery,
+                attrs_subquery.c.nomenclature_id == nomenclature.c.id,
+                isouter=True,
+            )
+
         # --- Условия фильтрации ---
         conditions = [
             nomenclature.c.is_deleted.is_not(True),
@@ -673,6 +701,51 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     f"%{request.seller_phone.lower()}%"
                 )
             )
+
+        if request.id:
+            if request.id.isdigit():
+                conditions.append(nomenclature.c.id == int(request.id))
+
+        if request.name:
+            conditions.append(
+                func.lower(nomenclature.c.name).ilike(f"%{request.name.lower()}%")
+            )
+
+        if request.description_long:
+            conditions.append(
+                func.lower(nomenclature.c.description_long).ilike(
+                    f"%{request.description_long.lower()}%"
+                )
+            )
+
+        if request.seo_title:
+            conditions.append(
+                func.lower(nomenclature.c.seo_title).ilike(
+                    f"%{request.seo_title.lower()}%"
+                )
+            )
+
+        if request.seo_description:
+            conditions.append(
+                func.lower(nomenclature.c.seo_description).ilike(
+                    f"%{request.seo_description.lower()}%"
+                )
+            )
+
+        if request.seo_keywords:
+            # func.unnest(Book.categories).column_valued()
+            column_valued = func.unnest(nomenclature.c.seo_keywords).column_valued(
+                "unnested_keywords"
+            )
+            # conditions.append(column_valued.ilike(f"%{request.seo_keywords.lower()}%"))
+            conditions.append(
+                select(column_valued)
+                .where(column_valued.ilike(f"%{request.seo_keywords.lower()}%"))
+                .exists()
+            )
+
+        if request.nomenclature_attributes:
+            conditions.append(nomenclature.c.id == attrs_subquery.c.nomenclature_id)
 
         query = query.where(and_(*conditions))
 
