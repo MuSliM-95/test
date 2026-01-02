@@ -17,7 +17,6 @@ router = APIRouter(prefix="/api/v1/avito", tags=["avito-webhook"])
 async def receive_avito_webhook_default(request: Request):
     try:
         body = await request.body()
-
         signature_header = request.headers.get("X-Avito-Signature")
 
         is_valid, webhook_data, cashbox_id = await process_avito_webhook(
@@ -40,10 +39,7 @@ async def receive_avito_webhook_default(request: Request):
 
             webhook = AvitoWebhook(**webhook_data)
         except Exception as e:
-            logger.error(
-                f"Failed to parse webhook data into AvitoWebhook model: {e}",
-                exc_info=True,
-            )
+            logger.error(f"Failed to parse webhook data into AvitoWebhook model: {e}")
             return {"success": False, "message": f"Invalid webhook structure: {str(e)}"}
 
         user_id = None
@@ -75,9 +71,6 @@ async def receive_avito_webhook_default(request: Request):
                 results = []
                 for channel_row in channels_result:
                     channel_id = channel_row["channel_id"]
-                    logger.info(
-                        f"Processing webhook for channel {channel_id} (user_id: {user_id})"
-                    )
                     result = await AvitoHandler.handle_webhook_event(
                         webhook, cashbox_id, channel_id
                     )
@@ -108,5 +101,5 @@ async def receive_avito_webhook_default(request: Request):
         }
 
     except Exception as e:
-        logger.error(f"Error processing Avito webhook: {e}", exc_info=True)
+        logger.error(f"Error processing Avito webhook: {e}")
         return {"success": False, "message": f"Error: {str(e)}"}

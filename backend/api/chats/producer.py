@@ -59,15 +59,8 @@ class ChatMessageProducer:
 
             await rabbit_messaging.publish(message=message, routing_key="chat.messages")
 
-            print(
-                f"[PRODUCER] Message sent to RabbitMQ for chat {chat_id}: {message_data.get('message_id')}"
-            )
-
         except Exception as e:
-            print(f"[PRODUCER] Failed to send message to RabbitMQ: {e}")
-            import traceback
-
-            traceback.print_exc()
+            pass
 
     async def send_typing_event(
         self, chat_id: int, user_id: int, user_type: str, is_typing: bool
@@ -89,15 +82,8 @@ class ChatMessageProducer:
                 message=event, routing_key="chat.events.typing"
             )
 
-            print(
-                f"[PRODUCER] Typing event sent to RabbitMQ for chat {chat_id}, user {user_id}, typing: {is_typing}"
-            )
-
         except Exception as e:
-            print(f"[PRODUCER] Failed to send typing event to RabbitMQ: {e}")
-            import traceback
-
-            traceback.print_exc()
+            pass
 
     async def send_user_connected_event(
         self, chat_id: int, user_id: int, user_type: str
@@ -118,15 +104,8 @@ class ChatMessageProducer:
                 message=event, routing_key="chat.events.user_connected"
             )
 
-            print(
-                f"[PRODUCER] User connected event sent to RabbitMQ for chat {chat_id}, user {user_id}"
-            )
-
         except Exception as e:
-            print(f"[PRODUCER] Failed to send user connected event to RabbitMQ: {e}")
-            import traceback
-
-            traceback.print_exc()
+            pass
 
     async def send_user_disconnected_event(
         self, chat_id: int, user_id: int, user_type: str
@@ -147,15 +126,8 @@ class ChatMessageProducer:
                 message=event, routing_key="chat.events.user_disconnected"
             )
 
-            print(
-                f"[PRODUCER] User disconnected event sent to RabbitMQ for chat {chat_id}, user {user_id}"
-            )
-
         except Exception as e:
-            print(f"[PRODUCER] Failed to send user disconnected event to RabbitMQ: {e}")
-            import traceback
-
-            traceback.print_exc()
+            pass
 
 
 chat_producer = ChatMessageProducer()

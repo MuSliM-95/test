@@ -3394,6 +3394,7 @@ channel_credentials = sqlalchemy.Table(
     sqlalchemy.Column("refresh_token", String(1000), nullable=True),
     sqlalchemy.Column("token_expires_at", DateTime, nullable=True),
     sqlalchemy.Column("avito_user_id", Integer, nullable=True),
+    sqlalchemy.Column("redirect_uri", String(500), nullable=True),
     sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
     sqlalchemy.Column(
         "auto_sync_chats_enabled", Boolean, nullable=False, server_default="false"

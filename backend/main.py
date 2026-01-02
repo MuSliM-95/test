@@ -271,7 +271,7 @@ app = FastAPI(
     root_path="/api/v1",
     title="TABLECRM API",
     description="Документация API TABLECRM",
-    version="1.0",
+    # version="1.0",
     # docs_url="/docs",
     # redoc_url="/redoc",
     # openapi_url="/openapi.json"
@@ -436,7 +436,22 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
         from api.chats.avito.avito_webhook import verify_webhook_signature
 
         body = await request.body()
+        
+        # Логируем сырой body от Avito API
+        try:
+            body_str = body.decode('utf-8')
+            print("=" * 80)
+            print(f"AVITO WEBHOOK RECEIVED (LEGACY) - cashbox_id={cashbox_id}")
+            print("Raw body:")
+            print(json.dumps(json.loads(body_str), indent=2, ensure_ascii=False))
+            print("=" * 80)
+        except Exception as e:
+            print(f"Failed to log webhook body as JSON: {e}")
+            print(f"Raw body (bytes): {body!r}")
+        
         signature_header = request.headers.get("X-Avito-Signature")
+        print(f"X-Avito-Signature header: {signature_header}")
+        print(f"Request headers: {dict(request.headers)}")
 
         if signature_header:
             if not verify_webhook_signature(body, signature_header):
@@ -449,7 +464,7 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
             logger.error(f"Failed to parse webhook JSON: {e}")
             return {"success": False, "message": f"Invalid webhook JSON: {str(e)}"}
 
-        logger.debug(f"Webhook data: {json.dumps(webhook_data, default=str)}")
+        print(f"Parsed webhook data: {json.dumps(webhook_data, indent=2, ensure_ascii=False, default=str)}")
 
         if not webhook_data:
             logger.error("Empty webhook data")

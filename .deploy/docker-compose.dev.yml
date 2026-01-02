@@ -99,8 +99,6 @@ services:
     image: prom/prometheus:latest
     network_mode: host
     restart: unless-stopped
-    ports:
-      - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -116,8 +114,6 @@ services:
     image: grafana/grafana:latest
     network_mode: host
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
