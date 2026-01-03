@@ -52,7 +52,7 @@ class AvitoClient:
 
         now = datetime.utcnow()
         expires_soon = now >= self.token_expires_at - timedelta(minutes=5)
-        
+
         if expires_soon:
             if self.refresh_token:
                 await self.refresh_access_token()
@@ -148,12 +148,12 @@ class AvitoClient:
                     access_token = result.get("access_token")
                     refresh_token = result.get("refresh_token")
                     expires_in = result.get("expires_in", 3600)
-                    
+
                     if not access_token:
                         error_text = "No access_token in Avito API response"
                         logger.error(error_text)
                         raise AvitoTokenExpiredError(error_text)
-                    
+
                     expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
                     self.access_token = access_token
@@ -362,13 +362,13 @@ class AvitoClient:
         response = await self._make_request(
             "GET", f"/v2/accounts/{user_id}/chats", params=params
         )
-        
+
         if response is None:
             return []
-        
+
         if not isinstance(response, dict):
             return []
-        
+
         chats = response.get("chats", [])
         return chats
 
@@ -716,9 +716,9 @@ class AvitoClient:
                 filtered = [
                     m for m in messages if m.get("created", 0) >= since_timestamp
                 ]
-                
+
                 all_messages.extend(filtered)
-                
+
                 if len(filtered) == 0:
                     consecutive_old_batches += 1
                     if consecutive_old_batches >= max_consecutive_old and len(messages) < limit:
@@ -733,7 +733,7 @@ class AvitoClient:
 
             if len(messages) < limit:
                 break
-        
+
         return all_messages
 
     async def register_webhook(self, webhook_url: str) -> Dict[str, Any]:

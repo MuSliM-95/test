@@ -403,11 +403,12 @@ async def create_chat(
             channel_name=channel_name,
             ad_title=ad_title,
         )
-        
+
         try:
-            from api.chats.websocket import cashbox_manager
             from datetime import datetime
-            
+
+            from api.chats.websocket import cashbox_manager
+
             cashbox_message = {
                 "type": "chat_message",
                 "event": "new_chat",
@@ -1217,7 +1218,7 @@ async def create_message_and_update_chat(
         current_time = message.created_at if message.created_at else datetime.now()
 
     chat_updates = {}
-    
+
     existing_last_message_time = chat.get("last_message_time")
 
     if sender_type == "CLIENT":
@@ -1343,11 +1344,11 @@ async def chain_client(
     Привязать chat_contact к contragent.
     Обновляет chat_contact.contragent_id.
     """
-    
+
     chat = await get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    
+
 
     if message_id:
         message = await get_message(message_id)
@@ -1368,24 +1369,24 @@ async def chain_client(
         )
         if not phone:
             raise HTTPException(status_code=400, detail="Phone number required")
-    
+
 
     if not name:
         name = chat_contact.get("name") or (
             chat.get("contact", {}).get("name") if chat.get("contact") else None
         )
-    
+
 
     cashbox_id = chat["cashbox_id"]
     channel_id = chat["channel_id"]
-    
+
 
     channel = await get_channel(channel_id)
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
 
     channel_type = channel.get("type", "UNKNOWN")
-    
+
     query = contragents.select().where(
         and_(
             contragents.c.phone == phone,
@@ -1426,7 +1427,7 @@ async def chain_client(
     else:
         is_new_contragent = True
         contragent_name = name or "Unknown"
-        
+
 
         contragent_data = {"chat_ids": [chat_id], "primary_channel": channel_type}
 

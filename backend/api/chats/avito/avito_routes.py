@@ -1,16 +1,16 @@
 import asyncio
-import json
 import logging
 import re
 import secrets
-import urllib.parse
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 logger = logging.getLogger(__name__)
 
 from typing import Optional
+
+from fastapi import Query
 
 from api.chats import crud
 from api.chats.auth import get_current_user_for_avito as get_current_user
@@ -29,7 +29,6 @@ from api.chats.avito.schemas import (
     AvitoOAuthCallbackResponse,
 )
 from database.db import channel_credentials, channels, chats, database
-from fastapi import Query, Request
 
 router = APIRouter(prefix="/chats/avito", tags=["chats-avito"])
 
@@ -82,14 +81,14 @@ async def connect_avito_channel(
             existing_channel_by_api_key = await crud.get_channel_by_api_key(
                 encrypted_api_key, "AVITO"
             )
-            
+
             if existing_channel_by_api_key:
                 avito_channel = existing_channel_by_api_key
             else:
                 existing_channel_by_cashbox = await crud.get_channel_by_cashbox(
                     cashbox_id, "AVITO"
                 )
-                
+
                 if existing_channel_by_cashbox:
                     avito_channel = existing_channel_by_cashbox
                 else:
@@ -110,7 +109,7 @@ async def connect_avito_channel(
         channel_id = avito_channel["id"]
 
         redirect_uri = credentials.redirect_uri or "https://dev.tablecrm.com/api/v1/avito/oauth/callback"
-        
+
         existing = await database.fetch_one(
             channel_credentials.select().where(
                 (channel_credentials.c.channel_id == channel_id)
@@ -143,16 +142,16 @@ async def connect_avito_channel(
             await database.execute(channel_credentials.insert().values(**insert_values))
 
         oauth_client_id = credentials.api_key
-        
+
         state = secrets.token_urlsafe(32)
         state_data = f"{cashbox_id}_{state}"
-        
+
         scope = "messenger:read,messenger:write,items:info,job:cv,job:applications,job:vacancy,messenger:read,messenger:write,short_term_rent:read,stats:read,user:read,user_operations:read"
         auth_url = f"https://avito.ru/oauth?response_type=code&client_id={oauth_client_id}&scope={scope}&state={state_data}"
 
         response = {
             "success": True,
-            "message": f"Credentials saved. Please authorize via OAuth to complete connection.",
+            "message": "Credentials saved. Please authorize via OAuth to complete connection.",
             "channel_id": channel_id,
             "cashbox_id": cashbox_id,
             "authorization_url": auth_url,
@@ -176,7 +175,7 @@ async def process_single_chat(
     use_date_filter: bool,
     semaphore: asyncio.Semaphore,
 ) -> dict:
-    async with semaphore:  
+    async with semaphore:
         result = {
             "chats_processed": 0,
             "chats_created": 0,
@@ -186,7 +185,7 @@ async def process_single_chat(
             "messages_updated": 0,
             "errors": [],
         }
-        
+
         try:
             external_chat_id = avito_chat.get("id")
             if not external_chat_id:
@@ -449,13 +448,13 @@ async def process_single_chat(
 
                 result["chats_updated"] = 1
                 chat_id = existing_chat["id"]
-                
+
                 messages_since = from_date if use_date_filter else None
                 try:
                     avito_messages = await client.sync_messages(
                         chat_id=external_chat_id, since_timestamp=messages_since
                     )
-                    
+
                     result["messages_loaded"] = len(avito_messages)
                 except Exception as sync_error:
                     error_str = str(sync_error)
@@ -469,7 +468,7 @@ async def process_single_chat(
                         if last_message and isinstance(last_message, dict):
                             try:
                                 from database.db import chat_messages
-                                
+
                                 external_message_id = last_message.get("id")
                                 if external_message_id:
                                     existing_message = await database.fetch_one(
@@ -481,12 +480,12 @@ async def process_single_chat(
                                             & (chat_messages.c.chat_id == chat_id)
                                         )
                                     )
-                                    
+
                                     if not existing_message:
                                         content = last_message.get("content", {})
                                         message_type_str = last_message.get("type", "text")
                                         message_text = ""
-                                        
+
                                         if isinstance(content, dict):
                                             if message_type_str == "text":
                                                 message_text = content.get("text", "")
@@ -496,21 +495,21 @@ async def process_single_chat(
                                                 message_text = "[Изображение]"
                                             else:
                                                 message_text = f"[{message_type_str}]"
-                                        
+
                                         direction = last_message.get("direction", "in")
                                         sender_type = "CLIENT" if direction == "in" else "OPERATOR"
-                                        
+
                                         created_timestamp = last_message.get("created")
                                         created_at = None
                                         if created_timestamp:
                                             created_at = datetime.fromtimestamp(created_timestamp)
-                                        
+
                                         is_read = (
                                             last_message.get("is_read", False)
                                             or last_message.get("read") is not None
                                         )
                                         status = "READ" if is_read else "DELIVERED"
-                                        
+
                                         db_message = await crud.create_message_and_update_chat(
                                             chat_id=chat_id,
                                             sender_type=sender_type,
@@ -562,25 +561,25 @@ async def process_single_chat(
                         message_type_str = avito_msg.get("type", "text")
                         direction = avito_msg.get("direction", "in")
                         created_timestamp = avito_msg.get("created")
-                        
-                        
+
+
                         if message_type_str == "deleted":
                             continue
-                        
+
                         message_text_preview = ""
                         if isinstance(content, dict):
                             message_text_preview = content.get("text", "")
                         elif isinstance(content, str):
                             message_text_preview = content
-                        
+
                         if message_text_preview:
                             message_text_lower = message_text_preview.lower().strip()
                             if message_text_lower == "[deleted]" or message_text_lower == "сообщение удалено" or "[deleted]" in message_text_lower:
                                 continue
-                        
+
                         if existing_message:
                             result["messages_updated"] += 1
-                            
+
                             if message_type_str == "image":
                                 from database.db import pictures
                                 existing_picture = await database.fetch_one(
@@ -615,9 +614,9 @@ async def process_single_chat(
                                                         cashbox=cashbox_id,
                                                     )
                                                 )
-                            
+
                             continue
-                        
+
                         message_text = ""
 
                         if isinstance(content, dict):
@@ -677,14 +676,14 @@ async def process_single_chat(
                         )
                         db_message_id = db_message.get("id") if isinstance(db_message, dict) else db_message.id
                         result["messages_created"] += 1
-                        
+
                         if message_type_str in ["image", "voice"]:
                             if isinstance(content, dict):
                                 try:
                                     from database.db import pictures
-                                    
+
                                     file_url = None
-                                    
+
                                     if message_type_str == "image":
                                         if "image" in content:
                                             image_data = content["image"]
@@ -699,7 +698,7 @@ async def process_single_chat(
                                                     or sizes.get("640x480")
                                                     or (list(sizes.values())[0] if sizes else None)
                                                 )
-                                    
+
                                     elif message_type_str == "voice":
                                         if "voice" in content:
                                             voice_data = content["voice"]
@@ -714,7 +713,7 @@ async def process_single_chat(
                                                             logger.warning(
                                                                 f"Failed to get voice URL for voice_id {voice_id}: {e}"
                                                             )
-                                    
+
                                     if file_url:
                                         message_id = db_message_id
                                         await database.execute(
@@ -740,10 +739,11 @@ async def process_single_chat(
                         result["errors"].append(
                             f"Failed to save message {avito_msg.get('id')}: {str(e)}"
                         )
-                
+
                 if result["messages_loaded"] > 0:
-                    from database.db import chat_messages
                     from sqlalchemy import desc
+
+                    from database.db import chat_messages
                     last_db_message = await database.fetch_one(
                         chat_messages.select()
                         .where(chat_messages.c.chat_id == chat_id)
@@ -774,7 +774,7 @@ async def process_single_chat(
                 result["errors"].append(
                     f"Failed to process chat {avito_chat.get('id')}: {str(e)}"
                 )
-        
+
         return result
 
 
@@ -839,14 +839,14 @@ async def load_avito_history(
         all_chats = []
         offset = 0
         limit = 100
-        max_offset = 1000  
+        max_offset = 1000
 
         current_timestamp = int(datetime.now().timestamp())
-        
+
         use_date_filter = True
         if from_date > current_timestamp:
-            use_date_filter = False 
-            
+            use_date_filter = False
+
         while offset < max_offset:
             try:
                 avito_chats = await client.get_chats(
@@ -864,10 +864,10 @@ async def load_avito_history(
                         chat_created = chat.get("created", 0)
                         last_message = chat.get("last_message", {})
                         last_message_created = last_message.get("created", 0) if isinstance(last_message, dict) else 0
-                        
+
                         if chat_created >= from_date or last_message_created >= from_date:
                             filtered_chats.append(chat)
-                    
+
                     all_chats.extend(filtered_chats)
                 else:
                     all_chats.extend(avito_chats)
@@ -884,7 +884,7 @@ async def load_avito_history(
                     break
 
                 offset += limit
-                
+
                 if avito_chats:
                     last_chat = avito_chats[-1]
                     last_chat_id = last_chat.get("id", "unknown")
@@ -893,7 +893,7 @@ async def load_avito_history(
                     last_msg_created = last_message.get("created", 0) if isinstance(last_message, dict) else 0
                     last_chat_created_str = datetime.fromtimestamp(last_chat_created).isoformat() if last_chat_created else "N/A"
                     last_msg_created_str = datetime.fromtimestamp(last_msg_created).isoformat() if last_msg_created else "N/A"
-                
+
                 if avito_chats:
                     last_chat = avito_chats[-1]
                     last_chat_id = last_chat.get("id", "unknown")
@@ -905,32 +905,32 @@ async def load_avito_history(
 
             except Exception as e:
                 error_str = str(e)
-                
+
                 if "400" in error_str:
                     errors.append(f"Error at offset {offset}: {str(e)}")
-                    break 
-                
+                    break
+
                 if offset >= max_offset:
                     break
-                
+
                 if (
                     "402" in error_str
                     or "подписку" in error_str.lower()
                     or "subscription" in error_str.lower()
                 ):
                     errors.append(f"Subscription error at offset {offset}: {str(e)}")
-                    offset += limit  
-                    continue  
-                
+                    offset += limit
+                    continue
+
                 logger.error(f"Error loading chats at offset {offset}: {e}")
                 errors.append(f"Error loading chats at offset {offset}: {str(e)}")
-                offset += limit 
-                continue 
+                offset += limit
+                continue
 
-        
-        max_concurrent = 10 
+
+        max_concurrent = 10
         semaphore = asyncio.Semaphore(max_concurrent)
-        
+
         tasks = [
             process_single_chat(
                 avito_chat=avito_chat,
@@ -943,23 +943,23 @@ async def load_avito_history(
             )
             for avito_chat in all_chats
         ]
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for idx, result in enumerate(results, 1):
             if isinstance(result, Exception):
                 error_str = str(result)
                 logger.error(f"Error processing chat at index {idx}: {result}")
                 errors.append(f"Error processing chat at index {idx}: {error_str}")
                 continue
-            
+
             chats_processed += result.get("chats_processed", 0)
             chats_created += result.get("chats_created", 0)
             chats_updated += result.get("chats_updated", 0)
             messages_loaded += result.get("messages_loaded", 0)
             messages_created += result.get("messages_created", 0)
             messages_updated += result.get("messages_updated", 0)
-            
+
             if result.get("errors"):
                 errors.extend(result["errors"])
 
@@ -996,8 +996,9 @@ async def mark_avito_chat_as_read(
             internal_chat_id = int(chat_id)
             chat = await crud.get_chat(internal_chat_id)
         except ValueError:
-            from database.db import channels
             from sqlalchemy import and_, select
+
+            from database.db import channels
 
             query = (
                 select(
@@ -1061,9 +1062,10 @@ async def mark_avito_chat_as_read(
 
         if success:
             try:
-                from database.db import chat_messages
                 from sqlalchemy import and_, update
-                
+
+                from database.db import chat_messages
+
                 update_query = (
                     update(chat_messages)
                     .where(
@@ -1078,11 +1080,12 @@ async def mark_avito_chat_as_read(
                 await database.execute(update_query)
             except Exception as e:
                 logger.warning(f"Failed to update message statuses: {e}")
-            
+
             try:
-                from api.chats.websocket import cashbox_manager
                 from datetime import datetime
-                
+
+                from api.chats.websocket import cashbox_manager
+
                 ws_message = {
                     "type": "chat_message",
                     "event": "message_read",
@@ -1092,7 +1095,7 @@ async def mark_avito_chat_as_read(
                 await cashbox_manager.broadcast_to_cashbox(cashbox_id, ws_message)
             except Exception as e:
                 logger.warning(f"Failed to send WebSocket event for chat read: {e}")
-            
+
             return {"success": True, "message": f"Chat {chat['external_chat_id']} marked as read"}
         else:
             raise HTTPException(

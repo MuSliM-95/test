@@ -2,6 +2,9 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from sqlalchemy import select
+
 from api.chats import crud
 from api.chats.auth import get_current_user, get_current_user_owner
 from api.chats.schemas import (
@@ -19,8 +22,6 @@ from api.chats.schemas import (
 )
 from api.chats.websocket import chat_manager
 from database.db import database, pictures
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -540,7 +541,7 @@ async def get_chat_messages(
         raise HTTPException(status_code=403, detail="Access denied")
 
     channel = await crud.get_channel(chat["channel_id"])
-    
+
     async def mark_chat_as_read_background():
         if channel and channel.get("type") == "AVITO" and chat.get("external_chat_id"):
             try:
@@ -548,7 +549,7 @@ async def get_chat_messages(
                     create_avito_client,
                     save_token_callback,
                 )
-                
+
                 client = await create_avito_client(
                     channel_id=chat["channel_id"],
                     cashbox_id=user.cashbox_id,
@@ -556,13 +557,14 @@ async def get_chat_messages(
                         chat["channel_id"], user.cashbox_id, token_data
                     ),
                 )
-                
+
                 if client:
                     try:
                         await client.mark_chat_as_read(chat["external_chat_id"])
-                        from database.db import chat_messages
                         from sqlalchemy import and_, update
-                        
+
+                        from database.db import chat_messages
+
                         update_query = (
                             update(chat_messages)
                             .where(
@@ -579,7 +581,7 @@ async def get_chat_messages(
                         logger.warning(f"Failed to mark chat {chat['external_chat_id']} as read: {e}")
             except Exception as e:
                 logger.warning(f"Failed to mark Avito chat {chat_id} as read: {e}")
-    
+
     if channel and channel.get("type") == "AVITO" and chat.get("external_chat_id"):
         background_tasks.add_task(mark_chat_as_read_background)
 
@@ -596,7 +598,7 @@ async def get_chat_messages(
 
         if channel and channel["type"] == "AVITO" and chat.get("external_chat_id"):
             needs_avatars = not client_avatar
-            
+
             if needs_avatars:
                 try:
                     from api.chats.avito.avito_factory import (
@@ -670,7 +672,9 @@ async def get_chat_messages(
                                             elif not client_avatar:
                                                 client_avatar = avatar_url
                                                 if chat.get("chat_contact_id"):
-                                                    from database.db import chat_contacts
+                                                    from database.db import (
+                                                        chat_contacts,
+                                                    )
 
                                                     await database.execute(
                                                         chat_contacts.update()
@@ -687,8 +691,9 @@ async def get_chat_messages(
         message_images = {}
         if message_ids:
             try:
-                from database.db import pictures
                 from sqlalchemy import select
+
+                from database.db import pictures
 
                 query = (
                     select(pictures)
@@ -738,7 +743,7 @@ async def get_chat_messages(
         limit=limit,
         date=chat.get("last_message_time"),
     )
-    
+
     return result
 
 

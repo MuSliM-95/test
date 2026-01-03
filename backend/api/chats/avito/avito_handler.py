@@ -1,10 +1,9 @@
-import json
 import logging
 import re
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 from database.db import database
+
 from .. import crud
 from ..producer import chat_producer
 from .avito_types import AvitoWebhook
@@ -50,7 +49,7 @@ class AvitoHandler:
     ) -> Dict[str, Any]:
         try:
             payload = webhook.payload.value
-            
+
             chat_id_external = payload.chat_id or ""
             author_id = payload.author_id
             user_id = payload.user_id
@@ -60,7 +59,7 @@ class AvitoHandler:
             message_content, message_text = AvitoHandler._extract_message_content(
                 payload.content or {}, message_type
             )
-            
+
 
             existing_chat = None
             avito_channel = None
@@ -347,10 +346,10 @@ class AvitoHandler:
                             "перейдите на подписку"
                         ]
                         is_subscription_message = (
-                            message_type == "system" or 
+                            message_type == "system" or
                             any(keyword in message_text_lower for keyword in subscription_keywords)
                         )
-                        
+
                         if is_subscription_message:
                             return {"success": True, "message": "Subscription message ignored, chat not created"}
 
@@ -399,13 +398,13 @@ class AvitoHandler:
                         "перейдите на подписку"
                     ]
                     is_subscription_message = (
-                        message_type == "system" or 
+                        message_type == "system" or
                         any(keyword in message_text_lower for keyword in subscription_keywords)
                     )
-                    
+
                     if is_subscription_message:
                         return {"success": True, "message": "Subscription message ignored, chat not created"}
-                    
+
                     chat = await AvitoHandler._find_or_create_chat(
                         channel_type="AVITO",
                         external_chat_id=chat_id_external,
@@ -426,13 +425,13 @@ class AvitoHandler:
                     "перейдите на подписку"
                 ]
                 is_subscription_message = (
-                    message_type == "system" or 
+                    message_type == "system" or
                     any(keyword in message_text_lower for keyword in subscription_keywords)
                 )
-                
+
                 if is_subscription_message:
                     return {"success": True, "message": "Subscription message ignored, chat not created"}
-                
+
                 chat = await AvitoHandler._find_or_create_chat(
                     channel_type="AVITO",
                     external_chat_id=chat_id_external,
@@ -749,10 +748,10 @@ class AvitoHandler:
                 )
             except Exception as e:
                 logger.error(f"Failed to send message to RabbitMQ: {e}")
-            
+
             try:
-                from api.chats.websocket import chat_manager, cashbox_manager
-                
+                from api.chats.websocket import cashbox_manager, chat_manager
+
                 ws_message = {
                     "type": "chat_message",
                     "event": "new_message",
@@ -763,7 +762,7 @@ class AvitoHandler:
                     "message_type": AvitoHandler._map_message_type(message_type),
                     "timestamp": datetime.utcnow().isoformat(),
                 }
-                
+
                 await chat_manager.broadcast_to_chat(chat_id, {
                     "type": "message",
                     "chat_id": chat_id,
@@ -774,7 +773,7 @@ class AvitoHandler:
                     "status": "DELIVERED",
                     "timestamp": datetime.utcnow().isoformat(),
                 })
-                
+
                 await cashbox_manager.broadcast_to_cashbox(cashbox_id, ws_message)
             except Exception as e:
                 logger.warning(f"Failed to send WebSocket event: {e}")
@@ -1221,13 +1220,13 @@ class AvitoHandler:
             new_messages = 0
             updated_messages = 0
             errors = []
-            
+
 
             for msg_idx, avito_msg in enumerate(avito_messages):
                 try:
                     message_id = avito_msg.get("id")
                     direction = avito_msg.get("direction", "in")
-                    
+
 
                     existing_message = await crud.get_message_by_external_id(
                         chat_id=chat_id, external_message_id=message_id
@@ -1239,12 +1238,12 @@ class AvitoHandler:
 
                     content = avito_msg.get("content", {})
                     message_type_str = avito_msg.get("type", "text")
-                    
+
                     if message_type_str == "deleted":
                         continue
-                    
+
                     message_text = ""
-                    
+
                     if isinstance(content, dict):
                         if message_type_str == "text":
                             message_text = content.get("text", "")
@@ -1256,7 +1255,7 @@ class AvitoHandler:
                             message_text = f"[{message_type_str}]"
                     else:
                         message_text = str(content) if content else f"[{message_type_str}]"
-                    
+
                     if message_text:
                         message_text_lower = message_text.lower().strip()
                         if message_text_lower == "[deleted]" or message_text_lower == "сообщение удалено" or "[deleted]" in message_text_lower:
@@ -1286,16 +1285,16 @@ class AvitoHandler:
                         source="avito",
                         created_at=created_at,
                     )
-                    
+
                     db_message_id = message.get("id") if isinstance(message, dict) else message.id
-                    
+
                     if message_type_str in ["image", "voice"]:
                         if isinstance(content, dict):
                             try:
                                 from database.db import pictures
-                                
+
                                 file_url = None
-                                
+
                                 if message_type_str == "image":
                                     if "image" in content:
                                         image_data = content["image"]
@@ -1310,13 +1309,13 @@ class AvitoHandler:
                                                 or sizes.get("640x480")
                                                 or (list(sizes.values())[0] if sizes else None)
                                             )
-                                
+
                                 elif message_type_str == "voice":
                                     if "voice" in content:
                                         voice_data = content["voice"]
                                         if isinstance(voice_data, dict):
                                             file_url = voice_data.get("url") or voice_data.get("voice_url")
-                                
+
                                 if file_url:
                                     await database.execute(
                                         pictures.insert().values(
