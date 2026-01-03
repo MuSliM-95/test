@@ -67,7 +67,6 @@ class ChatRabbitMQConsumer:
                 ]
             )
 
-
         except Exception as e:
             self.is_running = False
 

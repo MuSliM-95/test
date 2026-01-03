@@ -92,7 +92,9 @@ async def connect_avito_channel(
                 if existing_channel_by_cashbox:
                     avito_channel = existing_channel_by_cashbox
                 else:
-                    channel_name = credentials.channel_name or f"Avito - Cashbox {cashbox_id}"
+                    channel_name = (
+                        credentials.channel_name or f"Avito - Cashbox {cashbox_id}"
+                    )
                     from api.chats.avito.avito_constants import AVITO_SVG_ICON
 
                     channel_id = await database.execute(
@@ -108,7 +110,10 @@ async def connect_avito_channel(
 
         channel_id = avito_channel["id"]
 
-        redirect_uri = credentials.redirect_uri or "https://dev.tablecrm.com/api/v1/avito/oauth/callback"
+        redirect_uri = (
+            credentials.redirect_uri
+            or "https://dev.tablecrm.com/api/v1/avito/oauth/callback"
+        )
 
         existing = await database.fetch_one(
             channel_credentials.select().where(
@@ -220,9 +225,7 @@ async def process_single_chat(
                             user.get("phone")
                             or user.get("phone_number")
                             or user.get("public_user_profile", {}).get("phone")
-                            or user.get("public_user_profile", {}).get(
-                                "phone_number"
-                            )
+                            or user.get("public_user_profile", {}).get("phone_number")
                         )
                         public_profile = user.get("public_user_profile", {})
                         if public_profile:
@@ -233,9 +236,7 @@ async def process_single_chat(
                                     or avatar_data.get("images", {}).get("256x256")
                                     or avatar_data.get("images", {}).get("128x128")
                                     or (
-                                        list(
-                                            avatar_data.get("images", {}).values()
-                                        )[0]
+                                        list(avatar_data.get("images", {}).values())[0]
                                         if avatar_data.get("images")
                                         else None
                                     )
@@ -342,7 +343,9 @@ async def process_single_chat(
                         logger.error(
                             f"Failed to create chat with external_id {external_chat_id}"
                         )
-                        result["errors"].append(f"Failed to create chat {external_chat_id}")
+                        result["errors"].append(
+                            f"Failed to create chat {external_chat_id}"
+                        )
                         return result
 
                     chat_id = new_chat["id"]
@@ -382,8 +385,7 @@ async def process_single_chat(
                     if client_user_id:
                         existing_contact = await database.fetch_one(
                             chat_contacts.select().where(
-                                chat_contacts.c.id
-                                == existing_chat["chat_contact_id"]
+                                chat_contacts.c.id == existing_chat["chat_contact_id"]
                             )
                         )
                         if existing_contact and (
@@ -391,16 +393,13 @@ async def process_single_chat(
                             or existing_contact.get("external_contact_id")
                             != str(client_user_id)
                         ):
-                            contact_update["external_contact_id"] = str(
-                                client_user_id
-                            )
+                            contact_update["external_contact_id"] = str(client_user_id)
 
                     if contact_update:
                         await database.execute(
                             chat_contacts.update()
                             .where(
-                                chat_contacts.c.id
-                                == existing_chat["chat_contact_id"]
+                                chat_contacts.c.id == existing_chat["chat_contact_id"]
                             )
                             .values(**contact_update)
                         )
@@ -434,9 +433,7 @@ async def process_single_chat(
 
                 last_message = avito_chat.get("last_message")
                 if last_message and last_message.get("created"):
-                    last_message_time = datetime.fromtimestamp(
-                        last_message["created"]
-                    )
+                    last_message_time = datetime.fromtimestamp(last_message["created"])
                     chat_update["last_message_time"] = last_message_time
 
                 if chat_update:
@@ -483,26 +480,36 @@ async def process_single_chat(
 
                                     if not existing_message:
                                         content = last_message.get("content", {})
-                                        message_type_str = last_message.get("type", "text")
+                                        message_type_str = last_message.get(
+                                            "type", "text"
+                                        )
                                         message_text = ""
 
                                         if isinstance(content, dict):
                                             if message_type_str == "text":
                                                 message_text = content.get("text", "")
                                             elif message_type_str == "system":
-                                                message_text = content.get("text", "[Системное сообщение]")
+                                                message_text = content.get(
+                                                    "text", "[Системное сообщение]"
+                                                )
                                             elif message_type_str == "image":
                                                 message_text = "[Изображение]"
                                             else:
                                                 message_text = f"[{message_type_str}]"
 
                                         direction = last_message.get("direction", "in")
-                                        sender_type = "CLIENT" if direction == "in" else "OPERATOR"
+                                        sender_type = (
+                                            "CLIENT"
+                                            if direction == "in"
+                                            else "OPERATOR"
+                                        )
 
                                         created_timestamp = last_message.get("created")
                                         created_at = None
                                         if created_timestamp:
-                                            created_at = datetime.fromtimestamp(created_timestamp)
+                                            created_at = datetime.fromtimestamp(
+                                                created_timestamp
+                                            )
 
                                         is_read = (
                                             last_message.get("is_read", False)
@@ -513,7 +520,8 @@ async def process_single_chat(
                                         db_message = await crud.create_message_and_update_chat(
                                             chat_id=chat_id,
                                             sender_type=sender_type,
-                                            content=message_text or f"[{message_type_str}]",
+                                            content=message_text
+                                            or f"[{message_type_str}]",
                                             message_type=AvitoHandler._map_message_type(
                                                 message_type_str
                                             ),
@@ -522,7 +530,11 @@ async def process_single_chat(
                                             source="avito",
                                             created_at=created_at,
                                         )
-                                        db_message_id = db_message.get("id") if isinstance(db_message, dict) else db_message.id
+                                        db_message_id = (
+                                            db_message.get("id")
+                                            if isinstance(db_message, dict)
+                                            else db_message.id
+                                        )
                                         result["messages_created"] += 1
                                         result["messages_loaded"] += 1
                             except Exception as e:
@@ -562,7 +574,6 @@ async def process_single_chat(
                         direction = avito_msg.get("direction", "in")
                         created_timestamp = avito_msg.get("created")
 
-
                         if message_type_str == "deleted":
                             continue
 
@@ -574,7 +585,11 @@ async def process_single_chat(
 
                         if message_text_preview:
                             message_text_lower = message_text_preview.lower().strip()
-                            if message_text_lower == "[deleted]" or message_text_lower == "сообщение удалено" or "[deleted]" in message_text_lower:
+                            if (
+                                message_text_lower == "[deleted]"
+                                or message_text_lower == "сообщение удалено"
+                                or "[deleted]" in message_text_lower
+                            ):
                                 continue
 
                         if existing_message:
@@ -582,10 +597,14 @@ async def process_single_chat(
 
                             if message_type_str == "image":
                                 from database.db import pictures
+
                                 existing_picture = await database.fetch_one(
                                     pictures.select().where(
                                         (pictures.c.entity == "messages")
-                                        & (pictures.c.entity_id == existing_message["id"])
+                                        & (
+                                            pictures.c.entity_id
+                                            == existing_message["id"]
+                                        )
                                     )
                                 )
                                 if not existing_picture:
@@ -600,13 +619,19 @@ async def process_single_chat(
                                             file_url = (
                                                 sizes.get("1280x960")
                                                 or sizes.get("640x480")
-                                                or (list(sizes.values())[0] if sizes else None)
+                                                or (
+                                                    list(sizes.values())[0]
+                                                    if sizes
+                                                    else None
+                                                )
                                             )
                                             if file_url:
                                                 await database.execute(
                                                     pictures.insert().values(
                                                         entity="messages",
-                                                        entity_id=existing_message["id"],
+                                                        entity_id=existing_message[
+                                                            "id"
+                                                        ],
                                                         url=file_url,
                                                         is_main=False,
                                                         is_deleted=False,
@@ -674,7 +699,11 @@ async def process_single_chat(
                             source="avito",
                             created_at=created_at,
                         )
-                        db_message_id = db_message.get("id") if isinstance(db_message, dict) else db_message.id
+                        db_message_id = (
+                            db_message.get("id")
+                            if isinstance(db_message, dict)
+                            else db_message.id
+                        )
                         result["messages_created"] += 1
 
                         if message_type_str in ["image", "voice"]:
@@ -696,19 +725,29 @@ async def process_single_chat(
                                                 file_url = (
                                                     sizes.get("1280x960")
                                                     or sizes.get("640x480")
-                                                    or (list(sizes.values())[0] if sizes else None)
+                                                    or (
+                                                        list(sizes.values())[0]
+                                                        if sizes
+                                                        else None
+                                                    )
                                                 )
 
                                     elif message_type_str == "voice":
                                         if "voice" in content:
                                             voice_data = content["voice"]
                                             if isinstance(voice_data, dict):
-                                                file_url = voice_data.get("url") or voice_data.get("voice_url")
+                                                file_url = voice_data.get(
+                                                    "url"
+                                                ) or voice_data.get("voice_url")
                                                 if not file_url:
-                                                    voice_id = voice_data.get("voice_id")
+                                                    voice_id = voice_data.get(
+                                                        "voice_id"
+                                                    )
                                                     if voice_id:
                                                         try:
-                                                            file_url = await client.get_voice_file_url(voice_id)
+                                                            file_url = await client.get_voice_file_url(
+                                                                voice_id
+                                                            )
                                                         except Exception as e:
                                                             logger.warning(
                                                                 f"Failed to get voice URL for voice_id {voice_id}: {e}"
@@ -744,6 +783,7 @@ async def process_single_chat(
                     from sqlalchemy import desc
 
                     from database.db import chat_messages
+
                     last_db_message = await database.fetch_one(
                         chat_messages.select()
                         .where(chat_messages.c.chat_id == chat_id)
@@ -751,7 +791,11 @@ async def process_single_chat(
                         .limit(1)
                     )
                     if last_db_message:
-                        last_msg_time = last_db_message.get("created_at") if isinstance(last_db_message, dict) else last_db_message.created_at
+                        last_msg_time = (
+                            last_db_message.get("created_at")
+                            if isinstance(last_db_message, dict)
+                            else last_db_message.created_at
+                        )
                         if last_msg_time:
                             await database.execute(
                                 chats.update()
@@ -768,9 +812,7 @@ async def process_single_chat(
             ):
                 pass
             else:
-                logger.warning(
-                    f"Failed to process chat {avito_chat.get('id')}: {e}"
-                )
+                logger.warning(f"Failed to process chat {avito_chat.get('id')}: {e}")
                 result["errors"].append(
                     f"Failed to process chat {avito_chat.get('id')}: {str(e)}"
                 )
@@ -856,16 +898,22 @@ async def load_avito_history(
                 if not avito_chats:
                     break
 
-
                 if use_date_filter:
                     filtered_chats = []
                     for chat in avito_chats:
                         chat_id = chat.get("id")
                         chat_created = chat.get("created", 0)
                         last_message = chat.get("last_message", {})
-                        last_message_created = last_message.get("created", 0) if isinstance(last_message, dict) else 0
+                        last_message_created = (
+                            last_message.get("created", 0)
+                            if isinstance(last_message, dict)
+                            else 0
+                        )
 
-                        if chat_created >= from_date or last_message_created >= from_date:
+                        if (
+                            chat_created >= from_date
+                            or last_message_created >= from_date
+                        ):
                             filtered_chats.append(chat)
 
                     all_chats.extend(filtered_chats)
@@ -878,9 +926,21 @@ async def load_avito_history(
                         last_chat_id = last_chat.get("id", "unknown")
                         last_chat_created = last_chat.get("created", 0)
                         last_message = last_chat.get("last_message", {})
-                        last_msg_created = last_message.get("created", 0) if isinstance(last_message, dict) else 0
-                        last_chat_created_str = datetime.fromtimestamp(last_chat_created).isoformat() if last_chat_created else "N/A"
-                        last_msg_created_str = datetime.fromtimestamp(last_msg_created).isoformat() if last_msg_created else "N/A"
+                        last_msg_created = (
+                            last_message.get("created", 0)
+                            if isinstance(last_message, dict)
+                            else 0
+                        )
+                        last_chat_created_str = (
+                            datetime.fromtimestamp(last_chat_created).isoformat()
+                            if last_chat_created
+                            else "N/A"
+                        )
+                        last_msg_created_str = (
+                            datetime.fromtimestamp(last_msg_created).isoformat()
+                            if last_msg_created
+                            else "N/A"
+                        )
                     break
 
                 offset += limit
@@ -890,18 +950,42 @@ async def load_avito_history(
                     last_chat_id = last_chat.get("id", "unknown")
                     last_chat_created = last_chat.get("created", 0)
                     last_message = last_chat.get("last_message", {})
-                    last_msg_created = last_message.get("created", 0) if isinstance(last_message, dict) else 0
-                    last_chat_created_str = datetime.fromtimestamp(last_chat_created).isoformat() if last_chat_created else "N/A"
-                    last_msg_created_str = datetime.fromtimestamp(last_msg_created).isoformat() if last_msg_created else "N/A"
+                    last_msg_created = (
+                        last_message.get("created", 0)
+                        if isinstance(last_message, dict)
+                        else 0
+                    )
+                    last_chat_created_str = (
+                        datetime.fromtimestamp(last_chat_created).isoformat()
+                        if last_chat_created
+                        else "N/A"
+                    )
+                    last_msg_created_str = (
+                        datetime.fromtimestamp(last_msg_created).isoformat()
+                        if last_msg_created
+                        else "N/A"
+                    )
 
                 if avito_chats:
                     last_chat = avito_chats[-1]
                     last_chat_id = last_chat.get("id", "unknown")
                     last_chat_created = last_chat.get("created", 0)
                     last_message = last_chat.get("last_message", {})
-                    last_msg_created = last_message.get("created", 0) if isinstance(last_message, dict) else 0
-                    last_chat_created_str = datetime.fromtimestamp(last_chat_created).isoformat() if last_chat_created else "N/A"
-                    last_msg_created_str = datetime.fromtimestamp(last_msg_created).isoformat() if last_msg_created else "N/A"
+                    last_msg_created = (
+                        last_message.get("created", 0)
+                        if isinstance(last_message, dict)
+                        else 0
+                    )
+                    last_chat_created_str = (
+                        datetime.fromtimestamp(last_chat_created).isoformat()
+                        if last_chat_created
+                        else "N/A"
+                    )
+                    last_msg_created_str = (
+                        datetime.fromtimestamp(last_msg_created).isoformat()
+                        if last_msg_created
+                        else "N/A"
+                    )
 
             except Exception as e:
                 error_str = str(e)
@@ -926,7 +1010,6 @@ async def load_avito_history(
                 errors.append(f"Error loading chats at offset {offset}: {str(e)}")
                 offset += limit
                 continue
-
 
         max_concurrent = 10
         semaphore = asyncio.Semaphore(max_concurrent)
@@ -1034,9 +1117,7 @@ async def mark_avito_chat_as_read(
             )
 
         if not chat.get("external_chat_id"):
-            raise HTTPException(
-                status_code=400, detail="Chat has no external_chat_id"
-            )
+            raise HTTPException(status_code=400, detail="Chat has no external_chat_id")
 
         avito_channel = await crud.get_channel(chat["channel_id"])
         if not avito_channel or avito_channel.get("type") != "AVITO":
@@ -1096,17 +1177,20 @@ async def mark_avito_chat_as_read(
             except Exception as e:
                 logger.warning(f"Failed to send WebSocket event for chat read: {e}")
 
-            return {"success": True, "message": f"Chat {chat['external_chat_id']} marked as read"}
+            return {
+                "success": True,
+                "message": f"Chat {chat['external_chat_id']} marked as read",
+            }
         else:
-            raise HTTPException(
-                status_code=500, detail="Failed to mark chat as read"
-            )
+            raise HTTPException(status_code=500, detail="Failed to mark chat as read")
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error marking chat as read: {e}")
-        raise HTTPException(status_code=400, detail=f"Error marking chat as read: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Error marking chat as read: {str(e)}"
+        )
 
 
 @router.get("/webhooks/list")
@@ -1268,7 +1352,10 @@ async def avito_oauth_callback(
         oauth_client_id = _decrypt_credential(credentials["api_key"])
         oauth_client_secret = _decrypt_credential(credentials["api_secret"])
 
-        redirect_uri = credentials.get("redirect_uri") or "https://dev.tablecrm.com/api/v1/avito/oauth/callback"
+        redirect_uri = (
+            credentials.get("redirect_uri")
+            or "https://dev.tablecrm.com/api/v1/avito/oauth/callback"
+        )
 
         try:
             token_data = await AvitoClient.exchange_authorization_code_for_tokens(
@@ -1383,5 +1470,3 @@ async def avito_oauth_callback(
     except Exception as e:
         logger.error(f"Error in OAuth callback: {e}")
         raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
-
-

@@ -131,8 +131,12 @@ class AvitoClient:
 
                     if "error" in result:
                         error_code = result.get("error")
-                        error_description = result.get("error_description", "Unknown error")
-                        error_text = f"Avito API error: {error_code} - {error_description}"
+                        error_description = result.get(
+                            "error_description", "Unknown error"
+                        )
+                        error_text = (
+                            f"Avito API error: {error_code} - {error_description}"
+                        )
                         logger.error(f"Token request failed: {error_text}")
                         raise AvitoTokenExpiredError(error_text)
 
@@ -721,7 +725,10 @@ class AvitoClient:
 
                 if len(filtered) == 0:
                     consecutive_old_batches += 1
-                    if consecutive_old_batches >= max_consecutive_old and len(messages) < limit:
+                    if (
+                        consecutive_old_batches >= max_consecutive_old
+                        and len(messages) < limit
+                    ):
                         break
                 else:
                     consecutive_old_batches = 0
@@ -815,5 +822,3 @@ class AvitoClient:
         except Exception as e:
             logger.warning(f"Failed to get voice file URL for voice_id {voice_id}: {e}")
             return None
-
-

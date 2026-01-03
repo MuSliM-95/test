@@ -15,7 +15,7 @@ class AvitoCredentialsCreate(BaseModel):
                 "api_key": "your_client_id",
                 "api_secret": "your_client_secret",
                 "redirect_uri": "https://dev.tablecrm.com/api/v1/avito/oauth/callback",
-                "channel_name": "Avito Москва"
+                "channel_name": "Avito Москва",
             }
         }
 

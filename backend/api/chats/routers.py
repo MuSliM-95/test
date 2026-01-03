@@ -394,7 +394,9 @@ async def create_message(
                                         else:
                                             image_id = None
                                     except Exception as e:
-                                        logger.error(f"Failed to upload image to Avito: {e}")
+                                        logger.error(
+                                            f"Failed to upload image to Avito: {e}"
+                                        )
                                         image_id = None
 
                             except Exception as e:
@@ -420,7 +422,9 @@ async def create_message(
                                     )
                                 )
                             except Exception as e:
-                                logger.warning(f"Failed to save file for message {db_message['id']}: {e}")
+                                logger.warning(
+                                    f"Failed to save file for message {db_message['id']}: {e}"
+                                )
 
                         if has_image and has_text and db_message_text:
                             if image_id:
@@ -439,7 +443,9 @@ async def create_message(
                                             status="DELIVERED",
                                         )
                                 except Exception as e:
-                                    logger.error(f"Failed to send IMAGE message to Avito: {e}")
+                                    logger.error(
+                                        f"Failed to send IMAGE message to Avito: {e}"
+                                    )
                                     await crud.update_message(
                                         db_message["id"], status="FAILED"
                                     )
@@ -459,7 +465,9 @@ async def create_message(
                                         status="DELIVERED",
                                     )
                             except Exception as e:
-                                logger.error(f"Failed to send TEXT message to Avito: {e}")
+                                logger.error(
+                                    f"Failed to send TEXT message to Avito: {e}"
+                                )
                                 await crud.update_message(
                                     db_message_text["id"], status="FAILED"
                                 )
@@ -483,7 +491,9 @@ async def create_message(
                                             status="DELIVERED",
                                         )
                                 except Exception as e:
-                                    logger.error(f"Failed to send message to Avito: {e}")
+                                    logger.error(
+                                        f"Failed to send message to Avito: {e}"
+                                    )
                                     await crud.update_message(
                                         db_message["id"], status="FAILED"
                                     )
@@ -578,7 +588,9 @@ async def get_chat_messages(
                         )
                         await database.execute(update_query)
                     except Exception as e:
-                        logger.warning(f"Failed to mark chat {chat['external_chat_id']} as read: {e}")
+                        logger.warning(
+                            f"Failed to mark chat {chat['external_chat_id']} as read: {e}"
+                        )
             except Exception as e:
                 logger.warning(f"Failed to mark Avito chat {chat_id} as read: {e}")
 
@@ -625,7 +637,9 @@ async def get_chat_messages(
                         )
 
                         if client:
-                            chat_info = await client.get_chat_info(chat["external_chat_id"])
+                            chat_info = await client.get_chat_info(
+                                chat["external_chat_id"]
+                            )
                             users = chat_info.get("users", [])
                             avito_user_id = creds.get("avito_user_id")
 
@@ -640,16 +654,18 @@ async def get_chat_messages(
                                             "public_user_profile", {}
                                         )
                                         if public_profile:
-                                            avatar_data = public_profile.get("avatar", {})
+                                            avatar_data = public_profile.get(
+                                                "avatar", {}
+                                            )
                                             if isinstance(avatar_data, dict):
                                                 avatar_url = (
                                                     avatar_data.get("default")
-                                                    or avatar_data.get("images", {}).get(
-                                                        "256x256"
-                                                    )
-                                                    or avatar_data.get("images", {}).get(
-                                                        "128x128"
-                                                    )
+                                                    or avatar_data.get(
+                                                        "images", {}
+                                                    ).get("256x256")
+                                                    or avatar_data.get(
+                                                        "images", {}
+                                                    ).get("128x128")
                                                     or (
                                                         list(
                                                             avatar_data.get(

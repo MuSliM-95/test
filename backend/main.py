@@ -439,7 +439,7 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
 
         # Логируем сырой body от Avito API
         try:
-            body_str = body.decode('utf-8')
+            body_str = body.decode("utf-8")
             print("=" * 80)
             print(f"AVITO WEBHOOK RECEIVED (LEGACY) - cashbox_id={cashbox_id}")
             print("Raw body:")
@@ -464,7 +464,9 @@ async def receive_avito_webhook_legacy(cashbox_id: int, request: Request):
             logger.error(f"Failed to parse webhook JSON: {e}")
             return {"success": False, "message": f"Invalid webhook JSON: {str(e)}"}
 
-        print(f"Parsed webhook data: {json.dumps(webhook_data, indent=2, ensure_ascii=False, default=str)}")
+        print(
+            f"Parsed webhook data: {json.dumps(webhook_data, indent=2, ensure_ascii=False, default=str)}"
+        )
 
         if not webhook_data:
             logger.error("Empty webhook data")

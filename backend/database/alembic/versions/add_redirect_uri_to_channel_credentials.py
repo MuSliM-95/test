@@ -37,6 +37,3 @@ def downgrade() -> None:
 
     if "redirect_uri" in columns:
         op.drop_column("channel_credentials", "redirect_uri")
-
-
-

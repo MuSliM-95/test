@@ -194,9 +194,7 @@ async def get_channel_by_cashbox_and_api_key(
     return await database.fetch_one(query)
 
 
-async def get_channel_by_api_key(
-    encrypted_api_key: str, channel_type: str = "AVITO"
-):
+async def get_channel_by_api_key(encrypted_api_key: str, channel_type: str = "AVITO"):
     """Get channel by api_key across all cashboxes to prevent duplicates"""
     query = (
         select(
@@ -418,6 +416,7 @@ async def create_chat(
             await cashbox_manager.broadcast_to_cashbox(cashbox_id, cashbox_message)
         except Exception as ws_error:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to send new_chat event via websocket: {ws_error}")
     except Exception as e:
@@ -1349,7 +1348,6 @@ async def chain_client(
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-
     if message_id:
         message = await get_message(message_id)
         if not message:
@@ -1370,16 +1368,13 @@ async def chain_client(
         if not phone:
             raise HTTPException(status_code=400, detail="Phone number required")
 
-
     if not name:
         name = chat_contact.get("name") or (
             chat.get("contact", {}).get("name") if chat.get("contact") else None
         )
 
-
     cashbox_id = chat["cashbox_id"]
     channel_id = chat["channel_id"]
-
 
     channel = await get_channel(channel_id)
     if not channel:
@@ -1427,7 +1422,6 @@ async def chain_client(
     else:
         is_new_contragent = True
         contragent_name = name or "Unknown"
-
 
         contragent_data = {"chat_ids": [chat_id], "primary_channel": channel_type}
 

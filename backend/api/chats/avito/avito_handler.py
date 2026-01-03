@@ -60,7 +60,6 @@ class AvitoHandler:
                 payload.content or {}, message_type
             )
 
-
             existing_chat = None
             avito_channel = None
             if chat_id_external:
@@ -336,22 +335,27 @@ class AvitoHandler:
                     if existing_chat:
                         chat = existing_chat
                     else:
-                        message_text_lower = message_text.lower() if message_text else ""
+                        message_text_lower = (
+                            message_text.lower() if message_text else ""
+                        )
                         subscription_keywords = [
                             "подписк",
                             "мессенджер",
                             "api мессенджера",
                             "subscription",
                             "messenger",
-                            "перейдите на подписку"
+                            "перейдите на подписку",
                         ]
-                        is_subscription_message = (
-                            message_type == "system" or
-                            any(keyword in message_text_lower for keyword in subscription_keywords)
+                        is_subscription_message = message_type == "system" or any(
+                            keyword in message_text_lower
+                            for keyword in subscription_keywords
                         )
 
                         if is_subscription_message:
-                            return {"success": True, "message": "Subscription message ignored, chat not created"}
+                            return {
+                                "success": True,
+                                "message": "Subscription message ignored, chat not created",
+                            }
 
                         ad_title = None
                         metadata = {}
@@ -395,15 +399,18 @@ class AvitoHandler:
                         "api мессенджера",
                         "subscription",
                         "messenger",
-                        "перейдите на подписку"
+                        "перейдите на подписку",
                     ]
-                    is_subscription_message = (
-                        message_type == "system" or
-                        any(keyword in message_text_lower for keyword in subscription_keywords)
+                    is_subscription_message = message_type == "system" or any(
+                        keyword in message_text_lower
+                        for keyword in subscription_keywords
                     )
 
                     if is_subscription_message:
-                        return {"success": True, "message": "Subscription message ignored, chat not created"}
+                        return {
+                            "success": True,
+                            "message": "Subscription message ignored, chat not created",
+                        }
 
                     chat = await AvitoHandler._find_or_create_chat(
                         channel_type="AVITO",
@@ -422,15 +429,17 @@ class AvitoHandler:
                     "api мессенджера",
                     "subscription",
                     "messenger",
-                    "перейдите на подписку"
+                    "перейдите на подписку",
                 ]
-                is_subscription_message = (
-                    message_type == "system" or
-                    any(keyword in message_text_lower for keyword in subscription_keywords)
+                is_subscription_message = message_type == "system" or any(
+                    keyword in message_text_lower for keyword in subscription_keywords
                 )
 
                 if is_subscription_message:
-                    return {"success": True, "message": "Subscription message ignored, chat not created"}
+                    return {
+                        "success": True,
+                        "message": "Subscription message ignored, chat not created",
+                    }
 
                 chat = await AvitoHandler._find_or_create_chat(
                     channel_type="AVITO",
@@ -443,7 +452,9 @@ class AvitoHandler:
                 )
 
             if not chat:
-                logger.error(f"Failed to create or find chat {chat_id_external} for cashbox {cashbox_id}")
+                logger.error(
+                    f"Failed to create or find chat {chat_id_external} for cashbox {cashbox_id}"
+                )
                 raise Exception(f"Failed to create or find chat {chat_id_external}")
 
             chat_id = chat["id"]
@@ -655,7 +666,9 @@ class AvitoHandler:
                             f"No file_url found for image message {message['id']}"
                         )
                 except Exception as e:
-                    logger.warning(f"Failed to save image file for message {message['id']}: {e}")
+                    logger.warning(
+                        f"Failed to save image file for message {message['id']}: {e}"
+                    )
 
             if message_type == "voice" and message_content:
                 try:
@@ -763,16 +776,19 @@ class AvitoHandler:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
-                await chat_manager.broadcast_to_chat(chat_id, {
-                    "type": "message",
-                    "chat_id": chat_id,
-                    "message_id": message["id"],
-                    "sender_type": sender_type,
-                    "content": message_text,
-                    "message_type": AvitoHandler._map_message_type(message_type),
-                    "status": "DELIVERED",
-                    "timestamp": datetime.utcnow().isoformat(),
-                })
+                await chat_manager.broadcast_to_chat(
+                    chat_id,
+                    {
+                        "type": "message",
+                        "chat_id": chat_id,
+                        "message_id": message["id"],
+                        "sender_type": sender_type,
+                        "content": message_text,
+                        "message_type": AvitoHandler._map_message_type(message_type),
+                        "status": "DELIVERED",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
+                )
 
                 await cashbox_manager.broadcast_to_cashbox(cashbox_id, ws_message)
             except Exception as e:
@@ -989,7 +1005,9 @@ class AvitoHandler:
                                 if context:
                                     metadata["context"] = context
                 except Exception as e:
-                    logger.warning(f"Could not get chat info from API in _find_or_create_chat: {e}")
+                    logger.warning(
+                        f"Could not get chat info from API in _find_or_create_chat: {e}"
+                    )
 
             if not metadata and webhook_data:
                 try:
@@ -1221,12 +1239,10 @@ class AvitoHandler:
             updated_messages = 0
             errors = []
 
-
             for msg_idx, avito_msg in enumerate(avito_messages):
                 try:
                     message_id = avito_msg.get("id")
                     direction = avito_msg.get("direction", "in")
-
 
                     existing_message = await crud.get_message_by_external_id(
                         chat_id=chat_id, external_message_id=message_id
@@ -1254,11 +1270,17 @@ class AvitoHandler:
                         else:
                             message_text = f"[{message_type_str}]"
                     else:
-                        message_text = str(content) if content else f"[{message_type_str}]"
+                        message_text = (
+                            str(content) if content else f"[{message_type_str}]"
+                        )
 
                     if message_text:
                         message_text_lower = message_text.lower().strip()
-                        if message_text_lower == "[deleted]" or message_text_lower == "сообщение удалено" or "[deleted]" in message_text_lower:
+                        if (
+                            message_text_lower == "[deleted]"
+                            or message_text_lower == "сообщение удалено"
+                            or "[deleted]" in message_text_lower
+                        ):
                             continue
 
                     sender_type = "CLIENT" if direction == "in" else "OPERATOR"
@@ -1267,6 +1289,7 @@ class AvitoHandler:
                     created_at = None
                     if created_timestamp:
                         from datetime import datetime
+
                         created_at = datetime.fromtimestamp(created_timestamp)
 
                     is_read = (
@@ -1286,7 +1309,9 @@ class AvitoHandler:
                         created_at=created_at,
                     )
 
-                    db_message_id = message.get("id") if isinstance(message, dict) else message.id
+                    db_message_id = (
+                        message.get("id") if isinstance(message, dict) else message.id
+                    )
 
                     if message_type_str in ["image", "voice"]:
                         if isinstance(content, dict):
@@ -1307,14 +1332,20 @@ class AvitoHandler:
                                             file_url = (
                                                 sizes.get("1280x960")
                                                 or sizes.get("640x480")
-                                                or (list(sizes.values())[0] if sizes else None)
+                                                or (
+                                                    list(sizes.values())[0]
+                                                    if sizes
+                                                    else None
+                                                )
                                             )
 
                                 elif message_type_str == "voice":
                                     if "voice" in content:
                                         voice_data = content["voice"]
                                         if isinstance(voice_data, dict):
-                                            file_url = voice_data.get("url") or voice_data.get("voice_url")
+                                            file_url = voice_data.get(
+                                                "url"
+                                            ) or voice_data.get("voice_url")
 
                                 if file_url:
                                     await database.execute(
@@ -1329,7 +1360,9 @@ class AvitoHandler:
                                         )
                                     )
                             except Exception as pic_error:
-                                logger.warning(f"Failed to save {message_type_str} for message {message_id}: {pic_error}")
+                                logger.warning(
+                                    f"Failed to save {message_type_str} for message {message_id}: {pic_error}"
+                                )
 
                     new_messages += 1
 
