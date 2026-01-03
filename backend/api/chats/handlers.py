@@ -177,5 +177,16 @@ class ChatUserDisconnectedEventHandler(IEventHandler):
 
             await chat_manager.broadcast_to_chat(chat_id, ws_message)
 
+            if cashbox_id:
+                cashbox_message = {
+                    "type": "chat_user_disconnected",
+                    "event": "user_disconnected",
+                    "chat_id": chat_id,
+                    "user_id": disconnect_event.user_id,
+                    "user_type": disconnect_event.user_type,
+                    "timestamp": disconnect_event.timestamp,
+                }
+                await cashbox_manager.broadcast_to_cashbox(cashbox_id, cashbox_message)
+
         except Exception as e:
             raise
