@@ -1,7 +1,5 @@
 import json
 import os
-import time
-from collections import OrderedDict
 from datetime import datetime
 from typing import List, Optional
 
@@ -43,50 +41,6 @@ from database.db import (
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
-    # Простой in-memory кэш для часто запрашиваемых данных
-    # TTL: 60 секунд, максимальный размер: 100 записей
-    _cache: OrderedDict = OrderedDict()
-    _cache_timestamps: dict = {}
-    _cache_max_size: int = 100
-    _cache_ttl: int = 60  # секунд
-
-    @classmethod
-    def _get_cache_key(cls, method: str, **kwargs) -> str:
-        """Генерирует ключ кэша на основе метода и параметров"""
-        key_parts = [method]
-        for k, v in sorted(kwargs.items()):
-            if v is not None:
-                key_parts.append(f"{k}:{v}")
-        return "|".join(key_parts)
-
-    @classmethod
-    def _get_from_cache(cls, key: str):
-        """Получает значение из кэша, если оно не устарело"""
-        if key not in cls._cache:
-            return None
-
-        # Проверяем TTL
-        if time.time() - cls._cache_timestamps.get(key, 0) > cls._cache_ttl:
-            del cls._cache[key]
-            del cls._cache_timestamps[key]
-            return None
-
-        # Перемещаем в конец (LRU)
-        cls._cache.move_to_end(key)
-        return cls._cache[key]
-
-    @classmethod
-    def _set_to_cache(cls, key: str, value):
-        """Сохраняет значение в кэш"""
-        # Удаляем старые записи, если кэш переполнен
-        while len(cls._cache) >= cls._cache_max_size:
-            oldest_key = next(iter(cls._cache))
-            del cls._cache[oldest_key]
-            del cls._cache_timestamps[oldest_key]
-
-        cls._cache[key] = value
-        cls._cache_timestamps[key] = time.time()
-        cls._cache.move_to_end(key)
 
     @staticmethod
     def __transform_photo_route(photo_path: Optional[str]) -> Optional[str]:
@@ -451,23 +405,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         self,
         request: MarketplaceProductsRequest,
     ) -> MarketplaceProductList:
-        # Проверяем кэш
-        cache_key = self._get_cache_key(
-            "get_products",
-            page=request.page,
-            size=request.size,
-            sort_by=request.sort_by,
-            sort_order=request.sort_order,
-            category=getattr(request, "category", None),
-            manufacturer=getattr(request, "manufacturer", None),
-            search=getattr(request, "search", None),
-            min_price=getattr(request, "min_price", None),
-            max_price=getattr(request, "max_price", None),
-        )
-        cached_result = self._get_from_cache(cache_key)
-        if cached_result is not None:
-            return cached_result
-
         # --- НАЧАЛО: Подзапрос для выбора актуальной цены ---
         # Получаем текущий timestamp (в PostgreSQL это NOW())
         current_timestamp = int(datetime.now().timestamp())
@@ -937,9 +874,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             page=request.page,
             size=request.size,
         )
-
-        # Сохраняем в кэш
-        self._set_to_cache(cache_key, result)
 
         return result
 
