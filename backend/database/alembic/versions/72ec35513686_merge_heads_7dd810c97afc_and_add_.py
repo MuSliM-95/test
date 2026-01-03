@@ -6,8 +6,6 @@ Create Date: 2026-01-03 06:48:14.039816
 
 """
 
-
-
 # revision identifiers, used by Alembic.
 revision = "72ec35513686"
 down_revision = ("7dd810c97afc", "add_redirect_uri_cc")
