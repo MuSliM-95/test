@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, validator
@@ -18,6 +19,7 @@ class Payboxes(BaseModel):
     organization_id: Optional[int]
     created_at: int
     updated_at: int
+    deleted_at: Optional[datetime] = None
 
     @validator("start_balance", "balance", pre=True)
     def validate_float(cls, v):
@@ -71,6 +73,7 @@ class PayboxesShort(BaseModel):
     name: str
     created_at: int
     updated_at: int
+    deleted_at: Optional[datetime] = None
 
 
 class GetPaymentsShort(GetPayments):

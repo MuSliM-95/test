@@ -481,7 +481,12 @@ async def accounts(token: str, id_integration: int):
             tochka_bank_accounts.c.accountType,
             tochka_bank_accounts.c.is_active,
         )
-        .where(pboxes.c.cashbox == user.get("cashbox_id"))
+        .where(
+            and_(
+                pboxes.c.cashbox == user.get("cashbox_id"),
+                pboxes.c.deleted_at.is_(None),
+            )
+        )
         .select_from(pboxes)
         .join(tochka_bank_accounts, tochka_bank_accounts.c.payboxes_id == pboxes.c.id)
         .order_by(pboxes.c.name)

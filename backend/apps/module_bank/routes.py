@@ -233,7 +233,12 @@ async def accounts(token: str, id_integration: int):
             module_bank_accounts.c.currency,
             module_bank_accounts.c.is_active,
         )
-        .where(pboxes.c.cashbox == user.get("cashbox_id"))
+        .where(
+            and_(
+                pboxes.c.cashbox == user.get("cashbox_id"),
+                pboxes.c.deleted_at.is_(None),
+            )
+        )
         .select_from(pboxes)
         .join(module_bank_accounts, module_bank_accounts.c.payboxes_id == pboxes.c.id)
         .order_by(pboxes.c.name)

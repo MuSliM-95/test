@@ -137,6 +137,7 @@ async def tochka_update_transaction():
                 and_(
                     tochka_bank_accounts.c.is_active == True,
                     tochka_bank_accounts.c.is_deleted == False,
+                    pboxes.c.deleted_at.is_(None),
                 )
             )
             .select_from(tochka_bank_accounts)

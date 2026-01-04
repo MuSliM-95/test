@@ -222,7 +222,10 @@ async def get_user_permissions(token: str, user_id: int):
 
         permissions_list.append(section_perm)
 
-    payboxes_query = pboxes.select().where(pboxes.c.cashbox == user_relation.cashbox_id)
+    payboxes_query = pboxes.select().where(
+        pboxes.c.cashbox == user_relation.cashbox_id,
+        pboxes.c.deleted_at.is_(None),
+    )
     payboxes_list = await database.fetch_all(payboxes_query)
 
     for paybox in payboxes_list:
@@ -309,7 +312,8 @@ async def get_my_permissions(token: str):
 
     if user_relation.is_owner:
         payboxes_query = pboxes.select().where(
-            pboxes.c.cashbox == user_relation.cashbox_id
+            pboxes.c.cashbox == user_relation.cashbox_id,
+            pboxes.c.deleted_at.is_(None),
         )
         payboxes_list = await database.fetch_all(payboxes_query)
 
@@ -401,7 +405,10 @@ async def get_my_permissions(token: str):
 
         permissions_list.append(section_perm)
 
-    payboxes_query = pboxes.select().where(pboxes.c.cashbox == user_relation.cashbox_id)
+    payboxes_query = pboxes.select().where(
+        pboxes.c.cashbox == user_relation.cashbox_id,
+        pboxes.c.deleted_at.is_(None),
+    )
     payboxes_list = await database.fetch_all(payboxes_query)
 
     for paybox in payboxes_list:

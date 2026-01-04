@@ -545,7 +545,10 @@ async def create_payment_from_cheque(cheque_info: dict, cbox) -> int:
         contragent = await create_contragent(token, contragent_data)
 
     # setting temporary paybox
-    query = pboxes.select().where(pboxes.c.cashbox == cbox.id)
+    query = pboxes.select().where(
+        pboxes.c.cashbox == cbox.id,
+        pboxes.c.deleted_at.is_(None),
+    )
     pbox = await database.fetch_one(query)
     if not pbox:
         paybox_data = PayboxesCreate(
@@ -611,7 +614,10 @@ async def new_cheque_pic(message: types.Message, state: FSMContext):
             payment = await create_payment_from_cheque(cheque_info, cbox)
             await state.set_state(Form.cheque_paybox)
             await state.set_data({"payment": payment, "cheque": cheque_info})
-            query = pboxes.select().where(pboxes.c.cashbox == cbox.id)
+            query = pboxes.select().where(
+                pboxes.c.cashbox == cbox.id,
+                pboxes.c.deleted_at.is_(None),
+            )
             payboxes = await database.fetch_all(query)
             buttons = []
             for paybox in payboxes:
@@ -651,7 +657,9 @@ async def select_cheque_paybox(callback_query: types.CallbackQuery, state: FSMCo
 
         if cbox:
             query = pboxes.select().where(
-                pboxes.c.cashbox == cbox.id, pboxes.c.id == int(callback_query.data)
+                pboxes.c.cashbox == cbox.id,
+                pboxes.c.id == int(callback_query.data),
+                pboxes.c.deleted_at.is_(None),
             )
             pbox = await database.fetch_one(query)
             if not pbox:

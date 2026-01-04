@@ -1117,6 +1117,7 @@ pboxes = sqlalchemy.Table(
     sqlalchemy.Column("organization_id", Integer, ForeignKey("organizations.id")),
     sqlalchemy.Column("created_at", Integer),
     sqlalchemy.Column("updated_at", Integer),
+    sqlalchemy.Column("deleted_at", DateTime(timezone=True), nullable=True),
 )
 
 users = sqlalchemy.Table(

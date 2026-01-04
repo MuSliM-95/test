@@ -226,6 +226,7 @@ async def module_bank_update_transaction(
                 and_(
                     module_bank_accounts.c.is_active == True,
                     module_bank_accounts.c.is_deleted == False,
+                    pboxes.c.deleted_at.is_(None),
                 )
             )
             .select_from(module_bank_accounts)
