@@ -412,20 +412,6 @@ async def delete_paybox(token: str, id: int):
     if pbox.deleted_at:
         raise HTTPException(status_code=400, detail="Счет уже удален")
 
-    active_payments = await database.fetch_val(
-        select([func.count()]).where(
-            ((payments.c.paybox == id) | (payments.c.paybox_to == id)),
-            payments.c.is_deleted == False,
-            payments.c.cashbox == user.cashbox_id,
-        )
-    )
-
-    if active_payments > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Нельзя удалить счет. На нем есть {active_payments} активных платежей.",
-        )
-
     await database.execute(
         pboxes.update().where(pboxes.c.id == id).values(deleted_at=datetime.now())
     )
