@@ -56,6 +56,19 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         else:
             return f"https://{base_url}/{photo_path.lstrip('/')}"
 
+    @staticmethod
+    def __build_picture_url(picture_id: Optional[int]) -> Optional[str]:
+        """Строит публичный URL для фото по ID"""
+        if not picture_id:
+            return None
+        base_url = get_app_url_for_environment()
+        if not base_url:
+            return None
+        # Добавляем протокол, если его нет
+        if not base_url.startswith(("http://", "https://")):
+            base_url = f"https://{base_url}"
+        return f"{base_url}/api/v1/pictures/{picture_id}/content"
+
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
         current_timestamp = int(datetime.now().timestamp())
 
@@ -140,8 +153,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 cboxes.c.seller_description.label("seller_description"),
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
                 marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
-                func.array_agg(func.distinct(pictures.c.url))
-                .filter(pictures.c.url.is_not(None))
+                func.array_agg(func.distinct(pictures.c.id))
+                .filter(pictures.c.id.is_not(None))
                 .label("images"),
                 func.array_agg(func.distinct(nomenclature_barcodes.c.code))
                 .filter(nomenclature_barcodes.c.code.is_not(None))
@@ -351,11 +364,21 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         product["nomenclatures"] = nomenclatures_result or None
 
-        # Фото
-        if product["images"]:
+        # Фото - преобразуем ID фото в публичные URL
+        if (
+            product.get("images")
+            and isinstance(product["images"], list)
+            and any(product["images"])
+        ):
             product["images"] = [
-                self.__transform_photo_route(url) for url in product["images"]
+                self.__build_picture_url(picture_id)
+                for picture_id in product["images"]
+                if picture_id is not None
             ]
+            # Убираем None значения
+            product["images"] = [
+                url for url in product["images"] if url is not None
+            ] or None
 
         # Селлер
         if product["seller_photo"]:
@@ -609,8 +632,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 cboxes.c.seller_description.label("seller_description"),
                 marketplace_rating_aggregates.c.avg_rating.label("rating"),
                 marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
-                func.array_agg(func.distinct(pictures.c.url))
-                .filter(pictures.c.url.is_not(None))
+                func.array_agg(func.distinct(pictures.c.id))
+                .filter(pictures.c.id.is_not(None))
                 .label("images"),
                 func.array_agg(func.distinct(nomenclature_barcodes.c.code))
                 .filter(nomenclature_barcodes.c.code.is_not(None))
@@ -869,13 +892,29 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             product_dict["listing_pos"] = (request.page - 1) * request.size + index + 1
             product_dict["listing_page"] = request.page
 
-            # Images
+            # Images - преобразуем ID фото в публичные URL
             images = product_dict.get("images")
-            product_dict["images"] = (
-                [self.__transform_photo_route(url) for url in images if url]
-                if images and any(images)
-                else None
-            )
+            # PostgreSQL array_agg возвращает список или None
+            if images is not None:
+                # array_agg может вернуть список, даже если он пустой
+                if isinstance(images, list):
+                    # Фильтруем None значения и преобразуем ID в URL
+                    image_ids = [pid for pid in images if pid is not None]
+                    if image_ids:
+                        product_dict["images"] = [
+                            self.__build_picture_url(picture_id)
+                            for picture_id in image_ids
+                        ]
+                        # Убираем None значения
+                        product_dict["images"] = [
+                            url for url in product_dict["images"] if url is not None
+                        ] or None
+                    else:
+                        product_dict["images"] = None
+                else:
+                    product_dict["images"] = None
+            else:
+                product_dict["images"] = None
 
             # Barcodes
             barcodes = product_dict.get("barcodes")
