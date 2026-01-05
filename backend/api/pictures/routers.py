@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 
 import api.pictures.schemas as schemas
+from common.utils.url_helper import get_app_url_for_environment
 from database import db
 from database.db import database, pictures
 from functions.filter_schemas import PicturesFiltersQuery
@@ -32,7 +33,13 @@ ALLOWED_CONTENT_TYPES = {
 
 
 def build_public_url(picture_id: int) -> str:
-    base = environ.get("APP_URL").rstrip("/")
+    base = get_app_url_for_environment()
+    if not base:
+        raise ValueError("APP_URL не настроен для текущего окружения")
+    base = base.rstrip("/")
+    # Добавляем протокол, если его нет
+    if not base.startswith(("http://", "https://")):
+        base = f"https://{base}"
     return f"{base}/api/v1/pictures/{picture_id}/content"
 
 

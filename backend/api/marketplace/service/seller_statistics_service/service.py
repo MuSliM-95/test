@@ -1,7 +1,6 @@
-import os
-
 from sqlalchemy import Integer, and_, cast, desc, func, select
 
+from common.utils.url_helper import get_app_url_for_environment
 from database.db import (
     cboxes,
     database,
@@ -19,7 +18,9 @@ from .schemas import SellerStatisticsItem, SellerStatisticsResponse
 class MarketplaceSellerStatisticsService:
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
-        base_url = os.getenv("APP_URL")
+        base_url = get_app_url_for_environment()
+        if not base_url:
+            raise ValueError("APP_URL не настроен для текущего окружения")
         photo_url = photo_path.lstrip("/")
 
         if "seller" in photo_url:

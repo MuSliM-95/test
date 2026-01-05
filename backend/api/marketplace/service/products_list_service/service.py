@@ -1,5 +1,4 @@
 import json
-import os
 from datetime import datetime
 from typing import List, Optional
 
@@ -18,6 +17,7 @@ from api.marketplace.service.products_list_service.schemas import (
     MarketplaceSort,
     product_buttons_text,
 )
+from common.utils.url_helper import get_app_url_for_environment
 from database.db import (
     categories,
     cboxes,
@@ -43,8 +43,12 @@ from database.db import (
 
 class MarketplaceProductsListService(BaseMarketplaceService):
     @staticmethod
-    def __transform_photo_route(photo_path: str) -> str:
-        base_url = os.getenv("APP_URL")
+    def __transform_photo_route(photo_path: Optional[str]) -> Optional[str]:
+        if not photo_path:
+            return None
+        base_url = get_app_url_for_environment()
+        if not base_url:
+            raise ValueError("APP_URL не настроен для текущего окружения")
         photo_url = photo_path.lstrip("/")
 
         if "seller" in photo_url:
@@ -158,7 +162,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             )
             .join(price_types, price_types.c.id == active_prices_subquery.c.price_type)
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
-            .join(users, users.c.id == cboxes.c.admin)
+            .join(users, users.c.id == cboxes.c.admin, isouter=True)
             .join(
                 pictures,
                 and_(
@@ -218,6 +222,23 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         product = dict(row)
 
         # Отдельный запрос для получения складов с остатками
+        # ОПТИМИЗАЦИЯ: Используем подзапрос с MAX вместо прямого запроса - получаем только последние остатки
+        wb_max_for_product = (
+            select(
+                warehouse_balances.c.organization_id,
+                warehouse_balances.c.warehouse_id,
+                warehouse_balances.c.nomenclature_id,
+                func.max(warehouse_balances.c.id).label("max_id"),
+            )
+            .where(warehouse_balances.c.nomenclature_id == product_id)
+            .group_by(
+                warehouse_balances.c.organization_id,
+                warehouse_balances.c.warehouse_id,
+                warehouse_balances.c.nomenclature_id,
+            )
+            .subquery()
+        )
+
         warehouses_query = (
             select(
                 warehouses.c.id.label("warehouse_id"),
@@ -228,14 +249,25 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 warehouse_balances.c.current_amount,
                 warehouse_balances.c.organization_id,
             )
-            .select_from(warehouse_balances)
-            .join(
-                warehouses,
-                and_(
-                    warehouses.c.id == warehouse_balances.c.warehouse_id,
-                    # warehouses.c.status.is_(True),
-                    warehouses.c.is_deleted.is_not(True),
-                ),
+            .select_from(
+                warehouse_balances.join(
+                    wb_max_for_product,
+                    and_(
+                        warehouse_balances.c.organization_id
+                        == wb_max_for_product.c.organization_id,
+                        warehouse_balances.c.warehouse_id
+                        == wb_max_for_product.c.warehouse_id,
+                        warehouse_balances.c.nomenclature_id
+                        == wb_max_for_product.c.nomenclature_id,
+                        warehouse_balances.c.id == wb_max_for_product.c.max_id,
+                    ),
+                ).join(
+                    warehouses,
+                    and_(
+                        warehouses.c.id == warehouse_balances.c.warehouse_id,
+                        warehouses.c.is_deleted.is_not(True),
+                    ),
+                )
             )
             .where(
                 and_(
@@ -607,7 +639,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 price_types.c.id == active_prices_subquery.c.price_type,
             )
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
-            .join(users, users.c.id == cboxes.c.admin)
+            .join(users, users.c.id == cboxes.c.admin, isouter=True)
             .join(
                 pictures,
                 and_(
@@ -825,8 +857,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 stock_subquery.c.nomenclature_id == nomenclature.c.id,
                 isouter=True,
             )
-            .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
-            .join(users, users.c.id == cboxes.c.admin)
             .where(and_(*conditions))
         )
         count_result = await database.fetch_one(count_query)
