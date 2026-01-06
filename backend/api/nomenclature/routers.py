@@ -15,6 +15,7 @@ import api.nomenclature.schemas as schemas
 from api.marketplace.service.public_categories.public_categories_service import (
     MarketplacePublicCategoriesService,
 )
+from api.pictures.routers import build_public_url
 from database.db import (
     categories,
     database,
@@ -669,6 +670,18 @@ async def get_nomenclature(
             )
             photos_list = await database.fetch_all(photos_query)
             photos_list = [*map(datetime_to_timestamp, photos_list)]
+            # Добавляем public_url и подготавливаем url для фронтенда
+            # Фронтенд использует url и формирует /api/v1/photos/{url}/
+            # Endpoint /photos/{filename:path} добавит префикс "photos/" автоматически
+            for photo in photos_list:
+                photo["public_url"] = build_public_url(photo["id"])
+                # Убираем префикс "photos/" из url, чтобы фронтенд правильно сформировал путь
+                # В БД: "photos/2026/01/05/1/file.jpg"
+                # Для фронтенда: "2026/01/05/1/file.jpg"
+                # Фронтенд сформирует: /api/v1/photos/2026/01/05/1/file.jpg/
+                # Endpoint получит: "2026/01/05/1/file.jpg" и добавит "photos/" -> "photos/2026/01/05/1/file.jpg"
+                if photo.get("url") and photo["url"].startswith("photos/"):
+                    photo["url"] = photo["url"][7:]  # Убираем "photos/" (7 символов)
             nomenclature_info["photos"] = photos_list
         if with_hash:
             final_hash_string = None
