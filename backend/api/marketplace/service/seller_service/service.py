@@ -1,5 +1,4 @@
 import io
-import os
 from os import environ
 from typing import Optional
 from uuid import uuid4
@@ -14,6 +13,7 @@ from api.marketplace.service.seller_service.schemas import (
     SellerResponse,
     SellerUpdateRequest,
 )
+from common.utils.url_helper import get_app_url_for_environment
 from database.db import cboxes, database, users
 from functions.helpers import get_user_by_token
 
@@ -38,8 +38,10 @@ class MarketplaceSellerService(BaseMarketplaceService):
 
     @staticmethod
     def __transform_photo_route(photo_path: str) -> str:
-        base_url = os.getenv("APP_URL")
-        return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+        base_url = get_app_url_for_environment()
+        if not base_url:
+            raise ValueError("APP_URL не настроен для текущего окружения")
+        return f"https://{base_url}/api/v1/{photo_path.lstrip('/')}"
 
     async def update_seller_profile(
         self,

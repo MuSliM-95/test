@@ -71,16 +71,24 @@ async def get_picture_by_id(token: str, idx: int):
     return picture_db
 
 
-@router.get("/photos/{filename}/")
+@router.get("/photos/{filename:path}")
 async def get_picture_by_filename(filename: str):
     """Публичный доступ к фото по имени файла (обратная совместимость со старыми URL)"""
-    # Разрешаем имена как у старых файлов: nomenclature_39663_78d9b9b5.jpg
-    if not re.match(
-        r"^[a-zA-Z0-9_\-\.]+\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE
-    ):
-        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    # Поддерживаем как старый формат (nomenclature_39663_78d9b9b5.jpg),
+    # так и новый формат с путями (2025/12/21/4/938bd650df9248aabc21c0be8edc35e2.jpg)
 
-    file_key = f"photos/{filename}"
+    # Убираем начальный и завершающий слэш, если есть
+    filename = filename.strip("/")
+
+    # Проверяем, что файл имеет допустимое расширение
+    if not re.search(r"\.(jpg|jpeg|png|gif|pdf)$", filename, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="Недопустимое расширение файла")
+
+    # Если путь уже содержит "photos/", используем его как есть
+    if filename.startswith("photos/"):
+        file_key = filename
+    else:
+        file_key = f"photos/{filename}"
 
     async with s3_session.client(**s3_data) as s3:
         try:
