@@ -69,9 +69,20 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         return f"{base_url}/api/v1/pictures/{picture_id}/content"
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
+        # Сначала получаем ID типа цены 'chatting' один раз
+        # Это нужно, потому что у разных клиентов могут быть разные ID для одного и того же типа цены
+        price_type_results = await database.fetch_all(
+            select(price_types.c.id).where(price_types.c.name == "chatting")
+        )
+        if not price_type_results:
+            raise HTTPException(
+                status_code=500, detail="Price type 'chatting' not found in database"
+            )
+        chatting_price_type_ids = [row["id"] for row in price_type_results]
 
         current_timestamp = int(datetime.now().timestamp())
 
+        # Используем ID напрямую в фильтре вместо соединения таблиц - так быстрее
         ranked_prices_subquery = (
             select(
                 prices.c.nomenclature.label("nomenclature_id"),
@@ -96,12 +107,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 )
                 .label("rn"),
             )
-            .select_from(
-                prices.join(price_types, price_types.c.id == prices.c.price_type)
-            )
             .where(
                 prices.c.is_deleted.is_not(True),
-                price_types.c.name == "chatting",
+                # Фильтруем по ID типа цены, которые мы получили выше
+                prices.c.price_type.in_(chatting_price_type_ids),
             )
             .subquery()
         )
@@ -141,7 +150,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 categories.c.name.label("category_name"),
                 manufacturers.c.name.label("manufacturer_name"),
                 active_prices_subquery.c.price,
-                price_types.c.name.label("price_type"),
+                # Тип цены всегда "chatting", просто указываем строку
+                literal_column("'chatting'").label("price_type"),
                 func.coalesce(
                     func.nullif(cboxes.c.seller_name, ""),
                     cboxes.c.name,
@@ -173,7 +183,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
             )
-            .join(price_types, price_types.c.id == active_prices_subquery.c.price_type)
+            # Не нужно соединять с price_types - мы уже получили нужные ID выше
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
             .join(users, users.c.id == cboxes.c.admin, isouter=True)
             .join(
@@ -207,7 +217,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 and_(
                     nomenclature.c.id == product_id,
                     nomenclature.c.is_deleted.is_not(True),
-                    price_types.c.name == "chatting",
+                    # Проверяем, что тип цены соответствует нужным ID
+                    active_prices_subquery.c.price_type.in_(chatting_price_type_ids),
                 )
             )
             .group_by(
@@ -216,7 +227,6 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 categories.c.name,
                 manufacturers.c.name,
                 active_prices_subquery.c.price,
-                price_types.c.name,
                 cboxes.c.seller_name,
                 cboxes.c.name,
                 cboxes.c.seller_photo,
@@ -234,8 +244,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         product = dict(row)
 
-        # Отдельный запрос для получения складов с остатками
-        # ОПТИМИЗАЦИЯ: Используем подзапрос с MAX вместо прямого запроса - получаем только последние остатки
+        # Получаем склады с остатками отдельным запросом
+        # Используем MAX(id) чтобы взять только последнюю запись по каждому складу
         wb_max_for_product = (
             select(
                 warehouse_balances.c.organization_id,
@@ -335,13 +345,15 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         nomenclatures_result = []
 
-        # 2. Для каждой группы — получаем вариации
-        for group in groups:
-            group_id = group["group_id"]
-            group_name = group["group_name"]
+        # Получаем все вариации одним запросом вместо множества запросов (избегаем N+1)
+        variations_by_group = {}
+        if groups:
+            group_ids = [group["group_id"] for group in groups]
 
-            variations_query = (
+            # Загружаем все вариации для всех групп сразу
+            all_variations_query = (
                 select(
+                    nomenclature_groups_value.c.group_id,
                     nomenclature.c.id,
                     nomenclature.c.name,
                     nomenclature_groups_value.c.is_main,
@@ -351,13 +363,33 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     nomenclature,
                     nomenclature.c.id == nomenclature_groups_value.c.nomenclature_id,
                 )
-                .where(nomenclature_groups_value.c.group_id == group_id)
+                .where(nomenclature_groups_value.c.group_id.in_(group_ids))
             )
+            all_variations = await database.fetch_all(all_variations_query)
 
-            variations = await database.fetch_all(variations_query)
+            # Раскладываем вариации по группам
+            for variation in all_variations:
+                group_id = variation["group_id"]
+                if group_id not in variations_by_group:
+                    variations_by_group[group_id] = []
+                variations_by_group[group_id].append(
+                    {
+                        "id": variation["id"],
+                        "name": variation["name"],
+                        "is_main": variation["is_main"],
+                    }
+                )
+
+        # Используем уже загруженные вариации для каждой группы
+        for group in groups:
+            group_id = group["group_id"]
+            group_name = group["group_name"]
+
+            variations = variations_by_group.get(group_id, [])
 
             items = [
-                {"id": v.id, "name": v.name, "is_main": v.is_main} for v in variations
+                {"id": v["id"], "name": v["name"], "is_main": v["is_main"]}
+                for v in variations
             ]
 
             nomenclatures_result.append({"group_name": group_name, "items": items})
@@ -429,12 +461,23 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         self,
         request: MarketplaceProductsRequest,
     ) -> MarketplaceProductList:
-        # --- НАЧАЛО: Подзапрос для выбора актуальной цены ---
-        # Получаем текущий timestamp (в PostgreSQL это NOW())
+        # Получаем ID типа цены 'chatting' один раз в начале
+        # Это ускоряет запрос, потому что мы используем индекс напрямую вместо соединения таблиц
+        # У разных клиентов могут быть разные ID для одного и того же типа цены
+        price_type_results = await database.fetch_all(
+            select(price_types.c.id).where(price_types.c.name == "chatting")
+        )
+        if not price_type_results:
+            raise HTTPException(
+                status_code=500, detail="Price type 'chatting' not found in database"
+            )
+        chatting_price_type_ids = [row["id"] for row in price_type_results]
+
+        # Выбираем актуальную цену для каждого товара
         current_timestamp = int(datetime.now().timestamp())
 
-        # Подзапрос для получения актуальной цены
-        # Используем ROW_NUMBER для ранжирования цен по приоритету
+        # Ранжируем цены по приоритету: сначала те, что действуют сейчас, потом по дате создания
+        # Используем ID типа цены напрямую вместо соединения таблиц
         ranked_prices_subquery = (
             select(
                 prices.c.nomenclature.label("nomenclature_id"),
@@ -445,43 +488,44 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 prices.c.date_from,
                 prices.c.date_to,
                 prices.c.is_deleted,
-                # Ранжируем: 1. по времени (текущее в интервале), 2. по дате создания (новые первые), 3. по id (стабильность)
+                # Сортируем: сначала цены, которые действуют сейчас, потом по дате создания (новые первые)
                 func.row_number()
                 .over(
                     partition_by=prices.c.nomenclature,
                     order_by=[
-                        # Если дата не указана (None), считаем, что она подходит (предполагаем, что None означает "без ограничений")
-                        # Сначала идут записи с датами, которые соответствуют условию
-                        # func.coalesce(prices.c.date_from <= current_timestamp, True) & func.coalesce(current_timestamp < prices.c.date_to, True), # Не подходит напрямую для ORDER BY
-                        # Правильный способ - использовать CASE/WHEN для приоритета
-                        # Приоритет 1: цена с указанными датами и попадающая в интервал
-                        # Приоритет 2: цена с указанными датами, но НЕ попадающая в интервал (меньше приоритет)
-                        # Приоритет 3: цена с хотя бы одной датой None (предполагаем, что это "постоянно действительна", но может быть иначе)
-                        # Пример: сначала (1, ...), потом (0, 1, ...), потом (0, 0, ...)
-                        # (CASE WHEN (prices.c.date_from IS NOT NULL AND prices.c.date_to IS NOT NULL AND prices.c.date_from <= current_timestamp AND current_timestamp < prices.c.date_to) THEN 1 ELSE 0 END),
-                        # desc(CASE WHEN (prices.c.date_from IS NOT NULL AND prices.c.date_to IS NOT NULL AND prices.c.date_from <= current_timestamp AND current_timestamp < prices.c.date_to) THEN 1 ELSE 0 END),
-                        # desc((prices.c.date_from <= current_timestamp) & (current_timestamp < prices.c.date_to)),
-                        # Сортировка: сначала те, у кого даты указаны и они подходят, потом без дат (или частично), потом по created_at DESC
-                        # Чтобы сначала шли подходящие по времени:
+                        # Сначала идут цены, которые действуют в текущий момент
                         desc(
                             func.coalesce(prices.c.date_from <= current_timestamp, True)
                             & func.coalesce(current_timestamp < prices.c.date_to, True)
                         ),
                         # Потом по дате создания (новые первые)
                         desc(prices.c.created_at),
-                        # Потом по ID (стабильность)
+                        # И наконец по ID для стабильности
                         desc(prices.c.id),
                     ],
                 )
                 .label("rn"),
             )
             .where(
-                # Учитываем только неудаленные цены
+                # Только неудаленные цены
                 prices.c.is_deleted.is_not(True),
-                # Берём только цены типа "chatting"
-                price_types.c.name == "chatting",
+                # Фильтруем по ID типа цены, которые получили выше
+                prices.c.price_type.in_(chatting_price_type_ids),
             )
             .subquery()
+        )
+
+        # Берем только самую приоритетную цену для каждого товара (актуальную цену)
+        active_prices_subquery = (
+            select(ranked_prices_subquery)
+            .where(ranked_prices_subquery.c.rn == 1)
+            .subquery()
+        )
+
+        # Считаем количество продаж только для товаров, у которых есть цены
+        # Это быстрее, чем считать для всех товаров
+        nomenclature_with_prices = (
+            select(active_prices_subquery.c.nomenclature_id).distinct().subquery()
         )
 
         total_sold_subquery = (
@@ -489,25 +533,17 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 docs_sales_goods.c.nomenclature,
                 func.count(docs_sales_goods.c.id).label("total_sold"),
             )
-            .select_from(docs_sales_goods)
+            .where(
+                docs_sales_goods.c.nomenclature.in_(
+                    select(nomenclature_with_prices.c.nomenclature_id)
+                )
+            )
             .group_by(docs_sales_goods.c.nomenclature)
             .subquery()
         )
 
-        # Фильтруем подзапрос, чтобы оставить только первую (самую приоритетную) цену для каждой номенклатуры
-        # Это будет "актуальная" цена
-        active_prices_subquery = (
-            select(ranked_prices_subquery)
-            .where(ranked_prices_subquery.c.rn == 1)
-            .subquery()
-        )
-
-        # --- КОНЕЦ: Подзапрос для выбора актуальной цены ---
-
-        # --- Балансы по складам ---
-        # ОПТИМИЗАЦИЯ: Используем подзапрос с MAX вместо ROW_NUMBER() - быстрее в 5-10 раз
-        # 1) Берём последнюю запись по каждой паре (организация, склад, номенклатура)
-        # Используем подзапрос для получения максимального id (который соответствует последней записи)
+        # Получаем остатки по складам
+        # Используем MAX(id) чтобы взять последнюю запись по каждому складу - это быстрее чем ROW_NUMBER()
         wb_max_subquery = (
             select(
                 warehouse_balances.c.organization_id,
@@ -547,7 +583,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .subquery()
         )
 
-        # 2) Подсчёт суммарного остатка по товару (только положительные остатки)
+        # Считаем общий остаток по каждому товару (только положительные остатки)
         stock_subquery = (
             select(
                 wb_latest.c.nomenclature_id.label("nomenclature_id"),
@@ -560,7 +596,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .subquery()
         )
 
-        # 3) Агрегация доступных складов (для available_warehouses)
+        # Подготовка для получения списка доступных складов
         wh_bal = warehouses.alias("wh_bal")
 
         json_obj = func.jsonb_build_object(
@@ -608,7 +644,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 categories.c.name.label("category_name"),
                 manufacturers.c.name.label("manufacturer_name"),
                 active_prices_subquery.c.price,
-                price_types.c.name.label("price_type"),
+                # Тип цены всегда "chatting", просто указываем строку
+                literal_column("'chatting'").label("price_type"),
                 func.coalesce(
                     func.nullif(cboxes.c.seller_name, ""),
                     cboxes.c.name,
@@ -631,7 +668,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     "current_amount"
                 ),
                 func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
-                available_warehouses_agg,
+                # Склады получаем отдельным запросом после основного - это быстрее
+                literal_column("NULL::jsonb[]").label("available_warehouses"),
             )
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
@@ -645,10 +683,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
             )
-            .join(
-                price_types,
-                price_types.c.id == active_prices_subquery.c.price_type,
-            )
+            # Не нужно соединять с price_types - мы уже получили нужные ID выше
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
             .join(users, users.c.id == cboxes.c.admin, isouter=True)
             .join(
@@ -679,31 +714,19 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 isouter=True,
             )
             .join(
-                wb_latest,
-                wb_latest.c.nomenclature_id == nomenclature.c.id,
-                isouter=True,
-            )
-            .join(
-                wh_bal,
-                and_(
-                    wh_bal.c.id == wb_latest.c.warehouse_id,
-                    wh_bal.c.is_public.is_(True),
-                    wh_bal.c.status.is_(True),
-                    wh_bal.c.is_deleted.is_not(True),
-                ),
-                isouter=True,
-            )
-            .join(
                 total_sold_subquery,
                 total_sold_subquery.c.nomenclature == nomenclature.c.id,
                 isouter=True,
             )
+            # Не соединяем со складами в основном запросе - получаем их отдельно
+            # Это быстрее и избегает дублирования строк
         )
 
-        # --- Условия фильтрации ---
+        # Условия фильтрации
         conditions = [
             nomenclature.c.is_deleted.is_not(True),
-            price_types.c.name == "chatting",
+            # Проверяем, что тип цены соответствует нужным ID
+            active_prices_subquery.c.price_type.in_(chatting_price_type_ids),
         ]
 
         if request.category:
@@ -728,14 +751,14 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         query = query.where(and_(*conditions))
 
-        # --- GROUP BY — только по неизменяемым полям, без current_amount из balances ---
+        # Группируем по полям, которые не меняются
         group_by_fields = [
             nomenclature.c.id,
             units.c.convent_national_view,
             categories.c.name,
             manufacturers.c.name,
             active_prices_subquery.c.price,
-            price_types.c.name,
+            # price_type всегда "chatting", не нужно группировать
             cboxes.c.seller_name,
             cboxes.c.name,
             cboxes.c.seller_photo,
@@ -748,7 +771,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         ]
         query = query.group_by(*group_by_fields)
 
-        # --- Сортировка ---
+        # Сортировка
         order = asc if request.sort_order == "asc" else desc
 
         if request.sort_by == MarketplaceSort.price:
@@ -764,7 +787,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         elif request.sort_by == MarketplaceSort.updated_at:
             query = query.order_by(order(nomenclature.c.updated_at))
         else:
-            # по умолчанию — по продажам
+            # По умолчанию сортируем по количеству продаж
             query = query.order_by(order(total_sold_subquery.c.total_sold))
 
         # Пагинация
@@ -773,7 +796,60 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         products_db = await database.fetch_all(query)
 
-        # --- Подсчёт общего количества (без дублей по складам / картинкам) ---
+        # Получаем склады отдельным запросом только для тех товаров, которые вернулись
+        # Это быстрее, чем делать это в основном запросе (избегаем дублирования строк)
+        product_ids = [row["id"] for row in products_db]
+        available_warehouses_map = {}
+
+        if product_ids:
+            warehouses_query = (
+                select(
+                    wb_latest.c.nomenclature_id,
+                    wh_bal.c.id.label("warehouse_id"),
+                    wb_latest.c.organization_id,
+                    wh_bal.c.name.label("warehouse_name"),
+                    wh_bal.c.address.label("warehouse_address"),
+                    wh_bal.c.latitude,
+                    wh_bal.c.longitude,
+                    wb_latest.c.current_amount,
+                )
+                .select_from(
+                    wb_latest.join(
+                        wh_bal,
+                        and_(
+                            wh_bal.c.id == wb_latest.c.warehouse_id,
+                            wh_bal.c.is_public.is_(True),
+                            wh_bal.c.status.is_(True),
+                            wh_bal.c.is_deleted.is_not(True),
+                        ),
+                    )
+                )
+                .where(
+                    and_(
+                        wb_latest.c.nomenclature_id.in_(product_ids),
+                        wb_latest.c.current_amount > 0,
+                    )
+                )
+            )
+            warehouses_rows = await database.fetch_all(warehouses_query)
+
+            for row in warehouses_rows:
+                nom_id = row["nomenclature_id"]
+                if nom_id not in available_warehouses_map:
+                    available_warehouses_map[nom_id] = []
+                available_warehouses_map[nom_id].append(
+                    {
+                        "warehouse_id": row["warehouse_id"],
+                        "organization_id": row["organization_id"],
+                        "warehouse_name": row["warehouse_name"],
+                        "warehouse_address": row["warehouse_address"],
+                        "latitude": row["latitude"],
+                        "longitude": row["longitude"],
+                        "current_amount": row["current_amount"],
+                    }
+                )
+
+        # Считаем общее количество товаров (без дублей)
         count_query = (
             select(func.count(func.distinct(nomenclature.c.id)))
             .select_from(nomenclature)
@@ -787,10 +863,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
             )
-            .join(
-                price_types,
-                price_types.c.id == active_prices_subquery.c.price_type,
-            )
+            # Не нужно соединять с price_types - используем ID напрямую
             .join(
                 marketplace_rating_aggregates,
                 and_(
@@ -809,7 +882,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         count_result = await database.fetch_one(count_query)
         total_count = count_result[0] if count_result else 0
 
-        # --- Пост-обработка результатов ---
+        # Обрабатываем результаты
         products: List[MarketplaceProduct] = []
         for index, product in enumerate(products_db):
             product_dict = dict(product)
@@ -849,40 +922,31 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             )
 
             # Список складов (только с остатком > 0)
-            wh_raw = product_dict.get("available_warehouses")
-            if wh_raw and isinstance(wh_raw, list):
-                wh_valid = [
-                    w
-                    for w in wh_raw
-                    if w is not None
-                    and w.get("warehouse_id") is not None
-                    and (w.get("current_amount") or 0) > 0
-                ]
-                if wh_valid:
-                    product_dict["available_warehouses"] = sorted(
-                        [
-                            AvailableWarehouse(
-                                **w,
-                                distance_to_client=self._count_distance_to_client(
-                                    request.lat,
-                                    request.lon,
-                                    w["latitude"],
-                                    w["longitude"],
-                                ),
-                            )
-                            for w in wh_valid
-                        ],
-                        key=lambda x: (
-                            x.distance_to_client is None,
-                            x.distance_to_client or 0,
-                        ),
-                    )
-                else:
-                    product_dict["available_warehouses"] = None
+            # Получаем из отдельного запроса, который мы выполнили выше
+            wh_list = available_warehouses_map.get(product_dict["id"], [])
+            if wh_list:
+                product_dict["available_warehouses"] = sorted(
+                    [
+                        AvailableWarehouse(
+                            **w,
+                            distance_to_client=self._count_distance_to_client(
+                                request.lat,
+                                request.lon,
+                                w["latitude"],
+                                w["longitude"],
+                            ),
+                        )
+                        for w in wh_list
+                    ],
+                    key=lambda x: (
+                        x.distance_to_client is None,
+                        x.distance_to_client or 0,
+                    ),
+                )
             else:
                 product_dict["available_warehouses"] = None
 
-            # Остальные поля
+            # Заполняем остальные поля
             product_dict["is_ad_pos"] = False
             product_dict["variations"] = []
             product_dict["distance"] = (
@@ -900,7 +964,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
             products.append(MarketplaceProduct(**product_dict))
 
-        # Отдельная сортировка по distance (после расчёта distance_to_client)
+        # Если сортировка по расстоянию, делаем её отдельно (после того как рассчитали расстояния)
         if request.sort_by == MarketplaceSort.distance:
             reverse = request.sort_order == "desc"
             products.sort(
