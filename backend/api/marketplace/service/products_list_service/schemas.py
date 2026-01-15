@@ -64,6 +64,9 @@ class MarketplaceProduct(BaseModel):
 
     available_warehouses: Optional[List[AvailableWarehouse]] = None
 
+    production_time_min_from: Optional[int] = None
+    production_time_min_to: Optional[int] = None
+
     class Config:
         orm_mode = True
 

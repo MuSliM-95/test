@@ -786,6 +786,8 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("seo_title", String),
     sqlalchemy.Column("seo_description", String),
     sqlalchemy.Column("seo_keywords", ARRAY(item_type=String)),
+    sqlalchemy.Column("production_time_min_from", Integer, nullable=True),
+    sqlalchemy.Column("production_time_min_to", Integer, nullable=True),
 )
 
 nomenclature_attributes = sqlalchemy.Table(

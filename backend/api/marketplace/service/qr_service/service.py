@@ -40,6 +40,8 @@ class MarketplaceQrService(BaseMarketplaceService):
                 nomenclature.c.city,
                 nomenclature.c.cashbox,
                 nomenclature.c.public,
+                nomenclature.c.production_time_min_from,
+                nomenclature.c.production_time_min_to,
             ).where(
                 and_(
                     nomenclature.c.id == nomenclature_db.nomenclature_id,
@@ -81,6 +83,8 @@ class MarketplaceQrService(BaseMarketplaceService):
                 "price_type": price_data.price_type if price_data else "chatting",
                 "images": [],
                 "barcodes": [],
+                "production_time_min_from": product.production_time_min_from,
+                "production_time_min_to": product.production_time_min_to,
             }
             return QRResolveResponse(
                 type=QrEntityTypes.NOMENCLATURE,
