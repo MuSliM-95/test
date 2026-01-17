@@ -31,19 +31,26 @@ def upgrade() -> None:
         unique=False,
     )
 
-    # Инициализируем значение has_products для существующих категорий
-    # (будет обновлено при первом запуске синхронизации или при следующем изменении товаров)
-    op.execute(
+    # Инициализируем значение has_products для существующих категорий.
+    # Если колонка global_category_id в таблице nomenclature по каким-то причинам
+    # ещё не существует (несогласованность состояний миграций между ветками),
+    # просто пропускаем инициализацию, оставляя значение по умолчанию.
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    nomenclature_columns = [col["name"] for col in inspector.get_columns("nomenclature")]
+
+    if "global_category_id" in nomenclature_columns:
+        op.execute(
+            """
+            UPDATE global_categories gc
+            SET has_products = EXISTS(
+                SELECT 1
+                FROM nomenclature n
+                WHERE n.global_category_id = gc.id
+                  AND n.is_deleted IS NOT TRUE
+            )
         """
-        UPDATE global_categories gc
-        SET has_products = EXISTS(
-            SELECT 1
-            FROM nomenclature n
-            WHERE n.global_category_id = gc.id
-              AND n.is_deleted IS NOT TRUE
         )
-    """
-    )
 
 
 def downgrade() -> None:
