@@ -80,7 +80,8 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
         entity_type = ENTITY_TYPE_NOMENCLATURE
         entity_id = nomenclature_id
 
-        await self._validate_contragent(phone, nomenclature_id)
+        # Для избранного не проверяем кешбокс: посетитель может сохранять товары
+        # любых продавцов; контрагент может ещё не существовать или быть в другом кешбоксе.
 
         product_query = select(nomenclature.c.id).where(
             and_(
@@ -158,19 +159,6 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
                 status_code=404,
                 detail="Запись в избранном не найдена или не принадлежит указанному пользователю",
             )
-
-        # Определяем cashbox_id из номенклатуры для правильного поиска контрагента
-        cashbox_id = await database.fetch_val(
-            select(nomenclature.c.cashbox).where(
-                nomenclature.c.id == favorite.entity_id
-            )
-        )
-
-        if cashbox_id is None:
-            raise HTTPException(status_code=404, detail="Номенклатура не найдена")
-
-        # Проверяем, что контрагент существует и принадлежит правильной кассе
-        await self._validate_contragent(contragent_phone, favorite.entity_id)
 
         delete_query = marketplace_favorites.delete().where(
             marketplace_favorites.c.id == favorite.id

@@ -3,7 +3,7 @@ from abc import ABC
 from typing import List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, desc, select, update
 
 from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import (
     CreateMarketplaceOrderMessage,
@@ -16,7 +16,13 @@ from api.marketplace.service.orders_service.schemas import (
     MarketplaceOrderResponse,
 )
 from api.marketplace.service.products_list_service.schemas import AvailableWarehouse
-from database.db import database, marketplace_orders, nomenclature
+from database.db import (
+    database,
+    marketplace_orders,
+    nomenclature,
+    organizations,
+    warehouse_balances,
+)
 
 
 class MarketplaceOrdersService(BaseMarketplaceService, ABC):
@@ -42,7 +48,9 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
 
     @staticmethod
     async def __transform_good(good: OrderGoodMessage) -> OrderGoodMessage:
-        if good.organization_id == -1:
+        # Если organization_id не задан и склад указан - находим organization_id по балансу
+        # Если склад не указан (warehouse_id = None) - organization_id остаётся -1
+        if good.organization_id == -1 and good.warehouse_id is not None:
             good.organization_id = (
                 await BaseMarketplaceService._get_latest_organization_id_for_balance(
                     warehouse_id=good.warehouse_id,
@@ -102,6 +110,7 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
             )
 
             # Если склад не задан — подбираем доступный
+            # Но если складов нет, склад остаётся None (не обязателен)
             if good.warehouse_id is None:
                 warehouses: List[AvailableWarehouse] = (
                     await self._fetch_available_warehouses(
@@ -110,20 +119,47 @@ class MarketplaceOrdersService(BaseMarketplaceService, ABC):
                         client_lon=order_request.client_lon,
                     )
                 )
-                if not warehouses:
-                    await self.__set_marketplace_order_status(
-                        marketplace_order_id,
-                        "error",
-                        f"Нет доступных складов с товаром nomenclature_id={good.nomenclature_id}",
+                if warehouses:
+                    # Если есть доступные склады, выбираем первый
+                    selected = warehouses[0]
+                    good.warehouse_id = selected.warehouse_id
+                    good.organization_id = selected.organization_id
+                else:
+                    # Если складов нет, пытаемся найти organization_id из любого остатка
+                    # для этой номенклатуры (нужно для создания документа продажи)
+                    org_query = (
+                        select(warehouse_balances.c.organization_id)
+                        .where(
+                            warehouse_balances.c.nomenclature_id == good.nomenclature_id
+                        )
+                        .order_by(
+                            desc(warehouse_balances.c.created_at),
+                            desc(warehouse_balances.c.id),
+                        )
+                        .limit(1)
                     )
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Нет доступных складов с товаром nomenclature_id={good.nomenclature_id}",
-                    )
-
-                selected = warehouses[0]
-                good.warehouse_id = selected.warehouse_id
-                good.organization_id = selected.organization_id
+                    org_row = await database.fetch_one(org_query)
+                    if org_row:
+                        good.organization_id = org_row.organization_id
+                    else:
+                        # Если остатков нет, берём первую организацию для cashbox
+                        # (нужно для создания документа продажи)
+                        default_org_query = (
+                            select(organizations.c.id)
+                            .where(
+                                and_(
+                                    organizations.c.cashbox == cashbox_id,
+                                    organizations.c.is_deleted.is_not(True),
+                                )
+                            )
+                            .limit(1)
+                        )
+                        default_org = await database.fetch_one(default_org_query)
+                        if default_org:
+                            good.organization_id = default_org.id
+                        # Если и организации нет, organization_id останется -1
+                        # (но это крайний случай, обычно организация должна быть)
+                    # warehouse_id остаётся None - это допустимо
 
             # Если склад задан, но organization_id не задан — вычисляем из последнего balance
             good = await self.__transform_good(good)
