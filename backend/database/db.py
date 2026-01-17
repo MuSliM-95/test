@@ -3233,6 +3233,7 @@ global_categories = sqlalchemy.Table(
     sqlalchemy.Column("external_id", String),
     sqlalchemy.Column("image_url", String),
     sqlalchemy.Column("is_active", Boolean, default=True),
+    sqlalchemy.Column("has_products", Boolean, nullable=True, server_default="false"),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column(
         "updated_at",

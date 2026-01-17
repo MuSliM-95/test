@@ -15,6 +15,11 @@ import api.nomenclature.schemas as schemas
 from api.marketplace.service.public_categories.public_categories_service import (
     MarketplacePublicCategoriesService,
 )
+from api.nomenclature.utils import (
+    auto_link_global_category,
+    sync_global_category_for_nomenclature,
+    update_category_has_products,
+)
 from api.pictures.routers import build_public_url
 from database.db import (
     categories,
@@ -768,10 +773,36 @@ async def new_nomenclature(
                 await public_categories_service.ensure_global_category_exists(
                     nomenclature_values["global_category_id"]
                 )
+            else:
+                # Автоматически связываем с глобальной категорией, если не указано
+                if nomenclature_values.get("category") is not None:
+                    global_cat_id = await auto_link_global_category(
+                        nomenclature_values["category"]
+                    )
+                    if global_cat_id:
+                        nomenclature_values["global_category_id"] = global_cat_id
 
             query = nomenclature.insert().values(nomenclature_values)
             nomenclature_id = await database.execute(query)
             inserted_ids.add(nomenclature_id)
+
+            # Дополнительная синхронизация после создания
+            global_cat_id = None
+            if nomenclature_values.get("category") and not nomenclature_values.get(
+                "global_category_id"
+            ):
+                global_cat_id = await sync_global_category_for_nomenclature(
+                    nomenclature_id, nomenclature_values["category"]
+                )
+            elif nomenclature_values.get("global_category_id"):
+                global_cat_id = nomenclature_values.get("global_category_id")
+
+            # Обновляем has_products для категории после создания товара
+            if global_cat_id:
+                try:
+                    await update_category_has_products(global_cat_id)
+                except Exception:
+                    pass  # Игнорируем ошибки обновления, чтобы не ломать создание товара
 
         query = nomenclature.select().where(
             nomenclature.c.cashbox == user.cashbox_id,
@@ -842,6 +873,24 @@ async def edit_nomenclature(
             await public_categories_service.ensure_global_category_exists(
                 nomenclature_values["global_category_id"]
             )
+        else:
+            # Автоматически связываем с глобальной категорией, если не указано
+            if nomenclature_values.get("category") is not None:
+                global_cat_id = await auto_link_global_category(
+                    nomenclature_values["category"]
+                )
+                if global_cat_id:
+                    nomenclature_values["global_category_id"] = global_cat_id
+            elif nomenclature_db.get("category"):
+                # Если категория не меняется, но global_category_id не указан, синхронизируем
+                global_cat_id = await sync_global_category_for_nomenclature(
+                    idx, nomenclature_db.get("category")
+                )
+                if global_cat_id:
+                    nomenclature_values["global_category_id"] = global_cat_id
+
+        # Сохраняем старую категорию для обновления has_products
+        old_global_category_id = nomenclature_db.get("global_category_id")
 
         query = (
             nomenclature.update()
@@ -853,6 +902,27 @@ async def edit_nomenclature(
         await update_entity_hash(
             table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db
         )
+
+        # Обновляем has_products для старой и новой категории
+        categories_to_update = set()
+        if old_global_category_id:
+            categories_to_update.add(old_global_category_id)
+        new_global_category_id = nomenclature_values.get(
+            "global_category_id"
+        ) or nomenclature_db.get("global_category_id")
+        if new_global_category_id:
+            categories_to_update.add(new_global_category_id)
+
+        # Также обновляем, если изменился is_deleted
+        if "is_deleted" in nomenclature_values:
+            if new_global_category_id:
+                categories_to_update.add(new_global_category_id)
+
+        for cat_id in categories_to_update:
+            try:
+                await update_category_has_products(cat_id)
+            except Exception:
+                pass  # Игнорируем ошибки обновления
 
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
@@ -872,12 +942,17 @@ async def edit_nomenclature_mass(
     """Редактирование номенклатуры пачкой"""
     user = await get_user_by_token(token)
     response_body = []
+    categories_to_update = set()
+
     for nomenclature_in_list in nomenclature_data:
         idx = nomenclature_in_list.id
         nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
         nomenclature_values = nomenclature_in_list.dict(exclude_unset=True)
 
         del nomenclature_values["id"]
+
+        # Сохраняем старую категорию для обновления has_products
+        old_global_category_id = nomenclature_db.get("global_category_id")
 
         if nomenclature_values:
             if nomenclature_values.get("category") is not None:
@@ -895,6 +970,21 @@ async def edit_nomenclature_mass(
                 await public_categories_service.ensure_global_category_exists(
                     nomenclature_values["global_category_id"]
                 )
+            else:
+                # Автоматически связываем с глобальной категорией, если не указано
+                if nomenclature_values.get("category") is not None:
+                    global_cat_id = await auto_link_global_category(
+                        nomenclature_values["category"]
+                    )
+                    if global_cat_id:
+                        nomenclature_values["global_category_id"] = global_cat_id
+                elif nomenclature_db.get("category"):
+                    # Если категория не меняется, но global_category_id не указан, синхронизируем
+                    global_cat_id = await sync_global_category_for_nomenclature(
+                        idx, nomenclature_db.get("category")
+                    )
+                    if global_cat_id:
+                        nomenclature_values["global_category_id"] = global_cat_id
 
             query = (
                 nomenclature.update()
@@ -908,6 +998,18 @@ async def edit_nomenclature_mass(
             await update_entity_hash(
                 table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db
             )
+
+            # Собираем категории для обновления has_products
+            if old_global_category_id:
+                categories_to_update.add(old_global_category_id)
+            new_global_category_id = nomenclature_values.get(
+                "global_category_id"
+            ) or nomenclature_db.get("global_category_id")
+            if new_global_category_id:
+                categories_to_update.add(new_global_category_id)
+            # Также обновляем, если изменился is_deleted
+            if "is_deleted" in nomenclature_values and new_global_category_id:
+                categories_to_update.add(new_global_category_id)
 
         nomenclature_db = datetime_to_timestamp(nomenclature_db)
 

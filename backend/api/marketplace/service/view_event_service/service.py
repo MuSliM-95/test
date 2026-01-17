@@ -66,8 +66,9 @@ class MarketplaceViewEventService(BaseMarketplaceService):
         if request.event:
             conditions.append(marketplace_view_events.c.event == request.event.value)
         if request.contragent_phone:
+            # Используем cashbox_id из запроса для правильного поиска контрагента
             contragent_id = await self._get_contragent_id_by_phone(
-                request.contragent_phone
+                request.contragent_phone, cashbox_id=request.cashbox_id
             )
             conditions.append(marketplace_view_events.c.contragent_id == contragent_id)
         if request.from_time:

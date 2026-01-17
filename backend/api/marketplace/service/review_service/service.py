@@ -12,7 +12,11 @@ from api.marketplace.service.review_service.schemas import (
     ReviewListResponse,
     UpdateReviewRequest,
 )
-from database.db import database, marketplace_rating_aggregates, marketplace_reviews
+from database.db import (
+    database,
+    marketplace_rating_aggregates,
+    marketplace_reviews,
+)
 
 
 class MarketplaceReviewService(BaseMarketplaceService):

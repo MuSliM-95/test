@@ -258,10 +258,15 @@ async def remove_from_cart(
 async def get_global_categories(
     limit: int = 100,
     offset: int = 0,
+    only_with_products: bool = Query(
+        False, description="Показывать только категории с актуальными товарами"
+    ),
     service: MarketplaceService = Depends(get_marketplace_service),
 ):
     start = time.perf_counter()
-    data = await service.get_global_categories(limit=limit, offset=offset)
+    data = await service.get_global_categories(
+        limit=limit, offset=offset, only_with_products=only_with_products
+    )
     end_ms = int((time.perf_counter() - start) * 1000)
 
     return GlobalCategoryList(**data, processing_time_ms=end_ms)
@@ -269,10 +274,15 @@ async def get_global_categories(
 
 @router.get("/categories/tree/", response_model=GlobalCategoryTreeList)
 async def get_global_categories_tree(
+    only_with_products: bool = Query(
+        False, description="Показывать только категории с актуальными товарами"
+    ),
     service: MarketplaceService = Depends(get_marketplace_service),
 ):
     start = time.perf_counter()
-    data = await service.get_global_categories_tree()
+    data = await service.get_global_categories_tree(
+        only_with_products=only_with_products
+    )
     end_ms = int((time.perf_counter() - start) * 1000)
 
     return GlobalCategoryTreeList(**data, processing_time_ms=end_ms)
