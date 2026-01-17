@@ -16,7 +16,6 @@ async def init_avito_credentials():
         access_token = os.getenv("AVITO_ACCESS_TOKEN")
 
         if not api_key or not api_secret:
-            logger.info("AVITO_API_KEY/AVITO_API_SECRET not set — skipping Avito init")
             return
 
         avito_channel = await database.fetch_one(
@@ -39,15 +38,11 @@ async def init_avito_credentials():
                 channels.select().where(channels.c.id == channel_id)
             )
         else:
-            # Обновляем иконку для существующего канала, если она отсутствует
             if not avito_channel.get("svg_icon"):
                 await database.execute(
                     channels.update()
                     .where(channels.c.id == avito_channel["id"])
                     .values(svg_icon=AVITO_SVG_ICON, updated_at=datetime.utcnow())
-                )
-                logger.info(
-                    f"Updated Avito channel icon for channel {avito_channel['id']}"
                 )
 
         channel_id = avito_channel["id"]
@@ -85,7 +80,6 @@ async def init_avito_credentials():
                     from datetime import datetime as dt
 
                     token_expires_at = dt.fromisoformat(expires_at_str)
-                logger.info("Successfully obtained initial access_token from Avito API")
             except Exception as e:
                 logger.error(f"Failed to obtain access_token from Avito API: {e}")
 
@@ -123,9 +117,6 @@ async def init_avito_credentials():
                 .where(channel_credentials.c.id == existing["id"])
                 .values(**update_values)
             )
-            logger.info(
-                f"Updated Avito credentials for channel={channel_id} cashbox={cashbox_id}"
-            )
         else:
             insert_values = {
                 "channel_id": channel_id,
@@ -143,9 +134,6 @@ async def init_avito_credentials():
                 insert_values["token_expires_at"] = token_expires_at
 
             await database.execute(channel_credentials.insert().values(**insert_values))
-            logger.info(
-                f"Inserted Avito credentials for channel={channel_id} cashbox={cashbox_id}"
-            )
 
     except Exception as e:
-        logger.error(f"Failed to init Avito credentials from env: {e}", exc_info=True)
+        logger.error(f"Failed to init Avito credentials from env: {e}")

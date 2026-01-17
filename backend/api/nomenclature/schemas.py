@@ -32,6 +32,7 @@ class NomenclatureCreate(BaseModel):
     unit: Optional[int]
     category: Optional[int]
     manufacturer: Optional[int]
+    global_category_id: Optional[int] = None
     chatting_percent: Optional[int] = Field(default=None, le=100, gt=0)
     cashback_type: Optional[NomenclatureCashbackType] = (
         NomenclatureCashbackType.lcard_cashback
@@ -43,6 +44,13 @@ class NomenclatureCreate(BaseModel):
     seo_title: Optional[str]
     seo_description: Optional[str]
     seo_keywords: Optional[List[str]] = []
+
+    production_time_min_from: Optional[int] = Field(
+        None, description="Срок производства от (в минутах)", ge=0
+    )
+    production_time_min_to: Optional[int] = Field(
+        None, description="Срок производства до (в минутах)", ge=0
+    )
 
     class Config:
         orm_mode = True
@@ -65,6 +73,17 @@ class NomenclatureCreate(BaseModel):
                 )
 
         return tag_list
+
+    @validator("production_time_min_to")
+    def validate_production_time_range(cls, v, values):
+        """Проверяем, что 'до' не меньше 'от' если оба указаны"""
+        if v is not None and "production_time_min_from" in values:
+            from_val = values.get("production_time_min_from")
+            if from_val is not None and v < from_val:
+                raise ValueError(
+                    "'production_time_min_to' не может быть меньше 'production_time_min_from'"
+                )
+        return v
 
 
 class NomenclatureCreateMass(BaseModel):
@@ -114,6 +133,8 @@ class NomenclatureGet(NomenclatureCreate):
     group_name: Optional[str]
     is_main: Optional[bool]
     chatting_percent: Optional[int] = Field(None, gt=0, le=100)
+    qr_hash: Optional[str] = None
+    qr_url: Optional[str] = None
     updated_at: int
     created_at: int
 

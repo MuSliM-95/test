@@ -59,7 +59,13 @@ class MarketplaceProduct(BaseModel):
     rating: Optional[float] = None  # Рейтинг 1-5
     reviews_count: Optional[int] = None  # Количество отзывов
 
+    button_text: Optional[str] = None
+    button_logic: Optional[str] = None
+
     available_warehouses: Optional[List[AvailableWarehouse]] = None
+
+    production_time_min_from: Optional[int] = None
+    production_time_min_to: Optional[int] = None
 
     class Config:
         orm_mode = True
@@ -123,3 +129,47 @@ class MarketplaceProductsRequest(BaseModel):
 
     rating_from: Optional[int] = None
     rating_to: Optional[int] = None
+
+    seller_name: Optional[str] = None
+    seller_id: Optional[int] = None
+    seller_phone: Optional[str] = None
+
+    name: Optional[str] = None
+    description_long: Optional[str] = None
+    id: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    seo_keywords: Optional[str] = None
+    nomenclature_attributes: Optional[str] = None
+
+
+product_buttons_text: dict[str, dict[str, str]] = {
+    "product": {
+        "name": "В корзину",
+        "logic": "Добавить выбранный товар в корзину пользователя для последующей покупки.",
+    },
+    "rent": {
+        "name": "Забронировать",
+        "logic": "Открыть форму бронирования аренды с выбором даты и условий.",
+    },
+    "service": {
+        "name": "В корзину",
+        "logic": "Добавить выбранную услугу в корзину для оформления заказа.",
+    },
+    "offer": {
+        "name": "Подробнее",
+        "logic": "Показать детальную информацию о спецпредложении или акции.",
+    },
+    "resurs": {
+        "name": "Арендовать",
+        "logic": "Начать процесс аренды ресурса с выбором периода и условий.",
+    },
+    "property": {
+        "name": "Оставить заявку",
+        "logic": "Открыть форму подачи заявки на недвижимость или объект.",
+    },
+    "work": {
+        "name": "Подробнее",
+        "logic": "Показать расширенную информацию о работе или вакансии.",
+    },
+}

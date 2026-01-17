@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlalchemy import and_, func, or_, select
 
+from common.utils.url_helper import get_app_url_for_environment
 from database.db import database, files
 from functions.helpers import datetime_to_timestamp, get_user_by_token
 from ws_manager import manager
@@ -54,7 +55,13 @@ ALLOWED_CONTENT_TYPES = {
 
 
 def build_public_url(file_id: int) -> str:
-    base = environ.get("APP_URL").rstrip("/")
+    base = get_app_url_for_environment()
+    if not base:
+        raise ValueError("APP_URL не настроен для текущего окружения")
+    base = base.rstrip("/")
+    # Добавляем протокол, если его нет
+    if not base.startswith(("http://", "https://")):
+        base = f"https://{base}"
     return f"{base}/api/v1/files/{file_id}/content"
 
 
@@ -288,9 +295,17 @@ from fastapi.responses import RedirectResponse
 
 @router.get("/files/{file_id}/content")
 async def get_file_content(token: str, file_id: int):
-    user = await get_user_by_token(token)
+    """Доступ к файлу с проверкой владельца (требуется токен)"""
+    try:
+        user = await get_user_by_token(token)
+    except HTTPException as e:
+        # Логируем ошибку для диагностики
+        print(f"Token validation failed for file_id={file_id}, error: {e.detail}")
+        raise
     query = files.select().where(
-        files.c.id == file_id, files.c.owner == user.id, files.c.is_deleted.is_not(True)
+        files.c.id == file_id,
+        files.c.owner == user.id,
+        files.c.is_deleted.is_not(True),
     )
     file = await database.fetch_one(query)
     if not file:

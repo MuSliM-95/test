@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
 from api.marketplace.service.favorites_service.schemas import (
     CreateFavoritesUtm,
@@ -170,7 +170,7 @@ async def add_to_favorites(
     return await service.add_to_favorites(favorite_request, utm)
 
 
-@router.delete("/favorites/{favorite_id}")
+@router.delete("/favorites/{favorite_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_from_favorites(
     favorite_id: int,
     phone: str = Query(..., description="Номер телефона"),
@@ -179,7 +179,7 @@ async def remove_from_favorites(
     """
     Удалить элемент из избранного
     """
-    return await service.remove_from_favorites(favorite_id, phone)
+    await service.remove_from_favorites(favorite_id, phone)
 
 
 @router.get("/favorites", response_model=FavoriteListResponse)
@@ -258,10 +258,15 @@ async def remove_from_cart(
 async def get_global_categories(
     limit: int = 100,
     offset: int = 0,
+    only_with_products: bool = Query(
+        False, description="Показывать только категории с актуальными товарами"
+    ),
     service: MarketplaceService = Depends(get_marketplace_service),
 ):
     start = time.perf_counter()
-    data = await service.get_global_categories(limit=limit, offset=offset)
+    data = await service.get_global_categories(
+        limit=limit, offset=offset, only_with_products=only_with_products
+    )
     end_ms = int((time.perf_counter() - start) * 1000)
 
     return GlobalCategoryList(**data, processing_time_ms=end_ms)
@@ -269,10 +274,15 @@ async def get_global_categories(
 
 @router.get("/categories/tree/", response_model=GlobalCategoryTreeList)
 async def get_global_categories_tree(
+    only_with_products: bool = Query(
+        False, description="Показывать только категории с актуальными товарами"
+    ),
     service: MarketplaceService = Depends(get_marketplace_service),
 ):
     start = time.perf_counter()
-    data = await service.get_global_categories_tree()
+    data = await service.get_global_categories_tree(
+        only_with_products=only_with_products
+    )
     end_ms = int((time.perf_counter() - start) * 1000)
 
     return GlobalCategoryTreeList(**data, processing_time_ms=end_ms)

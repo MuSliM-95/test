@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from sqlalchemy import asc, func, select, text
+from sqlalchemy import and_, asc, func, select, text
 
 from database.db import (
     database,
@@ -84,7 +84,10 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
         report_data.paybox = [
             item.id
             for item in await database.fetch_all(
-                select(pboxes.c.id).where(pboxes.c.cashbox == user.cashbox_id)
+                select(pboxes.c.id).where(
+                    pboxes.c.cashbox == user.cashbox_id,
+                    pboxes.c.deleted_at.is_(None),
+                )
             )
         ]
     report = []
@@ -110,7 +113,13 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
                 *filters,
                 payments.c.type == "incoming",
             )
-            .join(pboxes, pboxes.c.id == payments.c.paybox)
+            .join(
+                pboxes,
+                and_(
+                    pboxes.c.id == payments.c.paybox,
+                    pboxes.c.deleted_at.is_(None),
+                ),
+            )
             .group_by(payments.c.paybox, payments.c.type, pboxes.c.name)
         )
 
@@ -134,7 +143,10 @@ async def get_balances_report(token: str, report_data: schemas.ReportData):
             dict(item) for item in await database.fetch_all(query_outgoing)
         ]
 
-        query = select(pboxes.c.name, pboxes.c.balance).where(pboxes.c.id == paybox)
+        query = select(pboxes.c.name, pboxes.c.balance).where(
+            pboxes.c.id == paybox,
+            pboxes.c.deleted_at.is_(None),
+        )
         report_db = await database.fetch_one(query)
         if not report_db:
             continue

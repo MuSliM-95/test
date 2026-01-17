@@ -1,23 +1,30 @@
+import hashlib
+import io
 import time
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import segno
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.params import Body, Query
-from sqlalchemy import (
-    and_,
-    case,
-    func,
-    or_,
-    select,
-)
+from fastapi.responses import StreamingResponse
+from sqlalchemy import and_, case, func, insert, or_, select
 from starlette import status
 
 import api.nomenclature.schemas as schemas
+from api.marketplace.service.public_categories.public_categories_service import (
+    MarketplacePublicCategoriesService,
+)
+from api.nomenclature.utils import (
+    auto_link_global_category,
+    sync_global_category_for_nomenclature,
+    update_category_has_products,
+)
 from api.pictures.routers import build_public_url
 from database.db import (
     categories,
     database,
+    global_categories,
     manufacturers,
     nomenclature,
     nomenclature_attributes,
@@ -45,6 +52,8 @@ from functions.helpers import (
 from ws_manager import manager
 
 router = APIRouter(tags=["nomenclature"])
+
+public_categories_service = MarketplacePublicCategoriesService()
 
 
 @router.patch("/nomenclature/barcode")
@@ -180,6 +189,74 @@ async def delete_barcode_to_nomenclature(
     await database.execute(query)
 
 
+@router.get("/nomenclature/{idx}/qr", response_class=StreamingResponse)
+async def get_nomenclature_qr(
+    token: str,
+    idx: int,
+    size: int = Query(300, description="Размер QR-кода в пикселях", ge=100, le=1000),
+):
+    """Генерация QR-кода для товара"""
+    user = await get_user_by_token(token)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+    nomenclature_db_dict = dict(nomenclature_db)
+    hash_query = select(nomenclature_hash.c.hash).where(
+        nomenclature_hash.c.nomenclature_id == idx
+    )
+    hash_record = await database.fetch_one(hash_query)
+    if not hash_record:
+        hash_base = f"{nomenclature_db_dict['id']}:{nomenclature_db_dict.get('name', '')}:{nomenclature_db_dict.get('article', '')}"
+        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        await database.execute(
+            insert(nomenclature_hash).values(
+                nomenclature_id=idx, hash=hash_string, created_at=datetime.now()
+            )
+        )
+    else:
+        hash_string = hash_record["hash"]
+    qr_content = f"NOM:{nomenclature_db_dict['id']}:{hash_string}"
+    qr = segno.make_qr(qr_content, error="H")
+    svg_buffer = io.BytesIO()
+    scale = max(3, size // 50)
+    qr.save(svg_buffer, kind="svg", scale=scale, border=2)
+    svg_buffer.seek(0)
+    filename = f"nomenclature_{idx}_qr.svg"
+    return StreamingResponse(
+        svg_buffer,
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/nomenclature/{idx}/qr/data")
+async def get_nomenclature_qr_data(token: str, idx: int):
+    """Получить хеш для товара"""
+    user = await get_user_by_token(token)
+    nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
+    nomenclature_db_dict = dict(nomenclature_db)
+    hash_query = select(nomenclature_hash.c.hash).where(
+        nomenclature_hash.c.nomenclature_id == idx
+    )
+    hash_record = await database.fetch_one(hash_query)
+    if not hash_record:
+        hash_base = f"{nomenclature_db_dict['id']}:{nomenclature_db_dict.get('name', '')}:{nomenclature_db_dict.get('article', '')}"
+        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        await database.execute(
+            insert(nomenclature_hash).values(
+                nomenclature_id=idx, hash=hash_string, created_at=datetime.now()
+            )
+        )
+    else:
+        hash_string = hash_record["hash"]
+    return {
+        "nomenclature_id": nomenclature_db_dict["id"],
+        "name": nomenclature_db_dict.get("name"),
+        "article": nomenclature_db_dict.get("article"),
+        "hash": hash_string,
+        "qr_content": f"NOM:{nomenclature_db_dict['id']}:{hash_string}",
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
 @router.post("/nomenclatures/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature_by_ids(
     token: str,
@@ -282,10 +359,13 @@ async def get_nomenclature_by_ids(
 
 @router.get("/nomenclature/", response_model=schemas.NomenclatureListGetRes)
 async def get_nomenclature(
+    request: Request,
     token: str,
     name: Optional[str] = None,
     barcode: Optional[str] = None,
     category: Optional[int] = None,
+    global_category_id: Optional[int] = None,
+    global_category_name: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     with_prices: bool = False,
@@ -294,6 +374,7 @@ async def get_nomenclature(
         False, description="Включить атрибуты номенклатуры в ответ"
     ),
     with_photos: bool = Query(False, description="Включить фото номенклатуры в ответ"),
+    with_hash: bool = Query(False, description="Включить QR хеш в ответ"),
     only_main_from_group: bool = False,
     min_price: Optional[float] = Query(
         None, description="Минимальная цена для фильтрации"
@@ -306,6 +387,7 @@ async def get_nomenclature(
 ):
     start_time = time.time()
     """Получение списка категорий"""
+    base_url = str(request.base_url).rstrip("/")
     user = await get_user_by_token(token)
 
     if name and barcode:
@@ -327,6 +409,12 @@ async def get_nomenclature(
             cu_filter_data[f] = datetime.fromtimestamp(filters_data[f])
 
     filters = build_filters(nomenclature, cu_filter_data)
+    hash_subquery = None
+    if with_hash:
+        hash_subquery = select(
+            nomenclature_hash.c.nomenclature_id,
+            nomenclature_hash.c.hash.label("qr_hash"),
+        ).alias("hash_subquery")
     price_subquery = None
     if min_price is not None or max_price is not None:
         price_subquery = (
@@ -352,7 +440,15 @@ async def get_nomenclature(
             full=True,
         )
     )
-
+    query = query.group_by(nomenclature.c.id, units.c.convent_national_view)
+    if with_hash and hash_subquery is not None:
+        query = query.join(
+            hash_subquery,
+            hash_subquery.c.nomenclature_id == nomenclature.c.id,
+            isouter=True,
+        )
+        query = query.add_columns(hash_subquery.c.qr_hash)
+        query = query.group_by(hash_subquery.c.qr_hash)
     if price_subquery is not None:
         query = query.join(
             price_subquery,
@@ -396,6 +492,17 @@ async def get_nomenclature(
             nomenclature_barcodes.c.code.ilike(f"%{barcode}%")
         )
         conditions.append(nomenclature.c.id.in_(join_barcode))
+
+    if global_category_id is not None:
+        conditions.append(nomenclature.c.global_category_id == global_category_id)
+
+    if global_category_name:
+        query = query.join(
+            global_categories,
+            global_categories.c.id == nomenclature.c.global_category_id,
+            isouter=False,
+        )
+        conditions.append(global_categories.c.name.ilike(f"%{global_category_name}%"))
 
     if min_price is not None:
         conditions.append(price_subquery.c.min_price >= min_price)
@@ -462,6 +569,13 @@ async def get_nomenclature(
                     select(nomenclature_groups_value.c.nomenclature_id)
                 ),
             )
+        )
+
+    if global_category_name:
+        count_query = count_query.join(
+            global_categories,
+            global_categories.c.id == nomenclature.c.global_category_id,
+            isouter=False,
         )
 
     count_query = count_query.where(and_(*conditions))
@@ -574,7 +688,35 @@ async def get_nomenclature(
                 if photo.get("url") and photo["url"].startswith("photos/"):
                     photo["url"] = photo["url"][7:]  # Убираем "photos/" (7 символов)
             nomenclature_info["photos"] = photos_list
-
+        if with_hash:
+            final_hash_string = None
+            if nomenclature_info.get("qr_hash"):
+                final_hash_string = nomenclature_info["qr_hash"]
+            else:
+                hash_query = select(nomenclature_hash.c.hash).where(
+                    nomenclature_hash.c.nomenclature_id == nomenclature_info["id"]
+                )
+                hash_record = await database.fetch_one(hash_query)
+                if hash_record:
+                    final_hash_string = hash_record["hash"]
+                else:
+                    hash_base = f"{nomenclature_info['id']}:{nomenclature_info.get('name', '')}:{nomenclature_info.get('article', '')}"
+                    final_hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[
+                        :16
+                    ]
+                    await database.execute(
+                        insert(nomenclature_hash).values(
+                            nomenclature_id=nomenclature_info["id"],
+                            hash=final_hash_string,
+                            created_at=datetime.now(),
+                        )
+                    )
+            nomenclature_info["qr_hash"] = (
+                f"NOM:{nomenclature_info['id']}:{final_hash_string}"
+            )
+            nomenclature_info["qr_url"] = (
+                f"{base_url}/nomenclature/{nomenclature_info['id']}/qr?token={token}"
+            )
     return {"result": nomenclature_db, "count": nomenclature_db_count}
 
 
@@ -627,9 +769,40 @@ async def new_nomenclature(
                         exceptions.append(str(nomenclature_values) + " " + e.detail)
                         continue
 
+            if nomenclature_values.get("global_category_id") is not None:
+                await public_categories_service.ensure_global_category_exists(
+                    nomenclature_values["global_category_id"]
+                )
+            else:
+                # Автоматически связываем с глобальной категорией, если не указано
+                if nomenclature_values.get("category") is not None:
+                    global_cat_id = await auto_link_global_category(
+                        nomenclature_values["category"]
+                    )
+                    if global_cat_id:
+                        nomenclature_values["global_category_id"] = global_cat_id
+
             query = nomenclature.insert().values(nomenclature_values)
             nomenclature_id = await database.execute(query)
             inserted_ids.add(nomenclature_id)
+
+            # Дополнительная синхронизация после создания
+            global_cat_id = None
+            if nomenclature_values.get("category") and not nomenclature_values.get(
+                "global_category_id"
+            ):
+                global_cat_id = await sync_global_category_for_nomenclature(
+                    nomenclature_id, nomenclature_values["category"]
+                )
+            elif nomenclature_values.get("global_category_id"):
+                global_cat_id = nomenclature_values.get("global_category_id")
+
+            # Обновляем has_products для категории после создания товара
+            if global_cat_id:
+                try:
+                    await update_category_has_products(global_cat_id)
+                except Exception:
+                    pass  # Игнорируем ошибки обновления, чтобы не ломать создание товара
 
         query = nomenclature.select().where(
             nomenclature.c.cashbox == user.cashbox_id,
@@ -637,6 +810,24 @@ async def new_nomenclature(
         )
         nomenclature_db = await database.fetch_all(query)
         nomenclature_db = [*map(datetime_to_timestamp, nomenclature_db)]
+
+    if inserted_ids:
+        hash_values_to_insert = []
+        for nom in nomenclature_db:
+            nom_id = nom["id"]
+            hash_base = f"{nom_id}:{nom.get('name', '')}:{nom.get('article', '')}"
+            hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+            hash_values_to_insert.append(
+                {
+                    "nomenclature_id": nom_id,
+                    "hash": hash_string,
+                    "created_at": datetime.now(),
+                }
+            )
+        if hash_values_to_insert:
+            await database.execute_many(
+                insert(nomenclature_hash), hash_values_to_insert
+            )
 
     await manager.send_message(
         token,
@@ -678,6 +869,29 @@ async def edit_nomenclature(
         if nomenclature_values.get("unit") is not None:
             await check_unit_exists(nomenclature_values["unit"])
 
+        if nomenclature_values.get("global_category_id") is not None:
+            await public_categories_service.ensure_global_category_exists(
+                nomenclature_values["global_category_id"]
+            )
+        else:
+            # Автоматически связываем с глобальной категорией, если не указано
+            if nomenclature_values.get("category") is not None:
+                global_cat_id = await auto_link_global_category(
+                    nomenclature_values["category"]
+                )
+                if global_cat_id:
+                    nomenclature_values["global_category_id"] = global_cat_id
+            elif nomenclature_db.get("category"):
+                # Если категория не меняется, но global_category_id не указан, синхронизируем
+                global_cat_id = await sync_global_category_for_nomenclature(
+                    idx, nomenclature_db.get("category")
+                )
+                if global_cat_id:
+                    nomenclature_values["global_category_id"] = global_cat_id
+
+        # Сохраняем старую категорию для обновления has_products
+        old_global_category_id = nomenclature_db.get("global_category_id")
+
         query = (
             nomenclature.update()
             .where(nomenclature.c.id == idx, nomenclature.c.cashbox == user.cashbox_id)
@@ -688,6 +902,27 @@ async def edit_nomenclature(
         await update_entity_hash(
             table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db
         )
+
+        # Обновляем has_products для старой и новой категории
+        categories_to_update = set()
+        if old_global_category_id:
+            categories_to_update.add(old_global_category_id)
+        new_global_category_id = nomenclature_values.get(
+            "global_category_id"
+        ) or nomenclature_db.get("global_category_id")
+        if new_global_category_id:
+            categories_to_update.add(new_global_category_id)
+
+        # Также обновляем, если изменился is_deleted
+        if "is_deleted" in nomenclature_values:
+            if new_global_category_id:
+                categories_to_update.add(new_global_category_id)
+
+        for cat_id in categories_to_update:
+            try:
+                await update_category_has_products(cat_id)
+            except Exception:
+                pass  # Игнорируем ошибки обновления
 
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
 
@@ -707,12 +942,17 @@ async def edit_nomenclature_mass(
     """Редактирование номенклатуры пачкой"""
     user = await get_user_by_token(token)
     response_body = []
+    categories_to_update = set()
+
     for nomenclature_in_list in nomenclature_data:
         idx = nomenclature_in_list.id
         nomenclature_db = await get_entity_by_id(nomenclature, idx, user.cashbox_id)
         nomenclature_values = nomenclature_in_list.dict(exclude_unset=True)
 
         del nomenclature_values["id"]
+
+        # Сохраняем старую категорию для обновления has_products
+        old_global_category_id = nomenclature_db.get("global_category_id")
 
         if nomenclature_values:
             if nomenclature_values.get("category") is not None:
@@ -726,6 +966,26 @@ async def edit_nomenclature_mass(
             if nomenclature_values.get("unit") is not None:
                 await check_unit_exists(nomenclature_values["unit"])
 
+            if nomenclature_values.get("global_category_id") is not None:
+                await public_categories_service.ensure_global_category_exists(
+                    nomenclature_values["global_category_id"]
+                )
+            else:
+                # Автоматически связываем с глобальной категорией, если не указано
+                if nomenclature_values.get("category") is not None:
+                    global_cat_id = await auto_link_global_category(
+                        nomenclature_values["category"]
+                    )
+                    if global_cat_id:
+                        nomenclature_values["global_category_id"] = global_cat_id
+                elif nomenclature_db.get("category"):
+                    # Если категория не меняется, но global_category_id не указан, синхронизируем
+                    global_cat_id = await sync_global_category_for_nomenclature(
+                        idx, nomenclature_db.get("category")
+                    )
+                    if global_cat_id:
+                        nomenclature_values["global_category_id"] = global_cat_id
+
             query = (
                 nomenclature.update()
                 .where(
@@ -738,6 +998,18 @@ async def edit_nomenclature_mass(
             await update_entity_hash(
                 table=nomenclature, table_hash=nomenclature_hash, entity=nomenclature_db
             )
+
+            # Собираем категории для обновления has_products
+            if old_global_category_id:
+                categories_to_update.add(old_global_category_id)
+            new_global_category_id = nomenclature_values.get(
+                "global_category_id"
+            ) or nomenclature_db.get("global_category_id")
+            if new_global_category_id:
+                categories_to_update.add(new_global_category_id)
+            # Также обновляем, если изменился is_deleted
+            if "is_deleted" in nomenclature_values and new_global_category_id:
+                categories_to_update.add(new_global_category_id)
 
         nomenclature_db = datetime_to_timestamp(nomenclature_db)
 

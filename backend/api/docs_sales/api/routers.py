@@ -9,10 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, desc, func, select
 
 from api.docs_sales import schemas
-from api.docs_sales.application.queries import (
-    GetDocSaleByIdQuery,
+from api.docs_sales.application.queries.GetDocSaleByIdQuery import GetDocSaleByIdQuery
+from api.docs_sales.application.queries.GetDocsSalesListByCreatedDateQuery import (
     GetDocsSalesListByCreatedDateQuery,
+)
+from api.docs_sales.application.queries.GetDocsSalesListByDeliveryDateQuery import (
     GetDocsSalesListByDeliveryDateQuery,
+)
+from api.docs_sales.application.queries.GetDocsSalesListQuery import (
     GetDocsSalesListQuery,
 )
 from api.docs_sales.notify_service import (
@@ -367,7 +371,10 @@ async def create(
     )
     count_docs_sales = await database.fetch_val(count_query, column=0)
 
-    paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
+    paybox_q = pboxes.select().where(
+        pboxes.c.cashbox == user.cashbox_id,
+        pboxes.c.deleted_at.is_(None),
+    )
     paybox = await database.fetch_one(paybox_q)
     paybox_id = None if not paybox else paybox.id
 
@@ -886,7 +893,10 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
         paybox = instance_values.pop("paybox", None)
         if paybox is None:
-            paybox_q = pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
+            paybox_q = pboxes.select().where(
+                pboxes.c.cashbox == user.cashbox_id,
+                pboxes.c.deleted_at.is_(None),
+            )
             paybox = await database.fetch_one(paybox_q)
             if paybox:
                 paybox = paybox.id

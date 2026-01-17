@@ -28,17 +28,14 @@ class ChatRabbitMQConsumer:
     async def start(self):
         """Запустить consumer для прослушивания сообщений чатов"""
         if self.is_running:
-            print("[CONSUMER] Chat consumer is already running")
             return
 
         self.is_running = True
-        print("[CONSUMER] Starting chat messages consumer...")
 
         try:
             rabbit_factory: IRabbitFactory = ioc.get(IRabbitFactory)
             self.rabbitmq_messaging = await rabbit_factory()
 
-            # Подписываемся на различные типы событий
             await self.rabbitmq_messaging.subscribe(
                 ChatMessageModel, ChatMessageHandler()
             )
@@ -55,7 +52,6 @@ class ChatRabbitMQConsumer:
                 ChatUserDisconnectedEventModel, ChatUserDisconnectedEventHandler()
             )
 
-            # Устанавливаем очереди для всех типов событий
             await self.rabbitmq_messaging.install(
                 [
                     QueueSettingsModel(queue_name="chat.messages", prefetch_count=10),
@@ -71,13 +67,7 @@ class ChatRabbitMQConsumer:
                 ]
             )
 
-            print("[CONSUMER] Chat consumer started successfully")
-
         except Exception as e:
-            print(f"[CONSUMER] Failed to start chat consumer: {e}")
-            import traceback
-
-            traceback.print_exc()
             self.is_running = False
 
     async def stop(self):
@@ -86,7 +76,6 @@ class ChatRabbitMQConsumer:
             return
 
         self.is_running = False
-        print("[CONSUMER] Chat consumer stopped")
 
 
 chat_consumer = ChatRabbitMQConsumer()

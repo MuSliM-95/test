@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +19,9 @@ from functions.helpers import (
     get_filters_pboxes,
 )
 from ws_manager import manager
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(tags=["pboxes"])
 
@@ -52,7 +56,12 @@ async def read_payboxes_meta(
         )
 
     base_query = (
-        pboxes.select().where(pboxes.c.cashbox == user.cashbox_id).filter(*filters)
+        pboxes.select()
+        .where(
+            pboxes.c.cashbox == user.cashbox_id,
+            pboxes.c.deleted_at.is_(None),
+        )
+        .filter(*filters)
     )
 
     if not user.is_owner:
@@ -120,7 +129,9 @@ async def get_paybox_by_id(token: str, id: int):
         )
 
     query = pboxes.select().where(
-        pboxes.c.id == id, pboxes.c.cashbox == user.cashbox_id
+        pboxes.c.id == id,
+        pboxes.c.cashbox == user.cashbox_id,
+        pboxes.c.deleted_at.is_(None),
     )
     pbox = await database.fetch_one(query)
 
@@ -199,8 +210,14 @@ async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit)
 
     new_pbox = {}
 
-    q = pboxes.select().where(pboxes.c.id == pbox_data.id)
+    q = pboxes.select().where(
+        pboxes.c.id == pbox_data.id,
+        pboxes.c.deleted_at.is_(None),
+    )
     pbox = await database.fetch_one(q)
+
+    if not pbox:
+        raise HTTPException(status_code=400, detail="Счет не найден или был удален")
 
     query = payments.select().where(
         or_(payments.c.paybox == pbox_data.id, payments.c.paybox_to == pbox_data.id),
@@ -243,8 +260,17 @@ async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit)
                                 all_payments_amount -= float(payment.amount)
                                 if payment.paybox_to:
                                     pbox_to = await database.fetch_one(
-                                        pboxes.select(pboxes.c.id == payment.paybox_to)
+                                        pboxes.select(
+                                            pboxes.c.id == payment.paybox_to,
+                                            pboxes.c.deleted_at.is_(None),
+                                        )
                                     )
+                                    if not pbox_to:
+                                        logger.warning(
+                                            f"Платеж {payment.id} ссылается на удаленный счет {payment.paybox_to}. "
+                                            f"Баланс не обновлен."
+                                        )
+                                        continue
                                     await database.execute(
                                         pboxes.update(pboxes.c.id == pbox_to.id).values(
                                             {
@@ -276,13 +302,19 @@ async def update_paybox_data(token: str, pbox_data: pboxes_schemas.PayboxesEdit)
 
         q = (
             pboxes.update()
-            .where(pboxes.c.id == pbox_data.id, pboxes.c.cashbox == user.cashbox_id)
+            .where(
+                pboxes.c.id == pbox_data.id,
+                pboxes.c.cashbox == user.cashbox_id,
+                pboxes.c.deleted_at.is_(None),
+            )
             .values(new_pbox)
         )
         await database.execute(q)
 
         q = pboxes.select().where(
-            pboxes.c.id == pbox_data.id, pboxes.c.cashbox == user.cashbox_id
+            pboxes.c.id == pbox_data.id,
+            pboxes.c.cashbox == user.cashbox_id,
+            pboxes.c.deleted_at.is_(None),
         )
         pbox = await database.fetch_one(q)
 
@@ -327,7 +359,10 @@ async def read_payboxes_short(
             pboxes.c.created_at,
             pboxes.c.updated_at,
         )
-        .where(pboxes.c.cashbox == user.cashbox_id)
+        .where(
+            pboxes.c.cashbox == user.cashbox_id,
+            pboxes.c.deleted_at.is_(None),
+        )
         .filter(*filters)
     )
 
@@ -356,3 +391,33 @@ async def read_payboxes_short(
     count = await database.fetch_val(count_query)
 
     return {"result": pbox_list, "count": count}
+
+
+@router.delete("/payboxes/{id}/")
+async def delete_paybox(token: str, id: int):
+    """Мягкое удаление счета"""
+    query = users_cboxes_relation.select().where(users_cboxes_relation.c.token == token)
+    user = await database.fetch_one(query)
+
+    if not user or not user.status:
+        raise HTTPException(status_code=403, detail="Вы ввели некорректный токен!")
+
+    pbox = await database.fetch_one(
+        pboxes.select().where(pboxes.c.id == id, pboxes.c.cashbox == user.cashbox_id)
+    )
+
+    if not pbox:
+        raise HTTPException(status_code=404, detail="Счет не найден")
+
+    if pbox.deleted_at:
+        raise HTTPException(status_code=400, detail="Счет уже удален")
+
+    await database.execute(
+        pboxes.update().where(pboxes.c.id == id).values(deleted_at=datetime.now())
+    )
+
+    await manager.send_message(
+        token, {"action": "delete", "target": "payboxes", "result": id}
+    )
+
+    return {"result": "success"}

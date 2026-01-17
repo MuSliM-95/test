@@ -114,17 +114,13 @@ async def create_avito_client(
                         avito_user_id=retrieved_user_id, updated_at=datetime.utcnow()
                     )
                 )
-                logger.info(f"Saved avito_user_id {retrieved_user_id} to credentials")
             except Exception as e:
                 logger.warning(f"Could not retrieve and save user_id: {e}")
 
-        logger.info(
-            f"AvitoClient created for channel {channel_id}, cashbox {cashbox_id}"
-        )
         return client
 
     except Exception as e:
-        logger.error(f"Failed to create AvitoClient: {e}", exc_info=True)
+        logger.error(f"Failed to create AvitoClient: {e}")
         return None
 
 
@@ -159,10 +155,8 @@ async def save_token_callback(
             )
         )
 
-        logger.info(f"Updated tokens for channel={channel_id}, cashbox={cashbox_id}")
-
     except Exception as e:
-        logger.error(f"Failed to save tokens: {e}", exc_info=True)
+        logger.error(f"Failed to save tokens: {e}")
 
 
 async def validate_avito_credentials(
@@ -176,7 +170,6 @@ async def validate_avito_credentials(
         result = await client.get_access_token()
 
         if result:
-            logger.info("Avito credentials validated successfully")
             return True
         else:
             logger.warning("Avito credentials validation failed")

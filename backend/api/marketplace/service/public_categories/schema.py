@@ -35,6 +35,9 @@ class GlobalCategory(GlobalCategoryBase):
     id: int
     created_at: str
     updated_at: str
+    has_products: Optional[bool] = (
+        None  # Показывает, есть ли актуальные товары в категории
+    )
 
 
 class GlobalCategoryTree(GlobalCategory):

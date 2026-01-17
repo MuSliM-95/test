@@ -42,21 +42,21 @@ class AvitoClient:
         self.refresh_token = refresh_token
         self.token_expires_at = token_expires_at
         self.on_token_refresh = on_token_refresh
-        self._user_id = user_id  # user_id для эндпоинтов
+        self._user_id = user_id
 
     async def _ensure_token_valid(self) -> None:
         if not self.token_expires_at:
-            # Если токен еще не был получен, получаем его
             if not self.access_token:
                 await self.get_access_token()
             return
 
-        if datetime.utcnow() >= self.token_expires_at - timedelta(minutes=5):
-            # Если есть refresh_token, используем его для обновления
+        now = datetime.utcnow()
+        expires_soon = now >= self.token_expires_at - timedelta(minutes=5)
+
+        if expires_soon:
             if self.refresh_token:
                 await self.refresh_access_token()
             else:
-                # Если refresh_token нет, получаем новый токен через client_credentials
                 logger.warning(
                     "No refresh token available, obtaining new token via client_credentials"
                 )
@@ -94,8 +94,6 @@ class AvitoClient:
                         seconds=expires_in
                     )
 
-                    logger.info("Access token refreshed successfully")
-
                     if self.on_token_refresh:
                         await self.on_token_refresh(
                             {
@@ -129,6 +127,19 @@ class AvitoClient:
                     data=data,
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
+                    result = await response.json()
+
+                    if "error" in result:
+                        error_code = result.get("error")
+                        error_description = result.get(
+                            "error_description", "Unknown error"
+                        )
+                        error_text = (
+                            f"Avito API error: {error_code} - {error_description}"
+                        )
+                        logger.error(f"Token request failed: {error_text}")
+                        raise AvitoTokenExpiredError(error_text)
+
                     if response.status != 200:
                         error_text = await response.text()
                         logger.error(
@@ -138,18 +149,29 @@ class AvitoClient:
                             f"Token request failed: HTTP {response.status}"
                         )
 
-                    result = await response.json()
-
                     access_token = result.get("access_token")
                     refresh_token = result.get("refresh_token")
                     expires_in = result.get("expires_in", 3600)
+
+                    if not access_token:
+                        error_text = "No access_token in Avito API response"
+                        logger.error(error_text)
+                        raise AvitoTokenExpiredError(error_text)
+
                     expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
                     self.access_token = access_token
                     self.refresh_token = refresh_token
                     self.token_expires_at = expires_at
 
-                    logger.info("Initial access token obtained successfully")
+                    if self.on_token_refresh:
+                        await self.on_token_refresh(
+                            {
+                                "access_token": access_token,
+                                "refresh_token": refresh_token,
+                                "expires_at": expires_at.isoformat(),
+                            }
+                        )
 
                     return {
                         "access_token": access_token,
@@ -177,6 +199,9 @@ class AvitoClient:
                     "client_secret": client_secret,
                 }
 
+                if redirect_uri:
+                    data["redirect_uri"] = redirect_uri
+
                 async with session.post(
                     "https://api.avito.ru/token/",
                     data=data,
@@ -198,8 +223,6 @@ class AvitoClient:
                     expires_in = result.get("expires_in", 3600)
                     expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
-                    logger.info("OAuth tokens obtained successfully")
-
                     return {
                         "access_token": access_token,
                         "refresh_token": refresh_token,
@@ -214,6 +237,8 @@ class AvitoClient:
     async def _get_user_id(self) -> int:
         if self._user_id:
             return self._user_id
+
+        await self._ensure_token_valid()
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -231,14 +256,14 @@ class AvitoClient:
                         user_id = user_data.get("id")
                         if user_id:
                             self._user_id = user_id
-                            logger.info(f"Retrieved user_id {user_id} from profile")
                             return user_id
 
+                    error_text = await response.text()
                     logger.warning(
-                        f"Failed to get user_id from profile: HTTP {response.status}"
+                        f"Failed to get user_id from profile: HTTP {response.status}, response: {error_text}"
                     )
                     raise AvitoAPIError(
-                        "user_id is required but could not be retrieved from profile"
+                        f"user_id is required but could not be retrieved from profile. HTTP {response.status}: {error_text}"
                     )
         except Exception as e:
             logger.error(f"Failed to get user_id: {e}")
@@ -341,7 +366,15 @@ class AvitoClient:
         response = await self._make_request(
             "GET", f"/v2/accounts/{user_id}/chats", params=params
         )
-        return response.get("chats", [])
+
+        if response is None:
+            return []
+
+        if not isinstance(response, dict):
+            return []
+
+        chats = response.get("chats", [])
+        return chats
 
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
         user_id = await self._get_user_id()
@@ -355,32 +388,25 @@ class AvitoClient:
     ) -> List[Dict[str, Any]]:
         limit = min(limit, 100)
         user_id = await self._get_user_id()
+        params = {"offset": offset}
         response = await self._make_request(
             "GET",
-            f"/v3/accounts/{user_id}/chats/{chat_id}/messages/",
-            params={"limit": limit, "offset": offset},
+            f"/v3/accounts/{user_id}/chats/{chat_id}/messages",
+            params=params,
         )
         if isinstance(response, list):
             return response
         elif isinstance(response, dict) and "messages" in response:
             return response.get("messages", [])
         elif isinstance(response, dict):
-            logger.warning(
-                f"Unexpected response format from get_messages: {type(response)}"
-            )
             return []
         else:
-            logger.error(
-                f"Unexpected response type from get_messages: {type(response)}, value: {response}"
-            )
             return []
 
     async def upload_image(
         self, image_data: bytes, filename: str = "image.jpg"
     ) -> Optional[tuple]:
         try:
-            import aiohttp
-
             max_size = 24 * 1024 * 1024
             if len(image_data) > max_size:
                 raise AvitoAPIError(
@@ -448,8 +474,6 @@ class AvitoClient:
                     response_text = await response.text()
 
                     try:
-                        import json
-
                         response_data = json.loads(response_text)
                     except json.JSONDecodeError:
                         response_data = response_text
@@ -486,9 +510,7 @@ class AvitoClient:
 
         user_id = await self._get_user_id()
 
-        # Если есть и изображение, и текст, отправляем изображение с текстом
         if image_id and text:
-            # Сначала отправляем изображение
             image_payload = {"image_id": image_id}
             image_response = await self._make_request(
                 "POST",
@@ -496,7 +518,6 @@ class AvitoClient:
                 data=image_payload,
             )
 
-            # Затем отправляем текст как отдельное сообщение
             text_payload = {"message": {"text": text}, "type": "text"}
             text_response = await self._make_request(
                 "POST",
@@ -504,10 +525,8 @@ class AvitoClient:
                 data=text_payload,
             )
 
-            # Возвращаем ответ с изображением (основной)
             return image_response
         elif image_id:
-            # Только изображение
             payload = {"image_id": image_id}
             response = await self._make_request(
                 "POST",
@@ -515,7 +534,6 @@ class AvitoClient:
                 data=payload,
             )
         else:
-            # Только текст
             payload = {"message": {"text": text}, "type": "text"}
             response = await self._make_request(
                 "POST", f"/v1/accounts/{user_id}/chats/{chat_id}/messages", data=payload
@@ -526,38 +544,41 @@ class AvitoClient:
     async def delete_message(self, chat_id: str, message_id: str) -> bool:
         try:
             user_id = await self._get_user_id()
-            endpoint = (
-                f"/v1/accounts/{user_id}/chats/{chat_id}/messages/{message_id}/delete"
-            )
+            endpoint = f"/v1/accounts/{user_id}/chats/{chat_id}/messages/{message_id}"
 
             try:
                 await self._make_request(
                     "POST", endpoint, base_url=self.MESSENGER_API, data={}
                 )
+                return True
             except AvitoAPIError as e:
-                if "404" in str(e):
+                if "404" in str(e) or "405" in str(e):
+                    logger.warning(
+                        f"Primary delete endpoint failed, trying alternatives: {e}"
+                    )
                     try:
-                        endpoint_without_delete = f"/v1/accounts/{user_id}/chats/{chat_id}/messages/{message_id}"
+                        endpoint_with_delete = f"{endpoint}/delete"
                         await self._make_request(
-                            "DELETE",
-                            endpoint_without_delete,
+                            "POST",
+                            endpoint_with_delete,
                             base_url=self.MESSENGER_API,
+                            data={},
                         )
+                        return True
                     except AvitoAPIError:
                         try:
                             await self._make_request(
-                                "POST",
-                                endpoint_without_delete,
+                                "DELETE",
+                                endpoint,
                                 base_url=self.MESSENGER_API,
-                                data={"action": "delete"},
                             )
+                            return True
                         except AvitoAPIError as e3:
+                            logger.warning(f"All delete methods failed: {e3}")
                             raise e3
                 else:
                     raise
 
-            logger.info(f"Message {message_id} deleted in chat {chat_id}")
-            return True
         except AvitoAPIError as e:
             logger.warning(
                 f"Failed to delete message {message_id} in chat {chat_id}: {e}"
@@ -567,22 +588,19 @@ class AvitoClient:
     async def mark_chat_as_read(self, chat_id: str) -> bool:
         try:
             user_id = await self._get_user_id()
-            await self._make_request(
-                "POST", f"/v1/accounts/{user_id}/chats/{chat_id}/read"
+            endpoint = f"/v1/accounts/{user_id}/chats/{chat_id}/read"
+            response = await self._make_request(
+                "POST",
+                endpoint,
+                base_url=self.MESSENGER_API,
+                data={},
             )
-            logger.info(f"Chat {chat_id} marked as read")
-            return True
+            return isinstance(response, dict)
         except AvitoAPIError as e:
-            logger.warning(f"Failed to mark chat as read: {e}")
+            logger.error(f"Failed to mark chat {chat_id} as read: {e}")
             return False
-
-    async def close_chat(self, chat_id: str) -> bool:
-        try:
-            await self._make_request("POST", f"/v2/user/chats/{chat_id}/close")
-            logger.info(f"Chat {chat_id} closed")
-            return True
-        except AvitoAPIError as e:
-            logger.warning(f"Failed to close chat: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error marking chat {chat_id} as read: {e}")
             return False
 
     async def get_user_profile(self) -> Dict[str, Any]:
@@ -599,7 +617,6 @@ class AvitoClient:
                 ) as response:
                     if response.status == 200:
                         user_data = await response.json()
-                        logger.info(f"Retrieved user profile: {user_data.get('id')}")
                         return user_data
                     else:
                         error_text = await response.text()
@@ -641,9 +658,6 @@ class AvitoClient:
 
                     if status_code == 200:
                         user_data = await response.json()
-                        logger.info(
-                            f"Status check successful for user {user_data.get('id')}"
-                        )
                         return {
                             "status_code": status_code,
                             "connection_status": "connected",
@@ -693,6 +707,8 @@ class AvitoClient:
         all_messages = []
         offset = 0
         limit = 100
+        consecutive_old_batches = 0
+        max_consecutive_old = 3
 
         while True:
             messages = await self.get_messages(chat_id, limit=limit, offset=offset)
@@ -702,62 +718,38 @@ class AvitoClient:
 
             if since_timestamp:
                 filtered = [
-                    m for m in messages if m.get("created", 0) > since_timestamp
+                    m for m in messages if m.get("created", 0) >= since_timestamp
                 ]
+
                 all_messages.extend(filtered)
-                if len(filtered) < len(messages):
-                    break
+
+                if len(filtered) == 0:
+                    consecutive_old_batches += 1
+                    if (
+                        consecutive_old_batches >= max_consecutive_old
+                        and len(messages) < limit
+                    ):
+                        break
+                else:
+                    consecutive_old_batches = 0
             else:
                 all_messages.extend(messages)
+                consecutive_old_batches = 0
 
             offset += limit
 
             if len(messages) < limit:
                 break
 
-        logger.info(f"Synced {len(all_messages)} messages from chat {chat_id}")
         return all_messages
 
     async def register_webhook(self, webhook_url: str) -> Dict[str, Any]:
         try:
             payload = {"url": webhook_url}
-
-            endpoints_to_try = [
-                "/v3/webhook",
-                "/v3/subscriptions",
-                "/v3/webhooks",
-            ]
-
-            for endpoint in endpoints_to_try:
-                try:
-                    response = await self._make_request(
-                        "POST", endpoint, data=payload, base_url=self.MESSENGER_API
-                    )
-                    logger.info(
-                        f"✅ Webhook registered successfully at {endpoint}: {webhook_url}"
-                    )
-                    logger.info(f"Response from Avito API: {response}")
-                    return response
-                except AvitoAPIError as e:
-                    if "404" not in str(e) and "not found" not in str(e).lower():
-                        raise
-                    continue
-
-            try:
-                response = await self._make_request(
-                    "POST", "/v3/subscriptions", data=payload
-                )
-                logger.info(
-                    f"✅ Webhook registered successfully via fallback endpoint: {webhook_url}"
-                )
-                logger.info(f"Response from Avito API: {response}")
-                return response
-            except AvitoAPIError as e:
-                logger.error(f"Failed to register webhook: {e}")
-                raise AvitoAPIError(
-                    f"Could not register webhook. Tried multiple endpoints. Last error: {str(e)}"
-                )
-
+            response = await self._make_request(
+                "POST", "/v3/webhook", data=payload, base_url=self.MESSENGER_API
+            )
+            return response
         except Exception as e:
             logger.error(f"Error registering webhook: {e}")
             raise AvitoAPIError(f"Failed to register webhook: {str(e)}")
@@ -775,18 +767,11 @@ class AvitoClient:
                     )
                     if isinstance(response, dict) and "subscriptions" in response:
                         subscriptions = response.get("subscriptions", [])
-                        logger.info(
-                            f"Got {len(subscriptions)} subscriptions from {endpoint}"
-                        )
                         return subscriptions
                     elif isinstance(response, list):
-                        logger.info(
-                            f"Got {len(response)} subscriptions as list from {endpoint}"
-                        )
                         return response
                     elif isinstance(response, dict) and "webhooks" in response:
                         webhooks = response.get("webhooks", [])
-                        logger.info(f"Got {len(webhooks)} webhooks from {endpoint}")
                         return webhooks
                     elif isinstance(response, dict):
                         logger.warning(
@@ -837,21 +822,3 @@ class AvitoClient:
         except Exception as e:
             logger.warning(f"Failed to get voice file URL for voice_id {voice_id}: {e}")
             return None
-
-    async def unsubscribe_webhook(self, webhook_url: str) -> Dict[str, Any]:
-        try:
-            payload = {"url": webhook_url}
-
-            response = await self._make_request(
-                "POST",
-                "/v1/webhook/unsubscribe",
-                data=payload,
-                base_url=self.MESSENGER_API,
-            )
-
-            logger.info(f"✅ Webhook unsubscribed successfully: {webhook_url}")
-            return response
-
-        except Exception as e:
-            logger.error(f"Error unsubscribing webhook: {e}")
-            raise AvitoAPIError(f"Failed to unsubscribe webhook: {str(e)}")

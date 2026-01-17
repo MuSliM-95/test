@@ -146,7 +146,7 @@ class PaymentInList(BaseModel):
     project_id: Optional[int]
     amount: Optional[float]
     description: Optional[str]
-    paybox: int
+    paybox: Optional[int] = None
     paybox_to: Optional[int]
     source_account_name: Optional[str]
     source_account_id: Optional[int]

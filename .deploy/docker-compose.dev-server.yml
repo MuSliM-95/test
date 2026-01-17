@@ -59,10 +59,18 @@ services:
       - pgdata-new:/var/lib/postgresql/data
       - ./postgresql.conf:/etc/postgresql.conf:ro
       - ./initdb:/docker-entrypoint-initdb.d
+      - ./db-healthcheck.sh:/healthcheck.sh:ro
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
       POSTGRES_DB: cash_2
+    healthcheck:
+      test: ["CMD-SHELL", "/healthcheck.sh"]
+      interval: 20s
+      timeout: 3s
+      retries: 5
+      start_interval: 5s
+      start_period: 5s
     networks:
       - nginx-proxy
       - infrastructure
@@ -80,23 +88,31 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_BACKUPS_SECRETKEY}
       S3_BUCKET: apps3tablecrm-default-bucket
       S3_PREFIX: backups/mastertablecrm
-      POSTGRES_HOST: db
+      POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_DATABASE: cash_2
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
       PGDUMP_EXTRA_OPTS: '--exclude-table-data=events'
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - nginx-proxy
 
   adminer:
-    image: adminer
+    # https://github.com/dockette/adminer/tree/master
+    image: dockette/adminer:postgres
     restart: always
+    environment:
+      ADMINER_DEFAULT_SERVER: ${POSTGRES_HOST}
+      ADMINER_DESIGN: pepa-linha-dark
+      ADMINER_PLUGINS: "designs tables-filter dump-json version-noverify edit-calendar config highlight-monaco pretty-json-column "
     networks:
       - nginx-proxy
+      - infrastructure
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   backend:
     build:
@@ -109,8 +125,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       LOG_LEVEL: debug
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
@@ -186,7 +204,8 @@ services:
     restart: always
     command: bash -c "python3 start_jobs.py"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       LOG_LEVEL: debug
       APPLE_PASS_TYPE_ID: ${APPLE_PASS_TYPE_ID}
@@ -220,8 +239,11 @@ services:
     volumes:
       - /photos:/backend/photos
     depends_on:
-      - backend
-      - rabbitmq
+      backend:
+        condition:
+          service_started
+      rabbitmq:
+        condition: service_healthy
     environment:
       LOG_LEVEL: debug
       APP_URL: ${APP_URL}

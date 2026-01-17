@@ -1,5 +1,4 @@
 import json
-import os
 from datetime import datetime
 from typing import List, Optional
 
@@ -16,6 +15,7 @@ from api.marketplace.service.products_list_service.schemas import (
     MarketplaceProductList,
     MarketplaceProductsRequest,
     MarketplaceSort,
+    product_buttons_text,
 )
 from common.utils.url_helper import get_app_url_for_environment
 from database.db import (
@@ -42,18 +42,19 @@ from database.db import (
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
-
     @staticmethod
     def __transform_photo_route(photo_path: Optional[str]) -> Optional[str]:
         if not photo_path:
             return None
-        base_url = os.getenv("APP_URL")
+        base_url = get_app_url_for_environment()
+        if not base_url:
+            raise ValueError("APP_URL не настроен для текущего окружения")
         photo_url = photo_path.lstrip("/")
 
         if "seller" in photo_url:
-            return f'https://{base_url}/api/v1/{photo_path.lstrip("/")}'
+            return f"https://{base_url}/api/v1/{photo_path.lstrip('/')}"
         else:
-            return f'https://{base_url}/{photo_path.lstrip("/")}'
+            return f"https://{base_url}/{photo_path.lstrip('/')}"
 
     @staticmethod
     def __build_picture_url(picture_id: Optional[int]) -> Optional[str]:
@@ -69,20 +70,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         return f"{base_url}/api/v1/pictures/{picture_id}/content"
 
     async def get_product(self, product_id: int) -> MarketplaceProductDetail:
-        # Сначала получаем ID типа цены 'chatting' один раз
-        # Это нужно, потому что у разных клиентов могут быть разные ID для одного и того же типа цены
-        price_type_results = await database.fetch_all(
-            select(price_types.c.id).where(price_types.c.name == "chatting")
-        )
-        if not price_type_results:
-            raise HTTPException(
-                status_code=500, detail="Price type 'chatting' not found in database"
-            )
-        chatting_price_type_ids = [row["id"] for row in price_type_results]
-
         current_timestamp = int(datetime.now().timestamp())
 
-        # Используем ID напрямую в фильтре вместо соединения таблиц - так быстрее
         ranked_prices_subquery = (
             select(
                 prices.c.nomenclature.label("nomenclature_id"),
@@ -107,10 +96,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 )
                 .label("rn"),
             )
+            .select_from(
+                prices.join(price_types, price_types.c.id == prices.c.price_type)
+            )
             .where(
                 prices.c.is_deleted.is_not(True),
-                # Фильтруем по ID типа цены, которые мы получили выше
-                prices.c.price_type.in_(chatting_price_type_ids),
+                price_types.c.name == "chatting",
             )
             .subquery()
         )
@@ -146,12 +137,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 nomenclature.c.seo_title,
                 nomenclature.c.seo_description,
                 nomenclature.c.seo_keywords,
+                nomenclature.c.production_time_min_from,
+                nomenclature.c.production_time_min_to,
                 units.c.convent_national_view.label("unit_name"),
                 categories.c.name.label("category_name"),
                 manufacturers.c.name.label("manufacturer_name"),
                 active_prices_subquery.c.price,
-                # Тип цены всегда "chatting", просто указываем строку
-                literal_column("'chatting'").label("price_type"),
+                price_types.c.name.label("price_type"),
                 func.coalesce(
                     func.nullif(cboxes.c.seller_name, ""),
                     cboxes.c.name,
@@ -183,7 +175,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
             )
-            # Не нужно соединять с price_types - мы уже получили нужные ID выше
+            .join(price_types, price_types.c.id == active_prices_subquery.c.price_type)
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
             .join(users, users.c.id == cboxes.c.admin, isouter=True)
             .join(
@@ -217,8 +209,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 and_(
                     nomenclature.c.id == product_id,
                     nomenclature.c.is_deleted.is_not(True),
-                    # Проверяем, что тип цены соответствует нужным ID
-                    active_prices_subquery.c.price_type.in_(chatting_price_type_ids),
+                    price_types.c.name == "chatting",
                 )
             )
             .group_by(
@@ -227,6 +218,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 categories.c.name,
                 manufacturers.c.name,
                 active_prices_subquery.c.price,
+                price_types.c.name,
                 cboxes.c.seller_name,
                 cboxes.c.name,
                 cboxes.c.seller_photo,
@@ -244,8 +236,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         product = dict(row)
 
-        # Получаем склады с остатками отдельным запросом
-        # Используем MAX(id) чтобы взять только последнюю запись по каждому складу
+        # Отдельный запрос для получения складов с остатками
+        # ОПТИМИЗАЦИЯ: Используем подзапрос с MAX вместо прямого запроса - получаем только последние остатки
         wb_max_for_product = (
             select(
                 warehouse_balances.c.organization_id,
@@ -345,15 +337,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         nomenclatures_result = []
 
-        # Получаем все вариации одним запросом вместо множества запросов (избегаем N+1)
-        variations_by_group = {}
-        if groups:
-            group_ids = [group["group_id"] for group in groups]
+        # 2. Для каждой группы — получаем вариации
+        for group in groups:
+            group_id = group["group_id"]
+            group_name = group["group_name"]
 
-            # Загружаем все вариации для всех групп сразу
-            all_variations_query = (
+            variations_query = (
                 select(
-                    nomenclature_groups_value.c.group_id,
                     nomenclature.c.id,
                     nomenclature.c.name,
                     nomenclature_groups_value.c.is_main,
@@ -363,33 +353,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     nomenclature,
                     nomenclature.c.id == nomenclature_groups_value.c.nomenclature_id,
                 )
-                .where(nomenclature_groups_value.c.group_id.in_(group_ids))
+                .where(nomenclature_groups_value.c.group_id == group_id)
             )
-            all_variations = await database.fetch_all(all_variations_query)
 
-            # Раскладываем вариации по группам
-            for variation in all_variations:
-                group_id = variation["group_id"]
-                if group_id not in variations_by_group:
-                    variations_by_group[group_id] = []
-                variations_by_group[group_id].append(
-                    {
-                        "id": variation["id"],
-                        "name": variation["name"],
-                        "is_main": variation["is_main"],
-                    }
-                )
-
-        # Используем уже загруженные вариации для каждой группы
-        for group in groups:
-            group_id = group["group_id"]
-            group_name = group["group_name"]
-
-            variations = variations_by_group.get(group_id, [])
+            variations = await database.fetch_all(variations_query)
 
             items = [
-                {"id": v["id"], "name": v["name"], "is_main": v["is_main"]}
-                for v in variations
+                {"id": v.id, "name": v.name, "is_main": v.is_main} for v in variations
             ]
 
             nomenclatures_result.append({"group_name": group_name, "items": items})
@@ -461,23 +431,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         self,
         request: MarketplaceProductsRequest,
     ) -> MarketplaceProductList:
-        # Получаем ID типа цены 'chatting' один раз в начале
-        # Это ускоряет запрос, потому что мы используем индекс напрямую вместо соединения таблиц
-        # У разных клиентов могут быть разные ID для одного и того же типа цены
-        price_type_results = await database.fetch_all(
-            select(price_types.c.id).where(price_types.c.name == "chatting")
-        )
-        if not price_type_results:
-            raise HTTPException(
-                status_code=500, detail="Price type 'chatting' not found in database"
-            )
-        chatting_price_type_ids = [row["id"] for row in price_type_results]
-
-        # Выбираем актуальную цену для каждого товара
+        # --- НАЧАЛО: Подзапрос для выбора актуальной цены ---
+        # Получаем текущий timestamp (в PostgreSQL это NOW())
         current_timestamp = int(datetime.now().timestamp())
 
-        # Ранжируем цены по приоритету: сначала те, что действуют сейчас, потом по дате создания
-        # Используем ID типа цены напрямую вместо соединения таблиц
+        # Подзапрос для получения актуальной цены
+        # Используем ROW_NUMBER для ранжирования цен по приоритету
         ranked_prices_subquery = (
             select(
                 prices.c.nomenclature.label("nomenclature_id"),
@@ -488,44 +447,43 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 prices.c.date_from,
                 prices.c.date_to,
                 prices.c.is_deleted,
-                # Сортируем: сначала цены, которые действуют сейчас, потом по дате создания (новые первые)
+                # Ранжируем: 1. по времени (текущее в интервале), 2. по дате создания (новые первые), 3. по id (стабильность)
                 func.row_number()
                 .over(
                     partition_by=prices.c.nomenclature,
                     order_by=[
-                        # Сначала идут цены, которые действуют в текущий момент
+                        # Если дата не указана (None), считаем, что она подходит (предполагаем, что None означает "без ограничений")
+                        # Сначала идут записи с датами, которые соответствуют условию
+                        # func.coalesce(prices.c.date_from <= current_timestamp, True) & func.coalesce(current_timestamp < prices.c.date_to, True), # Не подходит напрямую для ORDER BY
+                        # Правильный способ - использовать CASE/WHEN для приоритета
+                        # Приоритет 1: цена с указанными датами и попадающая в интервал
+                        # Приоритет 2: цена с указанными датами, но НЕ попадающая в интервал (меньше приоритет)
+                        # Приоритет 3: цена с хотя бы одной датой None (предполагаем, что это "постоянно действительна", но может быть иначе)
+                        # Пример: сначала (1, ...), потом (0, 1, ...), потом (0, 0, ...)
+                        # (CASE WHEN (prices.c.date_from IS NOT NULL AND prices.c.date_to IS NOT NULL AND prices.c.date_from <= current_timestamp AND current_timestamp < prices.c.date_to) THEN 1 ELSE 0 END),
+                        # desc(CASE WHEN (prices.c.date_from IS NOT NULL AND prices.c.date_to IS NOT NULL AND prices.c.date_from <= current_timestamp AND current_timestamp < prices.c.date_to) THEN 1 ELSE 0 END),
+                        # desc((prices.c.date_from <= current_timestamp) & (current_timestamp < prices.c.date_to)),
+                        # Сортировка: сначала те, у кого даты указаны и они подходят, потом без дат (или частично), потом по created_at DESC
+                        # Чтобы сначала шли подходящие по времени:
                         desc(
                             func.coalesce(prices.c.date_from <= current_timestamp, True)
                             & func.coalesce(current_timestamp < prices.c.date_to, True)
                         ),
                         # Потом по дате создания (новые первые)
                         desc(prices.c.created_at),
-                        # И наконец по ID для стабильности
+                        # Потом по ID (стабильность)
                         desc(prices.c.id),
                     ],
                 )
                 .label("rn"),
             )
             .where(
-                # Только неудаленные цены
+                # Учитываем только неудаленные цены
                 prices.c.is_deleted.is_not(True),
-                # Фильтруем по ID типа цены, которые получили выше
-                prices.c.price_type.in_(chatting_price_type_ids),
+                # Берём только цены типа "chatting"
+                price_types.c.name == "chatting",
             )
             .subquery()
-        )
-
-        # Берем только самую приоритетную цену для каждого товара (актуальную цену)
-        active_prices_subquery = (
-            select(ranked_prices_subquery)
-            .where(ranked_prices_subquery.c.rn == 1)
-            .subquery()
-        )
-
-        # Считаем количество продаж только для товаров, у которых есть цены
-        # Это быстрее, чем считать для всех товаров
-        nomenclature_with_prices = (
-            select(active_prices_subquery.c.nomenclature_id).distinct().subquery()
         )
 
         total_sold_subquery = (
@@ -533,57 +491,77 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 docs_sales_goods.c.nomenclature,
                 func.count(docs_sales_goods.c.id).label("total_sold"),
             )
-            .where(
-                docs_sales_goods.c.nomenclature.in_(
-                    select(nomenclature_with_prices.c.nomenclature_id)
-                )
-            )
+            .select_from(docs_sales_goods)
             .group_by(docs_sales_goods.c.nomenclature)
             .subquery()
         )
 
-        # Получаем остатки по складам
-        # Используем MAX(id) чтобы взять последнюю запись по каждому складу - это быстрее чем ROW_NUMBER()
-        wb_max_subquery = (
-            select(
-                warehouse_balances.c.organization_id,
-                warehouse_balances.c.warehouse_id,
-                warehouse_balances.c.nomenclature_id,
-                func.max(warehouse_balances.c.id).label("max_id"),
-            )
-            .group_by(
-                warehouse_balances.c.organization_id,
-                warehouse_balances.c.warehouse_id,
-                warehouse_balances.c.nomenclature_id,
-            )
+        # Фильтруем подзапрос, чтобы оставить только первую (самую приоритетную) цену для каждой номенклатуры
+        # Это будет "актуальная" цена
+        active_prices_subquery = (
+            select(ranked_prices_subquery)
+            .where(ranked_prices_subquery.c.rn == 1)
             .subquery()
         )
+
+        # --- НАЧАЛО: Подзапрос для поиска по атрибутам ---
+        # Создаём подзапрос только если есть значение для поиска по атрибутам
+        attrs_subquery = None
+        if request.nomenclature_attributes:
+            attrs_subquery = (
+                select(nomenclature_attributes_value.c.nomenclature_id)
+                .select_from(
+                    nomenclature_attributes_value.join(
+                        nomenclature_attributes,
+                        nomenclature_attributes.c.id
+                        == nomenclature_attributes_value.c.attribute_id,
+                    )
+                )
+                .where(
+                    func.lower(nomenclature_attributes_value.c.value).ilike(
+                        f"%{request.nomenclature_attributes.lower()}%"
+                    )
+                )
+                .distinct()
+                .subquery()
+            )
+        # --- КОНЕЦ: Подзапрос для поиска по атрибутам ---
+
+        # --- Балансы по складам ---
+
+        # 1) Берём последнюю запись по каждой паре (организация, склад, номенклатура)
+        wb_ranked = select(
+            warehouse_balances.c.organization_id.label("organization_id"),
+            warehouse_balances.c.warehouse_id.label("warehouse_id"),
+            warehouse_balances.c.nomenclature_id.label("nomenclature_id"),
+            warehouse_balances.c.current_amount.label("current_amount"),
+            func.row_number()
+            .over(
+                partition_by=[
+                    warehouse_balances.c.organization_id,
+                    warehouse_balances.c.warehouse_id,
+                    warehouse_balances.c.nomenclature_id,
+                ],
+                order_by=[
+                    desc(warehouse_balances.c.created_at),
+                    desc(warehouse_balances.c.id),
+                ],
+            )
+            .label("rn"),
+        ).subquery()
 
         wb_latest = (
             select(
-                warehouse_balances.c.organization_id,
-                warehouse_balances.c.warehouse_id,
-                warehouse_balances.c.nomenclature_id,
-                warehouse_balances.c.current_amount,
+                wb_ranked.c.organization_id,
+                wb_ranked.c.warehouse_id,
+                wb_ranked.c.nomenclature_id,
+                wb_ranked.c.current_amount,
             )
-            .select_from(
-                warehouse_balances.join(
-                    wb_max_subquery,
-                    and_(
-                        warehouse_balances.c.organization_id
-                        == wb_max_subquery.c.organization_id,
-                        warehouse_balances.c.warehouse_id
-                        == wb_max_subquery.c.warehouse_id,
-                        warehouse_balances.c.nomenclature_id
-                        == wb_max_subquery.c.nomenclature_id,
-                        warehouse_balances.c.id == wb_max_subquery.c.max_id,
-                    ),
-                )
-            )
+            .where(wb_ranked.c.rn == 1)
             .subquery()
         )
 
-        # Считаем общий остаток по каждому товару (только положительные остатки)
+        # 2) Подсчёт суммарного остатка по товару (только положительные остатки)
         stock_subquery = (
             select(
                 wb_latest.c.nomenclature_id.label("nomenclature_id"),
@@ -596,7 +574,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .subquery()
         )
 
-        # Подготовка для получения списка доступных складов
+        # 3) Агрегация доступных складов (для available_warehouses)
         wh_bal = warehouses.alias("wh_bal")
 
         json_obj = func.jsonb_build_object(
@@ -640,12 +618,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 nomenclature.c.updated_at,
                 nomenclature.c.tags,
                 nomenclature.c.type,
+                nomenclature.c.production_time_min_from,
+                nomenclature.c.production_time_min_to,
                 units.c.convent_national_view.label("unit_name"),
                 categories.c.name.label("category_name"),
                 manufacturers.c.name.label("manufacturer_name"),
                 active_prices_subquery.c.price,
-                # Тип цены всегда "chatting", просто указываем строку
-                literal_column("'chatting'").label("price_type"),
+                price_types.c.name.label("price_type"),
                 func.coalesce(
                     func.nullif(cboxes.c.seller_name, ""),
                     cboxes.c.name,
@@ -668,8 +647,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     "current_amount"
                 ),
                 func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
-                # Склады получаем отдельным запросом после основного - это быстрее
-                literal_column("NULL::jsonb[]").label("available_warehouses"),
+                available_warehouses_agg,
             )
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
@@ -683,7 +661,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
             )
-            # Не нужно соединять с price_types - мы уже получили нужные ID выше
+            .join(
+                price_types,
+                price_types.c.id == active_prices_subquery.c.price_type,
+            )
             .join(cboxes, cboxes.c.id == nomenclature.c.cashbox, isouter=True)
             .join(users, users.c.id == cboxes.c.admin, isouter=True)
             .join(
@@ -714,19 +695,38 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 isouter=True,
             )
             .join(
+                wb_latest,
+                wb_latest.c.nomenclature_id == nomenclature.c.id,
+                isouter=True,
+            )
+            .join(
+                wh_bal,
+                and_(
+                    wh_bal.c.id == wb_latest.c.warehouse_id,
+                    wh_bal.c.is_public.is_(True),
+                    wh_bal.c.status.is_(True),
+                    wh_bal.c.is_deleted.is_not(True),
+                ),
+                isouter=True,
+            )
+            .join(
                 total_sold_subquery,
                 total_sold_subquery.c.nomenclature == nomenclature.c.id,
                 isouter=True,
             )
-            # Не соединяем со складами в основном запросе - получаем их отдельно
-            # Это быстрее и избегает дублирования строк
         )
 
-        # Условия фильтрации
+        if request.nomenclature_attributes:
+            query = query.join(
+                attrs_subquery,
+                attrs_subquery.c.nomenclature_id == nomenclature.c.id,
+                isouter=True,
+            )
+
+        # --- Условия фильтрации ---
         conditions = [
             nomenclature.c.is_deleted.is_not(True),
-            # Проверяем, что тип цены соответствует нужным ID
-            active_prices_subquery.c.price_type.in_(chatting_price_type_ids),
+            price_types.c.name == "chatting",
         ]
 
         if request.category:
@@ -748,17 +748,74 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             conditions.append(
                 marketplace_rating_aggregates.c.avg_rating <= request.rating_to
             )
+        if request.seller_name:
+            conditions.append(
+                func.lower(cboxes.c.name).ilike(f"%{request.seller_name.lower()}%")
+            )
+        if request.seller_id:
+            conditions.append(cboxes.c.id == request.seller_id)
+        if request.seller_phone:
+            conditions.append(
+                func.lower(users.c.phone_number).ilike(
+                    f"%{request.seller_phone.lower()}%"
+                )
+            )
+
+        if request.id:
+            if request.id.isdigit():
+                conditions.append(nomenclature.c.id == int(request.id))
+
+        if request.name:
+            conditions.append(
+                func.lower(nomenclature.c.name).ilike(f"%{request.name.lower()}%")
+            )
+
+        if request.description_long:
+            conditions.append(
+                func.lower(nomenclature.c.description_long).ilike(
+                    f"%{request.description_long.lower()}%"
+                )
+            )
+
+        if request.seo_title:
+            conditions.append(
+                func.lower(nomenclature.c.seo_title).ilike(
+                    f"%{request.seo_title.lower()}%"
+                )
+            )
+
+        if request.seo_description:
+            conditions.append(
+                func.lower(nomenclature.c.seo_description).ilike(
+                    f"%{request.seo_description.lower()}%"
+                )
+            )
+
+        if request.seo_keywords:
+            # func.unnest(Book.categories).column_valued()
+            column_valued = func.unnest(nomenclature.c.seo_keywords).column_valued(
+                "unnested_keywords"
+            )
+            # conditions.append(column_valued.ilike(f"%{request.seo_keywords.lower()}%"))
+            conditions.append(
+                select(column_valued)
+                .where(column_valued.ilike(f"%{request.seo_keywords.lower()}%"))
+                .exists()
+            )
+
+        if request.nomenclature_attributes:
+            conditions.append(nomenclature.c.id == attrs_subquery.c.nomenclature_id)
 
         query = query.where(and_(*conditions))
 
-        # Группируем по полям, которые не меняются
+        # --- GROUP BY — только по неизменяемым полям, без current_amount из balances ---
         group_by_fields = [
             nomenclature.c.id,
             units.c.convent_national_view,
             categories.c.name,
             manufacturers.c.name,
             active_prices_subquery.c.price,
-            # price_type всегда "chatting", не нужно группировать
+            price_types.c.name,
             cboxes.c.seller_name,
             cboxes.c.name,
             cboxes.c.seller_photo,
@@ -771,7 +828,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         ]
         query = query.group_by(*group_by_fields)
 
-        # Сортировка
+        # --- Сортировка ---
         order = asc if request.sort_order == "asc" else desc
 
         if request.sort_by == MarketplaceSort.price:
@@ -787,7 +844,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         elif request.sort_by == MarketplaceSort.updated_at:
             query = query.order_by(order(nomenclature.c.updated_at))
         else:
-            # По умолчанию сортируем по количеству продаж
+            # по умолчанию — по продажам
             query = query.order_by(order(total_sold_subquery.c.total_sold))
 
         # Пагинация
@@ -796,60 +853,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         products_db = await database.fetch_all(query)
 
-        # Получаем склады отдельным запросом только для тех товаров, которые вернулись
-        # Это быстрее, чем делать это в основном запросе (избегаем дублирования строк)
-        product_ids = [row["id"] for row in products_db]
-        available_warehouses_map = {}
-
-        if product_ids:
-            warehouses_query = (
-                select(
-                    wb_latest.c.nomenclature_id,
-                    wh_bal.c.id.label("warehouse_id"),
-                    wb_latest.c.organization_id,
-                    wh_bal.c.name.label("warehouse_name"),
-                    wh_bal.c.address.label("warehouse_address"),
-                    wh_bal.c.latitude,
-                    wh_bal.c.longitude,
-                    wb_latest.c.current_amount,
-                )
-                .select_from(
-                    wb_latest.join(
-                        wh_bal,
-                        and_(
-                            wh_bal.c.id == wb_latest.c.warehouse_id,
-                            wh_bal.c.is_public.is_(True),
-                            wh_bal.c.status.is_(True),
-                            wh_bal.c.is_deleted.is_not(True),
-                        ),
-                    )
-                )
-                .where(
-                    and_(
-                        wb_latest.c.nomenclature_id.in_(product_ids),
-                        wb_latest.c.current_amount > 0,
-                    )
-                )
-            )
-            warehouses_rows = await database.fetch_all(warehouses_query)
-
-            for row in warehouses_rows:
-                nom_id = row["nomenclature_id"]
-                if nom_id not in available_warehouses_map:
-                    available_warehouses_map[nom_id] = []
-                available_warehouses_map[nom_id].append(
-                    {
-                        "warehouse_id": row["warehouse_id"],
-                        "organization_id": row["organization_id"],
-                        "warehouse_name": row["warehouse_name"],
-                        "warehouse_address": row["warehouse_address"],
-                        "latitude": row["latitude"],
-                        "longitude": row["longitude"],
-                        "current_amount": row["current_amount"],
-                    }
-                )
-
-        # Считаем общее количество товаров (без дублей)
+        # --- Подсчёт общего количества (без дублей по складам / картинкам) ---
         count_query = (
             select(func.count(func.distinct(nomenclature.c.id)))
             .select_from(nomenclature)
@@ -863,7 +867,10 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 active_prices_subquery,
                 active_prices_subquery.c.nomenclature_id == nomenclature.c.id,
             )
-            # Не нужно соединять с price_types - используем ID напрямую
+            .join(
+                price_types,
+                price_types.c.id == active_prices_subquery.c.price_type,
+            )
             .join(
                 marketplace_rating_aggregates,
                 and_(
@@ -882,7 +889,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         count_result = await database.fetch_one(count_query)
         total_count = count_result[0] if count_result else 0
 
-        # Обрабатываем результаты
+        # --- Пост-обработка результатов ---
         products: List[MarketplaceProduct] = []
         for index, product in enumerate(products_db):
             product_dict = dict(product)
@@ -922,31 +929,40 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             )
 
             # Список складов (только с остатком > 0)
-            # Получаем из отдельного запроса, который мы выполнили выше
-            wh_list = available_warehouses_map.get(product_dict["id"], [])
-            if wh_list:
-                product_dict["available_warehouses"] = sorted(
-                    [
-                        AvailableWarehouse(
-                            **w,
-                            distance_to_client=self._count_distance_to_client(
-                                request.lat,
-                                request.lon,
-                                w["latitude"],
-                                w["longitude"],
-                            ),
-                        )
-                        for w in wh_list
-                    ],
-                    key=lambda x: (
-                        x.distance_to_client is None,
-                        x.distance_to_client or 0,
-                    ),
-                )
+            wh_raw = product_dict.get("available_warehouses")
+            if wh_raw and isinstance(wh_raw, list):
+                wh_valid = [
+                    w
+                    for w in wh_raw
+                    if w is not None
+                    and w.get("warehouse_id") is not None
+                    and (w.get("current_amount") or 0) > 0
+                ]
+                if wh_valid:
+                    product_dict["available_warehouses"] = sorted(
+                        [
+                            AvailableWarehouse(
+                                **w,
+                                distance_to_client=self._count_distance_to_client(
+                                    request.lat,
+                                    request.lon,
+                                    w["latitude"],
+                                    w["longitude"],
+                                ),
+                            )
+                            for w in wh_valid
+                        ],
+                        key=lambda x: (
+                            x.distance_to_client is None,
+                            x.distance_to_client or 0,
+                        ),
+                    )
+                else:
+                    product_dict["available_warehouses"] = None
             else:
                 product_dict["available_warehouses"] = None
 
-            # Заполняем остальные поля
+            # Остальные поля
             product_dict["is_ad_pos"] = False
             product_dict["variations"] = []
             product_dict["distance"] = (
@@ -962,9 +978,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 product_dict["seller_photo"]
             )
 
+            product_button_text = product_buttons_text.get(product["type"]) or {}
+            product_dict["button_text"] = product_button_text.get("name")
+            product_dict["button_logic"] = product_button_text.get("logic")
+
             products.append(MarketplaceProduct(**product_dict))
 
-        # Если сортировка по расстоянию, делаем её отдельно (после того как рассчитали расстояния)
+        # Отдельная сортировка по distance (после расчёта distance_to_client)
         if request.sort_by == MarketplaceSort.distance:
             reverse = request.sort_order == "desc"
             products.sort(
@@ -972,14 +992,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 reverse=reverse,
             )
 
-        result = MarketplaceProductList(
+        return MarketplaceProductList(
             result=products,
             count=total_count,
             page=request.page,
             size=request.size,
         )
-
-        return result
 
     async def _fetch_available_warehouses(
         self,

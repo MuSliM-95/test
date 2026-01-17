@@ -681,14 +681,6 @@ async def startup():
     except Exception as e:
         pass
 
-    try:
-        if not scheduler.running:
-            scheduler.start()
-    except Exception as e:
-        import traceback
-
-        traceback.print_exc()
-
 
 @app.on_event("shutdown")
 async def shutdown():

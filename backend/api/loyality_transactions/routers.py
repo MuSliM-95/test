@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import case, desc, func, select, update
+from sqlalchemy import Numeric, case, cast, desc, func, literal, select, update
 
 import api.loyality_transactions.schemas as schemas
 from database.db import (
@@ -59,8 +59,10 @@ async def raschet_bonuses(card_id: int) -> None:
 
         # -----------------------------------------------
         # Шаг 3. Основной запрос для вычисления баланса
-        # CASE WHEN income > outcome THEN income - outcome ELSE 0 END
-        balance_q = case((a_q > w_q, a_q - w_q), else_=0).label("balance")
+        # ROUND(CASE WHEN income > outcome THEN income - outcome ELSE 0 END, 2)
+        balance_q = func.round(
+            cast(case((a_q > w_q, a_q - w_q), else_=0), Numeric), literal(2)
+        ).label("balance")
 
         # -----------------------------------------------
         # Шаг 4. Объединяем всё в SELECT и фильтруем по условиям

@@ -2,8 +2,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from sqlalchemy import and_, select, update
 
 from api.chats import crud
 from api.chats.auth import get_current_user, get_current_user_owner
@@ -14,7 +14,6 @@ from api.chats.schemas import (
     ChannelUpdate,
     ChatCreate,
     ChatResponse,
-    ChatUpdate,
     ManagerInChat,
     ManagersInChatResponse,
     MessageCreate,
@@ -22,7 +21,7 @@ from api.chats.schemas import (
     MessagesList,
 )
 from api.chats.websocket import chat_manager
-from database.db import database, pictures
+from database.db import chat_messages, database, pictures
 
 logger = logging.getLogger(__name__)
 
@@ -156,80 +155,11 @@ async def get_chats(
     )
 
 
-@router.put("/chats/{chat_id}", response_model=ChatResponse)
-async def update_chat(
-    chat_id: int, token: str, chat: ChatUpdate, user=Depends(get_current_user)
-):
-    """Update chat (must belong to user's cashbox)"""
-    existing_chat = await crud.get_chat(chat_id)
-    if not existing_chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
-
-    if existing_chat["cashbox_id"] != user.cashbox_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return await crud.update_chat(chat_id, **chat.dict(exclude_unset=True))
-
-
-@router.delete("/chats/{chat_id}")
-async def delete_chat(chat_id: int, token: str, user=Depends(get_current_user)):
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    existing_chat = await crud.get_chat(chat_id)
-    if not existing_chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
-
-    if existing_chat["cashbox_id"] != user.cashbox_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    if existing_chat.get("external_chat_id"):
-        try:
-            channel = await crud.get_channel(existing_chat["channel_id"])
-
-            if channel and channel["type"] == "AVITO":
-                from api.chats.avito.avito_factory import (
-                    create_avito_client,
-                    save_token_callback,
-                )
-
-                client = await create_avito_client(
-                    channel_id=channel["id"],
-                    cashbox_id=user.cashbox_id,
-                    on_token_refresh=lambda token_data: save_token_callback(
-                        channel["id"], user.cashbox_id, token_data
-                    ),
-                )
-
-                if client:
-                    try:
-                        closed = await client.close_chat(
-                            existing_chat["external_chat_id"]
-                        )
-                        if closed:
-                            logger.info(f"Chat {chat_id} closed in Avito API")
-                        else:
-                            logger.warning(
-                                f"Failed to close chat {chat_id} in Avito API"
-                            )
-                    except Exception as e:
-                        logger.warning(f"Error closing chat in Avito API: {e}")
-        except Exception as e:
-            logger.warning(f"Error during Avito chat closure: {e}")
-
-    return await crud.update_chat(chat_id, status="CLOSED")
-
-
 @router.post("/messages/", response_model=MessageResponse)
 async def create_message(
     token: str, message: MessageCreate, user=Depends(get_current_user)
 ):
     """Create a new message"""
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     chat = await crud.get_chat(message.chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -243,7 +173,7 @@ async def create_message(
         db_message_image = await crud.create_message_and_update_chat(
             chat_id=message.chat_id,
             sender_type=message.sender_type,
-            content="",  # Без текста
+            content="",
             message_type="IMAGE",
             external_message_id=None,
             status=message.status,
@@ -335,10 +265,7 @@ async def create_message(
                                         else:
                                             filename = "image.jpg"
                                     except Exception as e:
-                                        logger.error(
-                                            f"Failed to parse data URL: {e}",
-                                            exc_info=True,
-                                        )
+                                        logger.error(f"Failed to parse data URL: {e}")
                                         image_data = None
 
                                 if image_data is None:
@@ -441,12 +368,8 @@ async def create_message(
                                             )
 
                                         image_url_for_db = file_link
-                                        logger.info(f"File saved to S3: {file_link}")
                                     except Exception as e:
-                                        logger.error(
-                                            f"Failed to save file to S3: {e}",
-                                            exc_info=True,
-                                        )
+                                        logger.error(f"Failed to save file to S3: {e}")
 
                                 if (
                                     message.message_type == "IMAGE"
@@ -472,15 +395,12 @@ async def create_message(
                                             image_id = None
                                     except Exception as e:
                                         logger.error(
-                                            f"Failed to upload image to Avito: {e}",
-                                            exc_info=True,
+                                            f"Failed to upload image to Avito: {e}"
                                         )
                                         image_id = None
 
                             except Exception as e:
-                                logger.error(
-                                    f"Failed to process image: {e}", exc_info=True
-                                )
+                                logger.error(f"Failed to process image: {e}")
                                 image_id = None
 
                         if (
@@ -501,13 +421,9 @@ async def create_message(
                                         size=len(image_data) if image_data else None,
                                     )
                                 )
-                                logger.info(
-                                    f"File saved to pictures table for message {db_message['id']}: {image_url_for_db}"
-                                )
                             except Exception as e:
                                 logger.warning(
-                                    f"Failed to save file for message {db_message['id']}: {e}",
-                                    exc_info=True,
+                                    f"Failed to save file for message {db_message['id']}: {e}"
                                 )
 
                         if has_image and has_text and db_message_text:
@@ -528,8 +444,7 @@ async def create_message(
                                         )
                                 except Exception as e:
                                     logger.error(
-                                        f"Failed to send IMAGE message to Avito: {e}",
-                                        exc_info=True,
+                                        f"Failed to send IMAGE message to Avito: {e}"
                                     )
                                     await crud.update_message(
                                         db_message["id"], status="FAILED"
@@ -551,8 +466,7 @@ async def create_message(
                                     )
                             except Exception as e:
                                 logger.error(
-                                    f"Failed to send TEXT message to Avito: {e}",
-                                    exc_info=True,
+                                    f"Failed to send TEXT message to Avito: {e}"
                                 )
                                 await crud.update_message(
                                     db_message_text["id"], status="FAILED"
@@ -578,8 +492,7 @@ async def create_message(
                                         )
                                 except Exception as e:
                                     logger.error(
-                                        f"Failed to send message to Avito: {e}",
-                                        exc_info=True,
+                                        f"Failed to send message to Avito: {e}"
                                     )
                                     await crud.update_message(
                                         db_message["id"], status="FAILED"
@@ -592,9 +505,7 @@ async def create_message(
                                     db_message["id"], status="FAILED"
                                 )
                     except Exception as e:
-                        logger.error(
-                            f"Failed to send message to Avito: {e}", exc_info=True
-                        )
+                        logger.error(f"Failed to send message to Avito: {e}")
                         try:
                             await crud.update_message(db_message["id"], status="FAILED")
                         except Exception:
@@ -604,7 +515,7 @@ async def create_message(
                         f"Could not create Avito client for channel {channel['id']}, cashbox {user.cashbox_id}"
                     )
         except Exception as e:
-            logger.error(f"Error sending message to Avito: {e}", exc_info=True)
+            logger.error(f"Error sending message to Avito: {e}")
 
     return db_message
 
@@ -629,6 +540,7 @@ async def get_chat_messages(
     token: str,
     skip: int = 0,
     limit: int = 100,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     user=Depends(get_current_user),
 ):
     """Get messages from chat (must belong to user's cashbox)"""
@@ -637,6 +549,50 @@ async def get_chat_messages(
         raise HTTPException(status_code=404, detail="Chat not found")
     if chat["cashbox_id"] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
+
+    channel = await crud.get_channel(chat["channel_id"])
+
+    async def mark_chat_as_read_background():
+        if channel and channel.get("type") == "AVITO" and chat.get("external_chat_id"):
+            try:
+                from api.chats.avito.avito_factory import (
+                    create_avito_client,
+                    save_token_callback,
+                )
+
+                client = await create_avito_client(
+                    channel_id=chat["channel_id"],
+                    cashbox_id=user.cashbox_id,
+                    on_token_refresh=lambda token_data: save_token_callback(
+                        chat["channel_id"], user.cashbox_id, token_data
+                    ),
+                )
+
+                if client:
+                    try:
+                        await client.mark_chat_as_read(chat["external_chat_id"])
+
+                        update_query = (
+                            update(chat_messages)
+                            .where(
+                                and_(
+                                    chat_messages.c.chat_id == chat_id,
+                                    chat_messages.c.sender_type == "CLIENT",
+                                    chat_messages.c.status != "READ",
+                                )
+                            )
+                            .values(status="READ")
+                        )
+                        await database.execute(update_query)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to mark chat {chat['external_chat_id']} as read: {e}"
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to mark Avito chat {chat_id} as read: {e}")
+
+    if channel and channel.get("type") == "AVITO" and chat.get("external_chat_id"):
+        background_tasks.add_task(mark_chat_as_read_background)
 
     messages = await crud.get_messages(chat_id, skip, limit)
     total = await crud.get_messages_count(chat_id)
@@ -649,92 +605,100 @@ async def get_chat_messages(
         )
         operator_avatar = None
 
-        if channel and channel["type"] == "AVITO":
-            try:
-                from api.chats.avito.avito_factory import (
-                    create_avito_client,
-                    save_token_callback,
-                )
-                from database.db import channel_credentials
+        if channel and channel["type"] == "AVITO" and chat.get("external_chat_id"):
+            needs_avatars = not client_avatar
 
-                creds = await database.fetch_one(
-                    channel_credentials.select().where(
-                        (channel_credentials.c.channel_id == chat["channel_id"])
-                        & (channel_credentials.c.cashbox_id == user.cashbox_id)
-                        & (channel_credentials.c.is_active.is_(True))
+            if needs_avatars:
+                try:
+                    from api.chats.avito.avito_factory import (
+                        create_avito_client,
+                        save_token_callback,
                     )
-                )
+                    from database.db import channel_credentials
 
-                if creds:
-                    client = await create_avito_client(
-                        channel_id=chat["channel_id"],
-                        cashbox_id=user.cashbox_id,
-                        on_token_refresh=lambda token_data: save_token_callback(
-                            chat["channel_id"], user.cashbox_id, token_data
-                        ),
+                    creds = await database.fetch_one(
+                        channel_credentials.select().where(
+                            (channel_credentials.c.channel_id == chat["channel_id"])
+                            & (channel_credentials.c.cashbox_id == user.cashbox_id)
+                            & (channel_credentials.c.is_active.is_(True))
+                        )
                     )
 
-                    if client:
-                        chat_info = await client.get_chat_info(chat["external_chat_id"])
-                        users = chat_info.get("users", [])
-                        avito_user_id = creds.get("avito_user_id")
+                    if creds:
+                        client = await create_avito_client(
+                            channel_id=chat["channel_id"],
+                            cashbox_id=user.cashbox_id,
+                            on_token_refresh=lambda token_data: save_token_callback(
+                                chat["channel_id"], user.cashbox_id, token_data
+                            ),
+                        )
 
-                        if users:
-                            for user_data in users:
-                                user_id_in_chat = user_data.get(
-                                    "user_id"
-                                ) or user_data.get("id")
-                                if user_id_in_chat:
-                                    avatar_url = None
-                                    public_profile = user_data.get(
-                                        "public_user_profile", {}
-                                    )
-                                    if public_profile:
-                                        avatar_data = public_profile.get("avatar", {})
-                                        if isinstance(avatar_data, dict):
-                                            avatar_url = (
-                                                avatar_data.get("default")
-                                                or avatar_data.get("images", {}).get(
-                                                    "256x256"
-                                                )
-                                                or avatar_data.get("images", {}).get(
-                                                    "128x128"
-                                                )
-                                                or (
-                                                    list(
-                                                        avatar_data.get(
-                                                            "images", {}
-                                                        ).values()
-                                                    )[0]
-                                                    if avatar_data.get("images")
-                                                    else None
-                                                )
+                        if client:
+                            chat_info = await client.get_chat_info(
+                                chat["external_chat_id"]
+                            )
+                            users = chat_info.get("users", [])
+                            avito_user_id = creds.get("avito_user_id")
+
+                            if users:
+                                for user_data in users:
+                                    user_id_in_chat = user_data.get(
+                                        "user_id"
+                                    ) or user_data.get("id")
+                                    if user_id_in_chat:
+                                        avatar_url = None
+                                        public_profile = user_data.get(
+                                            "public_user_profile", {}
+                                        )
+                                        if public_profile:
+                                            avatar_data = public_profile.get(
+                                                "avatar", {}
                                             )
-                                        elif isinstance(avatar_data, str):
-                                            avatar_url = avatar_data
-
-                                    if avatar_url:
-                                        if (
-                                            avito_user_id
-                                            and user_id_in_chat == avito_user_id
-                                        ):
-                                            operator_avatar = avatar_url
-                                        elif not client_avatar:
-                                            client_avatar = avatar_url
-                                            # Сохраняем аватар в БД
-                                            if chat.get("chat_contact_id"):
-                                                from database.db import chat_contacts
-
-                                                await database.execute(
-                                                    chat_contacts.update()
-                                                    .where(
-                                                        chat_contacts.c.id
-                                                        == chat["chat_contact_id"]
+                                            if isinstance(avatar_data, dict):
+                                                avatar_url = (
+                                                    avatar_data.get("default")
+                                                    or avatar_data.get(
+                                                        "images", {}
+                                                    ).get("256x256")
+                                                    or avatar_data.get(
+                                                        "images", {}
+                                                    ).get("128x128")
+                                                    or (
+                                                        list(
+                                                            avatar_data.get(
+                                                                "images", {}
+                                                            ).values()
+                                                        )[0]
+                                                        if avatar_data.get("images")
+                                                        else None
                                                     )
-                                                    .values(avatar=avatar_url)
                                                 )
-            except Exception:
-                pass
+                                            elif isinstance(avatar_data, str):
+                                                avatar_url = avatar_data
+
+                                        if avatar_url:
+                                            if (
+                                                avito_user_id
+                                                and user_id_in_chat == avito_user_id
+                                            ):
+                                                operator_avatar = avatar_url
+                                            elif not client_avatar:
+                                                client_avatar = avatar_url
+                                                if chat.get("chat_contact_id"):
+                                                    from database.db import (
+                                                        chat_contacts,
+                                                    )
+
+                                                    await database.execute(
+                                                        chat_contacts.update()
+                                                        .where(
+                                                            chat_contacts.c.id
+                                                            == chat["chat_contact_id"]
+                                                        )
+                                                        .values(avatar=avatar_url)
+                                                    )
+                except Exception:
+                    pass
 
         message_ids = [msg["id"] for msg in messages] if messages else []
         message_images = {}
@@ -763,9 +727,7 @@ async def get_chat_messages(
                     if pic_url:
                         message_images[msg_id].append(pic_url)
             except Exception as e:
-                logger.warning(
-                    f"Failed to load images for messages: {e}", exc_info=True
-                )
+                logger.warning(f"Failed to load images for messages: {e}")
 
         for msg in messages:
             msg_dict = dict(msg)
@@ -787,7 +749,7 @@ async def get_chat_messages(
 
             messages_list.append(MessageResponse(**msg_dict))
 
-    return MessagesList(
+    result = MessagesList(
         data=messages_list,
         total=total,
         skip=skip,
@@ -795,14 +757,11 @@ async def get_chat_messages(
         date=chat.get("last_message_time"),
     )
 
+    return result
+
 
 @router.delete("/messages/{message_id}")
 async def delete_message(message_id: int, token: str, user=Depends(get_current_user)):
-
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     existing_message = await crud.get_message(message_id)
     if not existing_message:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -831,16 +790,10 @@ async def delete_message(message_id: int, token: str, user=Depends(get_current_u
 
                 if client:
                     try:
-                        deleted = await client.delete_message(
+                        await client.delete_message(
                             chat_id=chat["external_chat_id"],
                             message_id=existing_message["external_message_id"],
                         )
-                        if deleted:
-                            logger.info(f"Message {message_id} deleted in Avito API")
-                        else:
-                            logger.warning(
-                                f"Failed to delete message {message_id} in Avito API"
-                            )
                     except Exception as e:
                         logger.warning(f"Error deleting message in Avito API: {e}")
         except Exception as e:
@@ -869,32 +822,6 @@ async def get_chat_files(chat_id: int, token: str, user=Depends(get_current_user
         .where(
             pictures.c.entity == "messages",
             pictures.c.entity_id.in_(message_ids),
-            pictures.c.is_deleted.is_not(True),
-        )
-        .order_by(pictures.c.created_at.desc())
-    )
-
-    files = await database.fetch_all(query)
-    return files
-
-
-@router.get("/messages/{message_id}/files/", response_model=list)
-async def get_message_files(
-    message_id: int, token: str, user=Depends(get_current_user)
-):
-    message = await crud.get_message(message_id)
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    chat = await crud.get_chat(message["chat_id"])
-    if chat["cashbox_id"] != user.cashbox_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    query = (
-        select(pictures)
-        .where(
-            pictures.c.entity == "messages",
-            pictures.c.entity_id == message_id,
             pictures.c.is_deleted.is_not(True),
         )
         .order_by(pictures.c.created_at.desc())

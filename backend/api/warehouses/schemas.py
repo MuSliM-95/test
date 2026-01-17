@@ -35,6 +35,8 @@ class Warehouse(WarehouseCreate):
     created_at: int
     longitude: Optional[float]
     latitude: Optional[float]
+    qr_hash: Optional[str] = None
+    qr_url: Optional[str] = None
 
     class Config:
         orm_mode = True

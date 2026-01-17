@@ -6,7 +6,7 @@ import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException
 from fuzzywuzzy import fuzz
 from phonenumbers import geocoder, region_code_for_number
-from sqlalchemy import func, or_, select
+from sqlalchemy import Numeric, and_, cast, func, literal, or_, select
 
 import api.loyality_cards.schemas as schemas
 from api.apple_wallet.utils import update_apple_wallet_pass
@@ -38,15 +38,44 @@ from ws_manager import manager
 
 router = APIRouter(tags=["loyality_cards"])
 
+loyality_cards_columns_rounded = [
+    loyality_cards.c.id,
+    loyality_cards.c.card_number,
+    loyality_cards.c.tags,
+    func.round(cast(loyality_cards.c.balance, Numeric), literal(2)).label("balance"),
+    loyality_cards.c.income,
+    loyality_cards.c.outcome,
+    loyality_cards.c.cashback_percent,
+    loyality_cards.c.minimal_checque_amount,
+    loyality_cards.c.start_period,
+    loyality_cards.c.end_period,
+    loyality_cards.c.max_percentage,
+    loyality_cards.c.max_withdraw_percentage,
+    loyality_cards.c.contragent_id,
+    loyality_cards.c.organization_id,
+    loyality_cards.c.cashbox_id,
+    loyality_cards.c.created_by_id,
+    loyality_cards.c.status_card,
+    loyality_cards.c.is_deleted,
+    loyality_cards.c.apple_wallet_advertisement,
+    loyality_cards.c.lifetime,
+    loyality_cards.c.created_at,
+    loyality_cards.c.updated_at,
+]
+
 
 @router.get("/loyality_cards/{idx}/", response_model=schemas.LoyalityCardGet)
 async def get_loyality_card_by_id(token: str, idx: int):
     """Получение карты по ID"""
     user = await get_user_by_token(token)
-    loyality_cards_db_q = loyality_cards.select().where(
-        loyality_cards.c.is_deleted == False,
-        loyality_cards.c.cashbox_id == user.cashbox_id,
-        loyality_cards.c.id == idx,
+    loyality_cards_db_q = (
+        select(*loyality_cards_columns_rounded)
+        .select_from(loyality_cards)
+        .where(
+            loyality_cards.c.is_deleted == False,
+            loyality_cards.c.cashbox_id == user.cashbox_id,
+            loyality_cards.c.id == idx,
+        )
     )
     loyality_cards_db = await database.fetch_one(loyality_cards_db_q)
     loyality_cards_db = datetime_to_timestamp(loyality_cards_db)
@@ -149,7 +178,8 @@ async def get_cards(
 
     if filters:
         query = (
-            loyality_cards.select()
+            select(*loyality_cards_columns_rounded)
+            .select_from(loyality_cards)
             .where(
                 loyality_cards.c.cashbox_id == user.cashbox_id,
                 loyality_cards.c.is_deleted.is_not(True),
@@ -157,9 +187,13 @@ async def get_cards(
             .filter(*filters)
         )
     else:
-        query = loyality_cards.select().where(
-            loyality_cards.c.cashbox_id == user.cashbox_id,
-            loyality_cards.c.is_deleted.is_not(True),
+        query = (
+            select(*loyality_cards_columns_rounded)
+            .select_from(loyality_cards)
+            .where(
+                loyality_cards.c.cashbox_id == user.cashbox_id,
+                loyality_cards.c.is_deleted.is_not(True),
+            )
         )
 
     if sort:
@@ -456,6 +490,30 @@ async def new_loyality_card(
             loyality_cards.c.is_deleted.is_not(True),
         )
         card = await database.fetch_one(q)
+        q = loyality_cards.select().where(
+            and_(
+                loyality_cards.c.card_number == loyality_cards_values["card_number"],
+                loyality_cards.c.cashbox_id == user.cashbox_id,
+            ),
+        )
+        card_in_db = await database.execute(q)
+        if card_in_db:
+            raise HTTPException(
+                status_code=403,
+                detail="запись существует",
+            )
+        q = loyality_cards.select().where(
+            and_(
+                loyality_cards.c.card_number == loyality_cards_values["card_number"],
+                loyality_cards.c.cashbox_id == user.cashbox_id,
+            ),
+        )
+        card_in_db = await database.execute(q)
+        if card_in_db:
+            raise HTTPException(
+                status_code=403,
+                detail="запись существует",
+            )
 
         if card:
             inserted_ids.add(card.id)
@@ -473,9 +531,13 @@ async def new_loyality_card(
                 )
             inserted_ids.add(loyality_card_id)
     print(inserted_ids)
-    query = loyality_cards.select().where(
-        loyality_cards.c.cashbox_id == user.cashbox_id,
-        loyality_cards.c.id.in_(list(inserted_ids)),
+    query = (
+        select(*loyality_cards_columns_rounded)
+        .select_from(loyality_cards)
+        .where(
+            loyality_cards.c.cashbox_id == user.cashbox_id,
+            loyality_cards.c.id.in_(list(inserted_ids)),
+        )
     )
 
     loyality_cards_db = await database.fetch_all(query)
@@ -544,9 +606,13 @@ async def edit_loyality_transaction(
             .values(loyality_card_values)
         )
         await database.execute(query)
-        loyality_card_db = await get_entity_by_id_and_created_by(
-            loyality_cards, idx, user.id
-        )
+
+    loyality_cards_db_q = (
+        select(*loyality_cards_columns_rounded)
+        .select_from(loyality_cards)
+        .where(loyality_cards.c.id == idx, loyality_cards.c.created_by_id == user.id)
+    )
+    loyality_card_db = await database.fetch_one(loyality_cards_db_q)
 
     loyality_card_db = datetime_to_timestamp(loyality_card_db)
 
@@ -574,8 +640,10 @@ async def delete_loyality_transaction(token: str, idx: int):
     )
     await database.execute(query)
 
-    query = loyality_cards.select().where(
-        loyality_cards.c.id == idx, loyality_cards.c.created_by_id == user.id
+    query = (
+        select(*loyality_cards_columns_rounded)
+        .select_from(loyality_cards)
+        .where(loyality_cards.c.id == idx, loyality_cards.c.created_by_id == user.id)
     )
     loyality_card_db = await database.fetch_one(query)
     loyality_card_db = datetime_to_timestamp(loyality_card_db)

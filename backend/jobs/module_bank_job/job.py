@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import aiohttp
 from sqlalchemy import and_, select
 
+from common.decorators import ensure_db_connection
 from database.db import (
     async_session_maker,
     contragents,
@@ -90,6 +91,7 @@ async def process_payment(contragent_id, operation, cashbox_id, session):
     return False, 0
 
 
+@ensure_db_connection
 async def module_bank_update_transaction(
     contragent_repository: ContragentRepository = ContragentRepository(),
 ):
@@ -224,6 +226,7 @@ async def module_bank_update_transaction(
                 and_(
                     module_bank_accounts.c.is_active == True,
                     module_bank_accounts.c.is_deleted == False,
+                    pboxes.c.deleted_at.is_(None),
                 )
             )
             .select_from(module_bank_accounts)

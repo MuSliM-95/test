@@ -18,7 +18,7 @@ class FavoriteResponse(BaseModel):
 
     id: int
     nomenclature_id: int
-    contagent_id: int
+    phone: str
     created_at: datetime
     updated_at: datetime
 

@@ -20,10 +20,6 @@ async def get_current_user(
     if not token:
         if credentials:
             token = credentials.credentials
-        else:
-            # Пытаемся получить из заголовка напрямую (для обратной совместимости)
-            # Это не будет показано в Swagger, но будет работать
-            pass
 
     if not token:
         raise HTTPException(

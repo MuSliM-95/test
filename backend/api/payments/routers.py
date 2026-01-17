@@ -78,7 +78,10 @@ async def read_payments_list(
 
             # Добавляем информацию о счете откуда
             if pay_dict["paybox"]:
-                paybox_query = pboxes.select().where(pboxes.c.id == pay_dict["paybox"])
+                paybox_query = pboxes.select().where(
+                    pboxes.c.id == pay_dict["paybox"],
+                    pboxes.c.deleted_at.is_(None),
+                )
                 paybox_info = await database.fetch_one(paybox_query)
                 if paybox_info:
                     has_permission = await check_user_permission(
@@ -333,7 +336,9 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
     del payment_dict["repeat"]
 
     paybox_q = pboxes.select().where(
-        pboxes.c.id == payment.paybox, pboxes.c.cashbox == user.cashbox_id
+        pboxes.c.id == payment.paybox,
+        pboxes.c.cashbox == user.cashbox_id,
+        pboxes.c.deleted_at.is_(None),
     )
     paybox = await database.fetch_one(paybox_q)
 
@@ -405,7 +410,9 @@ async def create_payment(token: str, payment: pay_schemas.PaymentCreate):
                 float(paybox_dict["balance"]) - float(payment_dict["amount"]), 2
             )
             query = pboxes.select().where(
-                pboxes.c.id == paybox_to_id, pboxes.c.cashbox == user.cashbox_id
+                pboxes.c.id == paybox_to_id,
+                pboxes.c.cashbox == user.cashbox_id,
+                pboxes.c.deleted_at.is_(None),
             )
             pbox_to = await database.fetch_one(query)
 
@@ -659,6 +666,7 @@ async def update_payment(
                     q = pboxes.select().where(
                         pboxes.c.cashbox == user.cashbox_id,
                         pboxes.c.id == update_dict["paybox"],
+                        pboxes.c.deleted_at.is_(None),
                     )
                     res = await database.fetch_one(q)
 
@@ -672,6 +680,7 @@ async def update_payment(
                     q = pboxes.select().where(
                         pboxes.c.cashbox == user.cashbox_id,
                         pboxes.c.id == update_dict["paybox_to"],
+                        pboxes.c.deleted_at.is_(None),
                     )
                     res = await database.fetch_one(q)
 
@@ -812,7 +821,10 @@ async def delete_payment(token: str, payment_id: int):
 
             if payment.cashbox == user.cashbox_id and payment.account == user.user:
 
-                paybox_q = pboxes.select().where(pboxes.c.id == payment.paybox)
+                paybox_q = pboxes.select().where(
+                    pboxes.c.id == payment.paybox,
+                    pboxes.c.deleted_at.is_(None),
+                )
                 paybox = await database.fetch_one(paybox_q)
 
                 paybox_dict = dict(paybox)
@@ -832,7 +844,8 @@ async def delete_payment(token: str, payment_id: int):
                         )
 
                         paybox_to_q = pboxes.select().where(
-                            pboxes.c.id == payment.paybox_to
+                            pboxes.c.id == payment.paybox_to,
+                            pboxes.c.deleted_at.is_(None),
                         )
                         paybox_to_rec = await database.fetch_one(paybox_to_q)
 

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import aiohttp
 from sqlalchemy import and_, select
 
+from common.decorators import ensure_db_connection
 from database.db import (
     contragents,
     database,
@@ -116,8 +117,8 @@ async def process_payment(contragent_id, description, amount, cashbox_id):
     return False, 0
 
 
+@ensure_db_connection
 async def tochka_update_transaction():
-    await database.connect()
     print("START TOCHKABANK")
 
     @database.transaction()
@@ -136,6 +137,7 @@ async def tochka_update_transaction():
                 and_(
                     tochka_bank_accounts.c.is_active == True,
                     tochka_bank_accounts.c.is_deleted == False,
+                    pboxes.c.deleted_at.is_(None),
                 )
             )
             .select_from(tochka_bank_accounts)

@@ -58,7 +58,8 @@ async def raschet(user, token):
     )
 
     payboxes_list_q = select([pboxes.c.id, pboxes.c.start_balance]).where(
-        pboxes.c.cashbox == user.cashbox_id
+        pboxes.c.cashbox == user.cashbox_id,
+        pboxes.c.deleted_at.is_(None),
     )
     projects_list_q = select([projects.c.id]).where(
         projects.c.cashbox == user.cashbox_id
@@ -80,7 +81,10 @@ async def raschet(user, token):
 
     for i in update:
         if i.pb_id:
-            q = pboxes.select().where(pboxes.c.id == i.pb_id)
+            q = pboxes.select().where(
+                pboxes.c.id == i.pb_id,
+                pboxes.c.deleted_at.is_(None),
+            )
             paybox = await database.fetch_one(q)
             q = (
                 pboxes.update()
@@ -93,7 +97,10 @@ async def raschet(user, token):
                 )
             )
             await database.execute(q)
-            q = pboxes.select().where(pboxes.c.id == i.pb_id)
+            q = pboxes.select().where(
+                pboxes.c.id == i.pb_id,
+                pboxes.c.deleted_at.is_(None),
+            )
             paybox = await database.fetch_one(q)
             await manager.send_message(
                 token, {"action": "edit", "target": "payboxes", "result": dict(paybox)}
@@ -139,7 +146,10 @@ async def raschet(user, token):
             )
         )
         await database.execute(q)
-        q = pboxes.select().where(pboxes.c.id == z_paybox["id"])
+        q = pboxes.select().where(
+            pboxes.c.id == z_paybox["id"],
+            pboxes.c.deleted_at.is_(None),
+        )
         paybox = await database.fetch_one(q)
         await manager.send_message(
             token, {"action": "edit", "target": "payboxes", "result": dict(paybox)}

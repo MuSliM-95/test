@@ -25,17 +25,10 @@ def verify_webhook_signature(
             secret.encode(), request_body, hashlib.sha256
         ).hexdigest()
 
-        is_valid = hmac.compare_digest(calculated_signature, signature_header)
-
-        if not is_valid:
-            logger.warning(
-                f"Invalid webhook signature. Expected: {calculated_signature}, Got: {signature_header}"
-            )
-
-        return is_valid
+        return hmac.compare_digest(calculated_signature, signature_header)
 
     except Exception as e:
-        logger.error(f"Error verifying webhook signature: {e}", exc_info=True)
+        logger.error(f"Error verifying webhook signature: {e}")
         return False
 
 
@@ -48,34 +41,6 @@ def validate_webhook_structure(webhook_data: Dict[str, Any]) -> bool:
             return False
 
     return True
-
-
-def extract_cashbox_id_from_webhook(webhook_data: Dict[str, Any]) -> Optional[int]:
-    try:
-        payload = webhook_data.get("payload", {})
-
-        avito_identifier = (
-            payload.get("user_id")
-            or payload.get("account_id")
-            or payload.get("seller_id")
-            or webhook_data.get("user_id")
-        )
-
-        if not avito_identifier:
-            logger.warning(
-                "Could not extract Avito identifier from webhook - cannot lookup cashbox_id"
-            )
-            return None
-
-        logger.info(
-            f"Webhook contains Avito identifier: {avito_identifier}, will lookup cashbox in handler"
-        )
-
-        return None
-
-    except (ValueError, TypeError) as e:
-        logger.error(f"Error extracting cashbox_id from webhook: {e}", exc_info=True)
-        return None
 
 
 async def get_cashbox_id_for_avito_webhook(
@@ -117,12 +82,7 @@ async def get_cashbox_id_for_avito_webhook(
             existing_chat = await database.fetch_one(query)
 
             if existing_chat:
-                cashbox_id = existing_chat["cashbox_id"]
-                channel_id = existing_chat["channel_id"]
-                logger.info(
-                    f"Found cashbox_id {cashbox_id} and channel_id {channel_id} from existing chat {existing_chat['id']} by external_chat_id {external_chat_id}"
-                )
-                return cashbox_id
+                return existing_chat["cashbox_id"]
 
         if user_id:
             query = (
@@ -145,11 +105,7 @@ async def get_cashbox_id_for_avito_webhook(
 
             creds = await database.fetch_one(query)
             if creds:
-                cashbox_id = creds["cashbox_id"]
-                logger.info(
-                    f"Found cashbox_id {cashbox_id} from channel_credentials by avito_user_id {user_id}"
-                )
-                return cashbox_id
+                return creds["cashbox_id"]
 
         logger.warning(
             f"Could not determine cashbox_id from webhook. "
@@ -160,7 +116,7 @@ async def get_cashbox_id_for_avito_webhook(
         return None
 
     except Exception as e:
-        logger.error(f"Error getting cashbox_id for Avito webhook: {e}", exc_info=True)
+        logger.error(f"Error getting cashbox_id for Avito webhook: {e}")
         return None
 
 
@@ -195,9 +151,8 @@ async def process_avito_webhook(
             )
             return False, webhook_data, None
 
-        logger.info(f"Valid webhook received from cashbox {cashbox_id}")
         return True, webhook_data, cashbox_id
 
     except Exception as e:
-        logger.error(f"Error processing webhook: {e}", exc_info=True)
+        logger.error(f"Error processing webhook: {e}")
         return False, {}, None

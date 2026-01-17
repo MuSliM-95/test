@@ -13,76 +13,97 @@ from api.marketplace.service.product_cart_service.schemas import (
     MarketplaceGetCartRequest,
     MarketplaceRemoveFromCartRequest,
 )
-from database.db import database, marketplace_cart_goods, marketplace_contragent_cart
+from database.db import (
+    database,
+    marketplace_cart_goods,
+    marketplace_carts,
+    nomenclature,
+)
 
 
 class MarketplaceCartService(BaseMarketplaceService):
     async def add_to_cart(
         self, request: MarketplaceAddToCartRequest
     ) -> MarketplaceCartResponse:
-        """Add item to cart (creates cart if needed)"""
-        await self._validate_contragent(
-            request.contragent_phone, request.good.nomenclature_id
+        """
+        Добавить товар в корзину (корзина создаётся автоматически).
+
+        Логика как в старом коде:
+        1) получить/создать корзину
+        2) проверить, есть ли уже такая позиция (nomenclature_id + warehouse_id)
+        3) если есть — увеличить quantity, иначе вставить новую строку
+        4) вернуть корзину
+        """
+
+        phone = request.contragent_phone
+
+        await self._ensure_marketplace_client(phone)
+
+        product_query = select(nomenclature.c.id).where(
+            and_(
+                nomenclature.c.id == request.good.nomenclature_id,
+                nomenclature.c.is_deleted == False,
+            )
         )
-        # 1. Get contragent ID
-        contragent_id = await self._get_contragent_id_by_phone(request.contragent_phone)
+        product = await database.fetch_one(product_query)
+        if not product:
+            raise HTTPException(
+                status_code=404, detail="Товар не найден или не доступен"
+            )
 
-        # 2. Get or create cart
-        cart_id = await self._get_or_create_cart(contragent_id)
+        cart_id = await self._get_or_create_cart(phone)
 
-        # 3. Check for existing item
         existing_item = await self._get_cart_item(
             cart_id=cart_id,
             nomenclature_id=request.good.nomenclature_id,
             warehouse_id=request.good.warehouse_id,
         )
 
-        # 4. Update or insert item
         if existing_item:
             new_quantity = existing_item.quantity + request.good.quantity
-            query = (
+            upd = (
                 update(marketplace_cart_goods)
                 .where(marketplace_cart_goods.c.id == existing_item.id)
                 .values(quantity=new_quantity, updated_at=datetime.utcnow())
             )
-            await database.execute(query)
+            await database.execute(upd)
         else:
-            query = marketplace_cart_goods.insert().values(
+            ins = marketplace_cart_goods.insert().values(
                 nomenclature_id=request.good.nomenclature_id,
                 warehouse_id=request.good.warehouse_id,
                 quantity=request.good.quantity,
                 cart_id=cart_id,
             )
-            await database.execute(query)
+            await database.execute(ins)
 
-        # 5. Return updated cart
-        return await self.get_cart(
-            MarketplaceGetCartRequest(contragent_phone=request.contragent_phone)
+        await database.execute(
+            update(marketplace_carts)
+            .where(marketplace_carts.c.id == cart_id)
+            .values(updated_at=datetime.utcnow())
         )
+
+        return await self.get_cart(MarketplaceGetCartRequest(contragent_phone=phone))
 
     async def get_cart(
         self, request: MarketplaceGetCartRequest
     ) -> MarketplaceCartResponse:
-        """Get all items in cart"""
-        # 1. Get contragent ID
-        contragent_id = await self._get_contragent_id_by_phone(request.contragent_phone)
+        """Получить содержимое корзины по номеру телефона."""
 
-        # 2. Get cart
-        cart = await database.fetch_one(
-            select(marketplace_contragent_cart.c.id).where(
-                marketplace_contragent_cart.c.contragent_id == contragent_id
-            )
+        phone = request.contragent_phone
+
+        cart_query = select(marketplace_carts.c.id).where(
+            marketplace_carts.c.phone == phone
         )
+        cart = await database.fetch_one(cart_query)
 
         if not cart:
             return MarketplaceCartResponse(
-                contragent_phone=request.contragent_phone,
+                contragent_phone=phone,
                 goods=[],
                 total_count=0,
             )
 
-        # 3. Get cart items
-        query = select(
+        items_query = select(
             marketplace_cart_goods.c.id,
             marketplace_cart_goods.c.nomenclature_id,
             marketplace_cart_goods.c.warehouse_id,
@@ -90,12 +111,9 @@ class MarketplaceCartService(BaseMarketplaceService):
             marketplace_cart_goods.c.created_at,
             marketplace_cart_goods.c.updated_at,
         ).where(marketplace_cart_goods.c.cart_id == cart.id)
-        items = await database.fetch_all(query)
 
-        # 4. Calculate totals
-        total_count = len(items)
+        items = await database.fetch_all(items_query)
 
-        # 5. Format response
         goods = [
             MarketplaceOrderGood(
                 nomenclature_id=item.nomenclature_id,
@@ -106,36 +124,33 @@ class MarketplaceCartService(BaseMarketplaceService):
         ]
 
         return MarketplaceCartResponse(
-            contragent_phone=request.contragent_phone,
+            contragent_phone=phone,
             goods=goods,
-            total_count=total_count,
+            total_count=len(items),
         )
 
     async def remove_from_cart(
         self, request: MarketplaceRemoveFromCartRequest
     ) -> MarketplaceCartResponse:
-        """Remove item from cart"""
-        # 1. Get contragent ID
-        contragent_id = await self._get_contragent_id_by_phone(request.contragent_phone)
+        """
+        Удалить товар из корзины.
 
-        # 2. Get cart ID
+        В отличие от старого кода, не полагаемся на "result == 0" от database.execute(delete),
+        а сначала ищем строку — так надёжнее.
+        """
+
+        phone = request.contragent_phone
+
         cart = await database.fetch_one(
-            select(marketplace_contragent_cart.c.id).where(
-                marketplace_contragent_cart.c.contragent_id == contragent_id
-            )
+            select(marketplace_carts.c.id).where(marketplace_carts.c.phone == phone)
         )
-
         if not cart:
-            raise HTTPException(
-                status_code=404, detail="Cart not found for this contragent"
-            )
+            raise HTTPException(status_code=404, detail="Cart not found for this phone")
 
-        # 3. Build deletion conditions
         conditions = [
             marketplace_cart_goods.c.cart_id == cart.id,
             marketplace_cart_goods.c.nomenclature_id == request.nomenclature_id,
         ]
-
         if request.warehouse_id is not None:
             conditions.append(
                 marketplace_cart_goods.c.warehouse_id == request.warehouse_id
@@ -143,41 +158,42 @@ class MarketplaceCartService(BaseMarketplaceService):
         else:
             conditions.append(marketplace_cart_goods.c.warehouse_id.is_(None))
 
-        # 4. Delete item(s)
-        delete_query = delete(marketplace_cart_goods).where(and_(*conditions))
-        result = await database.execute(delete_query)
-
-        if result == 0:
+        item = await database.fetch_one(
+            select(marketplace_cart_goods.c.id).where(and_(*conditions))
+        )
+        if not item:
             raise HTTPException(status_code=404, detail="Item not found in cart")
 
-        # 5. Return updated cart
-        return await self.get_cart(
-            MarketplaceGetCartRequest(contragent_phone=request.contragent_phone)
+        await database.execute(
+            delete(marketplace_cart_goods).where(marketplace_cart_goods.c.id == item.id)
         )
+
+        await database.execute(
+            update(marketplace_carts)
+            .where(marketplace_carts.c.id == cart.id)
+            .values(updated_at=datetime.utcnow())
+        )
+
+        return await self.get_cart(MarketplaceGetCartRequest(contragent_phone=phone))
 
     @staticmethod
-    async def _get_or_create_cart(contragent_id: int) -> int:
-        """Get existing cart or create new one"""
-        # Try to get existing cart
+    async def _get_or_create_cart(phone: str) -> int:
+        """Получить существующую корзину по phone или создать новую."""
         cart = await database.fetch_one(
-            select(marketplace_contragent_cart.c.id).where(
-                marketplace_contragent_cart.c.contragent_id == contragent_id
-            )
+            select(marketplace_carts.c.id).where(marketplace_carts.c.phone == phone)
         )
-
         if cart:
             return cart.id
 
-        # Create new cart
-        query = marketplace_contragent_cart.insert().values(contragent_id=contragent_id)
-        cart_id = await database.execute(query)
+        cart_id = await database.execute(marketplace_carts.insert().values(phone=phone))
         return cart_id
 
     @staticmethod
     async def _get_cart_item(
-        cart_id: int, nomenclature_id: int, warehouse_id: Optional[int] = None
+        cart_id: int,
+        nomenclature_id: int,
+        warehouse_id: Optional[int] = None,
     ) -> Optional[MarketplaceCartGoodRepresentation]:
-        """Get specific item in cart"""
         conditions = [
             marketplace_cart_goods.c.cart_id == cart_id,
             marketplace_cart_goods.c.nomenclature_id == nomenclature_id,
@@ -188,10 +204,10 @@ class MarketplaceCartService(BaseMarketplaceService):
         else:
             conditions.append(marketplace_cart_goods.c.warehouse_id.is_(None))
 
-        query = select(marketplace_cart_goods).where(and_(*conditions))
-        try:
-            return MarketplaceCartGoodRepresentation.from_orm(
-                await database.fetch_one(query)
-            )
-        except Exception:
+        row = await database.fetch_one(
+            select(marketplace_cart_goods).where(and_(*conditions))
+        )
+        if not row:
             return None
+
+        return MarketplaceCartGoodRepresentation.from_orm(row)

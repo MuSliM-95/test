@@ -45,7 +45,7 @@ class PromocodeService:
         # Создание транзакции
         transaction_query = loyality_transactions.insert().values(
             {
-                "type": "promocode",
+                "type": "accrual",
                 "amount": amount,
                 "loyality_card_id": card_id,
                 "loyality_card_number": card_number,
@@ -56,6 +56,7 @@ class PromocodeService:
                 "description": "Начисление баллов",
                 "status": True,
                 "external_id": str(promo_id),
+                "is_deleted": False,
                 "created_at": now,
                 "updated_at": now,
             }

@@ -170,9 +170,6 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
     try:
         await websocket.accept()
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
         return
 
     cashbox_id = None
@@ -194,9 +191,6 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
                 pass
             return
         except Exception as e:
-            import traceback
-
-            traceback.print_exc()
             try:
                 await websocket.send_json({"error": "Unauthorized", "detail": str(e)})
                 await websocket.close(code=1008)
@@ -218,9 +212,7 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
                 }
             )
         except Exception as e:
-            import traceback
-
-            traceback.print_exc()
+            pass
 
         while True:
             try:
@@ -231,9 +223,6 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
             except json.JSONDecodeError:
                 continue
             except Exception as e:
-                import traceback
-
-                traceback.print_exc()
                 continue
 
     except WebSocketDisconnect:
@@ -243,9 +232,6 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
             except Exception:
                 pass
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
         if cashbox_id is not None:
             try:
                 await cashbox_manager.disconnect(cashbox_id, websocket)
@@ -255,7 +241,6 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
 
 @router.websocket("/ws/{chat_id}/")
 async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(...)):
-    """WebSocket для чатов с аутентификацией и RabbitMQ"""
     await websocket.accept()
 
     try:
@@ -275,9 +260,6 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
         except Exception as e:
             await websocket.send_json({"error": "Unauthorized", "detail": str(e)})
             await websocket.close(code=1008)
-            import traceback
-
-            traceback.print_exc()
             return
 
         chat = await crud.get_chat(chat_id)
@@ -309,9 +291,7 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
         try:
             await chat_producer.send_user_connected_event(chat_id, user.user, user_type)
         except Exception as e:
-            import traceback
-
-            traceback.print_exc()
+            pass
 
         try:
             await websocket.send_json(
@@ -339,9 +319,6 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                 await websocket.send_json({"error": "Invalid JSON", "detail": str(e)})
                 continue
             except Exception as e:
-                import traceback
-
-                traceback.print_exc()
                 try:
                     await websocket.send_json(
                         {"error": "Failed to process message", "detail": str(e)}
@@ -383,18 +360,6 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                 except Exception as e:
                     pass
 
-                response = {
-                    "type": "message",
-                    "message_id": db_message.id,
-                    "chat_id": chat_id,
-                    "sender_type": sender_type,
-                    "content": message_data.get("content", ""),
-                    "message_type": message_type,
-                    "status": "DELIVERED",
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-                await chat_manager.broadcast_to_chat(chat_id, response)
-
             elif event_type == "typing":
                 is_typing = message_data.get("is_typing", False)
 
@@ -431,9 +396,6 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
             except Exception as e:
                 pass
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
         try:
             connection_info = await chat_manager.disconnect(chat_id, websocket)
             if connection_info:

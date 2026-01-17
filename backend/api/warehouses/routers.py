@@ -1,7 +1,12 @@
+import hashlib
+import io
+from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import func, select
+import segno
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
+from sqlalchemy import func, insert, select
 
 import api.warehouses.schemas as schemas
 from common.geocoders.instance import geocoder
@@ -30,9 +35,15 @@ async def get_warehouse_by_id(token: str, idx: int):
 
 @router.get("/warehouses/", response_model=schemas.WarehouseListGet)
 async def get_warehouses(
-    token: str, name: Optional[str] = None, limit: int = 100, offset: int = 0
+    request: Request,
+    token: str,
+    name: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    with_hash: bool = Query(False, description="Включить QR хеш в ответ"),
 ):
     """Получение списка складов"""
+    base_url = str(request.base_url).rstrip("/")
     user = await get_user_by_token(token)
     filters = [
         warehouses.c.cashbox == user.cashbox_id,
@@ -48,6 +59,32 @@ async def get_warehouses(
 
     warehouses_db = await database.fetch_all(query)
     warehouses_db = [*map(datetime_to_timestamp, warehouses_db)]
+
+    if with_hash and warehouses_db:
+        warehouse_ids = [wh["id"] for wh in warehouses_db]
+        hash_query = select(
+            warehouse_hash.c.warehouses_id, warehouse_hash.c.hash
+        ).where(warehouse_hash.c.warehouses_id.in_(warehouse_ids))
+        existing_hashes = await database.fetch_all(hash_query)
+        hash_dict = {h["warehouses_id"]: h["hash"] for h in existing_hashes}
+        insert_values = []
+        for warehouse_info in warehouses_db:
+            wh_id = warehouse_info["id"]
+            if wh_id not in hash_dict:
+                hash_base = f"WH:{wh_id}:{warehouse_info.get('name', '')}"
+                hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+                hash_dict[wh_id] = hash_string
+                insert_values.append(
+                    {
+                        "warehouses_id": wh_id,
+                        "hash": hash_string,
+                        "created_at": datetime.now(),
+                    }
+                )
+            warehouse_info["qr_hash"] = f"WH:{wh_id}:{hash_dict[wh_id]}"
+            warehouse_info["qr_url"] = f"{base_url}/warehouses/{wh_id}/qr?token={token}"
+        if insert_values:
+            await database.execute_many(insert(warehouse_hash), insert_values)
 
     query = select(func.count(warehouses.c.id)).where(*filters)
 
@@ -205,3 +242,70 @@ async def delete_warehouse(token: str, idx: int):
     )
 
     return warehouse_db
+
+
+@router.get("/warehouses/{idx}/qr", response_class=StreamingResponse)
+async def get_warehouse_qr(
+    token: str,
+    idx: int,
+    size: int = Query(300, description="Размер QR-кода в пикселях", ge=100, le=1000),
+):
+    """Генерация QR-кода для склада"""
+    user = await get_user_by_token(token)
+    warehouse_db = await get_entity_by_id(warehouses, idx, user.cashbox_id)
+    warehouse_db_dict = dict(warehouse_db)
+    hash_query = select(warehouse_hash.c.hash).where(
+        warehouse_hash.c.warehouses_id == idx
+    )
+    hash_record = await database.fetch_one(hash_query)
+    if not hash_record:
+        hash_base = f"WH:{warehouse_db_dict['id']}:{warehouse_db_dict.get('name', '')}"
+        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        await database.execute(
+            insert(warehouse_hash).values(
+                warehouses_id=idx, hash=hash_string, created_at=datetime.now()
+            )
+        )
+    else:
+        hash_string = hash_record["hash"]
+    qr_content = f"WH:{warehouse_db_dict['id']}:{hash_string}"
+    qr = segno.make_qr(qr_content, error="H")
+    svg_buffer = io.BytesIO()
+    scale = max(3, size // 50)
+    qr.save(svg_buffer, kind="svg", scale=scale, border=2)
+    svg_buffer.seek(0)
+    filename = f"warehouse_{idx}_qr.svg"
+    return StreamingResponse(
+        svg_buffer,
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/warehouses/{idx}/hash")
+async def get_warehouse_hash(token: str, idx: int):
+    """Получить хеш для склада"""
+    user = await get_user_by_token(token)
+    warehouse_db = await get_entity_by_id(warehouses, idx, user.cashbox_id)
+    warehouse_db_dict = dict(warehouse_db)
+    hash_query = select(warehouse_hash.c.hash).where(
+        warehouse_hash.c.warehouses_id == idx
+    )
+    hash_record = await database.fetch_one(hash_query)
+    if not hash_record:
+        hash_base = f"WH:{warehouse_db_dict['id']}:{warehouse_db_dict.get('name', '')}"
+        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        await database.execute(
+            insert(warehouse_hash).values(
+                warehouses_id=idx, hash=hash_string, created_at=datetime.now()
+            )
+        )
+    else:
+        hash_string = hash_record["hash"]
+    return {
+        "warehouse_id": warehouse_db_dict["id"],
+        "name": warehouse_db_dict.get("name"),
+        "hash": hash_string,
+        "qr_content": f"WH:{warehouse_db_dict['id']}:{hash_string}",
+        "timestamp": datetime.now().isoformat(),
+    }

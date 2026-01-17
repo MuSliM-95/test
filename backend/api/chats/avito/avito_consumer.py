@@ -23,16 +23,10 @@ class AvitoMessageConsumer:
 
     async def start(self):
         try:
-            logger.info(
-                f"Avito consumer starting... Listening to queue: {AVITO_MESSAGES_QUEUE}"
-            )
-
             self.is_running = True
-
             asyncio.create_task(self._consume_messages())
-
         except Exception as e:
-            logger.error(f"Failed to start Avito consumer: {e}", exc_info=True)
+            logger.error(f"Failed to start Avito consumer: {e}")
             raise
 
     async def stop(self):
@@ -40,13 +34,10 @@ class AvitoMessageConsumer:
         if self.connection:
             try:
                 await self.connection.close()
-                logger.info("Avito consumer connection closed")
             except Exception as e:
                 logger.error(f"Error closing connection: {e}")
-        logger.info("Avito consumer stopped")
 
     async def _consume_messages(self):
-        """Основной цикл обработки сообщений с автоматическим переподключением"""
         while self.is_running:
             try:
                 if self.connection and not self.connection.is_closed:
@@ -75,10 +66,6 @@ class AvitoMessageConsumer:
 
                     await queue.bind(exchange, routing_key=AVITO_MESSAGES_ROUTING_KEY)
 
-                    logger.info(
-                        f"Queue {AVITO_MESSAGES_QUEUE} declared and bound to exchange {AVITO_MESSAGES_EXCHANGE}"
-                    )
-
                     async with queue.iterator() as queue_iter:
                         async for message in queue_iter:
                             if not self.is_running:
@@ -87,20 +74,16 @@ class AvitoMessageConsumer:
                                 await self._process_message(message)
 
             except Exception as e:
-                logger.error(f"Error in message consumer loop: {e}", exc_info=True)
+                logger.error(f"Error in message consumer loop: {e}")
                 if self.is_running:
-                    logger.info("Attempting to reconnect in 5 seconds...")
                     await asyncio.sleep(5)
 
     async def _process_message(self, message):
-        """Обработка одного сообщения из очереди"""
         try:
             payload = json.loads(message.body.decode())
 
             message_type = payload.get("message_type")
             chat_id = payload.get("chat_id")
-
-            logger.info(f"Processing {message_type} for chat {chat_id}")
 
             if message_type == "message_received":
                 await self._handle_message_received(payload)
@@ -113,11 +96,9 @@ class AvitoMessageConsumer:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse message JSON: {e}")
-            # Для некорректного JSON не нужно повторять обработку
             raise
         except Exception as e:
-            logger.error(f"Error processing message: {e}", exc_info=True)
-            # Пробрасываем исключение, чтобы сообщение было возвращено в очередь
+            logger.error(f"Error processing message: {e}")
             raise
 
     async def _handle_message_received(self, payload: Dict[str, Any]):
@@ -128,9 +109,6 @@ class AvitoMessageConsumer:
             if not chat_id:
                 logger.warning("Message received without chat_id")
                 return
-            logger.info(
-                f"Message received: chat={chat_id}, external_id={external_message_id}"
-            )
 
             if payload.get("message_id"):
                 try:
@@ -139,7 +117,7 @@ class AvitoMessageConsumer:
                     logger.warning(f"Failed to update message status: {e}")
 
         except Exception as e:
-            logger.error(f"Error handling message received: {e}", exc_info=True)
+            logger.error(f"Error handling message received: {e}")
             raise
 
     async def _handle_message_status(self, payload: Dict[str, Any]):
@@ -153,10 +131,8 @@ class AvitoMessageConsumer:
 
             await crud.update_message(message_id, status=status)
 
-            logger.info(f"Message {message_id} status updated to {status}")
-
         except Exception as e:
-            logger.error(f"Error handling message status: {e}", exc_info=True)
+            logger.error(f"Error handling message status: {e}")
             raise
 
     async def _handle_chat_closed(self, payload: Dict[str, Any]):
@@ -171,10 +147,8 @@ class AvitoMessageConsumer:
                 chat_id, status="CLOSED", last_message_time=datetime.utcnow()
             )
 
-            logger.info(f"Chat {chat_id} marked as closed")
-
         except Exception as e:
-            logger.error(f"Error handling chat closed: {e}", exc_info=True)
+            logger.error(f"Error handling chat closed: {e}")
             raise
 
 
