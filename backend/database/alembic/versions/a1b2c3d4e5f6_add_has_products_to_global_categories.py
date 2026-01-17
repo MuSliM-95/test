@@ -37,7 +37,9 @@ def upgrade() -> None:
     # просто пропускаем инициализацию, оставляя значение по умолчанию.
     conn = op.get_bind()
     inspector = sa.inspect(conn)
-    nomenclature_columns = [col["name"] for col in inspector.get_columns("nomenclature")]
+    nomenclature_columns = [
+        col["name"] for col in inspector.get_columns("nomenclature")
+    ]
 
     if "global_category_id" in nomenclature_columns:
         op.execute(
