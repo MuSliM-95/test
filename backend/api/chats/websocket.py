@@ -360,18 +360,6 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                 except Exception as e:
                     pass
 
-                response = {
-                    "type": "message",
-                    "message_id": db_message.id,
-                    "chat_id": chat_id,
-                    "sender_type": sender_type,
-                    "content": message_data.get("content", ""),
-                    "message_type": message_type,
-                    "status": "DELIVERED",
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-                await chat_manager.broadcast_to_chat(chat_id, response)
-
             elif event_type == "typing":
                 is_typing = message_data.get("is_typing", False)
 

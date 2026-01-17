@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import and_, select, update
 
 from api.chats import crud
 from api.chats.auth import get_current_user, get_current_user_owner
@@ -21,7 +21,7 @@ from api.chats.schemas import (
     MessagesList,
 )
 from api.chats.websocket import chat_manager
-from database.db import database, pictures
+from database.db import chat_messages, database, pictures
 
 logger = logging.getLogger(__name__)
 
@@ -571,9 +571,6 @@ async def get_chat_messages(
                 if client:
                     try:
                         await client.mark_chat_as_read(chat["external_chat_id"])
-                        from sqlalchemy import and_, update
-
-                        from database.db import chat_messages
 
                         update_query = (
                             update(chat_messages)
