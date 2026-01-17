@@ -2,9 +2,6 @@ import uuid
 from abc import ABC
 from typing import List, Optional
 
-from fastapi import HTTPException
-from sqlalchemy import and_, desc, select, update
-
 from api.marketplace.rabbitmq.messages.CreateMarketplaceOrderMessage import (
     CreateMarketplaceOrderMessage,
     OrderGoodMessage,
@@ -23,6 +20,8 @@ from database.db import (
     organizations,
     warehouse_balances,
 )
+from fastapi import HTTPException
+from sqlalchemy import and_, desc, select, update
 
 
 class MarketplaceOrdersService(BaseMarketplaceService, ABC):

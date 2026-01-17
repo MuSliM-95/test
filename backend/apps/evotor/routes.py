@@ -1,8 +1,4 @@
 import aiohttp
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import and_, select
-
 from api.docs_sales.api.routers import create as createDocSales
 from api.docs_sales.schemas import (
     Create,
@@ -23,7 +19,10 @@ from database.db import (
     users_cboxes_relation,
     warehouses,
 )
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from functions.helpers import get_user_by_token
+from sqlalchemy import and_, select
 from ws_manager import manager
 
 from .schemas import EvotorInstallEvent, EvotorUserToken, ListEvotorNomenclature

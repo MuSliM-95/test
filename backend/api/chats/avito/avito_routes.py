@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 
 from typing import Optional
 
-from fastapi import Query
-
 from api.chats import crud
 from api.chats.auth import get_current_user_for_avito as get_current_user
 from api.chats.avito.avito_client import AvitoAPIError, AvitoClient
@@ -29,6 +27,7 @@ from api.chats.avito.schemas import (
     AvitoOAuthCallbackResponse,
 )
 from database.db import channel_credentials, channels, chats, database
+from fastapi import Query
 
 router = APIRouter(prefix="/chats/avito", tags=["chats-avito"])
 
@@ -780,9 +779,8 @@ async def process_single_chat(
                         )
 
                 if result["messages_loaded"] > 0:
-                    from sqlalchemy import desc
-
                     from database.db import chat_messages
+                    from sqlalchemy import desc
 
                     last_db_message = await database.fetch_one(
                         chat_messages.select()
@@ -1079,9 +1077,8 @@ async def mark_avito_chat_as_read(
             internal_chat_id = int(chat_id)
             chat = await crud.get_chat(internal_chat_id)
         except ValueError:
-            from sqlalchemy import and_, select
-
             from database.db import channels
+            from sqlalchemy import and_, select
 
             query = (
                 select(
@@ -1143,9 +1140,8 @@ async def mark_avito_chat_as_read(
 
         if success:
             try:
-                from sqlalchemy import and_, update
-
                 from database.db import chat_messages
+                from sqlalchemy import and_, update
 
                 update_query = (
                     update(chat_messages)

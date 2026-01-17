@@ -2,9 +2,6 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import and_, select, update
-
 from api.chats import crud
 from api.chats.auth import get_current_user, get_current_user_owner
 from api.chats.schemas import (
@@ -22,6 +19,8 @@ from api.chats.schemas import (
 )
 from api.chats.websocket import chat_manager
 from database.db import chat_messages, database, pictures
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from sqlalchemy import and_, select, update
 
 logger = logging.getLogger(__name__)
 
@@ -704,9 +703,8 @@ async def get_chat_messages(
         message_images = {}
         if message_ids:
             try:
-                from sqlalchemy import select
-
                 from database.db import pictures
+                from sqlalchemy import select
 
                 query = (
                     select(pictures)

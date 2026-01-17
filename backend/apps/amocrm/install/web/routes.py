@@ -1,10 +1,6 @@
 from datetime import datetime
 
 import aiohttp
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import and_, select
-from starlette import status
-
 from apps.amocrm.install.functions.get_account_info import get_account_info
 from apps.amocrm.install.infrastructure.impl.AmoCRMAuthenticator import (
     AmoCRMAuthenticator,
@@ -21,7 +17,10 @@ from database.db import (
     database,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, HTTPException
 from functions.helpers import gen_token
+from sqlalchemy import and_, select
+from starlette import status
 from ws_manager import manager
 
 router = APIRouter(tags=["amocrm"])

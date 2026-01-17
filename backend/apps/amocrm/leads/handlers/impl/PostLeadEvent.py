@@ -1,7 +1,5 @@
 from typing import Any, Mapping
 
-from sqlalchemy import insert, select, update
-
 from apps.amocrm.leads.models.NewLeadBaseModelMessage import NewLeadBaseModelMessage
 from apps.amocrm.leads.repositories.core.ILeadsRepository import ILeadsRepository
 from apps.amocrm.leads.repositories.models.CreateLeadModel import (
@@ -22,6 +20,7 @@ from database.db import (
     docs_sales_tags,
     payments,
 )
+from sqlalchemy import insert, select, update
 
 
 class PostLeadEvent(IEventHandler[NewLeadBaseModelMessage]):

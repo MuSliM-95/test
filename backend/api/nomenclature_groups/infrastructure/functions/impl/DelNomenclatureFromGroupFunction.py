@@ -1,9 +1,8 @@
-from sqlalchemy import and_
-
 from api.nomenclature_groups.infrastructure.functions.core.IDelNomenclatureFromGroupFunction import (
     IDelNomenclatureFromGroupFunction,
 )
 from database.db import database, nomenclature_groups_value
+from sqlalchemy import and_
 
 
 class DelNomenclatureFromGroupFunction(IDelNomenclatureFromGroupFunction):

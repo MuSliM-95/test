@@ -1,8 +1,6 @@
 import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_
-
 from api.contragents.infrastructure.repositories.ContragentRepository import (
     ContragentRepository,
 )
@@ -33,6 +31,7 @@ from api.settings.infrastructure.repositories.SettingsRepository import (
 )
 from database.db import database
 from functions.helpers import datetime_to_timestamp
+from sqlalchemy import and_
 
 
 class GetDocsSalesListQuery:

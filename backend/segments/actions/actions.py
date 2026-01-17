@@ -4,9 +4,6 @@ import logging
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import and_, func, literal, or_, select, update
-from sqlalchemy.dialects.postgresql import insert
-
 from api.loyality_transactions.routers import raschet_bonuses
 from common.apple_wallet_service.impl.WalletNotificationService import (
     WalletNotificationService,
@@ -35,6 +32,8 @@ from segments.helpers.collect_obj_ids import collect_objects
 from segments.helpers.functions import create_replacements
 from segments.helpers.http_client import HttpClient
 from segments.masks import replace_masks
+from sqlalchemy import and_, func, literal, or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 
 logger = logging.getLogger(__name__)
 

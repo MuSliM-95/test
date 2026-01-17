@@ -1,13 +1,5 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import (
-    and_,
-    func as fsql,
-    or_,
-    select,
-)
-
 from api.users import schemas as schemas
 from database.db import (
     database,
@@ -17,8 +9,15 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, HTTPException
 from functions import users as func
 from functions.helpers import raise_wrong_token
+from sqlalchemy import (
+    and_,
+    func as fsql,
+    or_,
+    select,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 

@@ -5,7 +5,6 @@ import re
 from datetime import datetime
 
 import aiohttp
-
 from bot_routes.functions.pdf_reader import extract_text_from_pdf_images
 from bot_routes.functions.TgBillsFuncions import get_user_from_db
 from bot_routes.functions.tochka_api import (

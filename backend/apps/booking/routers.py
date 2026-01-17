@@ -1,8 +1,3 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
-from sqlalchemy import and_, desc, func, or_, select, update
-
 from api.pictures.routers import get_picture_link_by_id
 from apps.booking.schemas import (
     Booking,
@@ -27,7 +22,11 @@ from database.db import (
     pictures,
     users,
 )
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from functions.helpers import get_user_by_token
+from sqlalchemy import and_, desc, func, or_, select, update
 from ws_manager import manager
 
 router = APIRouter(tags=["booking"])

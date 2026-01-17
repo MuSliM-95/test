@@ -1,9 +1,8 @@
 import re
 from typing import Optional
 
-from pydantic import BaseModel, validator
-
 from common.apple_wallet_service.impl.models import Location, PassColorConfig
+from pydantic import BaseModel, validator
 
 
 class WalletCardSettings(BaseModel):

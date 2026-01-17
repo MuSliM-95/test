@@ -1,9 +1,8 @@
 from datetime import datetime
 
-from sqlalchemy import and_, select
-
 from common.decorators import ensure_db_connection
 from database.db import database, employee_shifts, users_cboxes_relation
+from sqlalchemy import and_, select
 from ws_manager import manager
 
 from .schemas import ShiftStatus

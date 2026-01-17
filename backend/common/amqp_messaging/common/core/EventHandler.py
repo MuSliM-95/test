@@ -1,7 +1,6 @@
 from typing import Generic, Optional, TypeVar
 
 from aio_pika import IncomingMessage
-
 from common.amqp_messaging.models.BaseModelMessage import BaseModelMessage
 
 E = TypeVar("E", bound=BaseModelMessage)

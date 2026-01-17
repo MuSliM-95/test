@@ -1,12 +1,11 @@
 import os
 
 from aioapns import APNs, NotificationRequest
-from sqlalchemy import select
-
 from common.apple_wallet_service.IWalletNotificationService import (
     IWalletNotificationService,
 )
 from database.db import apple_push_tokens, database
+from sqlalchemy import select
 
 
 class WalletNotificationService(IWalletNotificationService):

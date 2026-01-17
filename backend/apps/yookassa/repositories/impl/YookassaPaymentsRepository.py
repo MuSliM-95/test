@@ -1,7 +1,5 @@
 from typing import Optional
 
-from sqlalchemy import insert, select, update
-
 from apps.yookassa.models.PaymentModel import (
     AmountModel,
     ConfirmationRedirectResponce,
@@ -11,6 +9,7 @@ from apps.yookassa.repositories.core.IYookassaPaymentsRepository import (
     IYookassaPaymentsRepository,
 )
 from database.db import database, yookassa_payments
+from sqlalchemy import insert, select, update
 
 
 class YookassaPaymentsRepository(IYookassaPaymentsRepository):

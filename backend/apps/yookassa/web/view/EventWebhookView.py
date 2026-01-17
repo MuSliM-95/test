@@ -1,10 +1,9 @@
-from fastapi import HTTPException
-from fastapi.responses import Response
-
 from apps.yookassa.models.PaymentModel import (
     PaymentWebhookEventModel,
 )
 from apps.yookassa.services.core.IYookassaApiService import IYookassaApiService
+from fastapi import HTTPException
+from fastapi.responses import Response
 
 
 class EventWebhookView:

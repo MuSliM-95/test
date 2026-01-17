@@ -3,9 +3,6 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import HTTPException, UploadFile
-from sqlalchemy import func, select
-
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.public_categories.schema import (
     GlobalCategoryCreate,
@@ -20,6 +17,8 @@ from database.db import (
     price_types,
     prices,
 )
+from fastapi import HTTPException, UploadFile
+from sqlalchemy import func, select
 
 S3_BUCKET_NAME = "5075293c-docs_generated"
 S3_FOLDER = "photos"

@@ -1,7 +1,5 @@
 from typing import List
 
-from sqlalchemy import and_, select
-
 from api.nomenclature_groups.infrastructure.models.GroupModelWithNomenclaturesModel import (
     Nomenclature,
 )
@@ -19,6 +17,7 @@ from database.db import (
     nomenclature_groups,
     nomenclature_groups_value,
 )
+from sqlalchemy import and_, select
 
 
 class NomenclatureGroupsReader(INomenclatureGroupsReader):

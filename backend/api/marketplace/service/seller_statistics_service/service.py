@@ -1,5 +1,3 @@
-from sqlalchemy import Integer, and_, cast, desc, func, select
-
 from common.utils.url_helper import get_app_url_for_environment
 from database.db import (
     cboxes,
@@ -11,6 +9,7 @@ from database.db import (
     warehouse_balances,
     warehouses,
 )
+from sqlalchemy import Integer, and_, cast, desc, func, select
 
 from .schemas import SellerStatisticsItem, SellerStatisticsResponse
 

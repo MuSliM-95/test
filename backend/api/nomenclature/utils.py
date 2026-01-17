@@ -4,8 +4,6 @@
 
 from typing import List, Optional
 
-from sqlalchemy import and_, func, select
-
 from api.marketplace.service.public_categories.public_categories_service import (
     MarketplacePublicCategoriesService,
 )
@@ -17,6 +15,7 @@ from database.db import (
     price_types,
     prices,
 )
+from sqlalchemy import and_, func, select
 
 
 async def auto_link_global_category(

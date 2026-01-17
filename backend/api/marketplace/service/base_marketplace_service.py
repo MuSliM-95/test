@@ -2,13 +2,6 @@ import math
 import time
 from typing import List, Optional
 
-from fastapi import HTTPException
-from sqlalchemy import and_, desc, select
-from sqlalchemy.dialects.postgresql import insert
-
-from fastapi import HTTPException
-from sqlalchemy import select
-
 from api.marketplace.schemas import BaseMarketplaceUtm
 from api.marketplace.service.products_list_service.schemas import AvailableWarehouse
 from common.amqp_messaging.common.core.IRabbitMessaging import IRabbitMessaging
@@ -21,6 +14,9 @@ from database.db import (
     warehouse_balances,
     warehouses,
 )
+from fastapi import HTTPException
+from sqlalchemy import and_, desc, select
+from sqlalchemy.dialects.postgresql import insert
 
 
 class BaseMarketplaceService:

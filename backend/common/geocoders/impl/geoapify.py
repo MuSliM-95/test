@@ -2,7 +2,6 @@ import asyncio
 from typing import Union
 
 import aiohttp
-
 from common.geocoders.core.base_instance import BaseGeocoder
 from common.geocoders.schemas import GeocoderSearchResponse
 from common.geocoders.utils import AsyncLRU

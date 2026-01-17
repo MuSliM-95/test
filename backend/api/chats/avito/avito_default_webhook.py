@@ -1,12 +1,11 @@
 import logging
 
-from fastapi import APIRouter, Request
-from sqlalchemy import and_, select
-
 from api.chats.avito.avito_handler import AvitoHandler
 from api.chats.avito.avito_webhook import process_avito_webhook
 from api.chats.avito.schemas import AvitoWebhookResponse
 from database.db import channel_credentials, channels, database
+from fastapi import APIRouter, Request
+from sqlalchemy import and_, select
 
 logger = logging.getLogger(__name__)
 

@@ -1,12 +1,11 @@
 import time
 
-from sqlalchemy import Integer, and_, cast, func, or_, select
-from sqlalchemy.dialects.postgresql import JSONB
-
 from common.decorators import ensure_db_connection
 from database.db import database, segments
 from segments.logger import logger
 from segments.main import update_segment_task
+from sqlalchemy import Integer, and_, cast, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 async def get_segment_ids():

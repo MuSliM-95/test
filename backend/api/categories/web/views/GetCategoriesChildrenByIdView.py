@@ -1,9 +1,8 @@
-from fastapi import HTTPException
-from sqlalchemy import func, select
-
 from api.categories.routers import build_hierarchy
 from database.db import categories, database, nomenclature
+from fastapi import HTTPException
 from functions.helpers import datetime_to_timestamp, get_user_by_token
+from sqlalchemy import func, select
 
 
 class GetCategoriesChildrenByIdView:

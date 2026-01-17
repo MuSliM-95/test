@@ -2,9 +2,6 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
-
 import api.analytics.schemas as analytics_schemas
 import functions.filter_schemas as filter_schemas
 from const import PaymentType
@@ -15,7 +12,9 @@ from database.db import (
     users,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, Depends, HTTPException
 from functions.helpers import get_filters_analytics
+from sqlalchemy import func, select
 
 router = APIRouter(tags=["analytics"])
 

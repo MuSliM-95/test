@@ -4,10 +4,6 @@ from typing import Optional
 from uuid import uuid4
 
 import aioboto3
-from databases import Database
-from fastapi import HTTPException, UploadFile
-from sqlalchemy import func, select
-
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.seller_service.schemas import (
     SellerResponse,
@@ -15,7 +11,10 @@ from api.marketplace.service.seller_service.schemas import (
 )
 from common.utils.url_helper import get_app_url_for_environment
 from database.db import cboxes, database, users
+from databases import Database
+from fastapi import HTTPException, UploadFile
 from functions.helpers import get_user_by_token
+from sqlalchemy import func, select
 
 s3_session = aioboto3.Session()
 s3_data = {

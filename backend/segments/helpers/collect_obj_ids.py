@@ -1,7 +1,6 @@
-from sqlalchemy import and_, or_, select
-
 from database.db import SegmentObjectType, database, segment_objects, segments
 from segments.constants import SegmentChangeType
+from sqlalchemy import and_, or_, select
 
 
 async def collect_objects(segment_id, obj_type: SegmentObjectType, mode: str):

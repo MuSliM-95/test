@@ -1,9 +1,6 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import and_, asc, desc, func, or_, select
-
 import api.pboxes.schemas as pboxes_schemas
 import functions.filter_schemas as filter_schemas
 from const import PaymentType
@@ -14,10 +11,12 @@ from database.db import (
     user_permissions,
     users_cboxes_relation,
 )
+from fastapi import APIRouter, Depends, HTTPException
 from functions.helpers import (
     check_user_permission,
     get_filters_pboxes,
 )
+from sqlalchemy import and_, asc, desc, func, or_, select
 from ws_manager import manager
 
 logger = logging.getLogger(__name__)

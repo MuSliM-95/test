@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 
 import aio_pika
-
 from api.apple_wallet.messages.AppleWalletCardUpdateMessage import (
     AppleWalletCardUpdateMessage,
 )
@@ -140,9 +139,8 @@ async def send_new_chat_notification(
             f"contact_name: {contact_name}, channel_name: {channel_name}, ad_title: {ad_title}"
         )
 
-        from sqlalchemy import and_, select
-
         from database.db import users, users_cboxes_relation
+        from sqlalchemy import and_, select
 
         # Получаем всех владельцев кассы
         owner_query = (

@@ -1,9 +1,8 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, validator
-
 from common.utils.validators import sanitize_float
+from pydantic import BaseModel, validator
 
 
 class Payboxes(BaseModel):

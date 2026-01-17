@@ -1,6 +1,5 @@
-from fastapi import APIRouter, HTTPException, Query
-
 from api.events.schemas import GetEvents
+from fastapi import APIRouter, HTTPException, Query
 from functions.events import get_events
 
 router = APIRouter(prefix="/events", tags=["events"])

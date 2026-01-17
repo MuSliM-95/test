@@ -1,8 +1,4 @@
 import aiohttp
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import and_, select
-from starlette.responses import RedirectResponse
-
 from apps.tochka_bank.routes import integration_info
 from database.db import (
     database,
@@ -11,7 +7,10 @@ from database.db import (
     module_bank_credentials,
     pboxes,
 )
+from fastapi import APIRouter, HTTPException
 from functions.helpers import get_user_by_token
+from sqlalchemy import and_, select
+from starlette.responses import RedirectResponse
 from ws_manager import manager
 
 router = APIRouter(tags=["Module bank"])

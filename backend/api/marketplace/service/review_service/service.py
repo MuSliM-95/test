@@ -1,9 +1,5 @@
 from typing import Optional
 
-from fastapi import HTTPException
-from pydantic import BaseModel
-from sqlalchemy import Table, and_, asc, desc, func, select
-
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.review_service.schemas import (
     CreateReviewRequest,
@@ -17,6 +13,9 @@ from database.db import (
     marketplace_rating_aggregates,
     marketplace_reviews,
 )
+from fastapi import HTTPException
+from pydantic import BaseModel
+from sqlalchemy import Table, and_, asc, desc, func, select
 
 
 class MarketplaceReviewService(BaseMarketplaceService):

@@ -1,12 +1,11 @@
 from datetime import datetime, timedelta
 from typing import List
 
-from databases.backends.postgres import Record
-from sqlalchemy import and_, select, text
-
 from api.loyality_transactions.routers import raschet_bonuses
 from common.decorators import ensure_db_connection
 from database.db import database, loyality_cards, loyality_transactions
+from databases.backends.postgres import Record
+from sqlalchemy import and_, select, text
 
 
 class AutoBurn:

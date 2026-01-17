@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import aio_pika
-
 from api.chats import crud
 
 logger = logging.getLogger(__name__)

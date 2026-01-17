@@ -2,7 +2,6 @@ import functools
 import logging
 
 from asyncpg.exceptions import InterfaceError
-
 from database.db import database
 
 logger = logging.getLogger(__name__)

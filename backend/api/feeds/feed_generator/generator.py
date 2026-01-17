@@ -1,10 +1,9 @@
 import json
 from xml.sax.saxutils import escape
 
-from starlette.responses import Response
-
 from api.feeds.feed_generator.criterias.filters import FeedCriteriaFilter
 from database.db import database, feeds
+from starlette.responses import Response
 
 
 class FeedGenerator:
