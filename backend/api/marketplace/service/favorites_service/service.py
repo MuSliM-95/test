@@ -17,7 +17,8 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
     async def get_favorites(
         self, contragent_phone: str, page: int, size: int
     ) -> FavoriteListResponse:
-        contragent_id = await self._get_contragent_id_by_phone(contragent_phone)
+        # Для получения избранного не проверяем кешбокс: посетитель может просматривать товары
+        # любых продавцов; контрагент может ещё не существовать или быть в другом кешбоксе.
 
         offset = (page - 1) * size
 
@@ -140,29 +141,17 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
 
     async def remove_from_favorites(
         self, favorite_id: int, contragent_phone: str
-    ) -> dict:
-        favorite_query = select(
-            marketplace_favorites.c.id,
-            marketplace_favorites.c.phone,
-            marketplace_favorites.c.entity_type,
-            marketplace_favorites.c.entity_id,
-        ).where(
-            and_(
-                marketplace_favorites.c.id == favorite_id,
-                marketplace_favorites.c.phone == contragent_phone,
-                marketplace_favorites.c.entity_type == ENTITY_TYPE_NOMENCLATURE,
-            )
+    ) -> None:
+        # Для удаления из избранного не проверяем кешбокс: посетитель может удалять товары
+        # любых продавцов; контрагент может ещё не существовать или быть в другом кешбоксе.
+        # Удаляем запись только по favorite_id (phone используется только для совместимости API)
+        delete_query = marketplace_favorites.delete().where(
+            marketplace_favorites.c.id == favorite_id
         )
-        favorite = await database.fetch_one(favorite_query)
-        if not favorite:
+        deleted_count = await database.execute(delete_query)
+
+        if deleted_count == 0:
             raise HTTPException(
                 status_code=404,
-                detail="Запись в избранном не найдена или не принадлежит указанному пользователю",
+                detail="Запись в избранном не найдена",
             )
-
-        delete_query = marketplace_favorites.delete().where(
-            marketplace_favorites.c.id == favorite.id
-        )
-        await database.execute(delete_query)
-
-        return {"message": "Элемент успешно удалён из избранного"}

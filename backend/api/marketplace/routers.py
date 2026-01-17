@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
 from api.marketplace.service.favorites_service.schemas import (
     CreateFavoritesUtm,
@@ -170,7 +170,7 @@ async def add_to_favorites(
     return await service.add_to_favorites(favorite_request, utm)
 
 
-@router.delete("/favorites/{favorite_id}")
+@router.delete("/favorites/{favorite_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_from_favorites(
     favorite_id: int,
     phone: str = Query(..., description="Номер телефона"),
@@ -179,7 +179,7 @@ async def remove_from_favorites(
     """
     Удалить элемент из избранного
     """
-    return await service.remove_from_favorites(favorite_id, phone)
+    await service.remove_from_favorites(favorite_id, phone)
 
 
 @router.get("/favorites", response_model=FavoriteListResponse)
