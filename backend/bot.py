@@ -724,6 +724,7 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
                 cbox = await database.fetch_one(query)
 
                 if cbox:
+                    # У пользователя уже есть касса для этого чата - обновляем токен
                     new_token = gen_token()
                     query = (
                         users_cboxes_relation.update()
@@ -735,25 +736,45 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
                     )
 
                     await database.execute(query)
-                    answer = texts.change_token.format(token=new_token, url=app_url)
-                    await message.answer(
-                        text=answer, reply_markup=await get_open_app_link(new_token)
-                    )
+                    answer_1 = texts.change_token_1
+                    answer_2 = texts.change_token_2.format(token=new_token, url=app_url)
+                    msg_id = (
+                        await message.answer(
+                            text=answer_1, reply_markup=types.ReplyKeyboardRemove()
+                        )
+                    ).message_id
+                    msg_id = (
+                        await message.answer(
+                            text=answer_2,
+                            reply_markup=await get_open_app_link(new_token),
+                        )
+                    ).message_id
                     await store_bot_message(
-                        message.message_id + 1, message.chat.id, bot.id, answer
+                        message.message_id + 1, message.chat.id, bot.id, answer_2
                     )
                 else:
+                    # У пользователя есть запись для этого чата, но нет кассы - создаем кассу
                     rel = await create_cbox(user_and_chat)
-                    answer = texts.create_cbox.format(token=rel.token, url=app_url)
-                    await message.answer(
-                        text=answer, reply_markup=await get_open_app_link(rel.token)
-                    )
+                    answer_1 = texts.create_cbox_1
+                    answer_2 = texts.create_cbox_2.format(token=rel.token, url=app_url)
+                    msg_id = (
+                        await message.answer(
+                            text=answer_1, reply_markup=types.ReplyKeyboardRemove()
+                        )
+                    ).message_id
+                    msg_id = (
+                        await message.answer(
+                            text=answer_2,
+                            reply_markup=await get_open_app_link(rel.token),
+                        )
+                    ).message_id
                     await store_bot_message(
-                        message.message_id + 1, message.chat.id, bot.id, answer
+                        message.message_id + 1, message.chat.id, bot.id, answer_2
                     )
                     await create_balance(rel.cashbox_id, message)
             else:
-
+                # Пользователь зарегистрирован в личке, но нет записи для этого чата
+                # Создаем запись для чата и кассу автоматически
                 user_query = users.insert().values(
                     chat_id=str(message.chat.id),
                     owner_id=str(creator.id),
@@ -772,12 +793,21 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
                 user = await database.fetch_one(query)
 
                 rel = await create_cbox(user)
-                answer = texts.create_cbox.format(token=rel.token, url=app_url)
-                await message.answer(
-                    text=answer, reply_markup=await get_open_app_link(rel.token)
-                )
+                answer_1 = texts.create_cbox_1
+                answer_2 = texts.create_cbox_2.format(token=rel.token, url=app_url)
+                msg_id = (
+                    await message.answer(
+                        text=answer_1, reply_markup=types.ReplyKeyboardRemove()
+                    )
+                ).message_id
+                msg_id = (
+                    await message.answer(
+                        text=answer_2,
+                        reply_markup=await get_open_app_link(rel.token),
+                    )
+                ).message_id
                 await store_bot_message(
-                    message.message_id + 1, message.chat.id, bot.id, answer
+                    message.message_id + 1, message.chat.id, bot.id, answer_2
                 )
                 await create_balance(rel.cashbox_id, message)
 
