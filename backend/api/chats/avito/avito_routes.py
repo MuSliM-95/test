@@ -1460,22 +1460,17 @@ async def avito_oauth_callback(
 
         credentials = await database.fetch_one(
             channel_credentials.select().where(
-                (channel_credentials.c.channel_id == channel_id)
-                & (channel_credentials.c.cashbox_id == cashbox_id)
+                (channel_credentials.c.cashbox_id == cashbox_id)
                 & (channel_credentials.c.is_active.is_(True))
             )
         )
 
-        if not credentials:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Avito credentials not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint.",
-            )
+        redirect_uri = (
+            credentials.get("redirect_uri") if credentials else None
+        ) or AVITO_OAUTH_REDIRECT_URI
 
         oauth_client_id = AVITO_OAUTH_CLIENT_ID
         oauth_client_secret = AVITO_OAUTH_CLIENT_SECRET
-
-        redirect_uri = credentials.get("redirect_uri") or AVITO_OAUTH_REDIRECT_URI
 
         logger.info(
             f"OAuth callback: exchanging code for tokens, cashbox={cashbox_id}, client_id={oauth_client_id}"
@@ -1523,30 +1518,131 @@ async def avito_oauth_callback(
             avito_account_name = user_profile.get("name") or f"Cashbox {cashbox_id}"
         except Exception as e:
             avito_account_name = f"Cashbox {cashbox_id}"
+            logger.warning(f"Failed to get avito_user_id or user profile: {e}")
+
+        if not avito_user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Не удалось получить avito_user_id из профиля пользователя",
+            )
+
+        existing_credentials_with_same_user = await database.fetch_one(
+            channel_credentials.select().where(
+                (channel_credentials.c.cashbox_id == cashbox_id)
+                & (channel_credentials.c.avito_user_id == avito_user_id)
+                & (channel_credentials.c.is_active.is_(True))
+            )
+        )
 
         encrypted_access_token = _encrypt_credential(access_token)
         encrypted_refresh_token = (
             _encrypt_credential(refresh_token) if refresh_token else None
         )
 
-        update_values = {
-            "access_token": encrypted_access_token,
-            "is_active": True,
-            "updated_at": datetime.utcnow(),
-        }
+        if existing_credentials_with_same_user:
+            logger.info(
+                f"Found existing credentials with same avito_user_id={avito_user_id} for cashbox={cashbox_id}, updating tokens"
+            )
+            channel_id = existing_credentials_with_same_user["channel_id"]
+            credentials = existing_credentials_with_same_user
 
-        if encrypted_refresh_token:
-            update_values["refresh_token"] = encrypted_refresh_token
-        if token_expires_at:
-            update_values["token_expires_at"] = token_expires_at
-        if avito_user_id:
-            update_values["avito_user_id"] = avito_user_id
+            update_values = {
+                "access_token": encrypted_access_token,
+                "is_active": True,
+                "updated_at": datetime.utcnow(),
+            }
 
-        await database.execute(
-            channel_credentials.update()
-            .where(channel_credentials.c.id == credentials["id"])
-            .values(**update_values)
-        )
+            if encrypted_refresh_token:
+                update_values["refresh_token"] = encrypted_refresh_token
+            if token_expires_at:
+                update_values["token_expires_at"] = token_expires_at
+
+            await database.execute(
+                channel_credentials.update()
+                .where(channel_credentials.c.id == credentials["id"])
+                .values(**update_values)
+            )
+
+        else:
+            existing_channel_with_user = await database.fetch_one(
+                channel_credentials.select().where(
+                    (channel_credentials.c.cashbox_id == cashbox_id)
+                    & (channel_credentials.c.avito_user_id == avito_user_id)
+                    & (channel_credentials.c.is_active.is_(True))
+                )
+            )
+
+            if existing_channel_with_user:
+                channel_id = existing_channel_with_user["channel_id"]
+                logger.info(
+                    f"Using existing channel_id={channel_id} with avito_user_id={avito_user_id} for cashbox={cashbox_id}"
+                )
+
+                update_values = {
+                    "access_token": encrypted_access_token,
+                    "avito_user_id": avito_user_id,
+                    "is_active": True,
+                    "updated_at": datetime.utcnow(),
+                }
+
+                if encrypted_refresh_token:
+                    update_values["refresh_token"] = encrypted_refresh_token
+                if token_expires_at:
+                    update_values["token_expires_at"] = token_expires_at
+
+                await database.execute(
+                    channel_credentials.update()
+                    .where(channel_credentials.c.id == existing_channel_with_user["id"])
+                    .values(**update_values)
+                )
+                logger.info(
+                    f"Updated credentials for existing channel_id={channel_id}, avito_user_id={avito_user_id}"
+                )
+            else:
+                from api.chats.avito.avito_constants import AVITO_SVG_ICON
+
+                channel_name = f"Avito - {avito_account_name}"
+                new_channel_id = await database.execute(
+                    channels.insert().values(
+                        name=channel_name,
+                        type="AVITO",
+                        svg_icon=AVITO_SVG_ICON,
+                        description=f"Avito OAuth Integration for Cashbox {cashbox_id}, User {avito_user_id}",
+                        is_active=True,
+                    )
+                )
+                channel_id = new_channel_id
+                logger.info(
+                    f"Created new channel_id={channel_id} for cashbox={cashbox_id}, avito_user_id={avito_user_id} "
+                    f"(user can have multiple active channels for different Avito accounts)"
+                )
+
+                redirect_uri_from_creds = (
+                    credentials.get("redirect_uri") if credentials else None
+                ) or AVITO_OAUTH_REDIRECT_URI
+
+                insert_values = {
+                    "channel_id": channel_id,
+                    "cashbox_id": cashbox_id,
+                    "redirect_uri": redirect_uri_from_creds,
+                    "access_token": encrypted_access_token,
+                    "avito_user_id": avito_user_id,
+                    "is_active": True,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                }
+
+                if encrypted_refresh_token:
+                    insert_values["refresh_token"] = encrypted_refresh_token
+                if token_expires_at:
+                    insert_values["token_expires_at"] = token_expires_at
+
+                await database.execute(
+                    channel_credentials.insert().values(**insert_values)
+                )
+                logger.info(
+                    f"Created new credentials for channel_id={channel_id}, cashbox_id={cashbox_id}, avito_user_id={avito_user_id}"
+                )
 
         webhook_registered = False
         webhook_error_message = None

@@ -121,8 +121,28 @@ async def get_channel_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
     return await database.fetch_one(query)
 
 
+def calculate_channel_status(
+    refresh_token: Optional[str],
+    token_expires_at: Optional[datetime],
+    is_active_cred: bool,
+    is_active_channel: bool,
+) -> bool:
+
+    if not is_active_cred or not is_active_channel:
+        return False
+
+    if refresh_token is not None and refresh_token.strip():
+        return True
+
+    if token_expires_at is None:
+        return False
+
+    now = datetime.utcnow()
+    return token_expires_at > now
+
+
 async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
-    """Get all channels for specific cashbox by type through channel_credentials"""
+    """Get all channels for specific cashbox by type through channel_credentials with real status"""
     query = (
         select(
             [
@@ -136,6 +156,12 @@ async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVIT
                 channels.c.is_active,
                 channels.c.created_at,
                 channels.c.updated_at,
+                channel_credentials.c.refresh_token,
+                channel_credentials.c.token_expires_at,
+                channel_credentials.c.is_active.label("credentials_is_active"),
+                channel_credentials.c.connection_status,
+                channel_credentials.c.last_status_code,
+                channel_credentials.c.last_status_check_at,
             ]
         )
         .select_from(
@@ -152,7 +178,19 @@ async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVIT
             )
         )
     )
-    return await database.fetch_all(query)
+    results = await database.fetch_all(query)
+
+    for result in results:
+        real_status = calculate_channel_status(
+            refresh_token=result.get("refresh_token"),
+            token_expires_at=result.get("token_expires_at"),
+            is_active_cred=result.get("credentials_is_active", False),
+            is_active_channel=result.get("is_active", False),
+        )
+        result["is_active"] = real_status
+        result["real_status"] = real_status
+
+    return results
 
 
 async def get_channel_by_cashbox_and_api_key(
