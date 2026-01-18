@@ -127,12 +127,13 @@ def calculate_channel_status(
     is_active_cred: bool,
     is_active_channel: bool,
 ) -> bool:
-
+    """Calculate real-time channel status based on tokens and active flags"""
     if not is_active_cred or not is_active_channel:
         return False
 
-    if refresh_token is not None and refresh_token.strip():
-        return True
+    if refresh_token is not None:
+        if isinstance(refresh_token, str) and refresh_token.strip():
+            return True
 
     if token_expires_at is None:
         return False
@@ -180,6 +181,7 @@ async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVIT
     )
     results = await database.fetch_all(query)
 
+    active_results = []
     for result in results:
         real_status = calculate_channel_status(
             refresh_token=result.get("refresh_token"),
@@ -189,8 +191,10 @@ async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVIT
         )
         result["is_active"] = real_status
         result["real_status"] = real_status
+        if real_status:
+            active_results.append(result)
 
-    return results
+    return active_results
 
 
 async def get_channel_by_cashbox_and_api_key(
