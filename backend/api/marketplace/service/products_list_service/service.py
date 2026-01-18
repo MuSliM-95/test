@@ -36,8 +36,7 @@ from database.db import (
     warehouses,
 )
 from fastapi import HTTPException
-from sqlalchemy import and_, asc, cast, desc, func, literal_column, select
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import and_, asc, desc, func, literal_column, select
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
@@ -336,13 +335,15 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         nomenclatures_result = []
 
-        # 2. Для каждой группы — получаем вариации
-        for group in groups:
-            group_id = group["group_id"]
-            group_name = group["group_name"]
+        # Получаем все вариации одним запросом вместо множества запросов (избегаем N+1)
+        variations_by_group = {}
+        if groups:
+            group_ids = [group["group_id"] for group in groups]
 
-            variations_query = (
+            # Загружаем все вариации для всех групп сразу
+            all_variations_query = (
                 select(
+                    nomenclature_groups_value.c.group_id,
                     nomenclature.c.id,
                     nomenclature.c.name,
                     nomenclature_groups_value.c.is_main,
@@ -352,13 +353,33 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     nomenclature,
                     nomenclature.c.id == nomenclature_groups_value.c.nomenclature_id,
                 )
-                .where(nomenclature_groups_value.c.group_id == group_id)
+                .where(nomenclature_groups_value.c.group_id.in_(group_ids))
             )
+            all_variations = await database.fetch_all(all_variations_query)
 
-            variations = await database.fetch_all(variations_query)
+            # Раскладываем вариации по группам
+            for variation in all_variations:
+                group_id = variation["group_id"]
+                if group_id not in variations_by_group:
+                    variations_by_group[group_id] = []
+                variations_by_group[group_id].append(
+                    {
+                        "id": variation["id"],
+                        "name": variation["name"],
+                        "is_main": variation["is_main"],
+                    }
+                )
+
+        # Используем уже загруженные вариации для каждой группы
+        for group in groups:
+            group_id = group["group_id"]
+            group_name = group["group_name"]
+
+            variations = variations_by_group.get(group_id, [])
 
             items = [
-                {"id": v.id, "name": v.name, "is_main": v.is_main} for v in variations
+                {"id": v["id"], "name": v["name"], "is_main": v["is_main"]}
+                for v in variations
             ]
 
             nomenclatures_result.append({"group_name": group_name, "items": items})
@@ -476,6 +497,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 )
                 .label("rn"),
             )
+            .select_from(
+                prices.join(price_types, price_types.c.id == prices.c.price_type)
+            )
             .where(
                 # Учитываем только неудаленные цены
                 prices.c.is_deleted.is_not(True),
@@ -485,21 +509,31 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .subquery()
         )
 
-        total_sold_subquery = (
-            select(
-                docs_sales_goods.c.nomenclature,
-                func.count(docs_sales_goods.c.id).label("total_sold"),
-            )
-            .select_from(docs_sales_goods)
-            .group_by(docs_sales_goods.c.nomenclature)
-            .subquery()
-        )
-
         # Фильтруем подзапрос, чтобы оставить только первую (самую приоритетную) цену для каждой номенклатуры
         # Это будет "актуальная" цена
         active_prices_subquery = (
             select(ranked_prices_subquery)
             .where(ranked_prices_subquery.c.rn == 1)
+            .subquery()
+        )
+
+        # Считаем количество продаж только для товаров, у которых есть цены
+        # Это быстрее, чем считать для всех товаров (оптимизация для docs_sales_goods с 1+ млн строк)
+        nomenclature_with_prices = (
+            select(active_prices_subquery.c.nomenclature_id).distinct().subquery()
+        )
+
+        total_sold_subquery = (
+            select(
+                docs_sales_goods.c.nomenclature,
+                func.count(docs_sales_goods.c.id).label("total_sold"),
+            )
+            .where(
+                docs_sales_goods.c.nomenclature.in_(
+                    select(nomenclature_with_prices.c.nomenclature_id)
+                )
+            )
+            .group_by(docs_sales_goods.c.nomenclature)
             .subquery()
         )
 
@@ -573,36 +607,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             .subquery()
         )
 
-        # 3) Агрегация доступных складов (для available_warehouses)
+        # 3) Подготовка алиаса для складов (используется в отдельном запросе для складов)
         wh_bal = warehouses.alias("wh_bal")
-
-        json_obj = func.jsonb_build_object(
-            literal_column("'warehouse_id'"),
-            wh_bal.c.id,
-            literal_column("'organization_id'"),
-            wb_latest.c.organization_id,
-            literal_column("'warehouse_name'"),
-            wh_bal.c.name,
-            literal_column("'warehouse_address'"),
-            wh_bal.c.address,
-            literal_column("'latitude'"),
-            wh_bal.c.latitude,
-            literal_column("'longitude'"),
-            wh_bal.c.longitude,
-            literal_column("'current_amount'"),
-            wb_latest.c.current_amount,
-        )
-
-        available_warehouses_agg = (
-            func.array_agg(cast(json_obj, JSONB).distinct())
-            .filter(
-                and_(
-                    wh_bal.c.id.is_not(None),
-                    wb_latest.c.current_amount > 0,
-                )
-            )
-            .label("available_warehouses")
-        )
 
         # --- Основной запрос по товарам ---
         query = (
@@ -646,7 +652,8 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                     "current_amount"
                 ),
                 func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
-                available_warehouses_agg,
+                # Склады получаем отдельным запросом после основного - это быстрее
+                literal_column("NULL::jsonb[]").label("available_warehouses"),
             )
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
@@ -694,25 +701,12 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 isouter=True,
             )
             .join(
-                wb_latest,
-                wb_latest.c.nomenclature_id == nomenclature.c.id,
-                isouter=True,
-            )
-            .join(
-                wh_bal,
-                and_(
-                    wh_bal.c.id == wb_latest.c.warehouse_id,
-                    wh_bal.c.is_public.is_(True),
-                    wh_bal.c.status.is_(True),
-                    wh_bal.c.is_deleted.is_not(True),
-                ),
-                isouter=True,
-            )
-            .join(
                 total_sold_subquery,
                 total_sold_subquery.c.nomenclature == nomenclature.c.id,
                 isouter=True,
             )
+            # Не соединяем со складами в основном запросе - получаем их отдельно
+            # Это быстрее и избегает дублирования строк
         )
 
         if request.nomenclature_attributes:
@@ -852,6 +846,60 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         products_db = await database.fetch_all(query)
 
+        # Получаем склады отдельным запросом только для тех товаров, которые вернулись
+        # Это быстрее, чем делать это в основном запросе (избегаем дублирования строк)
+        product_ids = [row["id"] for row in products_db]
+        available_warehouses_map = {}
+
+        if product_ids:
+            # Используем wb_latest и wh_bal, которые были определены выше
+            warehouses_query = (
+                select(
+                    wb_latest.c.nomenclature_id,
+                    wh_bal.c.id.label("warehouse_id"),
+                    wb_latest.c.organization_id,
+                    wh_bal.c.name.label("warehouse_name"),
+                    wh_bal.c.address.label("warehouse_address"),
+                    wh_bal.c.latitude,
+                    wh_bal.c.longitude,
+                    wb_latest.c.current_amount,
+                )
+                .select_from(
+                    wb_latest.join(
+                        wh_bal,
+                        and_(
+                            wh_bal.c.id == wb_latest.c.warehouse_id,
+                            wh_bal.c.is_public.is_(True),
+                            wh_bal.c.status.is_(True),
+                            wh_bal.c.is_deleted.is_not(True),
+                        ),
+                    )
+                )
+                .where(
+                    and_(
+                        wb_latest.c.nomenclature_id.in_(product_ids),
+                        wb_latest.c.current_amount > 0,
+                    )
+                )
+            )
+            warehouses_rows = await database.fetch_all(warehouses_query)
+
+            for row in warehouses_rows:
+                nom_id = row["nomenclature_id"]
+                if nom_id not in available_warehouses_map:
+                    available_warehouses_map[nom_id] = []
+                available_warehouses_map[nom_id].append(
+                    {
+                        "warehouse_id": row["warehouse_id"],
+                        "organization_id": row["organization_id"],
+                        "warehouse_name": row["warehouse_name"],
+                        "warehouse_address": row["warehouse_address"],
+                        "latitude": row["latitude"],
+                        "longitude": row["longitude"],
+                        "current_amount": row["current_amount"],
+                    }
+                )
+
         # --- Подсчёт общего количества (без дублей по складам / картинкам) ---
         count_query = (
             select(func.count(func.distinct(nomenclature.c.id)))
@@ -928,36 +976,27 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             )
 
             # Список складов (только с остатком > 0)
-            wh_raw = product_dict.get("available_warehouses")
-            if wh_raw and isinstance(wh_raw, list):
-                wh_valid = [
-                    w
-                    for w in wh_raw
-                    if w is not None
-                    and w.get("warehouse_id") is not None
-                    and (w.get("current_amount") or 0) > 0
-                ]
-                if wh_valid:
-                    product_dict["available_warehouses"] = sorted(
-                        [
-                            AvailableWarehouse(
-                                **w,
-                                distance_to_client=self._count_distance_to_client(
-                                    request.lat,
-                                    request.lon,
-                                    w["latitude"],
-                                    w["longitude"],
-                                ),
-                            )
-                            for w in wh_valid
-                        ],
-                        key=lambda x: (
-                            x.distance_to_client is None,
-                            x.distance_to_client or 0,
-                        ),
-                    )
-                else:
-                    product_dict["available_warehouses"] = None
+            # Получаем из отдельного запроса, который мы выполнили выше
+            wh_list = available_warehouses_map.get(product_dict["id"], [])
+            if wh_list:
+                product_dict["available_warehouses"] = sorted(
+                    [
+                        AvailableWarehouse(
+                            **w,
+                            distance_to_client=self._count_distance_to_client(
+                                request.lat,
+                                request.lon,
+                                w["latitude"],
+                                w["longitude"],
+                            ),
+                        )
+                        for w in wh_list
+                    ],
+                    key=lambda x: (
+                        x.distance_to_client is None,
+                        x.distance_to_client or 0,
+                    ),
+                )
             else:
                 product_dict["available_warehouses"] = None
 
