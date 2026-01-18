@@ -1604,7 +1604,7 @@ async def avito_oauth_callback(
             else:
                 from api.chats.avito.avito_constants import AVITO_SVG_ICON
 
-                channel_name = f"Avito - {avito_account_name}"
+                channel_name = f"Avito - {avito_account_name} ({avito_user_id})"
                 new_channel_id = await database.execute(
                     channels.insert().values(
                         name=channel_name,
