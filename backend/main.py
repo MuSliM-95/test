@@ -381,8 +381,8 @@ async def tinkoff_callback_direct(request: Request):
     return await tinkoff_callback(request)
 
 
-@app.get("/api/v1/hook/chat/123456", include_in_schema=False)
-@app.post("/api/v1/hook/chat/123456", include_in_schema=False)
+@app.get("/hook/chat/123456", include_in_schema=False)
+@app.post("/hook/chat/123456", include_in_schema=False)
 async def avito_oauth_callback_legacy(
     request: Request,
     code: str = Query(None, description="Authorization code from Avito"),
