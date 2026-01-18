@@ -4,8 +4,8 @@ from pydantic import BaseModel
 
 
 class AvitoCredentialsCreate(BaseModel):
-    api_key: str
-    api_secret: str
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
     redirect_uri: Optional[str] = None
     channel_name: Optional[str] = None
     grant_type: Optional[str] = "client_credentials"

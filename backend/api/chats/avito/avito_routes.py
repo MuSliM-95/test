@@ -20,8 +20,9 @@ from api.chats.avito.schemas import (
     AvitoHistoryLoadResponse,
     AvitoOAuthCallbackResponse,
 )
-from database.db import channel_credentials, channels, chats, database
+from database.db import channel_credentials, channels, chat_messages, chats, database
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, desc, select, update
 
 logger = logging.getLogger(__name__)
 
@@ -71,43 +72,58 @@ async def connect_avito_channel(
         cashbox_id = user.cashbox_id
         grant_type = credentials.grant_type or "client_credentials"
 
-        encrypted_api_key = _encrypt_credential(credentials.api_key)
-        encrypted_api_secret = _encrypt_credential(credentials.api_secret)
-
-        avito_channel = await crud.get_channel_by_cashbox_and_api_key(
-            cashbox_id, encrypted_api_key, "AVITO"
-        )
-
-        if not avito_channel:
-            existing_channel_by_api_key = await crud.get_channel_by_api_key(
-                encrypted_api_key, "AVITO"
-            )
-
-            if existing_channel_by_api_key:
-                avito_channel = existing_channel_by_api_key
-            else:
-                existing_channel_by_cashbox = await crud.get_channel_by_cashbox(
-                    cashbox_id, "AVITO"
+        if grant_type == "client_credentials":
+            if not credentials.api_key or not credentials.api_secret:
+                raise HTTPException(
+                    status_code=422,
+                    detail="api_key and api_secret are required for personal authorization (client_credentials)",
                 )
 
-                if existing_channel_by_cashbox:
-                    avito_channel = existing_channel_by_cashbox
-                else:
-                    channel_name = (
-                        credentials.channel_name or f"Avito - Cashbox {cashbox_id}"
-                    )
-                    from api.chats.avito.avito_constants import AVITO_SVG_ICON
+        encrypted_api_key = (
+            _encrypt_credential(credentials.api_key) if credentials.api_key else None
+        )
+        encrypted_api_secret = (
+            _encrypt_credential(credentials.api_secret)
+            if credentials.api_secret
+            else None
+        )
 
-                    channel_id = await database.execute(
-                        channels.insert().values(
-                            name=channel_name,
-                            type="AVITO",
-                            svg_icon=AVITO_SVG_ICON,
-                            description=f"Avito White API Integration for Cashbox {cashbox_id}",
-                            is_active=True,
-                        )
+        if grant_type == "client_credentials" and encrypted_api_key:
+            avito_channel = await crud.get_channel_by_cashbox_and_api_key(
+                cashbox_id, encrypted_api_key, "AVITO"
+            )
+
+            if not avito_channel:
+                existing_channel_by_api_key = await crud.get_channel_by_api_key(
+                    encrypted_api_key, "AVITO"
+                )
+
+                if existing_channel_by_api_key:
+                    avito_channel = existing_channel_by_api_key
+                else:
+                    existing_channel_by_cashbox = await crud.get_channel_by_cashbox(
+                        cashbox_id, "AVITO"
                     )
-                    avito_channel = await crud.get_channel(channel_id)
+
+                    if existing_channel_by_cashbox:
+                        avito_channel = existing_channel_by_cashbox
+        else:
+            avito_channel = await crud.get_channel_by_cashbox(cashbox_id, "AVITO")
+
+        if not avito_channel:
+            channel_name = credentials.channel_name or f"Avito - Cashbox {cashbox_id}"
+            from api.chats.avito.avito_constants import AVITO_SVG_ICON
+
+            channel_id = await database.execute(
+                channels.insert().values(
+                    name=channel_name,
+                    type="AVITO",
+                    svg_icon=AVITO_SVG_ICON,
+                    description=f"Avito White API Integration for Cashbox {cashbox_id}",
+                    is_active=True,
+                )
+            )
+            avito_channel = await crud.get_channel(channel_id)
 
         channel_id = avito_channel["id"]
 
@@ -125,12 +141,14 @@ async def connect_avito_channel(
         )
 
         update_values = {
-            "api_key": encrypted_api_key,
-            "api_secret": encrypted_api_secret,
             "redirect_uri": redirect_uri,
             "is_active": True,
             "updated_at": datetime.utcnow(),
         }
+
+        if grant_type == "client_credentials":
+            update_values["api_key"] = encrypted_api_key
+            update_values["api_secret"] = encrypted_api_secret
 
         if grant_type == "client_credentials":
             logger.info(
@@ -897,9 +915,6 @@ async def process_single_chat(
                         )
 
                 if result["messages_loaded"] > 0:
-                    from database.db import chat_messages
-                    from sqlalchemy import desc
-
                     last_db_message = await database.fetch_one(
                         chat_messages.select()
                         .where(chat_messages.c.chat_id == chat_id)
@@ -1195,9 +1210,6 @@ async def mark_avito_chat_as_read(
             internal_chat_id = int(chat_id)
             chat = await crud.get_chat(internal_chat_id)
         except ValueError:
-            from database.db import channels
-            from sqlalchemy import and_, select
-
             query = (
                 select(
                     [
@@ -1258,9 +1270,6 @@ async def mark_avito_chat_as_read(
 
         if success:
             try:
-                from database.db import chat_messages
-                from sqlalchemy import and_, update
-
                 update_query = (
                     update(chat_messages)
                     .where(
