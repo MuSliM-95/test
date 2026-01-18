@@ -18,9 +18,9 @@ from api.chats.schemas import (
     MessagesList,
 )
 from api.chats.websocket import chat_manager
-from database.db import chat_messages, database, pictures
+from database.db import database, pictures
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import and_, select, update
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -570,6 +570,8 @@ async def get_chat_messages(
                 if client:
                     try:
                         await client.mark_chat_as_read(chat["external_chat_id"])
+                        from database.db import chat_messages
+                        from sqlalchemy import and_, update
 
                         update_query = (
                             update(chat_messages)

@@ -8,14 +8,16 @@ class AvitoCredentialsCreate(BaseModel):
     api_secret: str
     redirect_uri: Optional[str] = None
     channel_name: Optional[str] = None
+    grant_type: Optional[str] = "client_credentials"
 
     class Config:
         json_schema_extra = {
             "example": {
                 "api_key": "your_client_id",
                 "api_secret": "your_client_secret",
-                "redirect_uri": "https://dev.tablecrm.com/api/v1/avito/oauth/callback",
+                "redirect_uri": "https://app.tablecrm.com/api/v1/hook/chat/123456",
                 "channel_name": "Avito Москва",
+                "grant_type": "client_credentials",
             }
         }
 

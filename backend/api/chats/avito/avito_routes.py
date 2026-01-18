@@ -3,18 +3,12 @@ import logging
 import re
 import secrets
 from datetime import datetime
-
-from fastapi import APIRouter, Depends, HTTPException
-
-logger = logging.getLogger(__name__)
-
 from typing import Optional
 
 from api.chats import crud
 from api.chats.auth import get_current_user_for_avito as get_current_user
 from api.chats.avito.avito_client import AvitoAPIError, AvitoClient
 from api.chats.avito.avito_factory import (
-    _decrypt_credential,
     _encrypt_credential,
     create_avito_client,
     save_token_callback,
@@ -27,9 +21,16 @@ from api.chats.avito.schemas import (
     AvitoOAuthCallbackResponse,
 )
 from database.db import channel_credentials, channels, chats, database
-from fastapi import Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chats/avito", tags=["chats-avito"])
+
+AVITO_OAUTH_CLIENT_ID = "KIaI_T0JMKK-9FOly0HE"
+AVITO_OAUTH_CLIENT_SECRET = "H4swEkou67ucS5tqJFPWJ24f5MFdzTu-zXdJ51Qp"
+AVITO_OAUTH_REDIRECT_URI = "https://app.tablecrm.com/api/v1/hook/chat/123456"
+AVITO_OAUTH_SCOPE = "messenger:read,messenger:write,items:info,job:cv,job:applications,job:vacancy,short_term_rent:read,stats:read,user:read,user_operations:read"
 
 
 def extract_phone_from_text(text: str) -> Optional[str]:
@@ -68,6 +69,7 @@ async def connect_avito_channel(
 ):
     try:
         cashbox_id = user.cashbox_id
+        grant_type = credentials.grant_type or "client_credentials"
 
         encrypted_api_key = _encrypt_credential(credentials.api_key)
         encrypted_api_secret = _encrypt_credential(credentials.api_secret)
@@ -111,7 +113,7 @@ async def connect_avito_channel(
 
         redirect_uri = (
             credentials.redirect_uri
-            or "https://dev.tablecrm.com/api/v1/avito/oauth/callback"
+            or "https://app.tablecrm.com/api/v1/hook/chat/123456"
         )
 
         existing = await database.fetch_one(
@@ -130,6 +132,49 @@ async def connect_avito_channel(
             "updated_at": datetime.utcnow(),
         }
 
+        if grant_type == "client_credentials":
+            logger.info(
+                f"Personal authorization for cashbox={cashbox_id}, getting access_token"
+            )
+
+            try:
+                from api.chats.avito.avito_client import AvitoClient
+
+                temp_client = AvitoClient(
+                    api_key=credentials.api_key, api_secret=credentials.api_secret
+                )
+                token_data = await temp_client.get_access_token()
+
+                access_token = token_data.get("access_token")
+                expires_at = token_data.get("expires_at")
+
+                if not access_token:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Не удалось получить access_token от Avito",
+                    )
+
+                temp_client.access_token = access_token
+                avito_user_id = await temp_client._get_user_id()
+
+                update_values["access_token"] = _encrypt_credential(access_token)
+                update_values["token_expires_at"] = (
+                    datetime.fromisoformat(expires_at) if expires_at else None
+                )
+                update_values["avito_user_id"] = avito_user_id
+                update_values["refresh_token"] = None
+
+                logger.info(
+                    f"Successfully obtained access_token for cashbox={cashbox_id}, avito_user_id={avito_user_id}"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to get access_token: {e}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Не удалось получить токен от Avito: {str(e)}",
+                )
+
         if existing:
             await database.execute(
                 channel_credentials.update()
@@ -145,21 +190,94 @@ async def connect_avito_channel(
             }
             await database.execute(channel_credentials.insert().values(**insert_values))
 
-        oauth_client_id = credentials.api_key
+        webhook_registered = False
+        webhook_error_message = None
+        webhook_url = None
 
-        state = secrets.token_urlsafe(32)
-        state_data = f"{cashbox_id}_{state}"
+        if grant_type == "client_credentials":
+            try:
+                webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
 
-        scope = "messenger:read,messenger:write,items:info,job:cv,job:applications,job:vacancy,messenger:read,messenger:write,short_term_rent:read,stats:read,user:read,user_operations:read"
-        auth_url = f"https://avito.ru/oauth?response_type=code&client_id={oauth_client_id}&scope={scope}&state={state_data}"
+                async def save_token_callback(channel_id, cashbox_id, token_data):
+                    encrypted_access = _encrypt_credential(
+                        token_data.get("access_token")
+                    )
+                    expires_at = token_data.get("expires_at")
+                    token_expires_at = (
+                        datetime.fromisoformat(expires_at) if expires_at else None
+                    )
 
-        response = {
-            "success": True,
-            "message": "Credentials saved. Please authorize via OAuth to complete connection.",
-            "channel_id": channel_id,
-            "cashbox_id": cashbox_id,
-            "authorization_url": auth_url,
-        }
+                    await database.execute(
+                        channel_credentials.update()
+                        .where(
+                            (channel_credentials.c.channel_id == channel_id)
+                            & (channel_credentials.c.cashbox_id == cashbox_id)
+                        )
+                        .values(
+                            access_token=encrypted_access,
+                            token_expires_at=token_expires_at,
+                            updated_at=datetime.utcnow(),
+                        )
+                    )
+
+                client = await create_avito_client(
+                    channel_id=channel_id,
+                    cashbox_id=cashbox_id,
+                    on_token_refresh=lambda token_data: save_token_callback(
+                        channel_id, cashbox_id, token_data
+                    ),
+                )
+
+                if client:
+                    try:
+                        result = await client.register_webhook(webhook_url)
+                        webhook_registered = True
+                        logger.info(
+                            f"Webhook registered successfully for channel={channel_id}"
+                        )
+                    except Exception as webhook_error:
+                        webhook_error_message = str(webhook_error)
+                        logger.warning(
+                            f"Failed to register webhook: {webhook_error_message}"
+                        )
+                else:
+                    webhook_error_message = "Could not create Avito client"
+
+            except Exception as e:
+                webhook_error_message = str(e)
+                logger.warning(f"Error during webhook registration: {e}")
+
+        if grant_type == "client_credentials":
+            response = {
+                "success": True,
+                "message": "Канал успешно подключен через персональную авторизацию",
+                "channel_id": channel_id,
+                "cashbox_id": cashbox_id,
+                "authorization_url": None,
+                "webhook_registered": webhook_registered,
+                "webhook_url": webhook_url if webhook_registered else None,
+                "webhook_error": webhook_error_message,
+            }
+        else:
+            oauth_client_id = AVITO_OAUTH_CLIENT_ID
+            oauth_scope = AVITO_OAUTH_SCOPE
+
+            state = secrets.token_urlsafe(32)
+            state_data = f"{cashbox_id}_{state}"
+
+            auth_url = f"https://avito.ru/oauth?response_type=code&client_id={oauth_client_id}&scope={oauth_scope}&state={state_data}"
+
+            logger.info(
+                f"OAuth authorization URL generated for cashbox={cashbox_id}, client_id={oauth_client_id}"
+            )
+
+            response = {
+                "success": True,
+                "message": "Credentials saved. Please authorize via OAuth to complete connection.",
+                "channel_id": channel_id,
+                "cashbox_id": cashbox_id,
+                "authorization_url": auth_url,
+            }
 
         return response
 
@@ -1264,7 +1382,7 @@ async def register_avito_webhook(
             )
 
         if not webhook_url:
-            webhook_url = "https://dev.tablecrm.com/api/v1/avito/hook"
+            webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
 
         client = await create_avito_client(
             channel_id=avito_channel["id"],
@@ -1345,12 +1463,13 @@ async def avito_oauth_callback(
                 detail=f"Avito credentials not found for cashbox {cashbox_id}. Please connect Avito channel first via /connect endpoint.",
             )
 
-        oauth_client_id = _decrypt_credential(credentials["api_key"])
-        oauth_client_secret = _decrypt_credential(credentials["api_secret"])
+        oauth_client_id = AVITO_OAUTH_CLIENT_ID
+        oauth_client_secret = AVITO_OAUTH_CLIENT_SECRET
 
-        redirect_uri = (
-            credentials.get("redirect_uri")
-            or "https://dev.tablecrm.com/api/v1/avito/oauth/callback"
+        redirect_uri = credentials.get("redirect_uri") or AVITO_OAUTH_REDIRECT_URI
+
+        logger.info(
+            f"OAuth callback: exchanging code for tokens, cashbox={cashbox_id}, client_id={oauth_client_id}"
         )
 
         try:
@@ -1424,7 +1543,7 @@ async def avito_oauth_callback(
         webhook_error_message = None
         webhook_url = None
         try:
-            webhook_url = "https://dev.tablecrm.com/api/v1/avito/hook"
+            webhook_url = "https://app.tablecrm.com/api/v1/avito/hook"
 
             if webhook_url:
                 client = await create_avito_client(
