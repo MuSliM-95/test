@@ -1,7 +1,7 @@
 """Ensure nomenclature.global_category_id column exists
 
 Revision ID: fix_nomenclature_global_category_safe
-Revises: fix_payboxes_deleted_at_safe
+Revises: alembic_version_widen
 Create Date: 2026-01-18 00:15:00.000000
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "fix_nomenclature_global_category_safe"
-down_revision = "fix_payboxes_deleted_at_safe"
+down_revision = "alembic_version_widen"
 branch_labels = None
 depends_on = None
 
