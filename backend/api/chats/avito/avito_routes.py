@@ -149,6 +149,9 @@ async def connect_avito_channel(
         if grant_type == "client_credentials":
             update_values["api_key"] = encrypted_api_key
             update_values["api_secret"] = encrypted_api_secret
+        else:
+            update_values["api_key"] = _encrypt_credential(AVITO_OAUTH_CLIENT_ID)
+            update_values["api_secret"] = _encrypt_credential(AVITO_OAUTH_CLIENT_SECRET)
 
         if grant_type == "client_credentials":
             logger.info(
@@ -1621,9 +1624,16 @@ async def avito_oauth_callback(
                     credentials.get("redirect_uri") if credentials else None
                 ) or AVITO_OAUTH_REDIRECT_URI
 
+                encrypted_oauth_api_key = _encrypt_credential(AVITO_OAUTH_CLIENT_ID)
+                encrypted_oauth_api_secret = _encrypt_credential(
+                    AVITO_OAUTH_CLIENT_SECRET
+                )
+
                 insert_values = {
                     "channel_id": channel_id,
                     "cashbox_id": cashbox_id,
+                    "api_key": encrypted_oauth_api_key,
+                    "api_secret": encrypted_oauth_api_secret,
                     "redirect_uri": redirect_uri_from_creds,
                     "access_token": encrypted_access_token,
                     "avito_user_id": avito_user_id,
