@@ -183,16 +183,19 @@ async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVIT
 
     active_results = []
     for result in results:
+        result_dict = dict(result)
+
         real_status = calculate_channel_status(
-            refresh_token=result.get("refresh_token"),
-            token_expires_at=result.get("token_expires_at"),
-            is_active_cred=result.get("credentials_is_active", False),
-            is_active_channel=result.get("is_active", False),
+            refresh_token=result_dict.get("refresh_token"),
+            token_expires_at=result_dict.get("token_expires_at"),
+            is_active_cred=result_dict.get("credentials_is_active", False),
+            is_active_channel=result_dict.get("is_active", False),
         )
-        result["is_active"] = real_status
-        result["real_status"] = real_status
+        result_dict["is_active"] = real_status
+        result_dict["real_status"] = real_status
+
         if real_status:
-            active_results.append(result)
+            active_results.append(result_dict)
 
     return active_results
 
