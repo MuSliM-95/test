@@ -297,13 +297,68 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         # Для админских форм (only_with_products=False) используем значение из БД,
         # чтобы не делать N дополнительных запросов и не тормозить загрузку дерева.
         if only_with_products:
-            for category in categories_db:
-                try:
-                    category["has_products"] = await self._check_category_has_products(
-                        category["id"]
+            # ОПТИМИЗАЦИЯ: вместо N запросов _check_category_has_products делаем один групповой запрос
+            # Получаем мапу category_id -> products_count для всех категорий сразу
+            from sqlalchemy import and_
+
+            products_by_category_query = (
+                select(
+                    nomenclature.c.global_category_id.label("category_id"),
+                    func.count(func.distinct(nomenclature.c.id)).label(
+                        "products_count"
+                    ),
+                )
+                .select_from(
+                    nomenclature.join(
+                        prices, prices.c.nomenclature == nomenclature.c.id
+                    ).join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(
+                    and_(
+                        nomenclature.c.global_category_id.is_not(None),
+                        nomenclature.c.is_deleted.is_not(True),
+                        price_types.c.name == "chatting",
+                        prices.c.is_deleted.is_not(True),
                     )
-                except Exception:
-                    category["has_products"] = False
+                )
+                .group_by(nomenclature.c.global_category_id)
+            )
+
+            products_rows = await database.fetch_all(products_by_category_query)
+            # Создаём мапу: category_id -> has_products (True если products_count > 0)
+            products_map = {
+                row["category_id"]: (row["products_count"] > 0) for row in products_rows
+            }
+
+            # Создаём мапу для быстрого доступа к категориям по ID
+            categories_by_id = {cat["id"]: cat for cat in categories_db}
+
+            # Проставляем has_products всем категориям из мапы
+            for category in categories_db:
+                category_id = category["id"]
+                category["has_products"] = products_map.get(category_id, False)
+
+            # Учитываем рекурсивность: если у дочерней категории есть товары,
+            # то и у всех её родителей должно быть has_products = True
+            # Проходим снизу вверх по дереву
+            def mark_parents_recursive(category_id):
+                """Рекурсивно проставляет has_products всем родителям категории"""
+                category = categories_by_id.get(category_id)
+                if not category:
+                    return
+
+                parent_id = category.get("parent_id")
+                if parent_id:
+                    parent = categories_by_id.get(parent_id)
+                    if parent:
+                        parent["has_products"] = True
+                        # Продолжаем вверх по дереву
+                        mark_parents_recursive(parent_id)
+
+            # Для всех категорий с товарами проставляем has_products родителям
+            for category_id in products_map:
+                if products_map[category_id]:
+                    mark_parents_recursive(category_id)
 
         tree = await self.build_global_hierarchy(
             categories_db, parent_id=None, only_with_products=only_with_products
