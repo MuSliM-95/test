@@ -75,6 +75,27 @@ class ChatResponse(BaseModel):
     contact: Optional[ContactInfo] = None
 
 
+class TelegramButton(BaseModel):
+    text: str
+    callback_data: Optional[str] = None
+    url: Optional[str] = None
+    request_contact: Optional[bool] = None
+    request_location: Optional[bool] = None
+
+    @validator("url", always=True)
+    def validate_action(cls, v, values):
+        if (
+            not v
+            and not values.get("callback_data")
+            and not values.get("request_contact")
+            and not values.get("request_location")
+        ):
+            raise ValueError(
+                "One of callback_data, url, request_contact, request_location is required"
+            )
+        return v
+
+
 class MessageCreate(BaseModel):
     chat_id: int
     sender_type: str
@@ -83,6 +104,11 @@ class MessageCreate(BaseModel):
     status: str = "SENT"
     image_url: Optional[str] = None
     source: Optional[str] = None
+    files: Optional[List[str]] = None
+    buttons: Optional[List[List[TelegramButton]]] = None
+    buttons_type: Optional[str] = "inline"
+    buttons_resize: Optional[bool] = True
+    buttons_one_time: Optional[bool] = False
 
 
 class MessageResponse(BaseModel):

@@ -42,7 +42,7 @@ class BaseMarketplaceUtm(BaseModel):
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
-    # utm_term: Optional[List[str]] = None
+    utm_term: Optional[List[str]] = None
     utm_content: Optional[str] = None
     utm_name: Optional[str] = None
     utm_phone: Optional[str] = None
@@ -50,6 +50,7 @@ class BaseMarketplaceUtm(BaseModel):
     utm_leadid: Optional[str] = None
     utm_yclientid: Optional[str] = None
     utm_gaclientid: Optional[str] = None
+    ref_user: Optional[str] = None
 
     class Config:
         orm_mode = True

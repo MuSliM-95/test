@@ -9,6 +9,9 @@ class PriceCreate(BaseModel):
     price_type: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
     class Config:
         orm_mode = True
@@ -28,6 +31,9 @@ class PriceEdit(BaseModel):
     price_type: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class PriceEditOne(BaseModel):
@@ -35,6 +41,9 @@ class PriceEditOne(BaseModel):
     price_type: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class PriceInList(BaseModel):

@@ -15,6 +15,7 @@ from aiogram.dispatcher.fsm.context import FSMContext
 from aiogram.types import ContentType, PhotoSize
 from api.articles.routers import new_article
 from api.articles.schemas import ArticleCreate
+from api.chats.telegram import telegram_polling_worker
 from api.contragents.routers import create_contragent
 from api.contragents.schemas import ContragentCreate
 from api.payments.routers import create_payment
@@ -802,8 +803,7 @@ async def cmd_id_groups(message: types.Message, state: FSMContext):
                 ).message_id
                 msg_id = (
                     await message.answer(
-                        text=answer_2,
-                        reply_markup=await get_open_app_link(rel.token),
+                        text=answer_2, reply_markup=await get_open_app_link(rel.token)
                     )
                 ).message_id
                 await store_bot_message(
@@ -1280,6 +1280,7 @@ async def main():
     dp = Dispatcher()
 
     await database.connect()
+    asyncio.create_task(telegram_polling_worker.run_polling_forever(manage_db=False))
     router = get_bill_route(bot, s3_client)
     # Register handlers
     dp.include_router(router)

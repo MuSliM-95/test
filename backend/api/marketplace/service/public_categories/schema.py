@@ -55,3 +55,17 @@ class GlobalCategoryTreeList(BaseModel):
     result: List[GlobalCategoryTree]
     count: int
     processing_time_ms: Optional[int] = None
+
+
+class TreeSelectNode(BaseModel):
+    """Узел для Ant Design TreeSelect"""
+
+    title: str
+    value: int
+    children: Optional[List["TreeSelectNode"]] = []
+
+
+class TreeSelectNodeList(BaseModel):
+    result: List[TreeSelectNode]
+    count: int
+    processing_time_ms: Optional[int] = None

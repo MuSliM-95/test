@@ -21,6 +21,7 @@ class MarketplaceOrderRequest(BaseModel):
     # order_type: str = "self"  # Тип заказа: self, other, corporate, gift, proxy
     client_lat: Optional[float] = None
     client_lon: Optional[float] = None
+    ref_user: Optional[str] = None
     additional_data: List[Dict[str, Any]] = Field(default_factory=list)
 
 
@@ -31,6 +32,7 @@ class MarketplaceOrderResponse(BaseModel):
     # status: str
     message: str
     processing_time_ms: Optional[int] = None
+    cart_cleared: bool = True  # Флаг для фронтенда, что корзина будет очищена
     # estimated_delivery: Optional[str] = None
     # cashbox_assignments: Optional[List[dict]] = None
 

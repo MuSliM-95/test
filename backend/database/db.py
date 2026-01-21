@@ -787,6 +787,9 @@ nomenclature = sqlalchemy.Table(
     sqlalchemy.Column("seo_keywords", ARRAY(item_type=String)),
     sqlalchemy.Column("production_time_min_from", Integer, nullable=True),
     sqlalchemy.Column("production_time_min_to", Integer, nullable=True),
+    sqlalchemy.Column("address", String, nullable=True),
+    sqlalchemy.Column("latitude", Float, nullable=True),
+    sqlalchemy.Column("longitude", Float, nullable=True),
 )
 
 nomenclature_attributes = sqlalchemy.Table(
@@ -984,6 +987,9 @@ prices = sqlalchemy.Table(
         "owner", Integer, ForeignKey("relation_tg_cashboxes.id"), nullable=False
     ),
     sqlalchemy.Column("cashbox", Integer, ForeignKey("cashboxes.id"), nullable=True),
+    sqlalchemy.Column("address", String, nullable=True),
+    sqlalchemy.Column("latitude", Float, nullable=True),
+    sqlalchemy.Column("longitude", Float, nullable=True),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column(
@@ -3070,6 +3076,13 @@ marketplace_clients_list = sqlalchemy.Table(
         "id", BigInteger, primary_key=True, index=True, autoincrement=True
     ),
     sqlalchemy.Column("phone", String, nullable=False, unique=True, index=True),
+    sqlalchemy.Column("first_name", String, nullable=True),
+    sqlalchemy.Column("last_name", String, nullable=True),
+    sqlalchemy.Column("utm_source", String, nullable=True),
+    sqlalchemy.Column("utm_medium", String, nullable=True),
+    sqlalchemy.Column("utm_campaign", String, nullable=True),
+    sqlalchemy.Column("utm_term", ARRAY(item_type=String), nullable=True),
+    sqlalchemy.Column("ref_user", String, nullable=True),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column(
         "updated_at",
@@ -3088,8 +3101,14 @@ marketplace_favorites = sqlalchemy.Table(
     sqlalchemy.Column(
         "phone",
         String,
+        nullable=True,  # Deprecated, use client_id instead
+        index=True,
+    ),
+    sqlalchemy.Column(
+        "client_id",
+        BigInteger,
         ForeignKey(
-            "marketplace_clients_list.phone", ondelete="CASCADE", onupdate="CASCADE"
+            "marketplace_clients_list.id", ondelete="CASCADE", onupdate="CASCADE"
         ),
         nullable=False,
         index=True,
@@ -3104,7 +3123,7 @@ marketplace_favorites = sqlalchemy.Table(
         onupdate=func.now(),
     ),
     UniqueConstraint(
-        "phone",
+        "client_id",
         "entity_type",
         "entity_id",
         name="uq_marketplace_favorites_client_entity",
@@ -3120,11 +3139,18 @@ marketplace_carts = sqlalchemy.Table(
     sqlalchemy.Column(
         "phone",
         String,
+        nullable=True,  # Deprecated, use client_id instead
+        unique=True,  # один активный cart на телефон
+        index=True,
+    ),
+    sqlalchemy.Column(
+        "client_id",
+        BigInteger,
         ForeignKey(
-            "marketplace_clients_list.phone", ondelete="CASCADE", onupdate="CASCADE"
+            "marketplace_clients_list.id", ondelete="CASCADE", onupdate="CASCADE"
         ),
         nullable=False,
-        unique=True,  # один активный cart на телефон
+        unique=True,  # один активный cart на клиента
         index=True,
     ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -3179,8 +3205,14 @@ marketplace_orders = sqlalchemy.Table(
     sqlalchemy.Column(
         "phone",
         String,
+        nullable=True,  # Deprecated, use client_id instead
+        index=True,
+    ),
+    sqlalchemy.Column(
+        "client_id",
+        BigInteger,
         ForeignKey(
-            "marketplace_clients_list.phone", ondelete="RESTRICT", onupdate="CASCADE"
+            "marketplace_clients_list.id", ondelete="RESTRICT", onupdate="CASCADE"
         ),
         nullable=False,
         index=True,
@@ -3191,6 +3223,11 @@ marketplace_orders = sqlalchemy.Table(
         "additional_data", JSONB, nullable=False, server_default=text("'[]'::jsonb")
     ),
     sqlalchemy.Column("error", Text, nullable=True),
+    sqlalchemy.Column(
+        "recipient_name",
+        String,
+        nullable=True,  # Имя получателя из конкретного заказа (может отличаться от имени в marketplace_clients_list)
+    ),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column(
         "updated_at",
@@ -3209,8 +3246,14 @@ marketplace_searches = sqlalchemy.Table(
     sqlalchemy.Column(
         "phone",
         String,
+        nullable=True,  # Deprecated, use client_id instead
+        index=True,
+    ),
+    sqlalchemy.Column(
+        "client_id",
+        BigInteger,
         ForeignKey(
-            "marketplace_clients_list.phone", ondelete="SET NULL", onupdate="CASCADE"
+            "marketplace_clients_list.id", ondelete="SET NULL", onupdate="CASCADE"
         ),
         nullable=True,
         index=True,
@@ -3452,6 +3495,7 @@ marketplace_utm_tags = sqlalchemy.Table(
     sqlalchemy.Column("utm_leadid", String, nullable=True),
     sqlalchemy.Column("utm_yclientid", String, nullable=True),
     sqlalchemy.Column("utm_gaclientid", String, nullable=True),
+    sqlalchemy.Column("ref_user", String, nullable=True),
     sqlalchemy.Column(
         "created_at", DateTime(timezone=True), server_default=func.now(), nullable=False
     ),

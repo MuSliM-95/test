@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from api.marketplace.schemas import BaseMarketplaceUtm, UtmEntityType
 from pydantic import BaseModel
@@ -10,6 +10,9 @@ class FavoriteRequest(BaseModel):
 
     nomenclature_id: int
     contragent_phone: str
+    # UTM параметры (опциональные, могут быть в body или query string)
+    utm_term: Optional[str] = None
+    ref_user: Optional[str] = None
 
 
 class FavoriteResponse(BaseModel):

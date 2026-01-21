@@ -981,7 +981,12 @@ async def update_entity_hash(table: Table, table_hash: Table, entity):
         }
     )
 
-    hash_string = f"{table.name}_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
+    # Используем новые префиксы: nm_ для товаров, wh_ для складов
+    if table.name == "nomenclature":
+        hash_string = "nm_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
+    else:  # warehouses
+        hash_string = "wh_" + str(hashlib.md5(data.encode("utf-8")).hexdigest())
+
     hash_data = {
         "hash": hash_string,
         f"{table.name}_id": entity.id,

@@ -32,7 +32,12 @@ class NomenclatureCreate(BaseModel):
     category: Optional[int]
     manufacturer: Optional[int]
     global_category_id: Optional[int] = None
-    chatting_percent: Optional[int] = Field(default=None, le=100, gt=0)
+    chatting_percent: Optional[int] = Field(
+        default=None,
+        le=100,
+        gt=0,
+        description="Комиссия маркета (округление кратно 4%)",
+    )
     cashback_type: Optional[NomenclatureCashbackType] = (
         NomenclatureCashbackType.lcard_cashback
     )
@@ -50,6 +55,9 @@ class NomenclatureCreate(BaseModel):
     production_time_min_to: Optional[int] = Field(
         None, description="Срок производства до (в минутах)", ge=0
     )
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
     class Config:
         orm_mode = True
@@ -84,6 +92,25 @@ class NomenclatureCreate(BaseModel):
                 )
         return v
 
+    @validator("chatting_percent")
+    def validate_chatting_percent(cls, v):
+        """Округляет процент комиссии маркета кратно 4"""
+        if v is None:
+            return v
+        # Округляем до ближайшего кратного 4
+        # Если v=5, то (5 + 2) // 4 * 4 = 7 // 4 * 4 = 1 * 4 = 4
+        # Если v=6, то (6 + 2) // 4 * 4 = 8 // 4 * 4 = 2 * 4 = 8
+        # Если v=7, то (7 + 2) // 4 * 4 = 9 // 4 * 4 = 2 * 4 = 8
+        # Если v=8, то (8 + 2) // 4 * 4 = 10 // 4 * 4 = 2 * 4 = 8
+        rounded = ((v + 2) // 4) * 4
+        # Ограничиваем максимум 100
+        if rounded > 100:
+            rounded = 100
+        # Минимум 4, если значение было больше 0
+        if rounded < 4 and v > 0:
+            rounded = 4
+        return rounded
+
 
 class NomenclatureCreateMass(BaseModel):
     __root__: List[NomenclatureCreate]
@@ -104,6 +131,7 @@ class Nomenclature(NomenclatureCreate):
     id: int
     updated_at: int
     created_at: int
+    qr_hash: Optional[str] = None
 
     class Config:
         orm_mode = True

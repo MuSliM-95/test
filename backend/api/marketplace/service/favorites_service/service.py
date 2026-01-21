@@ -5,7 +5,12 @@ from api.marketplace.service.favorites_service.schemas import (
     FavoriteRequest,
     FavoriteResponse,
 )
-from database.db import database, marketplace_favorites, nomenclature
+from database.db import (
+    database,
+    marketplace_clients_list,
+    marketplace_favorites,
+    nomenclature,
+)
 from fastapi import HTTPException
 from sqlalchemy import and_, desc, func, select
 
@@ -18,6 +23,14 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
     ) -> FavoriteListResponse:
         # Для получения избранного не проверяем кешбокс: посетитель может просматривать товары
         # любых продавцов; контрагент может ещё не существовать или быть в другом кешбоксе.
+
+        # Получаем client_id по phone
+        client_query = select(marketplace_clients_list.c.id).where(
+            marketplace_clients_list.c.phone == contragent_phone
+        )
+        client = await database.fetch_one(client_query)
+        if not client:
+            return FavoriteListResponse(result=[], count=0, page=page, size=size)
 
         offset = (page - 1) * size
 
@@ -33,7 +46,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
             )
             .where(
                 and_(
-                    marketplace_favorites.c.phone == contragent_phone,
+                    marketplace_favorites.c.client_id == client.id,
                     marketplace_favorites.c.entity_type == ENTITY_TYPE_NOMENCLATURE,
                 )
             )
@@ -49,7 +62,7 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
             .select_from(marketplace_favorites)
             .where(
                 and_(
-                    marketplace_favorites.c.phone == contragent_phone,
+                    marketplace_favorites.c.client_id == client.id,
                     marketplace_favorites.c.entity_type == ENTITY_TYPE_NOMENCLATURE,
                 )
             )
@@ -95,24 +108,41 @@ class MarketplaceFavoritesService(BaseMarketplaceService):
                 status_code=404, detail="Товар не найден или не доступен"
             )
 
-        await self._ensure_marketplace_client(phone)
+        client_id = await self._ensure_marketplace_client(phone)
 
-        existing_query = select(marketplace_favorites.c.id).where(
+        existing_query = select(
+            marketplace_favorites.c.id,
+            marketplace_favorites.c.phone,
+            marketplace_favorites.c.entity_type,
+            marketplace_favorites.c.entity_id,
+            marketplace_favorites.c.created_at,
+            marketplace_favorites.c.updated_at,
+        ).where(
             and_(
-                marketplace_favorites.c.phone == phone,
+                marketplace_favorites.c.client_id == client_id,
                 marketplace_favorites.c.entity_type == entity_type,
                 marketplace_favorites.c.entity_id == entity_id,
             )
         )
         existing_favorite = await database.fetch_one(existing_query)
+
         if existing_favorite:
-            raise HTTPException(
-                status_code=409, detail="Элемент уже добавлен в избранное"
+            # Элемент уже в избранном - возвращаем его (идемпотентная операция)
+            # Обновляем UTM метки для существующего элемента
+            await self._add_utm(existing_favorite.id, utm)
+
+            return FavoriteResponse(
+                id=existing_favorite.id,
+                nomenclature_id=existing_favorite.entity_id,
+                phone=existing_favorite.phone,
+                created_at=existing_favorite.created_at,
+                updated_at=existing_favorite.updated_at,
             )
 
         favorite_id = await database.execute(
             marketplace_favorites.insert().values(
-                phone=phone,
+                phone=phone,  # Оставляем для обратной совместимости
+                client_id=client_id,
                 entity_type=entity_type,
                 entity_id=entity_id,
             )

@@ -204,7 +204,7 @@ async def get_nomenclature_qr(
     hash_record = await database.fetch_one(hash_query)
     if not hash_record:
         hash_base = f"{nomenclature_db_dict['id']}:{nomenclature_db_dict.get('name', '')}:{nomenclature_db_dict.get('article', '')}"
-        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        hash_string = "nm_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
         await database.execute(
             insert(nomenclature_hash).values(
                 nomenclature_id=idx, hash=hash_string, created_at=datetime.now()
@@ -238,7 +238,7 @@ async def get_nomenclature_qr_data(token: str, idx: int):
     hash_record = await database.fetch_one(hash_query)
     if not hash_record:
         hash_base = f"{nomenclature_db_dict['id']}:{nomenclature_db_dict.get('name', '')}:{nomenclature_db_dict.get('article', '')}"
-        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        hash_string = "nm_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
         await database.execute(
             insert(nomenclature_hash).values(
                 nomenclature_id=idx, hash=hash_string, created_at=datetime.now()
@@ -700,9 +700,9 @@ async def get_nomenclature(
                     final_hash_string = hash_record["hash"]
                 else:
                     hash_base = f"{nomenclature_info['id']}:{nomenclature_info.get('name', '')}:{nomenclature_info.get('article', '')}"
-                    final_hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[
-                        :16
-                    ]
+                    final_hash_string = (
+                        "nm_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+                    )
                     await database.execute(
                         insert(nomenclature_hash).values(
                             nomenclature_id=nomenclature_info["id"],
@@ -812,10 +812,11 @@ async def new_nomenclature(
 
     if inserted_ids:
         hash_values_to_insert = []
+        hash_dict = {}
         for nom in nomenclature_db:
             nom_id = nom["id"]
             hash_base = f"{nom_id}:{nom.get('name', '')}:{nom.get('article', '')}"
-            hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+            hash_string = "nm_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
             hash_values_to_insert.append(
                 {
                     "nomenclature_id": nom_id,
@@ -823,10 +824,17 @@ async def new_nomenclature(
                     "created_at": datetime.now(),
                 }
             )
+            hash_dict[nom_id] = hash_string
         if hash_values_to_insert:
             await database.execute_many(
                 insert(nomenclature_hash), hash_values_to_insert
             )
+
+        # Добавляем qr_hash в ответ для каждого созданного товара
+        for nom in nomenclature_db:
+            nom_id = nom["id"]
+            if nom_id in hash_dict:
+                nom["qr_hash"] = f"NOM:{nom_id}:{hash_dict[nom_id]}"
 
     await manager.send_message(
         token,
@@ -924,6 +932,26 @@ async def edit_nomenclature(
                 pass  # Игнорируем ошибки обновления
 
     nomenclature_db = datetime_to_timestamp(nomenclature_db)
+
+    # Добавляем qr_hash в ответ - ВСЕГДА возвращаем актуальный хеш
+    # После update_entity_hash хеш должен быть в БД, но проверяем еще раз
+    hash_query = select(nomenclature_hash.c.hash).where(
+        nomenclature_hash.c.nomenclature_id == idx
+    )
+    hash_record = await database.fetch_one(hash_query)
+    if hash_record:
+        # Хеш найден в БД - возвращаем его
+        nomenclature_db["qr_hash"] = f"NOM:{idx}:{hash_record['hash']}"
+    else:
+        # Генерируем хеш, если его нет (на случай, если update_entity_hash не сработал)
+        hash_base = f"{idx}:{nomenclature_db.get('name', '')}:{nomenclature_db.get('article', '')}"
+        hash_string = "nm_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        await database.execute(
+            insert(nomenclature_hash).values(
+                nomenclature_id=idx, hash=hash_string, created_at=datetime.now()
+            )
+        )
+        nomenclature_db["qr_hash"] = f"NOM:{idx}:{hash_string}"
 
     await manager.send_message(
         token,

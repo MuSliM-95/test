@@ -18,13 +18,112 @@ from api.chats.schemas import (
     MessagesList,
 )
 from api.chats.websocket import chat_manager
-from database.db import database, pictures
+from common.utils.url_helper import get_app_url_for_environment
+from database.db import chat_messages, database, pictures
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import and_, select, update
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+
+def _build_telegram_inline_keyboard(buttons):
+    if not buttons:
+        return None
+
+    keyboard = []
+    for row in buttons:
+        row_buttons = []
+        for button in row:
+            data = {"text": button.text}
+            if button.url:
+                data["url"] = button.url
+            else:
+                data["callback_data"] = button.callback_data or button.text
+            row_buttons.append(data)
+        if row_buttons:
+            keyboard.append(row_buttons)
+
+    if not keyboard:
+        return None
+
+    return {"inline_keyboard": keyboard}
+
+
+def _build_telegram_reply_keyboard(
+    buttons, resize_keyboard=True, one_time_keyboard=False
+):
+    if not buttons:
+        return None
+
+    keyboard = []
+    for row in buttons:
+        row_buttons = []
+        for button in row:
+            data = {"text": button.text}
+            if button.request_contact:
+                data["request_contact"] = True
+            if button.request_location:
+                data["request_location"] = True
+            row_buttons.append(data)
+        if row_buttons:
+            keyboard.append(row_buttons)
+
+    if not keyboard:
+        return None
+
+    return {
+        "keyboard": keyboard,
+        "resize_keyboard": bool(resize_keyboard),
+        "one_time_keyboard": bool(one_time_keyboard),
+    }
+
+
+def _parse_data_url(data_url: str):
+    import base64
+
+    if not data_url.startswith("data:") or "," not in data_url:
+        return None
+
+    header, encoded = data_url.split(",", 1)
+    content_type = header.split(";")[0].split(":")[1] if ":" in header else None
+    return base64.b64decode(encoded), content_type
+
+
+def _normalize_telegram_file_url(file_url: str) -> str:
+    if not file_url:
+        return file_url
+
+    app_url = get_app_url_for_environment()
+    if not app_url:
+        return file_url
+
+    if not app_url.startswith("http"):
+        app_url = f"https://{app_url}"
+
+    scheme, host = app_url.split("://", 1)
+    if file_url.startswith("http://") or file_url.startswith("https://"):
+        if "api.telegram.org/" in file_url:
+            return file_url
+        if host in file_url:
+            normalized = file_url.split(host, 1)[-1].lstrip("/")
+            if normalized.startswith("api/v1/photos/"):
+                return f"{scheme}://{host}/{normalized}"
+            if normalized.startswith("photos/") or normalized.startswith(
+                "chats_files/"
+            ):
+                return f"{scheme}://{host}/api/v1/photos/{normalized}"
+        return file_url
+
+    normalized = file_url.lstrip("/")
+    if normalized.startswith(host):
+        return f"{scheme}://{normalized}"
+    if normalized.startswith("api/v1/photos/"):
+        return f"{app_url.rstrip('/')}/{normalized}"
+    if normalized.startswith("photos/") or normalized.startswith("chats_files/"):
+        return f"{app_url.rstrip('/')}/api/v1/photos/{normalized}"
+    return f"{app_url.rstrip('/')}/{normalized}"
 
 
 @router.post("/channels/", response_model=ChannelResponse)
@@ -54,9 +153,13 @@ async def get_channel(channel_id: int, token: str, user=Depends(get_current_user
 
 @router.get("/channels/", response_model=list)
 async def get_channels(
-    token: str, skip: int = 0, limit: int = 100, user=Depends(get_current_user)
+    token: str,
+    skip: int = 0,
+    limit: int = 100,
+    channel_type: Optional[str] = None,
+    user=Depends(get_current_user),
 ):
-    return await crud.get_all_channels_by_cashbox(user.cashbox_id)
+    return await crud.get_all_channels_by_cashbox(user.cashbox_id, channel_type)
 
 
 @router.put("/channels/{channel_id}", response_model=ChannelResponse)
@@ -513,6 +616,246 @@ async def create_message(
                     logger.warning(
                         f"Could not create Avito client for channel {channel['id']}, cashbox {user.cashbox_id}"
                     )
+            elif (
+                channel
+                and channel["type"] == "TELEGRAM"
+                and chat.get("external_chat_id")
+            ):
+                try:
+                    from api.chats.avito.avito_factory import _decrypt_credential
+                    from api.chats.telegram.telegram_client import (
+                        send_document,
+                        send_media_group,
+                        send_message,
+                        send_photo,
+                        send_video,
+                    )
+                    from database.db import channel_credentials, pictures
+
+                    creds = await database.fetch_one(
+                        channel_credentials.select().where(
+                            (channel_credentials.c.channel_id == channel["id"])
+                            & (channel_credentials.c.cashbox_id == user.cashbox_id)
+                            & (channel_credentials.c.is_active.is_(True))
+                        )
+                    )
+
+                    if not creds:
+                        logger.warning(
+                            f"No Telegram credentials for channel {channel['id']}, cashbox {user.cashbox_id}"
+                        )
+                        return db_message
+
+                    bot_token = _decrypt_credential(creds["api_key"])
+                    chat_id = chat["external_chat_id"]
+                    if message.buttons_type == "reply":
+                        keyboard = _build_telegram_reply_keyboard(
+                            message.buttons,
+                            resize_keyboard=message.buttons_resize,
+                            one_time_keyboard=message.buttons_one_time,
+                        )
+                    else:
+                        keyboard = _build_telegram_inline_keyboard(message.buttons)
+
+                    file_urls = message.files or []
+                    if message.image_url:
+                        file_urls = [message.image_url] + file_urls
+
+                    normalized_urls = []
+                    for url in file_urls:
+                        if isinstance(url, str) and url.startswith("data:"):
+                            normalized_urls.append(url)
+                        else:
+                            normalized_urls.append(_normalize_telegram_file_url(url))
+                    file_urls = normalized_urls
+
+                    stored_urls = []
+                    data_url_bytes = None
+                    data_url_content_type = None
+
+                    if len(file_urls) == 1 and file_urls[0].startswith("data:"):
+                        parsed = _parse_data_url(file_urls[0])
+                        if parsed:
+                            data_url_bytes, data_url_content_type = parsed
+                            try:
+                                import io
+                                import os
+                                from uuid import uuid4
+
+                                import aioboto3
+
+                                extension = "bin"
+                                if data_url_content_type:
+                                    if "jpeg" in data_url_content_type:
+                                        extension = "jpg"
+                                    elif "png" in data_url_content_type:
+                                        extension = "png"
+                                    elif "gif" in data_url_content_type:
+                                        extension = "gif"
+                                    elif "pdf" in data_url_content_type:
+                                        extension = "pdf"
+                                s3_session = aioboto3.Session()
+                                s3_data = {
+                                    "service_name": "s3",
+                                    "endpoint_url": os.environ.get("S3_URL"),
+                                    "aws_access_key_id": os.environ.get("S3_ACCESS"),
+                                    "aws_secret_access_key": os.environ.get(
+                                        "S3_SECRET"
+                                    ),
+                                }
+                                bucket_name = "5075293c-docs_generated"
+                                file_link = f"photos/messages_{db_message['id']}_{uuid4().hex[:8]}.{extension}"
+
+                                async with s3_session.client(**s3_data) as s3:
+                                    await s3.upload_fileobj(
+                                        io.BytesIO(data_url_bytes),
+                                        bucket_name,
+                                        file_link,
+                                    )
+                                stored_urls.append(file_link)
+                            except Exception:
+                                stored_urls.append(file_urls[0])
+                        else:
+                            stored_urls.append(file_urls[0])
+                    else:
+                        stored_urls = list(file_urls)
+
+                    for url in stored_urls:
+                        try:
+                            await database.execute(
+                                pictures.insert().values(
+                                    entity="messages",
+                                    entity_id=db_message["id"],
+                                    url=url,
+                                    is_main=False,
+                                    is_deleted=False,
+                                    owner=user.id,
+                                    cashbox=user.cashbox_id,
+                                )
+                            )
+                        except Exception:
+                            pass
+
+                    send_result = None
+                    external_id = None
+                    send_separate_text = bool(
+                        has_image and has_text and db_message_text
+                    )
+
+                    if len(file_urls) > 1:
+                        media_type = "photo"
+                        if message.message_type == "VIDEO":
+                            media_type = "video"
+                        elif message.message_type == "DOCUMENT":
+                            media_type = "document"
+
+                        media_payload = []
+                        for idx, url in enumerate(file_urls):
+                            media_item = {"type": media_type, "media": url}
+                            if idx == 0 and message.content:
+                                media_item["caption"] = message.content
+                            media_payload.append(media_item)
+
+                        send_result = await send_media_group(
+                            bot_token, chat_id, media_payload
+                        )
+
+                        if keyboard and send_separate_text and db_message_text:
+                            text_result = await send_message(
+                                bot_token,
+                                chat_id,
+                                message.content or " ",
+                                reply_markup=keyboard,
+                            )
+                            if text_result:
+                                await crud.update_message(
+                                    db_message_text["id"],
+                                    external_message_id=str(
+                                        text_result.get("message_id")
+                                    ),
+                                    status="DELIVERED",
+                                )
+
+                        if send_result:
+                            external_id = str(send_result[0].get("message_id"))
+                    else:
+                        file_payload = file_urls[0] if file_urls else None
+                        if data_url_bytes is not None:
+                            file_payload = data_url_bytes
+
+                        if send_separate_text and file_payload:
+                            send_result = await send_photo(
+                                bot_token,
+                                chat_id,
+                                file_payload,
+                                caption=None,
+                            )
+                            if send_result:
+                                external_id = str(send_result.get("message_id"))
+
+                            text_result = await send_message(
+                                bot_token,
+                                chat_id,
+                                message.content,
+                                reply_markup=keyboard,
+                            )
+                            if text_result and db_message_text:
+                                await crud.update_message(
+                                    db_message_text["id"],
+                                    external_message_id=str(
+                                        text_result.get("message_id")
+                                    ),
+                                    status="DELIVERED",
+                                )
+                        elif message.message_type == "IMAGE" and file_payload:
+                            send_result = await send_photo(
+                                bot_token,
+                                chat_id,
+                                file_payload,
+                                caption=message.content,
+                                reply_markup=keyboard,
+                            )
+                        elif message.message_type == "VIDEO" and file_payload:
+                            send_result = await send_video(
+                                bot_token,
+                                chat_id,
+                                file_payload,
+                                caption=message.content,
+                                reply_markup=keyboard,
+                            )
+                        elif message.message_type == "DOCUMENT" and file_payload:
+                            send_result = await send_document(
+                                bot_token,
+                                chat_id,
+                                file_payload,
+                                caption=message.content,
+                                reply_markup=keyboard,
+                            )
+                        else:
+                            send_result = await send_message(
+                                bot_token,
+                                chat_id,
+                                message.content,
+                                reply_markup=keyboard,
+                            )
+
+                        if send_result:
+                            external_id = str(send_result.get("message_id"))
+
+                    if external_id:
+                        await crud.update_message(
+                            db_message["id"],
+                            external_message_id=external_id,
+                            status="DELIVERED",
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send message to Telegram: {e}", exc_info=True
+                    )
+                    try:
+                        await crud.update_message(db_message["id"], status="FAILED")
+                    except Exception:
+                        pass
         except Exception as e:
             logger.error(f"Error sending message to Avito: {e}")
 
@@ -570,8 +913,6 @@ async def get_chat_messages(
                 if client:
                     try:
                         await client.mark_chat_as_read(chat["external_chat_id"])
-                        from database.db import chat_messages
-                        from sqlalchemy import and_, update
 
                         update_query = (
                             update(chat_messages)
@@ -701,6 +1042,11 @@ async def get_chat_messages(
                 except Exception:
                     pass
 
+        if client_avatar:
+            client_avatar = _normalize_telegram_file_url(client_avatar)
+        if operator_avatar:
+            operator_avatar = _normalize_telegram_file_url(operator_avatar)
+
         message_ids = [msg["id"] for msg in messages] if messages else []
         message_images = {}
         if message_ids:
@@ -725,7 +1071,9 @@ async def get_chat_messages(
                         message_images[msg_id] = []
                     pic_url = pic["url"]
                     if pic_url:
-                        message_images[msg_id].append(pic_url)
+                        message_images[msg_id].append(
+                            _normalize_telegram_file_url(pic_url)
+                        )
             except Exception as e:
                 logger.warning(f"Failed to load images for messages: {e}")
 

@@ -142,8 +142,21 @@ def calculate_channel_status(
     return token_expires_at > now
 
 
-async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
-    """Get all channels for specific cashbox by type through channel_credentials with real status"""
+async def get_all_channels_by_cashbox(
+    cashbox_id: int, channel_type: Optional[str] = None
+):
+    """
+    Get all channels for specific cashbox, optionally filtered by type.
+    Returns only channels with real active status (based on tokens and credentials).
+    """
+    filters = [
+        channel_credentials.c.cashbox_id == cashbox_id,
+        channel_credentials.c.is_active.is_(True),
+        channels.c.is_active.is_(True),
+    ]
+    if channel_type:
+        filters.append(channels.c.type == channel_type)
+
     query = (
         select(
             [
@@ -170,14 +183,7 @@ async def get_all_channels_by_cashbox(cashbox_id: int, channel_type: str = "AVIT
                 channel_credentials, channels.c.id == channel_credentials.c.channel_id
             )
         )
-        .where(
-            and_(
-                channel_credentials.c.cashbox_id == cashbox_id,
-                channels.c.type == channel_type,
-                channel_credentials.c.is_active.is_(True),
-                channels.c.is_active.is_(True),
-            )
-        )
+        .where(and_(*filters))
     )
     results = await database.fetch_all(query)
 

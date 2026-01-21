@@ -71,7 +71,9 @@ async def get_warehouses(
             wh_id = warehouse_info["id"]
             if wh_id not in hash_dict:
                 hash_base = f"WH:{wh_id}:{warehouse_info.get('name', '')}"
-                hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+                hash_string = (
+                    "wh_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+                )
                 hash_dict[wh_id] = hash_string
                 insert_values.append(
                     {
@@ -259,7 +261,7 @@ async def get_warehouse_qr(
     hash_record = await database.fetch_one(hash_query)
     if not hash_record:
         hash_base = f"WH:{warehouse_db_dict['id']}:{warehouse_db_dict.get('name', '')}"
-        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        hash_string = "wh_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
         await database.execute(
             insert(warehouse_hash).values(
                 warehouses_id=idx, hash=hash_string, created_at=datetime.now()
@@ -293,7 +295,7 @@ async def get_warehouse_hash(token: str, idx: int):
     hash_record = await database.fetch_one(hash_query)
     if not hash_record:
         hash_base = f"WH:{warehouse_db_dict['id']}:{warehouse_db_dict.get('name', '')}"
-        hash_string = hashlib.sha256(hash_base.encode()).hexdigest()[:16]
+        hash_string = "wh_" + hashlib.sha256(hash_base.encode()).hexdigest()[:16]
         await database.execute(
             insert(warehouse_hash).values(
                 warehouses_id=idx, hash=hash_string, created_at=datetime.now()

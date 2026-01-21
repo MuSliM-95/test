@@ -27,6 +27,7 @@ from api.chats.avito.avito_default_webhook import router as avito_default_webhoo
 from api.chats.avito.avito_routes import router as avito_router
 from api.chats.rabbitmq_consumer import chat_consumer
 from api.chats.routers import router as chats_router
+from api.chats.telegram.telegram_routes import router as telegram_router
 from api.chats.websocket import router as chats_ws_router
 from api.cheques.routers import router as cheques_router
 from api.contracts.routers import router as contracts_router
@@ -362,6 +363,7 @@ app.include_router(chats_ws_router)
 # app.include_router(rabbitmq_health_router)
 app.include_router(avito_router)
 app.include_router(avito_default_webhook_router)
+app.include_router(telegram_router)
 
 
 # @app.get("/api/v1/openapi.json", include_in_schema=False)

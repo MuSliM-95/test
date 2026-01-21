@@ -35,16 +35,12 @@ class MarketplaceQrService(BaseMarketplaceService):
                 nomenclature.c.description_short,
                 nomenclature.c.description_long,
                 nomenclature.c.code,
-                nomenclature.c.geo_point,
-                nomenclature.c.city,
                 nomenclature.c.cashbox,
-                nomenclature.c.public,
                 nomenclature.c.production_time_min_from,
                 nomenclature.c.production_time_min_to,
             ).where(
                 and_(
                     nomenclature.c.id == nomenclature_db.nomenclature_id,
-                    nomenclature.c.public == True,
                     nomenclature.c.is_deleted == False,
                 )
             )
@@ -61,7 +57,7 @@ class MarketplaceQrService(BaseMarketplaceService):
                 )
                 .where(
                     and_(
-                        prices.c.nomenclature == nomenclature_db.id,
+                        prices.c.nomenclature == nomenclature_db.nomenclature_id,
                         price_types.c.name == "chatting",
                     )
                 )
@@ -104,7 +100,6 @@ class MarketplaceQrService(BaseMarketplaceService):
             ).where(
                 and_(
                     warehouses.c.id == warehouse_db.warehouses_id,
-                    warehouses.c.is_public == True,
                     warehouses.c.is_deleted.is_not(True),
                 )
             )

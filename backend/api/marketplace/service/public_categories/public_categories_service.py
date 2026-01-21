@@ -18,7 +18,7 @@ from database.db import (
     prices,
 )
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 S3_BUCKET_NAME = "5075293c-docs_generated"
 S3_FOLDER = "photos"
@@ -59,6 +59,19 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         """
         Рекурсивно получает все ID категорий (включая саму категорию и все дочерние).
         """
+        # Проверяем, существует ли категория
+        category = await database.fetch_one(
+            select(global_categories).where(global_categories.c.id == category_id)
+        )
+
+        if not category:
+            print(f"WARNING: Category with ID {category_id} does not exist")
+            return []
+
+        if not category.get("is_active"):
+            print(f"WARNING: Category with ID {category_id} is not active")
+            # Все равно возвращаем ID, так как может быть нужно найти товары даже для неактивных категорий
+
         all_ids = [category_id]
 
         # Получаем прямых детей
@@ -82,14 +95,13 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
     @staticmethod
     async def _check_category_has_products(category_id: int) -> bool:
         """
-        Проверяет, есть ли актуальные товары в категории.
-        Актуальные товары - это товары с:
+        Проверяет, есть ли актуальные товары в категории для маркетплейса.
+        Актуальные товары - это ТОЛЬКО товары с:
         - is_deleted != True
-        - price_type = "chatting" (если есть цены)
+        - price_type = "chatting" (обязательно!)
         - global_category_id = category_id (или в дочерних категориях)
 
-        Если у товара нет цены с price_type="chatting", но есть global_category_id,
-        товар все равно считается актуальным для категории.
+        Товары БЕЗ цены "chatting" НЕ считаются актуальными для маркетплейса.
         """
         from sqlalchemy import and_
 
@@ -104,7 +116,8 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         if not all_category_ids:
             return False
 
-        # Сначала проверяем товары с price_type = "chatting" (приоритет)
+        # Проверяем ТОЛЬКО товары с price_type = "chatting"
+        # Товары без цены "chatting" не учитываются для маркетплейса
         try:
             products_with_chatting_query = (
                 select(func.count(func.distinct(nomenclature.c.id)))
@@ -124,23 +137,7 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
                 )
             )
             count_with_chatting = await database.fetch_val(products_with_chatting_query)
-            if count_with_chatting and count_with_chatting > 0:
-                return True
-        except Exception:
-            pass
-
-        # Если товаров с chatting нет, проверяем любые товары в категории
-        # (товары могут быть без цен или с другими типами цен)
-        try:
-            any_products_query = select(func.count(nomenclature.c.id)).where(
-                and_(
-                    nomenclature.c.global_category_id.is_not(None),
-                    nomenclature.c.global_category_id.in_(all_category_ids),
-                    nomenclature.c.is_deleted.is_not(True),
-                )
-            )
-            count_any = await database.fetch_val(any_products_query)
-            return count_any > 0 if count_any else False
+            return count_with_chatting > 0 if count_with_chatting else False
         except Exception:
             # В случае ошибки возвращаем False, чтобы не ломать вывод категорий
             return False
@@ -258,23 +255,34 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
 
                 # Если фильтрация включена, проверяем:
                 # - есть ли товары в самой категории (has_products=True)
-                # - или есть ли дочерние категории с товарами
+                # - или есть ли дочерние категории с товарами (рекурсивно)
                 if only_with_products:
                     has_products = category_dict.get("has_products", False)
-                    has_children_with_products = len(children) > 0
+
+                    # Рекурсивно проверяем, есть ли дочерние категории с товарами
+                    # Если у дочерней категории has_products=True или есть свои дочерние с товарами
+                    def has_any_products_in_children(children_list):
+                        for child in children_list:
+                            if child.get("has_products", False):
+                                return True
+                            if child.get("children"):
+                                if has_any_products_in_children(child["children"]):
+                                    return True
+                        return False
+
+                    has_children_with_products = has_any_products_in_children(children)
 
                     if not has_products and not has_children_with_products:
-                        # Пропускаем категории без товаров и без дочерних категорий
+                        # Пропускаем категории без товаров и без дочерних категорий с товарами
                         continue
 
                 result.append(category_dict)
         return result
 
     async def get_global_categories_tree(self, only_with_products: bool = False):
-        # Если фильтрация включена, используем поле has_products из БД
+        # Всегда загружаем все активные категории
+        # При only_with_products=true фильтруем через build_global_hierarchy после пересчета has_products
         conditions = [global_categories.c.is_active.is_(True)]
-        if only_with_products:
-            conditions.append(global_categories.c.has_products.is_(True))
 
         query = (
             select(global_categories)
@@ -284,14 +292,12 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         categories_db = await database.fetch_all(query)
         categories_db = [*map(serialize_datetime_fields, categories_db)]
 
-        # Используем поле has_products из БД (если есть), иначе вычисляем
-        for category in categories_db:
-            # Если поле уже есть в БД, используем его
-            if "has_products" in category and category["has_products"] is not None:
-                # Поле уже загружено из БД
-                pass
-            else:
-                # Вычисляем динамически (fallback для старых данных или если поле не обновлено)
+        # Пересчитываем has_products динамически ТОЛЬКО когда это реально нужно:
+        # - при only_with_products=True (когда фронт просит показать только категории с товарами)
+        # Для админских форм (only_with_products=False) используем значение из БД,
+        # чтобы не делать N дополнительных запросов и не тормозить загрузку дерева.
+        if only_with_products:
+            for category in categories_db:
                 try:
                     category["has_products"] = await self._check_category_has_products(
                         category["id"]
@@ -323,6 +329,35 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
             count = count_result.count_1
 
         return {"result": tree, "count": count}
+
+    def _convert_to_tree_select_format(self, tree_data):
+        """
+        Преобразует дерево категорий в формат для Ant Design TreeSelect.
+        TreeSelect ожидает: [{ title: string, value: string|number, children: [...] }]
+        """
+        result = []
+        for item in tree_data:
+            node = {
+                "title": item.get("name", ""),
+                "value": item.get("id"),
+            }
+            if item.get("children"):
+                node["children"] = self._convert_to_tree_select_format(item["children"])
+            result.append(node)
+        return result
+
+    async def get_global_categories_tree_for_select(
+        self, only_with_products: bool = False
+    ):
+        """
+        Возвращает дерево категорий в формате для Ant Design TreeSelect.
+        Формат: [{ title: string, value: number, children: [...] }]
+        """
+        tree_data = await self.get_global_categories_tree(
+            only_with_products=only_with_products
+        )
+        tree_select_data = self._convert_to_tree_select_format(tree_data["result"])
+        return {"result": tree_select_data, "count": tree_data["count"]}
 
     async def get_global_category(self, category_id: int):
         query = select(global_categories).where(
@@ -375,10 +410,24 @@ class MarketplacePublicCategoriesService(BaseMarketplaceService):
         return category_dict
 
     async def create_global_category(self, category: GlobalCategoryCreate):
-        insert_query = global_categories.insert().values(
-            **category.dict(exclude={"model_config"})
-        )
+        # Проверяем наличие товаров для новой категории
+        category_dict = category.dict(exclude={"model_config"})
+        category_id_for_check = None  # Пока ID нет, проверим после создания
+
+        insert_query = global_categories.insert().values(**category_dict)
         new_category_id = await database.execute(insert_query)
+
+        # Проверяем наличие товаров и обновляем has_products
+        has_products = await self._check_category_has_products(new_category_id)
+        if not has_products:
+            # Устанавливаем has_products = false для новой категории без товаров
+            update_query = (
+                update(global_categories)
+                .where(global_categories.c.id == new_category_id)
+                .values(has_products=False)
+            )
+            await database.execute(update_query)
+
         created_category_query = select(global_categories).where(
             global_categories.c.id == new_category_id
         )

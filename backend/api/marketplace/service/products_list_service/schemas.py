@@ -141,6 +141,7 @@ class MarketplaceProductsRequest(BaseModel):
     seo_description: Optional[str] = None
     seo_keywords: Optional[str] = None
     nomenclature_attributes: Optional[str] = None
+    global_category_id: Optional[int] = None
 
 
 product_buttons_text: dict[str, dict[str, str]] = {

@@ -1,6 +1,8 @@
+import logging
 from datetime import datetime
 from typing import Optional
 
+import asyncpg
 from api.marketplace.service.base_marketplace_service import BaseMarketplaceService
 from api.marketplace.service.orders_service.schemas import MarketplaceOrderGood
 from api.marketplace.service.product_cart_service.schemas import (
@@ -14,10 +16,13 @@ from database.db import (
     database,
     marketplace_cart_goods,
     marketplace_carts,
+    marketplace_clients_list,
     nomenclature,
 )
 from fastapi import HTTPException
 from sqlalchemy import and_, delete, select, update
+
+logger = logging.getLogger(__name__)
 
 
 class MarketplaceCartService(BaseMarketplaceService):
@@ -35,8 +40,16 @@ class MarketplaceCartService(BaseMarketplaceService):
         """
 
         phone = request.contragent_phone
+        print(
+            f"[ADD TO CART] Request: phone={phone}, nomenclature_id={request.good.nomenclature_id}, warehouse_id={request.good.warehouse_id}, quantity={request.good.quantity}"
+        )
+        logger.info(
+            f"[ADD TO CART] Request: phone={phone}, nomenclature_id={request.good.nomenclature_id}, warehouse_id={request.good.warehouse_id}, quantity={request.good.quantity}"
+        )
 
-        await self._ensure_marketplace_client(phone)
+        client_id = await self._ensure_marketplace_client(phone)
+        print(f"[ADD TO CART] Client ID: {client_id}")
+        logger.info(f"[ADD TO CART] Client ID: {client_id}")
 
         product_query = select(nomenclature.c.id).where(
             and_(
@@ -46,27 +59,46 @@ class MarketplaceCartService(BaseMarketplaceService):
         )
         product = await database.fetch_one(product_query)
         if not product:
+            logger.warning(
+                f"[ADD TO CART] Product not found: nomenclature_id={request.good.nomenclature_id}"
+            )
             raise HTTPException(
                 status_code=404, detail="Товар не найден или не доступен"
             )
 
-        cart_id = await self._get_or_create_cart(phone)
+        cart_id = await self._get_or_create_cart(client_id, phone)
+        print(f"[ADD TO CART] Cart ID: {cart_id}")
+        logger.info(f"[ADD TO CART] Cart ID: {cart_id}")
 
         existing_item = await self._get_cart_item(
             cart_id=cart_id,
             nomenclature_id=request.good.nomenclature_id,
             warehouse_id=request.good.warehouse_id,
         )
+        print(f"[ADD TO CART] Existing item: {existing_item}")
 
         if existing_item:
             new_quantity = existing_item.quantity + request.good.quantity
+            print(
+                f"[ADD TO CART] Updating existing item: id={existing_item.id}, old_quantity={existing_item.quantity}, new_quantity={new_quantity}"
+            )
+            logger.info(
+                f"[ADD TO CART] Updating existing item: id={existing_item.id}, old_quantity={existing_item.quantity}, new_quantity={new_quantity}"
+            )
             upd = (
                 update(marketplace_cart_goods)
                 .where(marketplace_cart_goods.c.id == existing_item.id)
                 .values(quantity=new_quantity, updated_at=datetime.utcnow())
             )
             await database.execute(upd)
+            print("[ADD TO CART] Update executed")
         else:
+            print(
+                f"[ADD TO CART] Inserting new item: nomenclature_id={request.good.nomenclature_id}, warehouse_id={request.good.warehouse_id}, quantity={request.good.quantity}"
+            )
+            logger.info(
+                f"[ADD TO CART] Inserting new item: nomenclature_id={request.good.nomenclature_id}, warehouse_id={request.good.warehouse_id}, quantity={request.good.quantity}"
+            )
             ins = marketplace_cart_goods.insert().values(
                 nomenclature_id=request.good.nomenclature_id,
                 warehouse_id=request.good.warehouse_id,
@@ -74,6 +106,7 @@ class MarketplaceCartService(BaseMarketplaceService):
                 cart_id=cart_id,
             )
             await database.execute(ins)
+            print("[ADD TO CART] Insert executed")
 
         await database.execute(
             update(marketplace_carts)
@@ -81,7 +114,14 @@ class MarketplaceCartService(BaseMarketplaceService):
             .values(updated_at=datetime.utcnow())
         )
 
-        return await self.get_cart(MarketplaceGetCartRequest(contragent_phone=phone))
+        result = await self.get_cart(MarketplaceGetCartRequest(contragent_phone=phone))
+        print(
+            f"[ADD TO CART] Result: total_count={result.total_count}, goods_count={len(result.goods)}"
+        )
+        logger.info(
+            f"[ADD TO CART] Result: total_count={result.total_count}, goods_count={len(result.goods)}"
+        )
+        return result
 
     async def get_cart(
         self, request: MarketplaceGetCartRequest
@@ -89,13 +129,54 @@ class MarketplaceCartService(BaseMarketplaceService):
         """Получить содержимое корзины по номеру телефона."""
 
         phone = request.contragent_phone
+        print(f"[GET CART] Request: phone={phone}")
 
-        cart_query = select(marketplace_carts.c.id).where(
-            marketplace_carts.c.phone == phone
+        # Получаем client_id по phone
+        client_query = select(marketplace_clients_list.c.id).where(
+            marketplace_clients_list.c.phone == phone
         )
+        client = await database.fetch_one(client_query)
+        if client:
+            print(f"[GET CART] Client found: id={client.id}")
+        else:
+            print("[GET CART] Client not found")
+
+        if not client:
+            return MarketplaceCartResponse(
+                contragent_phone=phone,
+                goods=[],
+                total_count=0,
+            )
+
+        # Сначала ищем по client_id
+        cart_query = select(
+            marketplace_carts.c.id,
+            marketplace_carts.c.client_id,
+            marketplace_carts.c.phone,
+        ).where(marketplace_carts.c.client_id == client.id)
         cart = await database.fetch_one(cart_query)
 
+        # Если не нашли по client_id, ищем по phone
         if not cart:
+            print(
+                f"[GET CART] Cart not found by client_id={client.id}, trying by phone={phone}"
+            )
+            cart_query = select(
+                marketplace_carts.c.id,
+                marketplace_carts.c.client_id,
+                marketplace_carts.c.phone,
+            ).where(marketplace_carts.c.phone == phone)
+            cart = await database.fetch_one(cart_query)
+
+        if cart:
+            print(
+                f"[GET CART] Cart found: id={cart.id}, client_id={cart.client_id}, phone={cart.phone}"
+            )
+        else:
+            print(f"[GET CART] Cart not found for client_id={client.id}, phone={phone}")
+
+        if not cart:
+            print("[GET CART] Cart not found")
             return MarketplaceCartResponse(
                 contragent_phone=phone,
                 goods=[],
@@ -112,6 +193,7 @@ class MarketplaceCartService(BaseMarketplaceService):
         ).where(marketplace_cart_goods.c.cart_id == cart.id)
 
         items = await database.fetch_all(items_query)
+        print(f"[GET CART] Items found: {len(items)}")
 
         goods = [
             MarketplaceOrderGood(
@@ -122,6 +204,9 @@ class MarketplaceCartService(BaseMarketplaceService):
             for item in items
         ]
 
+        print(
+            f"[GET CART] Returning: total_count={len(items)}, goods_count={len(goods)}"
+        )
         return MarketplaceCartResponse(
             contragent_phone=phone,
             goods=goods,
@@ -140,8 +225,20 @@ class MarketplaceCartService(BaseMarketplaceService):
 
         phone = request.contragent_phone
 
+        # Получаем client_id по phone
+        client_query = select(marketplace_clients_list.c.id).where(
+            marketplace_clients_list.c.phone == phone
+        )
+        client = await database.fetch_one(client_query)
+        if not client:
+            raise HTTPException(
+                status_code=404, detail="Client not found for this phone"
+            )
+
         cart = await database.fetch_one(
-            select(marketplace_carts.c.id).where(marketplace_carts.c.phone == phone)
+            select(marketplace_carts.c.id).where(
+                marketplace_carts.c.client_id == client.id
+            )
         )
         if not cart:
             raise HTTPException(status_code=404, detail="Cart not found for this phone")
@@ -176,16 +273,67 @@ class MarketplaceCartService(BaseMarketplaceService):
         return await self.get_cart(MarketplaceGetCartRequest(contragent_phone=phone))
 
     @staticmethod
-    async def _get_or_create_cart(phone: str) -> int:
-        """Получить существующую корзину по phone или создать новую."""
+    async def _get_or_create_cart(client_id: int, phone: str) -> int:
+        """Получить существующую корзину по client_id или создать новую."""
+        # Сначала проверяем по client_id (основной способ)
         cart = await database.fetch_one(
-            select(marketplace_carts.c.id).where(marketplace_carts.c.phone == phone)
+            select(marketplace_carts.c.id).where(
+                marketplace_carts.c.client_id == client_id
+            )
         )
         if cart:
             return cart.id
 
-        cart_id = await database.execute(marketplace_carts.insert().values(phone=phone))
-        return cart_id
+        # Если корзины нет по client_id, проверяем по phone
+        # (на случай если корзина была создана раньше с другим client_id)
+        cart_by_phone = await database.fetch_one(
+            select(marketplace_carts.c.id).where(marketplace_carts.c.phone == phone)
+        )
+        if cart_by_phone:
+            # Если найдена корзина по phone, обновляем её client_id только если он отличается
+            # Но сначала проверяем, нет ли уже другой корзины с таким client_id
+            existing_cart_by_client = await database.fetch_one(
+                select(marketplace_carts.c.id).where(
+                    marketplace_carts.c.client_id == client_id
+                )
+            )
+            if not existing_cart_by_client:
+                # Обновляем client_id только если нет конфликта
+                try:
+                    await database.execute(
+                        update(marketplace_carts)
+                        .where(marketplace_carts.c.id == cart_by_phone.id)
+                        .values(client_id=client_id)
+                    )
+                except asyncpg.exceptions.UniqueViolationError:
+                    # Если возник конфликт (например, другой client_id уже использует этот cart), просто возвращаем найденную корзину
+                    pass
+            return cart_by_phone.id
+
+        # Пытаемся создать новую корзину
+        try:
+            cart_id = await database.execute(
+                marketplace_carts.insert().values(client_id=client_id, phone=phone)
+            )
+            return cart_id
+        except asyncpg.exceptions.UniqueViolationError:
+            # Если все еще возник конфликт (race condition), получаем существующую корзину
+            cart_final = await database.fetch_one(
+                select(marketplace_carts.c.id).where(marketplace_carts.c.phone == phone)
+            )
+            if cart_final:
+                return cart_final.id
+            # Если не найдена корзина по phone, пробуем по client_id
+            cart_by_client_final = await database.fetch_one(
+                select(marketplace_carts.c.id).where(
+                    marketplace_carts.c.client_id == client_id
+                )
+            )
+            if cart_by_client_final:
+                return cart_by_client_final.id
+            raise HTTPException(
+                status_code=500, detail="Failed to create or retrieve cart"
+            )
 
     @staticmethod
     async def _get_cart_item(
@@ -209,4 +357,4 @@ class MarketplaceCartService(BaseMarketplaceService):
         if not row:
             return None
 
-        return MarketplaceCartGoodRepresentation.from_orm(row)
+        return MarketplaceCartGoodRepresentation(**dict(row))

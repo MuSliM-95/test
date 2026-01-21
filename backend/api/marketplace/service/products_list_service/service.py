@@ -13,6 +13,9 @@ from api.marketplace.service.products_list_service.schemas import (
     MarketplaceSort,
     product_buttons_text,
 )
+from api.marketplace.service.public_categories.public_categories_service import (
+    MarketplacePublicCategoriesService,
+)
 from common.utils.url_helper import get_app_url_for_environment
 from database.db import (
     categories,
@@ -798,6 +801,16 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
         if request.nomenclature_attributes:
             conditions.append(nomenclature.c.id == attrs_subquery.c.nomenclature_id)
+
+        if request.global_category_id:
+            # Получаем все ID категорий (включая дочерние) рекурсивно
+            all_category_ids = await MarketplacePublicCategoriesService._get_all_category_ids_recursive(
+                request.global_category_id
+            )
+            if all_category_ids:
+                conditions.append(
+                    nomenclature.c.global_category_id.in_(all_category_ids)
+                )
 
         query = query.where(and_(*conditions))
 
