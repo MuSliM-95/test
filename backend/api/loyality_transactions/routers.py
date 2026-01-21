@@ -116,17 +116,27 @@ async def get_transactions(
     limit: int = 100,
     offset: int = 0,
     filters_q: schemas.LoyalityTranstactionFilters = Depends(),
+    sort: str = "id:desc",
 ):
     """Получение списка транзакций"""
     user = await get_user_by_token(token)
     filters = get_filters_transactions(loyality_transactions, filters_q)
+
+    order_column = desc(loyality_transactions.c.id)
+    if sort:
+        sort_field, _, sort_direction = sort.partition(":")
+        column = getattr(loyality_transactions.c, sort_field, None)
+        if column is not None:
+            sort_direction = sort_direction.lower() or "asc"
+            order_column = column.desc() if sort_direction == "desc" else column.asc()
+
     query = (
         loyality_transactions.select()
         .where(
             loyality_transactions.c.cashbox == user.cashbox_id,
             loyality_transactions.c.is_deleted.is_not(True),
         )
-        .order_by(desc(loyality_transactions.c.id))
+        .order_by(order_column)
     )
     count_query = select(func.count(loyality_transactions.c.id)).where(
         loyality_transactions.c.cashbox == user.cashbox_id,

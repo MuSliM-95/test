@@ -18,6 +18,8 @@ class LoyalityTranstactionFilters(BaseModel):
     status: Optional[bool]
 
     # autoburned: Optional[bool]
+    updated_at__gte: Optional[int] = None
+    updated_at__lte: Optional[int] = None
 
 
 class LoyalityTranstactionType(str, Enum):

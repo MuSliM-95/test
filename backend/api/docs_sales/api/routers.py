@@ -3,6 +3,7 @@ import calendar
 import datetime
 import hashlib
 import os
+from collections import defaultdict
 from typing import Any, Dict, Optional, Union
 
 from api.docs_sales import schemas
@@ -75,6 +76,7 @@ from database.db import (
     docs_sales_tags,
     docs_warehouse,
     entity_to_entity,
+    fifo_settings,
     loyality_cards,
     loyality_transactions,
     nomenclature,
@@ -82,6 +84,7 @@ from database.db import (
     payments,
     pboxes,
     price_types,
+    units,
     users,
     users_cboxes_relation,
     warehouse_balances,
@@ -102,7 +105,7 @@ from functions.helpers import (
 )
 from functions.users import raschet
 from producer import queue_notification
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 from ws_manager import manager
 
 router = APIRouter(tags=["docs_sales"])
@@ -864,25 +867,303 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
     updated_ids = set()
     exceptions = []
 
-    count_query = select(func.count(docs_sales.c.id)).where(
-        docs_sales.c.cashbox == user.cashbox_id, docs_sales.c.is_deleted.is_(False)
-    )
+    clients_ids = {i.client for i in docs_sales_data.__root__ if i.client is not None}
+    contragent_ids = {
+        i.contragent for i in docs_sales_data.__root__ if i.contragent is not None
+    }
+    contract_ids = {
+        i.contract for i in docs_sales_data.__root__ if i.contract is not None
+    }
+    organization_ids = {
+        i.organization for i in docs_sales_data.__root__ if i.organization is not None
+    }
+    warehouse_ids = {
+        i.warehouse for i in docs_sales_data.__root__ if i.warehouse is not None
+    }
+    sales_manager_ids = {
+        i.sales_manager for i in docs_sales_data.__root__ if i.sales_manager is not None
+    }
+    loyalty_card_ids = {
+        i.loyality_card_id
+        for i in docs_sales_data.__root__
+        if i.loyality_card_id is not None
+    }
+    goods_nomenclature_ids = {
+        int(g.nomenclature)
+        for i in docs_sales_data.__root__
+        if i.goods
+        for g in i.goods
+        if g.nomenclature is not None
+    }
+    goods_price_type_ids = {
+        int(g.price_type)
+        for i in docs_sales_data.__root__
+        if i.goods
+        for g in i.goods
+        if g.price_type is not None
+    }
+    goods_unit_ids = {
+        int(g.unit)
+        for i in docs_sales_data.__root__
+        if i.goods
+        for g in i.goods
+        if g.unit is not None
+    }
+    goods_docs_ids = {
+        i.id for i in docs_sales_data.__root__ if i.goods and i.id is not None
+    }
 
-    count_docs_sales = await database.fetch_val(count_query, column=0)
+    contragent_ids_total = clients_ids | contragent_ids
 
-    for index, instance_values in enumerate(
-        docs_sales_data.dict(exclude_unset=True)["__root__"]
+    found_contragents = set()
+    if contragent_ids_total:
+        q_contragents = (
+            select(contragents.c.id)
+            .where(
+                contragents.c.id.in_(contragent_ids_total),
+                contragents.c.cashbox == user.cashbox_id,
+            )
+            .with_only_columns([contragents.c.id])
+        )
+        found_contragents = {row.id for row in await database.fetch_all(q_contragents)}
+        contragents_cache.update(found_contragents)
+
+    found_contracts = set()
+    if contract_ids:
+        q_contracts = select(contracts.c.id).where(
+            contracts.c.id.in_(contract_ids),
+            contracts.c.cashbox == user.cashbox_id,
+            contracts.c.is_deleted == False,
+        )
+        found_contracts = {row.id for row in await database.fetch_all(q_contracts)}
+        contracts_cache.update(found_contracts)
+
+    found_organizations = set()
+    if organization_ids:
+        q_orgs = select(organizations.c.id).where(
+            organizations.c.id.in_(organization_ids),
+            organizations.c.cashbox == user.cashbox_id,
+            organizations.c.is_deleted == False,
+        )
+        found_organizations = {row.id for row in await database.fetch_all(q_orgs)}
+        organizations_cache.update(found_organizations)
+
+    found_warehouses = set()
+    if warehouse_ids:
+        q_warehouses = select(warehouses.c.id).where(
+            warehouses.c.id.in_(warehouse_ids),
+            warehouses.c.cashbox == user.cashbox_id,
+            warehouses.c.is_deleted == False,
+        )
+        found_warehouses = {row.id for row in await database.fetch_all(q_warehouses)}
+        warehouses_cache.update(found_warehouses)
+
+    found_users = set()
+    if sales_manager_ids:
+        q_users = (
+            select(users_cboxes_relation.c.id)
+            .where(
+                users_cboxes_relation.c.id.in_(sales_manager_ids),
+                users_cboxes_relation.c.cashbox_id == user.cashbox_id,
+            )
+            .with_only_columns([users_cboxes_relation.c.id])
+        )
+        found_users = {row.id for row in await database.fetch_all(q_users)}
+        users_cache.update(found_users)
+
+    found_price_types = set()
+    if goods_price_type_ids:
+        q_price_types = select(price_types.c.id).where(
+            price_types.c.id.in_(goods_price_type_ids)
+        )
+        found_price_types = {row.id for row in await database.fetch_all(q_price_types)}
+        price_types_cache.update(found_price_types)
+
+    found_units = set()
+    if goods_unit_ids:
+        q_units = select(units.c.id).where(units.c.id.in_(goods_unit_ids))
+        found_units = {row.id for row in await database.fetch_all(q_units)}
+        units_cache.update(found_units)
+
+    loyalty_cards_map: Dict[int, Any] = {}
+    found_loyalty_cards = set()
+    if loyalty_card_ids:
+        q_loyalty_cards = select(
+            loyality_cards.c.id,
+            loyality_cards.c.card_number,
+            loyality_cards.c.balance,
+            loyality_cards.c.cashback_percent,
+        ).where(
+            loyality_cards.c.id.in_(loyalty_card_ids),
+            loyality_cards.c.cashbox_id == user.cashbox_id,
+            loyality_cards.c.is_deleted == False,
+        )
+        loyalty_cards_rows = await database.fetch_all(q_loyalty_cards)
+        found_loyalty_cards = {row.id for row in loyalty_cards_rows}
+        loyalty_cards_map = {row.id: row for row in loyalty_cards_rows}
+
+    nomenclature_map: Dict[int, Any] = {}
+    if goods_nomenclature_ids:
+        nom_rows = await database.fetch_all(
+            select(
+                nomenclature.c.id,
+                nomenclature.c.cashback_type,
+                nomenclature.c.cashback_value,
+                nomenclature.c.type,
+            ).where(nomenclature.c.id.in_(goods_nomenclature_ids))
+        )
+        nomenclature_map = {row.id: row for row in nom_rows}
+
+    missing_contragents = contragent_ids_total - found_contragents
+    missing_contracts = contract_ids - found_contracts
+    missing_organizations = organization_ids - found_organizations
+    missing_warehouses = warehouse_ids - found_warehouses
+    missing_users = sales_manager_ids - found_users
+    missing_price_types = goods_price_type_ids - found_price_types
+    missing_units = goods_unit_ids - found_units
+    missing_loyalty_cards = loyalty_card_ids - found_loyalty_cards
+
+    if (
+        missing_contragents
+        or missing_contracts
+        or missing_organizations
+        or missing_warehouses
+        or missing_users
+        or missing_price_types
+        or missing_units
+        or missing_loyalty_cards
     ):
-        if not await check_period_blocked(
-            instance_values["organization"], instance_values.get("dated"), exceptions
-        ):
-            continue
+        errors = []
+        if missing_contragents:
+            errors.append(f"contragents: {sorted(missing_contragents)}")
+        if missing_contracts:
+            errors.append(f"contracts: {sorted(missing_contracts)}")
+        if missing_organizations:
+            errors.append(f"organizations: {sorted(missing_organizations)}")
+        if missing_warehouses:
+            errors.append(f"warehouses: {sorted(missing_warehouses)}")
+        if missing_users:
+            errors.append(f"users: {sorted(missing_users)}")
+        if missing_price_types:
+            errors.append(f"price_types: {sorted(missing_price_types)}")
+        if missing_units:
+            errors.append(f"units: {sorted(missing_units)}")
+        if missing_loyalty_cards:
+            errors.append(f"loyality_cards: {sorted(missing_loyalty_cards)}")
+        raise HTTPException(
+            400,
+            "Не найдены связанные сущности перед обновлением docs_sales: "
+            + "; ".join(errors),
+        )
 
-        if not await check_foreign_keys(instance_values, user, exceptions):
-            continue
+    conds = []
+    for d in docs_sales_data.__root__:
+        if d.dated is not None:
+            conds.append(
+                and_(
+                    fifo_settings.c.organization_id == d.organization,
+                    fifo_settings.c.blocked_date >= d.dated,
+                )
+            )
+    if conds:
+        blocked = await database.fetch_all(
+            select(fifo_settings.c.organization_id, fifo_settings.c.blocked_date).where(
+                or_(*conds)
+            )
+        )
+        if blocked:
+            bad_orgs = {b.organization_id for b in blocked}
+            raise HTTPException(
+                400,
+                f"Период закрыт для организаций: {', '.join(map(str, bad_orgs))}",
+            )
 
-        # if instance_values.get("number") is None:
-        #     instance_values["number"] = str(count_docs_sales + index + 1)
+    paybox_default = None
+    paybox_row = await database.fetch_one(
+        pboxes.select().where(pboxes.c.cashbox == user.cashbox_id)
+    )
+    if paybox_row:
+        paybox_default = paybox_row.id
+
+    payload_ids = [inst.id for inst in docs_sales_data.__root__ if inst.id is not None]
+    ids_with_settings = set()
+    settings_map: Dict[int, Optional[int]] = {}
+    if payload_ids:
+        settings_q = select(docs_sales.c.id, docs_sales.c.settings).where(
+            docs_sales.c.id.in_(payload_ids), docs_sales.c.settings.is_not(None)
+        )
+        settings_rows = await database.fetch_all(settings_q)
+        ids_with_settings = {row.id for row in settings_rows}
+        settings_map = {row.id: row.settings for row in settings_rows}
+
+    proxies_by_from_id: Dict[int, list] = defaultdict(list)
+    if payload_ids:
+        proxy_query = entity_to_entity.select().where(
+            entity_to_entity.c.cashbox_id == user.cashbox_id,
+            entity_to_entity.c.from_id.in_(payload_ids),
+        )
+        proxy_rows = await database.fetch_all(proxy_query)
+        for proxy in proxy_rows:
+            proxies_by_from_id[proxy.from_id].append(proxy)
+    loyalty_proxy_ids = {
+        proxy.to_id
+        for proxies in proxies_by_from_id.values()
+        for proxy in proxies
+        if proxy.to_entity == 6
+    }
+    loyalty_transactions_map: Dict[int, Any] = {}
+    if loyalty_proxy_ids:
+        loyalty_tx_rows = await database.fetch_all(
+            select(loyality_transactions.c.id, loyality_transactions.c.type).where(
+                loyality_transactions.c.id.in_(loyalty_proxy_ids),
+                loyality_transactions.c.cashbox == user.cashbox_id,
+                loyality_transactions.c.status == True,
+                loyality_transactions.c.is_deleted == False,
+            )
+        )
+        loyalty_transactions_map = {row.id: row for row in loyalty_tx_rows}
+
+    doc_warehouse_map: Dict[int, Any] = {}
+
+    if goods_docs_ids:
+        latest_doc_wh = (
+            select(
+                func.max(docs_warehouse.c.id).label("id"),
+                docs_warehouse.c.docs_sales_id,
+            )
+            .where(docs_warehouse.c.docs_sales_id.in_(goods_docs_ids))
+            .group_by(docs_warehouse.c.docs_sales_id)
+        ).subquery()
+
+        doc_warehouse_rows = await database.fetch_all(
+            select(docs_warehouse.c.id, docs_warehouse.c.docs_sales_id).where(
+                docs_warehouse.c.id.in_(select(latest_doc_wh.c.id))
+            )
+        )
+        doc_warehouse_map = {row.docs_sales_id: row for row in doc_warehouse_rows}
+
+    # Массовое добавление/обновление настроек
+    settings_to_update: Dict[int, Dict[str, Any]] = {}
+    settings_to_add: Dict[int, Dict[str, Any]] = {}
+    # Массовое обновление/создание платежей
+    payments_to_update: list[dict[str, Any]] = []
+    payments_to_add: list[dict[str, Any]] = []
+    # Массовое обновление транзакций лояльности
+    loyalty_transactions_to_update: list[dict[str, Any]] = []
+    loyalty_transactions_to_insert: list[dict[str, Any]] = []
+    loyalty_transactions_doc_ids: list[int] = []
+    cards_for_bonus: set[int] = set()
+    docs_sales_updates: list[dict[str, Any]] = []
+    docs_update_keys: set[str] = set()
+    docs_goods_to_delete: set[int] = set()
+    docs_goods_to_insert: list[dict[str, Any]] = []
+    doc_sum_updates: list[dict[str, Any]] = []
+    warehouse_balance_pending: list[dict[str, Any]] = []
+    warehouse_balances_to_insert: list[dict[str, Any]] = []
+    warehouse_updates_payload: list[dict[str, Any]] = []
+
+    for index, instance in enumerate(docs_sales_data.__root__):
+        instance_values = instance.dict(exclude_unset=True)
 
         goods: Union[list, None] = instance_values.pop("goods", None)
 
@@ -892,274 +1173,210 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
 
         paybox = instance_values.pop("paybox", None)
         if paybox is None:
-            paybox_q = pboxes.select().where(
-                pboxes.c.cashbox == user.cashbox_id,
-                pboxes.c.deleted_at.is_(None),
-            )
-            paybox = await database.fetch_one(paybox_q)
-            if paybox:
-                paybox = paybox.id
+            paybox = paybox_default
 
         instance_id_db = instance_values["id"]
 
         settings: Optional[Dict[str, Any]] = instance_values.pop("settings", None)
-        if await exists_settings_docs_sales(instance_id_db):
-            await update_settings_docs_sales(instance_id_db, settings)
-        else:
-            instance_values["settings"] = await add_settings_docs_sales(settings)
+        if settings:
+            if instance_id_db in ids_with_settings:
+                settings_to_update[instance_id_db] = settings
+            else:
+                settings_to_add[instance_id_db] = settings
 
         if paid_rubles or paid_lt or lt:
-            query = entity_to_entity.select().where(
-                entity_to_entity.c.cashbox_id == user.cashbox_id,
-                entity_to_entity.c.from_id == instance_values["id"],
-            )
-            proxyes = await database.fetch_all(query)
+            proxyes = proxies_by_from_id.get(instance_values["id"], [])
 
             proxy_payment = False
-            proxy_lt = False
+            existing_withdraw_id = None
+            existing_accrual_id = None
 
             for proxy in proxyes:
                 if proxy.from_entity == 7:
                     # Платеж
-
                     if proxy.to_entity == 5:
-                        q_payment = (
-                            payments.update()
-                            .where(
-                                payments.c.id == proxy.to_id,
-                                payments.c.cashbox == user.cashbox_id,
-                                payments.c.status == True,
-                                payments.c.is_deleted == False,
-                            )
-                            .values(
-                                {
-                                    "amount": paid_rubles,
-                                    "amount_without_tax": paid_rubles,
-                                }
-                            )
-                        )
-                        await database.execute(q_payment)
-                        proxy_payment = True
-
-                    # Транзакция
-                    if proxy.to_entity == 6:
-                        q_trans = (
-                            loyality_transactions.update()
-                            .where(
-                                loyality_transactions.c.id == proxy.to_id,
-                                loyality_transactions.c.cashbox == user.cashbox_id,
-                                loyality_transactions.c.status == True,
-                                loyality_transactions.c.is_deleted == False,
-                            )
-                            .values({"amount": paid_lt})
-                        )
-                        await database.execute(q_trans)
-                        proxy_lt = True
-
-            if not proxy_payment:
-                rubles_body = {
-                    "contragent": instance_values["contragent"],
-                    "type": "outgoing",
-                    "name": f"Оплата по документу {instance_values['number']}",
-                    "amount_without_tax": instance_values.get("paid_rubles"),
-                    "amount": instance_values.get("paid_rubles"),
-                    "paybox": paybox,
-                    "tags": instance_values.get("tags", ""),
-                    "date": int(datetime.datetime.now().timestamp()),
-                    "account": user.user,
-                    "cashbox": user.cashbox_id,
-                    "is_deleted": False,
-                    "created_at": int(datetime.datetime.now().timestamp()),
-                    "updated_at": int(datetime.datetime.now().timestamp()),
-                    "status": True,
-                    "stopped": True,
-                    "docs_sales_id": instance_id_db,
-                }
-                payment_id = await database.execute(
-                    payments.insert().values(rubles_body)
-                )
-
-                await database.execute(
-                    entity_to_entity.insert().values(
-                        {
-                            "from_entity": 7,
-                            "to_entity": 5,
-                            "cashbox_id": user.cashbox_id,
-                            "type": "docs_sales_payments",
-                            "from_id": instance_id_db,
-                            "to_id": payment_id,
-                            "status": True,
-                            "delinked": False,
-                        }
-                    )
-                )
-
-                if lt:
-                    lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
-                    lcard = await database.fetch_one(lcard_q)
-                    rubles_body = {
-                        "loyality_card_id": lt,
-                        "loyality_card_number": lcard.card_number,
-                        "type": "accrual",
-                        "name": f"Кешбек по документу {instance_values['number']}",
-                        "amount": round(
-                            (paid_rubles * (lcard.cashback_value / 100)), 2
-                        ),
-                        "created_by_id": user.id,
-                        "card_balance": lcard.balance,
-                        "tags": instance_values.get("tags", ""),
-                        "dated": datetime.datetime.now(),
-                        "cashbox": user.cashbox_id,
-                        "is_deleted": False,
-                        "created_at": datetime.datetime.now(),
-                        "updated_at": datetime.datetime.now(),
-                        "status": True,
-                    }
-                    lt_id = await database.execute(
-                        loyality_transactions.insert().values(rubles_body)
-                    )
-                    await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
-
-                await asyncio.gather(asyncio.create_task(raschet(user, token)))
-
-            if lt and not proxy_lt:
-                if paid_lt > 0:
-                    paybox_q = loyality_cards.select().where(loyality_cards.c.id == lt)
-                    payboxes = await database.fetch_one(paybox_q)
-                    lcard_q = loyality_cards.select().where(loyality_cards.c.id == lt)
-                    lcard = await database.fetch_one(lcard_q)
-
-                    rubles_body = {
-                        "loyality_card_id": lt,
-                        "loyality_card_number": payboxes.card_number,
-                        "type": "withdraw",
-                        "name": f"Оплата по документу {instance_values['number']}",
-                        "amount": paid_lt,
-                        "created_by_id": user.id,
-                        "tags": instance_values.get("tags", ""),
-                        "dated": datetime.datetime.now(),
-                        "card_balance": lcard.balance,
-                        "cashbox": user.cashbox_id,
-                        "is_deleted": False,
-                        "created_at": datetime.datetime.now(),
-                        "updated_at": datetime.datetime.now(),
-                        "status": True,
-                    }
-                    lt_id = await database.execute(
-                        loyality_transactions.insert().values(rubles_body)
-                    )
-
-                    await database.execute(
-                        entity_to_entity.insert().values(
+                        payments_to_update.append(
                             {
-                                "from_entity": 7,
-                                "to_entity": 6,
-                                "cashbox_id": user.cashbox_id,
-                                "type": "docs_sales_loyality_transactions",
-                                "from_id": instance_id_db,
-                                "to_id": lt_id,
-                                "status": True,
-                                "delinked": False,
+                                "payment_id": proxy.to_id,
+                                "amount": paid_rubles,
+                                "amount_without_tax": paid_rubles,
                             }
                         )
-                    )
+                        proxy_payment = True
+                    # Транзакция
+                    if proxy.to_entity == 6:
+                        txn = loyalty_transactions_map.get(proxy.to_id)
+                        if txn:
+                            if txn.type == "withdraw":
+                                existing_withdraw_id = txn.id
+                            else:
+                                existing_accrual_id = txn.id
 
-                    await asyncio.gather(asyncio.create_task(raschet_bonuses(lt)))
+            full_payment = float(paid_rubles) + float(paid_lt)
+            cashback_sum = 0.0
+            if lt and goods:
+                share_rubles = paid_rubles / full_payment if full_payment else 0
+                lcard_row = loyalty_cards_map.get(lt)
+                card_percent = (lcard_row.cashback_percent or 0) if lcard_row else 0
+                for item in goods:
+                    nom_id = int(item["nomenclature"])
+                    nom = nomenclature_map.get(nom_id)
+                    if not nom:
+                        continue
+                    if nom.cashback_type == NomenclatureCashbackType.no_cashback:
+                        continue
+                    elif nom.cashback_type == NomenclatureCashbackType.percent:
+                        current_percent = (
+                            item["price"]
+                            * item["quantity"]
+                            * (nom.cashback_value / 100)
+                        )
+                        cashback_sum += share_rubles * current_percent
+                    elif nom.cashback_type == NomenclatureCashbackType.const:
+                        cashback_sum += item["quantity"] * nom.cashback_value
+                    elif nom.cashback_type == NomenclatureCashbackType.lcard_cashback:
+                        current_percent = (
+                            item["price"] * item["quantity"] * (card_percent / 100)
+                        )
+                        cashback_sum += share_rubles * current_percent
+                    else:
+                        current_percent = (
+                            item["price"] * item["quantity"] * (card_percent / 100)
+                        )
+                        cashback_sum += share_rubles * current_percent
+
+            if not proxy_payment:
+                payments_to_add.append(
+                    {
+                        "contragent": instance_values["contragent"],
+                        "type": "outgoing",
+                        "name": f"Оплата по документу {instance_values['number']}",
+                        "amount_without_tax": instance_values.get("paid_rubles"),
+                        "amount": instance_values.get("paid_rubles"),
+                        "paybox": paybox,
+                        "tags": instance_values.get("tags", ""),
+                        "date": int(datetime.datetime.now().timestamp()),
+                        "account": user.user,
+                        "cashbox": user.cashbox_id,
+                        "is_deleted": False,
+                        "created_at": int(datetime.datetime.now().timestamp()),
+                        "updated_at": int(datetime.datetime.now().timestamp()),
+                        "status": True,
+                        "stopped": True,
+                        "docs_sales_id": instance_id_db,
+                    }
+                )
+
+            withdraw_amount = paid_lt if lt and paid_lt > 0 else 0
+            if withdraw_amount:
+                lcard = loyalty_cards_map.get(lt)
+                if not lcard:
+                    raise HTTPException(
+                        400, f"Карта лояльности {lt} не найдена перед списанием"
+                    )
+                if existing_withdraw_id:
+                    loyalty_transactions_to_update.append(
+                        {
+                            "transaction_id": existing_withdraw_id,
+                            "amount": withdraw_amount,
+                        }
+                    )
+                else:
+                    loyalty_transactions_to_insert.append(
+                        {
+                            "loyality_card_id": lt,
+                            "loyality_card_number": lcard.card_number,
+                            "type": "withdraw",
+                            "name": f"Оплата по документу {instance_values['number']}",
+                            "amount": withdraw_amount,
+                            "created_by_id": user.id,
+                            "tags": instance_values.get("tags", ""),
+                            "dated": datetime.datetime.utcnow(),
+                            "card_balance": lcard.balance,
+                            "cashbox": user.cashbox_id,
+                            "is_deleted": False,
+                            "created_at": datetime.datetime.utcnow(),
+                            "updated_at": datetime.datetime.utcnow(),
+                            "status": True,
+                        }
+                    )
+                    loyalty_transactions_doc_ids.append(instance_id_db)
+                cards_for_bonus.add(lt)
+
+            if lt and cashback_sum > 0:
+                lcard = loyalty_cards_map.get(lt)
+                if not lcard:
+                    raise HTTPException(
+                        400, f"Карта лояльности {lt} не найдена перед начислением"
+                    )
+                if existing_accrual_id:
+                    loyalty_transactions_to_update.append(
+                        {
+                            "transaction_id": existing_accrual_id,
+                            "amount": round(cashback_sum, 2),
+                        }
+                    )
+                else:
+                    loyalty_transactions_to_insert.append(
+                        {
+                            "loyality_card_id": lt,
+                            "loyality_card_number": lcard.card_number,
+                            "type": "accrual",
+                            "name": f"Кешбек по документу {instance_values['number']}",
+                            "amount": round(cashback_sum, 2),
+                            "created_by_id": user.id,
+                            "card_balance": lcard.balance,
+                            "tags": instance_values.get("tags", ""),
+                            "dated": datetime.datetime.utcnow(),
+                            "cashbox": user.cashbox_id,
+                            "is_deleted": False,
+                            "created_at": datetime.datetime.utcnow(),
+                            "updated_at": datetime.datetime.utcnow(),
+                            "status": True,
+                        }
+                    )
+                    loyalty_transactions_doc_ids.append(instance_id_db)
+                cards_for_bonus.add(lt)
 
         if instance_values.get("paid_rubles"):
             del instance_values["paid_rubles"]
 
-        query = (
-            docs_sales.update()
-            .where(docs_sales.c.id == instance_values["id"])
-            .values(instance_values)
-        )
-        await database.execute(query)
+        update_payload = dict(instance_values)
+        docs_update_keys.update(set(update_payload.keys()) - {"id"})
+        docs_sales_updates.append(update_payload)
+
         instance_id = instance_values["id"]
-        updated_ids.add(instance_id)
+        updated_ids.add(instance_values["id"])
+
         if goods:
-            query = docs_sales_goods.delete().where(
-                docs_sales_goods.c.docs_sales_id == instance_id
-            )
-            await database.execute(query)
             items_sum = 0
             for item in goods:
-                item["docs_sales_id"] = instance_id
 
-                if item.get("price_type") is not None:
-                    if item["price_type"] not in price_types_cache:
-                        try:
-                            await check_entity_exists(
-                                price_types, item["price_type"], user.id
-                            )
-                            price_types_cache.add(item["price_type"])
-                        except HTTPException as e:
-                            exceptions.append(str(item) + " " + e.detail)
-                            continue
-                if item.get("unit") is not None:
-                    if item["unit"] not in units_cache:
-                        try:
-                            await check_unit_exists(item["unit"])
-                            units_cache.add(item["unit"])
-                        except HTTPException as e:
-                            exceptions.append(str(item) + " " + e.detail)
-                            continue
+                item["docs_sales_id"] = instance_id
                 item["nomenclature"] = int(item["nomenclature"])
-                query = docs_sales_goods.insert().values(item)
-                await database.execute(query)
+                docs_goods_to_insert.append(item)
+
                 items_sum += item["price"] * item["quantity"]
                 if instance_values.get("warehouse") is not None:
-                    query = (
-                        warehouse_balances.select()
-                        .where(
-                            warehouse_balances.c.warehouse_id
-                            == instance_values["warehouse"],
-                            warehouse_balances.c.nomenclature_id
-                            == item["nomenclature"],
-                        )
-                        .order_by(desc(warehouse_balances.c.created_at))
-                    )
-                    last_warehouse_balance = await database.fetch_one(query)
-                    warehouse_amount = (
-                        last_warehouse_balance.current_amount
-                        if last_warehouse_balance
-                        else 0
-                    )
-
-                    query = warehouse_balances.insert().values(
+                    warehouse_balance_pending.append(
                         {
                             "organization_id": instance_values["organization"],
                             "warehouse_id": instance_values["warehouse"],
                             "nomenclature_id": item["nomenclature"],
                             "document_sale_id": instance_id,
                             "outgoing_amount": item["quantity"],
-                            "current_amount": warehouse_amount - item["quantity"],
-                            "cashbox_id": user.cashbox_id,
                         }
                     )
-                    await database.execute(query)
 
-            query = (
-                docs_sales.update()
-                .where(docs_sales.c.id == instance_id)
-                .values({"sum": round(items_sum, 2)})
-            )
-            await database.execute(query)
+            docs_goods_to_delete.add(instance_id)
+            doc_sum_updates.append({"id": instance_id, "sum": round(items_sum, 2)})
 
-            doc_warehouse = await database.fetch_one(
-                docs_warehouse.select()
-                .where(docs_warehouse.c.docs_sales_id == instance_id)
-                .order_by(desc(docs_warehouse.c.id))
-            )
+            doc_warehouse = doc_warehouse_map.get(instance_id)
 
             goods_res = []
             for good in goods:
-                nomenclature_db = await database.fetch_one(
-                    nomenclature.select().where(
-                        nomenclature.c.id == good["nomenclature"]
-                    )
-                )
-                if nomenclature_db.type == "product":
+                nomenclature_db = nomenclature_map.get(int(good["nomenclature"]))
+                if nomenclature_db and nomenclature_db.type == "product":
                     goods_res.append(
                         {
                             "price_type": 1,
@@ -1189,7 +1406,234 @@ async def update(token: str, docs_sales_data: schemas.EditMass):
                 ]
             )
 
-            await update_warehouse_doc(token, body)
+            warehouse_updates_payload.extend(body.__root__)
+
+    if warehouse_balance_pending:
+        balance_pairs = {
+            (row["warehouse_id"], row["nomenclature_id"])
+            for row in warehouse_balance_pending
+        }
+        balance_conditions = [
+            and_(
+                warehouse_balances.c.warehouse_id == wh,
+                warehouse_balances.c.nomenclature_id == nom,
+            )
+            for wh, nom in balance_pairs
+        ]
+        latest_map: Dict[tuple[int, int], float] = {}
+        if balance_conditions:
+            subq = (
+                select(
+                    warehouse_balances.c.warehouse_id,
+                    warehouse_balances.c.nomenclature_id,
+                    warehouse_balances.c.current_amount,
+                    func.row_number()
+                    .over(
+                        partition_by=(
+                            warehouse_balances.c.warehouse_id,
+                            warehouse_balances.c.nomenclature_id,
+                        ),
+                        order_by=warehouse_balances.c.created_at.desc(),
+                    )
+                    .label("rn"),
+                ).where(
+                    warehouse_balances.c.cashbox_id == user.cashbox_id,
+                    or_(*balance_conditions),
+                )
+            ).subquery()
+
+            latest_rows = await database.fetch_all(select(subq).where(subq.c.rn == 1))
+            latest_map = {
+                (row.warehouse_id, row.nomenclature_id): row.current_amount
+                for row in latest_rows
+            }
+
+        running_balance = dict(latest_map)
+        for row in warehouse_balance_pending:
+            key = (row["warehouse_id"], row["nomenclature_id"])
+            prev_amount = running_balance.get(key, 0)
+            current_amount = prev_amount - row["outgoing_amount"]
+            running_balance[key] = current_amount
+            warehouse_balances_to_insert.append(
+                {
+                    "organization_id": row["organization_id"],
+                    "warehouse_id": row["warehouse_id"],
+                    "nomenclature_id": row["nomenclature_id"],
+                    "document_sale_id": row["document_sale_id"],
+                    "outgoing_amount": row["outgoing_amount"],
+                    "current_amount": current_amount,
+                    "cashbox_id": user.cashbox_id,
+                }
+            )
+
+    new_payment_links: list[dict[str, Any]] = []
+    if payments_to_add:
+        payments_insert_query = (
+            payments.insert()
+            .values(payments_to_add)
+            .returning(payments.c.id, payments.c.docs_sales_id)
+        )
+        inserted_payments = await database.fetch_all(payments_insert_query)
+        for row in inserted_payments:
+            new_payment_links.append(
+                {
+                    "from_entity": 7,
+                    "to_entity": 5,
+                    "cashbox_id": user.cashbox_id,
+                    "type": "docs_sales_payments",
+                    "from_id": row.docs_sales_id,
+                    "to_id": row.id,
+                    "status": True,
+                    "delinked": False,
+                }
+            )
+
+    if new_payment_links:
+        await database.execute_many(entity_to_entity.insert(), new_payment_links)
+
+    if docs_goods_to_delete:
+        delete_goods_query = docs_sales_goods.delete().where(
+            docs_sales_goods.c.docs_sales_id.in_(docs_goods_to_delete)
+        )
+        await database.execute(delete_goods_query)
+    if docs_goods_to_insert:
+        await database.execute_many(docs_sales_goods.insert(), docs_goods_to_insert)
+
+    if warehouse_balances_to_insert:
+        await database.execute_many(
+            warehouse_balances.insert(), warehouse_balances_to_insert
+        )
+
+    if warehouse_updates_payload:
+        await update_warehouse_doc(
+            token, WarehouseUpdate(__root__=warehouse_updates_payload)
+        )
+
+    if doc_sum_updates:
+        sum_update_query = "UPDATE docs_sales SET sum = :sum WHERE id = :id"
+        await database.execute_many(sum_update_query, doc_sum_updates)
+
+    if docs_sales_updates and docs_update_keys:
+        for row in docs_sales_updates:
+            for key in docs_update_keys:
+                row.setdefault(key, None)
+
+        update_keys = sorted(docs_update_keys)
+        set_clause = ", ".join(f"{key} = :{key}" for key in update_keys)
+        docs_update_query = f"UPDATE docs_sales SET {set_clause} WHERE id = :id"
+
+        await database.execute_many(docs_update_query, docs_sales_updates)
+
+    new_loyalty_links: list[dict[str, Any]] = []
+    if loyalty_transactions_to_insert:
+        loyalty_insert_query = (
+            loyality_transactions.insert()
+            .values(loyalty_transactions_to_insert)
+            .returning(loyality_transactions.c.id)
+        )
+        inserted_loyalty = await database.fetch_all(loyalty_insert_query)
+        for doc_id, row in zip(loyalty_transactions_doc_ids, inserted_loyalty):
+            new_loyalty_links.append(
+                {
+                    "from_entity": 7,
+                    "to_entity": 6,
+                    "cashbox_id": user.cashbox_id,
+                    "type": "docs_sales_loyality_transactions",
+                    "from_id": doc_id,
+                    "to_id": row.id,
+                    "status": True,
+                    "delinked": False,
+                }
+            )
+
+    if new_loyalty_links:
+        await database.execute_many(entity_to_entity.insert(), new_loyalty_links)
+
+    if payments_to_update:
+        for payment_row in payments_to_update:
+            payment_row["cashbox"] = user.cashbox_id
+        payments_update_query = (
+            "UPDATE payments "
+            "SET amount = :amount, amount_without_tax = :amount_without_tax "
+            "WHERE id = :payment_id AND cashbox = :cashbox AND status = TRUE AND is_deleted = FALSE"
+        )
+        await database.execute_many(payments_update_query, payments_to_update)
+
+    await asyncio.gather(asyncio.create_task(raschet(user, token)))
+
+    if loyalty_transactions_to_update:
+        for txn_row in loyalty_transactions_to_update:
+            txn_row["cashbox"] = user.cashbox_id
+        loyalty_update_query = (
+            "UPDATE loyality_transactions "
+            "SET amount = :amount "
+            "WHERE id = :transaction_id AND cashbox = :cashbox AND status = TRUE AND is_deleted = FALSE"
+        )
+        await database.execute_many(
+            loyalty_update_query, loyalty_transactions_to_update
+        )
+
+    if cards_for_bonus:
+        await asyncio.gather(
+            *[
+                asyncio.create_task(raschet_bonuses(card_id))
+                for card_id in cards_for_bonus
+            ]
+        )
+
+    settings_keys = [
+        "repeatability_period",
+        "repeatability_value",
+        "date_next_created",
+        "transfer_from_weekends",
+        "skip_current_month",
+        "repeatability_count",
+        "default_payment_status",
+        "repeatability_tags",
+        "repeatability_status",
+    ]
+    if settings_to_add:
+        doc_ids_add = []
+        settings_values = []
+        for doc_id, settings in settings_to_add.items():
+            doc_ids_add.append(doc_id)
+            settings_values.append({key: settings.get(key) for key in settings_keys})
+
+        insert_settings_query = (
+            docs_sales_settings.insert()
+            .values(settings_values)
+            .returning(docs_sales_settings.c.id)
+        )
+        inserted_rows = await database.fetch_all(insert_settings_query)
+
+        rows_update = []
+        for doc_id, row in zip(doc_ids_add, inserted_rows):
+            if not row:
+                continue
+            rows_update.append({"doc_id": doc_id, "settings_id": row.id})
+
+        if rows_update:
+            update_new_settings = (
+                "UPDATE docs_sales SET settings = :settings_id WHERE id = :doc_id"
+            )
+            await database.execute_many(update_new_settings, rows_update)
+
+    if settings_to_update:
+        values = []
+        for doc_id, settings in settings_to_update.items():
+            settings_id = settings_map.get(doc_id)
+            if not settings_id:
+                continue
+            row = {"settings_id": settings_id}
+            for key in settings_keys:
+                row[key] = settings.get(key)
+            values.append(row)
+        if values:
+            set_clause = ", ".join(f"{key} = :{key}" for key in settings_keys)
+            update_query = (
+                f"UPDATE docs_sales_settings SET {set_clause} WHERE id = :settings_id"
+            )
+            await database.execute_many(update_query, values)
 
     query = docs_sales.select().where(docs_sales.c.id.in_(updated_ids))
     docs_sales_db = await database.fetch_all(query)

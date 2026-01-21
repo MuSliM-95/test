@@ -224,6 +224,16 @@ def get_filters_transactions(table, filters):
 
     _periods_filter("dated")
 
+    updated_at_from = filters_dict.get("updated_at__gte")
+    if updated_at_from:
+        filters_list.append(
+            table.c.updated_at >= datetime.fromtimestamp(updated_at_from)
+        )
+
+    updated_at_to = filters_dict.get("updated_at__lte")
+    if updated_at_to:
+        filters_list.append(table.c.updated_at <= datetime.fromtimestamp(updated_at_to))
+
     for filter, value in filters_dict.items():
         if filter == "type":
             if value:

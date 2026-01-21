@@ -54,6 +54,7 @@ async def new_organization(token: str, organization: schemas.OrganizationCreate)
     organization_values = organization.dict()
     organization_values["owner"] = user.id
     organization_values["cashbox"] = user.cashbox_id
+    organization_values["is_deleted"] = False
 
     query = organizations.insert().values(organization_values)
     organization_id = await database.execute(query)

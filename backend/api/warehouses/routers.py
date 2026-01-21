@@ -144,6 +144,7 @@ async def new_warehouse(token: str, warehouses_data: schemas.WarehouseCreateMass
                     ),
                     "latitude": structured_geo.latitude,
                     "longitude": structured_geo.longitude,
+                    "is_deleted": False,
                 }
             )
 
