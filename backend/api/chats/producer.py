@@ -38,6 +38,12 @@ class ChatUserDisconnectedEventModel(BaseModelMessage):
     timestamp: str
 
 
+class ChatNewChatEventModel(BaseModelMessage):
+    chat_id: int
+    cashbox_id: int
+    timestamp: str
+
+
 class ChatMessageProducer:
     """Producer для отправки сообщений чатов в RabbitMQ"""
 
@@ -127,6 +133,24 @@ class ChatMessageProducer:
             )
 
         except Exception as e:
+            pass
+
+    async def send_new_chat_event(self, chat_id: int, cashbox_id: int):
+        """Отправить событие нового чата в очередь"""
+        try:
+            rabbit_messaging: IRabbitMessaging = await ioc.get(IRabbitFactory)()
+
+            event = ChatNewChatEventModel(
+                message_id=uuid.uuid4(),
+                chat_id=chat_id,
+                cashbox_id=cashbox_id,
+                timestamp=datetime.utcnow().isoformat(),
+            )
+
+            await rabbit_messaging.publish(
+                message=event, routing_key="chat.events.new_chat"
+            )
+        except Exception:
             pass
 
 

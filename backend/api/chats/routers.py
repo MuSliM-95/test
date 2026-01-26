@@ -4,6 +4,7 @@ from typing import Optional
 
 from api.chats import crud
 from api.chats.auth import get_current_user, get_current_user_owner
+from api.chats.producer import chat_producer
 from api.chats.schemas import (
     ChainClientRequest,
     ChannelCreate,
@@ -17,9 +18,10 @@ from api.chats.schemas import (
     MessageResponse,
     MessagesList,
 )
+from api.chats.telegram.telegram_handler import refresh_telegram_avatar
 from api.chats.websocket import chat_manager
 from common.utils.url_helper import get_app_url_for_environment
-from database.db import chat_messages, database, pictures
+from database.db import chat_contacts, chat_messages, database, pictures
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import and_, select, update
 
@@ -91,6 +93,82 @@ def _parse_data_url(data_url: str):
     return base64.b64decode(encoded), content_type
 
 
+def _is_placeholder_content(content: Optional[str]) -> bool:
+    if not content:
+        return False
+    normalized = content.strip().lower()
+    if normalized.startswith("[file"):
+        return True
+    if normalized.startswith("[doc"):
+        return True
+    if normalized.startswith("[document"):
+        return True
+    if normalized.startswith("[image"):
+        return True
+    return normalized in {
+        "[photo]",
+        "[document]",
+        "[doc]",
+        "[file]",
+        "[image]",
+        "[video]",
+        "[voice]",
+        "[message]",
+        "photo",
+        "file",
+        "doc",
+        "image",
+        "document",
+        "video",
+        "voice",
+        "message",
+        "документ",
+        "фото",
+        "видео",
+        "голосовое",
+        "сообщение",
+    }
+
+
+async def _refresh_telegram_avatar_for_chat(chat: dict) -> None:
+    if not chat or chat.get("channel_type") != "TELEGRAM":
+        return
+    contact = chat.get("contact") or {}
+    if contact.get("avatar"):
+        return
+    contact_id = chat.get("chat_contact_id")
+    if not contact_id:
+        return
+
+    contact_row = await database.fetch_one(
+        chat_contacts.select().where(chat_contacts.c.id == contact_id)
+    )
+    if not contact_row:
+        return
+
+    external_contact_id = contact_row.get("external_contact_id")
+    if not external_contact_id:
+        external_contact_id = chat.get("external_chat_id")
+    if not external_contact_id:
+        return
+
+    avatar_url = await refresh_telegram_avatar(
+        channel_id=chat.get("channel_id"),
+        cashbox_id=chat.get("cashbox_id"),
+        external_contact_id=external_contact_id,
+    )
+    if not avatar_url:
+        return
+
+    await database.execute(
+        chat_contacts.update()
+        .where(chat_contacts.c.id == contact_id)
+        .values(avatar=avatar_url, updated_at=datetime.utcnow())
+    )
+    contact["avatar"] = avatar_url
+    chat["contact"] = contact
+
+
 def _normalize_telegram_file_url(file_url: str) -> str:
     if not file_url:
         return file_url
@@ -108,6 +186,8 @@ def _normalize_telegram_file_url(file_url: str) -> str:
             return file_url
         if host in file_url:
             normalized = file_url.split(host, 1)[-1].lstrip("/")
+            if normalized.startswith(host):
+                normalized = normalized.split(host, 1)[-1].lstrip("/")
             if normalized.startswith("api/v1/photos/"):
                 return f"{scheme}://{host}/{normalized}"
             if normalized.startswith("photos/") or normalized.startswith(
@@ -205,6 +285,13 @@ async def get_chat(chat_id: int, token: str, user=Depends(get_current_user)):
     if chat["cashbox_id"] != user.cashbox_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    try:
+        await _refresh_telegram_avatar_for_chat(chat)
+    except Exception as exc:
+        logger.warning(
+            "Failed to refresh Telegram avatar for chat %s: %s", chat_id, exc
+        )
+
     return chat
 
 
@@ -240,7 +327,7 @@ async def get_chats(
     limit: int = 100,
     user=Depends(get_current_user),
 ):
-    return await crud.get_chats(
+    chats = await crud.get_chats(
         cashbox_id=user.cashbox_id,
         channel_id=channel_id,
         contragent_id=contragent_id,
@@ -255,6 +342,16 @@ async def get_chats(
         skip=skip,
         limit=limit,
     )
+    for chat in chats:
+        try:
+            await _refresh_telegram_avatar_for_chat(chat)
+        except Exception as exc:
+            logger.warning(
+                "Failed to refresh Telegram avatar for chat %s: %s",
+                chat.get("id"),
+                exc,
+            )
+    return chats
 
 
 @router.post("/messages/", response_model=MessageResponse)
@@ -858,6 +955,50 @@ async def create_message(
                         pass
         except Exception as e:
             logger.error(f"Error sending message to Avito: {e}")
+
+    try:
+        preview_url = None
+        if message.image_url:
+            preview_url = message.image_url
+        elif message.files:
+            preview_url = message.files[0]
+
+        if preview_url and isinstance(preview_url, str):
+            if not preview_url.startswith("data:"):
+                preview_url = _normalize_telegram_file_url(preview_url)
+            else:
+                preview_url = None
+
+        if _is_placeholder_content(db_message.get("content")) and preview_url:
+            await crud.update_message(db_message["id"], content=preview_url)
+            db_message["content"] = preview_url
+
+        await chat_producer.send_message(
+            chat["id"],
+            {
+                "message_id": db_message["id"],
+                "chat_id": chat["id"],
+                "sender_type": db_message["sender_type"],
+                "content": db_message.get("content") or "",
+                "message_type": db_message.get("message_type") or "TEXT",
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+        if db_message_text:
+            await chat_producer.send_message(
+                chat["id"],
+                {
+                    "message_id": db_message_text["id"],
+                    "chat_id": chat["id"],
+                    "sender_type": db_message_text["sender_type"],
+                    "content": db_message_text.get("content") or "",
+                    "message_type": db_message_text.get("message_type") or "TEXT",
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
+            )
+    except Exception as e:
+        logger.warning(f"Failed to publish chat message event: {e}")
 
     return db_message
 

@@ -1,1 +1,1 @@
-TELEGRAM_SVG_ICON = "https://telegram.org/favicon.ico"
+TELEGRAM_SVG_ICON = "https://telegram.org/img/t_logo.png"

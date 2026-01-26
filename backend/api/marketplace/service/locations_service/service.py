@@ -3,6 +3,7 @@ from api.marketplace.service.locations_service.schemas import (
     LocationsListRequest,
     LocationsListResponse,
 )
+from common.geocoders.instance import geocoder
 from database.db import database, marketplace_rating_aggregates, warehouses
 from sqlalchemy import and_, func, literal_column, select
 
@@ -14,12 +15,34 @@ class MarketplaceLocationsService(BaseMarketplaceService):
         lat = request.lat
         lon = request.lon
         radius = request.radius
+        address = request.address
+        city = request.city
         page = request.page
         size = request.size
+
+        # Если переданы address или city, но нет координат - геокодируем адрес
+        if (address or city) and (lat is None or lon is None):
+            search_address = address or city
+            if search_address:
+                structured_geo = await geocoder.validate_address(
+                    search_address, limit=1
+                )
+                if (
+                    structured_geo
+                    and structured_geo.latitude
+                    and structured_geo.longitude
+                ):
+                    # Используем координаты из результата геокодирования
+                    lat = structured_geo.latitude
+                    lon = structured_geo.longitude
+                    # Если радиус не указан, используем значение по умолчанию
+                    if radius is None:
+                        radius = 20  # 20 км по умолчанию
 
         offset = (page - 1) * size
 
         # Основной запрос для получения информации о складах
+        # Показываем все публичные склады (независимо от остатков товаров)
         query = select(
             warehouses.c.id,
             warehouses.c.name,
@@ -41,14 +64,17 @@ class MarketplaceLocationsService(BaseMarketplaceService):
         )
 
         # Условия для фильтрации складов
+        # ВАЖНО: склады должны быть публичными и активными
         conditions = [
             warehouses.c.is_public.is_(True),
             warehouses.c.status.is_(True),
             warehouses.c.is_deleted.is_not(True),
+            warehouses.c.address.is_not(None),  # Адрес обязателен
         ]
 
-        # Если предоставлены координаты и радиус, добавляем фильтр по расстоянию
-        if lat is not None and lon is not None and radius is not None:
+        # Вычисляем расстояние для всех складов (если есть координаты)
+        distance_expr = None
+        if lat is not None and lon is not None:
             # Используем формулу Haversine для PostgreSQL
             # earth_radius = 6371 (км)
             distance_expr = (
@@ -62,12 +88,49 @@ class MarketplaceLocationsService(BaseMarketplaceService):
                 * 6371
             )
 
-            # Добавляем условие фильтрации по радиусу
+        # Фильтрация по местоположению
+        if city:
+            # Если передан город - всегда ищем по адресу склада
+            city_lower = city.lower().strip()
+
+            # Маппинг английских названий городов на русские
+            city_mapping = {
+                "moscow": "москва",
+                "saint petersburg": "санкт-петербург",
+                "spb": "санкт-петербург",
+                "kazan": "казань",
+                "ekaterinburg": "екатеринбург",
+                "novosibirsk": "новосибирск",
+                "nizhny novgorod": "нижний новгород",
+                "samara": "самара",
+                "omsk": "омск",
+                "rostov-on-don": "ростов-на-дону",
+                "chelyabinsk": "челябинск",
+                "ufa": "уфа",
+                "volgograd": "волгоград",
+                "perm": "пермь",
+                "krasnoyarsk": "красноярск",
+            }
+
+            # Если передан английский вариант - используем русский
+            city_ru = city_mapping.get(city_lower, city_lower)
+
+            # Ищем склады, у которых адрес содержит название города
+            # Учитываем разные варианты написания: "Москва", "г. Москва", "Москва, ул. ..." и т.д.
+            conditions.append(func.lower(warehouses.c.address).ilike(f"%{city_ru}%"))
+        elif lat is not None and lon is not None and radius is not None:
+            # Если нет города, но есть координаты - используем радиус
             conditions.append(distance_expr <= radius)
-            # Добавляем вычисляемое поле расстояния для сортировки и отображения
+
+        # Добавляем вычисляемое поле расстояния для сортировки и отображения
+        if distance_expr is not None:
             query = query.add_columns(distance_expr.label("distance"))
-            # Сортировка по расстоянию (ближайшие первыми)
-            query = query.order_by(distance_expr)
+            # Сортировка по расстоянию (ближайшие первыми), если есть координаты
+            if city:
+                # Если есть город - сортируем сначала по наличию адреса с городом, потом по расстоянию
+                query = query.order_by(distance_expr)
+            else:
+                query = query.order_by(distance_expr)
         else:
             # Если нет координат, сортируем по ID
             query = query.order_by(warehouses.c.id)

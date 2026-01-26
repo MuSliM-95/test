@@ -16,9 +16,11 @@ class MarketplaceLocation(BaseModel):
 
 
 class LocationsListRequest(BaseModel):
-    lat: Optional[float]
-    lon: Optional[float]
-    radius: Optional[float]
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    radius: Optional[float] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
     page: int = 1
     size: int = 20
 

@@ -3,6 +3,7 @@ from typing import Any, Mapping, Optional
 from aio_pika import IncomingMessage
 from api.chats.producer import (
     ChatMessageModel,
+    ChatNewChatEventModel,
     ChatTypingEventModel,
     ChatUserConnectedEventModel,
     ChatUserDisconnectedEventModel,
@@ -188,4 +189,26 @@ class ChatUserDisconnectedEventHandler(IEventHandler):
                 await cashbox_manager.broadcast_to_cashbox(cashbox_id, cashbox_message)
 
         except Exception as e:
+            raise
+
+
+class ChatNewChatEventHandler(IEventHandler):
+    """Обработчик событий создания нового чата из RabbitMQ"""
+
+    async def __call__(
+        self, event: Mapping[str, Any], message: Optional[IncomingMessage] = None
+    ):
+        try:
+            new_chat_event = ChatNewChatEventModel(**event)
+
+            cashbox_message = {
+                "type": "chat_message",
+                "event": "new_chat",
+                "chat_id": new_chat_event.chat_id,
+                "timestamp": new_chat_event.timestamp,
+            }
+            await cashbox_manager.broadcast_to_cashbox(
+                new_chat_event.cashbox_id, cashbox_message
+            )
+        except Exception:
             raise

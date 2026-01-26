@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import aioboto3
 from api.chats import crud
+from api.chats.avito.avito_factory import _decrypt_credential
 from api.chats.producer import chat_producer
 from api.chats.telegram.telegram_client import (
     answer_callback_query,
@@ -16,7 +17,14 @@ from api.chats.telegram.telegram_client import (
     get_user_profile_photos,
 )
 from common.utils.url_helper import get_app_url_for_environment
-from database.db import cboxes, chat_messages, chats, database, pictures
+from database.db import (
+    cboxes,
+    channel_credentials,
+    chat_messages,
+    chats,
+    database,
+    pictures,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +57,21 @@ def _build_contact_name(user: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _build_chat_name(user: Dict[str, Any], chat_external_id: str) -> str:
+def _build_chat_name(
+    user: Dict[str, Any],
+    chat_external_id: str,
+    chat_title: Optional[str] = None,
+    contact_name: Optional[str] = None,
+) -> str:
+    if chat_title:
+        return chat_title
+    if contact_name:
+        return contact_name
     username = user.get("username")
     if username:
-        return f"Telegram @{username} ({chat_external_id})"
-    return f"Telegram {chat_external_id}"
+        return username
+    short_id = chat_external_id[:8] if chat_external_id else "unknown"
+    return f"Telegram Chat {short_id}"
 
 
 def _normalize_app_url(app_url: Optional[str]) -> Optional[str]:
@@ -80,6 +98,41 @@ async def _get_cashbox_owner_id(cashbox_id: int) -> Optional[int]:
     if owner_id is not None:
         _CASHBOX_OWNER_CACHE[cashbox_id] = owner_id
     return owner_id
+
+
+async def refresh_telegram_avatar(
+    channel_id: int,
+    cashbox_id: int,
+    external_contact_id: Optional[str],
+) -> Optional[str]:
+    if not external_contact_id:
+        return None
+    try:
+        user_id = int(external_contact_id)
+    except (TypeError, ValueError):
+        return None
+
+    creds = await database.fetch_one(
+        channel_credentials.select().where(
+            (channel_credentials.c.channel_id == channel_id)
+            & (channel_credentials.c.cashbox_id == cashbox_id)
+            & (channel_credentials.c.is_active.is_(True))
+        )
+    )
+    if not creds or not creds.get("api_key"):
+        return None
+
+    try:
+        bot_token = _decrypt_credential(creds["api_key"])
+    except Exception:
+        return None
+
+    return await _get_avatar_url(
+        user_id=user_id,
+        bot_token=bot_token,
+        cashbox_id=cashbox_id,
+        channel_id=channel_id,
+    )
 
 
 def _guess_extension(filename: Optional[str], mime_type: Optional[str]) -> str:
@@ -297,6 +350,7 @@ async def _ensure_chat(
                 external_contact_id=external_contact_id,
                 name=name,
                 avatar=avatar,
+                allow_name_fallback=False,
             )
         if chat_name:
             existing_meta = chat.get("metadata") or {}
@@ -327,6 +381,7 @@ async def _ensure_chat(
         name=name,
         avatar=avatar,
         metadata=metadata,
+        allow_name_fallback=False,
     )
     return chat
 
@@ -349,6 +404,10 @@ async def handle_update(
         if not chat_external_id:
             return {"success": True, "message": "No chat id"}
 
+        external_contact_id = (
+            str(user_info.get("id")) if user_info.get("id") else chat_external_id
+        )
+
         avatar_url = await _get_avatar_url(
             user_info.get("id"),
             bot_token,
@@ -357,14 +416,17 @@ async def handle_update(
         )
 
         contact_name = _build_contact_name(user_info)
-        chat_name = _build_chat_name(user_info, chat_external_id)
+        chat_name = _build_chat_name(
+            user_info,
+            chat_external_id,
+            chat_title=chat_info.get("title"),
+            contact_name=contact_name,
+        )
         chat = await _ensure_chat(
             channel_id=channel_id,
             cashbox_id=cashbox_id,
             external_chat_id=chat_external_id,
-            external_contact_id=(
-                str(user_info.get("id")) if user_info.get("id") else None
-            ),
+            external_contact_id=external_contact_id,
             name=contact_name,
             chat_name=chat_name,
             metadata={"source": "telegram", "username": user_info.get("username")},
@@ -427,6 +489,10 @@ async def handle_update(
         "chat_type": chat_info.get("type"),
     }
 
+    external_contact_id = (
+        str(user_info.get("id")) if user_info.get("id") else chat_external_id
+    )
+
     avatar_url = await _get_avatar_url(
         user_info.get("id"),
         bot_token,
@@ -435,12 +501,17 @@ async def handle_update(
     )
 
     contact_name = _build_contact_name(user_info)
-    chat_name = _build_chat_name(user_info, chat_external_id)
+    chat_name = _build_chat_name(
+        user_info,
+        chat_external_id,
+        chat_title=chat_info.get("title"),
+        contact_name=contact_name,
+    )
     chat = await _ensure_chat(
         channel_id=channel_id,
         cashbox_id=cashbox_id,
         external_chat_id=chat_external_id,
-        external_contact_id=str(user_info.get("id")) if user_info.get("id") else None,
+        external_contact_id=external_contact_id,
         name=contact_name,
         chat_name=chat_name,
         metadata=metadata,

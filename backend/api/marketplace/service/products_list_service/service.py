@@ -613,51 +613,82 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # 3) Подготовка алиаса для складов (используется в отдельном запросе для складов)
         wh_bal = warehouses.alias("wh_bal")
 
-        # --- Основной запрос по товарам ---
-        query = (
-            select(
-                nomenclature.c.id,
-                nomenclature.c.name,
-                nomenclature.c.description_short,
-                nomenclature.c.description_long,
-                nomenclature.c.code,
-                nomenclature.c.cashbox,
-                nomenclature.c.created_at,
-                nomenclature.c.updated_at,
-                nomenclature.c.tags,
-                nomenclature.c.type,
-                nomenclature.c.production_time_min_from,
-                nomenclature.c.production_time_min_to,
-                units.c.convent_national_view.label("unit_name"),
-                categories.c.name.label("category_name"),
-                manufacturers.c.name.label("manufacturer_name"),
-                active_prices_subquery.c.price,
-                price_types.c.name.label("price_type"),
-                func.coalesce(
-                    func.nullif(cboxes.c.seller_name, ""),
-                    cboxes.c.name,
-                ).label("seller_name"),
-                func.coalesce(
-                    func.nullif(cboxes.c.seller_photo, ""),
-                    users.c.photo,
-                ).label("seller_photo"),
-                cboxes.c.seller_description.label("seller_description"),
-                marketplace_rating_aggregates.c.avg_rating.label("rating"),
-                marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
-                func.array_agg(func.distinct(pictures.c.id))
-                .filter(pictures.c.id.is_not(None))
-                .label("images"),
-                func.array_agg(func.distinct(nomenclature_barcodes.c.code))
-                .filter(nomenclature_barcodes.c.code.is_not(None))
-                .label("barcodes"),
-                # суммарный остаток по всем складам (минимум 0)
-                func.coalesce(stock_subquery.c.current_amount, 0).label(
-                    "current_amount"
-                ),
-                func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
-                # Склады получаем отдельным запросом после основного - это быстрее
-                literal_column("NULL::jsonb[]").label("available_warehouses"),
+        # 4) Подзапрос для определения, есть ли у товара склад в указанном городе
+        city_warehouse_subquery = None
+        if request.city:
+            # Проверяем, есть ли у товара склад с адресом, содержащим указанный город
+            city_warehouse_subquery = (
+                select(
+                    wb_latest.c.nomenclature_id.label("nomenclature_id"),
+                    func.bool_or(
+                        func.lower(wh_bal.c.address).ilike(f"%{request.city.lower()}%")
+                    ).label("has_city_warehouse"),
+                )
+                .select_from(
+                    wb_latest.join(
+                        wh_bal,
+                        and_(
+                            wh_bal.c.id == wb_latest.c.warehouse_id,
+                            wh_bal.c.is_deleted.is_not(True),
+                        ),
+                    )
+                )
+                .where(wh_bal.c.address.is_not(None))
+                .group_by(wb_latest.c.nomenclature_id)
+                .subquery()
             )
+
+        # Приоритетная сортировка будет выполнена в Python после получения данных
+        # Это избегает проблем с типами данных в SQL
+
+        # --- Основной запрос по товарам ---
+        # Формируем список колонок для select
+        select_columns = [
+            nomenclature.c.id,
+            nomenclature.c.name,
+            nomenclature.c.description_short,
+            nomenclature.c.description_long,
+            nomenclature.c.code,
+            nomenclature.c.cashbox,
+            nomenclature.c.created_at,
+            nomenclature.c.updated_at,
+            nomenclature.c.tags,
+            nomenclature.c.type,
+            nomenclature.c.production_time_min_from,
+            nomenclature.c.production_time_min_to,
+            units.c.convent_national_view.label("unit_name"),
+            categories.c.name.label("category_name"),
+            manufacturers.c.name.label("manufacturer_name"),
+            active_prices_subquery.c.price,
+            price_types.c.name.label("price_type"),
+            func.coalesce(
+                func.nullif(cboxes.c.seller_name, ""),
+                cboxes.c.name,
+            ).label("seller_name"),
+            func.coalesce(
+                func.nullif(cboxes.c.seller_photo, ""),
+                users.c.photo,
+            ).label("seller_photo"),
+            cboxes.c.seller_description.label("seller_description"),
+            marketplace_rating_aggregates.c.avg_rating.label("rating"),
+            marketplace_rating_aggregates.c.reviews_count.label("reviews_count"),
+            func.array_agg(func.distinct(pictures.c.id))
+            .filter(pictures.c.id.is_not(None))
+            .label("images"),
+            func.array_agg(func.distinct(nomenclature_barcodes.c.code))
+            .filter(nomenclature_barcodes.c.code.is_not(None))
+            .label("barcodes"),
+            # суммарный остаток по всем складам (минимум 0)
+            func.coalesce(stock_subquery.c.current_amount, 0).label("current_amount"),
+            func.coalesce(total_sold_subquery.c.total_sold, 0).label("total_sold"),
+            # Склады получаем отдельным запросом после основного - это быстрее
+            literal_column("NULL::jsonb[]").label("available_warehouses"),
+            # Добавляем cashbox_id для определения приоритета в Python
+            nomenclature.c.cashbox.label("cashbox_id"),
+        ]
+
+        query = (
+            select(*select_columns)
             .select_from(nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, isouter=True)
             .join(categories, categories.c.id == nomenclature.c.category, isouter=True)
@@ -708,9 +739,13 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 total_sold_subquery.c.nomenclature == nomenclature.c.id,
                 isouter=True,
             )
-            # Не соединяем со складами в основном запросе - получаем их отдельно
-            # Это быстрее и избегает дублирования строк
         )
+
+        # JOIN с подзапросом города не нужен в основном запросе
+        # Будем определять город по складам после получения данных
+
+        # Не соединяем со складами в основном запросе - получаем их отдельно
+        # Это быстрее и избегает дублирования строк
 
         if request.nomenclature_attributes:
             query = query.join(
@@ -748,8 +783,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             conditions.append(
                 func.lower(cboxes.c.name).ilike(f"%{request.seller_name.lower()}%")
             )
-        if request.seller_id:
-            conditions.append(cboxes.c.id == request.seller_id)
+        # seller_id НЕ используем для фильтрации, только для приоритизации
+        # Если у селлера нет товаров - показываем все товары
+        # Фильтрация по seller_id будет выполнена только в приоритизации
         if request.seller_phone:
             conditions.append(
                 func.lower(users.c.phone_number).ilike(
@@ -831,12 +867,16 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             marketplace_rating_aggregates.c.reviews_count,
             stock_subquery.c.current_amount,
             total_sold_subquery.c.total_sold,
+            cboxes.c.id,  # Нужно для проверки seller_id в sort_priority
         ]
         query = query.group_by(*group_by_fields)
 
         # --- Сортировка ---
         order = asc if request.sort_order == "asc" else desc
 
+        # Приоритетная сортировка будет выполнена в Python после получения данных
+
+        # Затем по выбранному полю
         if request.sort_by == MarketplaceSort.price:
             query = query.order_by(order(active_prices_subquery.c.price))
         elif request.sort_by == MarketplaceSort.name:
@@ -853,11 +893,131 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             # по умолчанию — по продажам
             query = query.order_by(order(total_sold_subquery.c.total_sold))
 
-        # Пагинация
-        offset = (request.page - 1) * request.size
-        query = query.limit(request.size).offset(offset)
-
+        # Получаем все товары без пагинации для сортировки по приоритету в Python
+        # (пагинацию применим после сортировки)
         products_db = await database.fetch_all(query)
+
+        # --- Сортировка по приоритету в Python (город+селлер, город, селлер, остальные) ---
+        if request.city or request.seller_id:
+            # Получаем информацию о складах для определения города товара
+            product_ids = [row["id"] for row in products_db]
+            product_city_map = {}  # product_id -> has_city_warehouse (bool)
+
+            if request.city and product_ids:
+                # Проверяем, есть ли у товара склад в указанном городе
+                city_check_query = (
+                    select(
+                        wb_latest.c.nomenclature_id.label("nomenclature_id"),
+                        func.bool_or(
+                            func.lower(wh_bal.c.address).ilike(
+                                f"%{request.city.lower()}%"
+                            )
+                        ).label("has_city_warehouse"),
+                    )
+                    .select_from(
+                        wb_latest.join(
+                            wh_bal,
+                            and_(
+                                wh_bal.c.id == wb_latest.c.warehouse_id,
+                                wh_bal.c.is_deleted.is_not(True),
+                            ),
+                        )
+                    )
+                    .where(
+                        and_(
+                            wb_latest.c.nomenclature_id.in_(product_ids),
+                            wh_bal.c.address.is_not(None),
+                        )
+                    )
+                    .group_by(wb_latest.c.nomenclature_id)
+                )
+                city_rows = await database.fetch_all(city_check_query)
+                product_city_map = {
+                    row["nomenclature_id"]: row["has_city_warehouse"]
+                    for row in city_rows
+                }
+
+            # Проверяем, есть ли у селлера активные товары (если передан seller_id)
+            seller_has_products = True
+            if request.seller_id:
+                seller_product_ids = [
+                    row["id"]
+                    for row in products_db
+                    if (row.get("cashbox_id") or row.get("cashbox"))
+                    == request.seller_id
+                ]
+                seller_has_products = len(seller_product_ids) > 0
+
+            # Функция для определения приоритета товара
+            def get_product_priority(product_row):
+                cashbox_id = product_row.get("cashbox_id") or product_row.get("cashbox")
+                has_city = product_city_map.get(product_row["id"], False)
+                is_seller = (
+                    (cashbox_id == request.seller_id) if request.seller_id else False
+                )
+
+                # Если у селлера нет товаров - не приоритизируем по seller_id
+                if request.seller_id and not seller_has_products:
+                    is_seller = False
+
+                if has_city and is_seller:
+                    return 0  # Город + селлер
+                elif has_city:
+                    return 1  # Только город
+                elif is_seller:
+                    return 2  # Только селлер
+                else:
+                    return 3  # Остальные
+
+            # Сортируем по приоритету, затем по выбранному полю
+            products_db = list(products_db)
+            products_db.sort(key=lambda p: get_product_priority(p))
+
+            # Затем применяем обычную сортировку по выбранному полю
+            if request.sort_by == MarketplaceSort.price:
+                products_db.sort(
+                    key=lambda p: p.get("price", 0),
+                    reverse=(request.sort_order != "asc"),
+                )
+            elif request.sort_by == MarketplaceSort.name:
+                products_db.sort(
+                    key=lambda p: p.get("name", ""),
+                    reverse=(request.sort_order != "asc"),
+                )
+            elif request.sort_by == MarketplaceSort.rating:
+                products_db.sort(
+                    key=lambda p: p.get("rating") or 0,
+                    reverse=(request.sort_order != "asc"),
+                )
+            elif request.sort_by == MarketplaceSort.total_sold:
+                products_db.sort(
+                    key=lambda p: p.get("total_sold", 0),
+                    reverse=(request.sort_order != "asc"),
+                )
+            elif request.sort_by == MarketplaceSort.created_at:
+                products_db.sort(
+                    key=lambda p: p.get("created_at") or datetime.min,
+                    reverse=(request.sort_order != "asc"),
+                )
+            elif request.sort_by == MarketplaceSort.updated_at:
+                products_db.sort(
+                    key=lambda p: p.get("updated_at") or datetime.min,
+                    reverse=(request.sort_order != "asc"),
+                )
+            else:
+                # По умолчанию — по продажам
+                products_db.sort(
+                    key=lambda p: p.get("total_sold", 0),
+                    reverse=(request.sort_order != "asc"),
+                )
+
+            # Применяем пагинацию после сортировки
+            offset = (request.page - 1) * request.size
+            products_db = products_db[offset : offset + request.size]
+        else:
+            # Если нет параметров city/seller_id, применяем обычную пагинацию
+            offset = (request.page - 1) * request.size
+            products_db = products_db[offset : offset + request.size]
 
         # Получаем склады отдельным запросом только для тех товаров, которые вернулись
         # Это быстрее, чем делать это в основном запросе (избегаем дублирования строк)

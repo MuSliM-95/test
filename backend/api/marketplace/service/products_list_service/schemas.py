@@ -134,6 +134,8 @@ class MarketplaceProductsRequest(BaseModel):
     seller_id: Optional[int] = None
     seller_phone: Optional[str] = None
 
+    city: Optional[str] = None  # Город для приоритетной сортировки товаров
+
     name: Optional[str] = None
     description_long: Optional[str] = None
     id: Optional[str] = None

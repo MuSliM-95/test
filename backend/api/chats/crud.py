@@ -3,6 +3,8 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from api.chats.telegram.telegram_constants import TELEGRAM_SVG_ICON
+from common.utils.url_helper import get_app_url_for_environment
 from database.db import (
     channel_credentials,
     channels,
@@ -11,9 +13,83 @@ from database.db import (
     chats,
     contragents,
     database,
+    pictures,
 )
 from fastapi import HTTPException
 from sqlalchemy import String, and_, cast, desc, func, or_, select
+
+
+def _normalize_public_file_url(file_url: Optional[str]) -> Optional[str]:
+    if not file_url:
+        return file_url
+
+    app_url = get_app_url_for_environment()
+    if not app_url:
+        return file_url
+
+    if not app_url.startswith("http"):
+        app_url = f"https://{app_url}"
+
+    scheme, host = app_url.split("://", 1)
+
+    if file_url.startswith("http://") or file_url.startswith("https://"):
+        if "api.telegram.org/" in file_url:
+            return file_url
+        if host in file_url:
+            normalized = file_url.split(host, 1)[-1].lstrip("/")
+            if normalized.startswith(host):
+                normalized = normalized.split(host, 1)[-1].lstrip("/")
+            if normalized.startswith("api/v1/photos/"):
+                return f"{scheme}://{host}/{normalized}"
+            if normalized.startswith("photos/") or normalized.startswith(
+                "chats_files/"
+            ):
+                return f"{scheme}://{host}/api/v1/photos/{normalized}"
+        return file_url
+
+    normalized = file_url.lstrip("/")
+    if normalized.startswith("api/v1/photos/"):
+        return f"{app_url.rstrip('/')}/{normalized}"
+    if normalized.startswith("photos/") or normalized.startswith("chats_files/"):
+        return f"{app_url.rstrip('/')}/api/v1/photos/{normalized}"
+    return f"{app_url.rstrip('/')}/{normalized}"
+
+
+def _is_preview_placeholder(preview: Optional[str]) -> bool:
+    if not preview:
+        return False
+    normalized = preview.strip().lower()
+    if normalized.startswith("[file"):
+        return True
+    if normalized.startswith("[doc"):
+        return True
+    if normalized.startswith("[document"):
+        return True
+    if normalized.startswith("[image"):
+        return True
+    return normalized in {
+        "[photo]",
+        "[document]",
+        "[doc]",
+        "[file]",
+        "[image]",
+        "[video]",
+        "[voice]",
+        "[message]",
+        "photo",
+        "file",
+        "doc",
+        "image",
+        "document",
+        "video",
+        "voice",
+        "message",
+        "документ",
+        "фото",
+        "видео",
+        "голосовое",
+        "сообщение",
+    }
 
 
 async def create_channel(
@@ -310,6 +386,7 @@ async def get_or_create_chat_contact(
     email: Optional[str] = None,
     avatar: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    allow_name_fallback: bool = True,
 ) -> int:
     """
     Получить или создать chat_contact.
@@ -334,7 +411,7 @@ async def get_or_create_chat_contact(
             )
         )
 
-    if not existing and name and not phone:
+    if not existing and allow_name_fallback and name and not phone:
         existing = await database.fetch_one(
             chat_contacts.select().where(
                 (chat_contacts.c.channel_id == channel_id)
@@ -403,6 +480,7 @@ async def create_chat(
     email: Optional[str] = None,
     avatar: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    allow_name_fallback: bool = True,
 ):
     """
     Create a new chat.
@@ -416,6 +494,7 @@ async def create_chat(
             phone=phone,
             email=email,
             avatar=avatar,
+            allow_name_fallback=allow_name_fallback,
         )
 
     query = chats.insert().values(
@@ -451,24 +530,15 @@ async def create_chat(
             channel_name=channel_name,
             ad_title=ad_title,
         )
-
         try:
-            from datetime import datetime
+            from api.chats.producer import chat_producer
 
-            from api.chats.websocket import cashbox_manager
-
-            cashbox_message = {
-                "type": "chat_message",
-                "event": "new_chat",
-                "chat_id": chat_id,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            await cashbox_manager.broadcast_to_cashbox(cashbox_id, cashbox_message)
+            await chat_producer.send_new_chat_event(chat_id, cashbox_id)
         except Exception as ws_error:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to send new_chat event via websocket: {ws_error}")
+            logger.warning(f"Failed to send new_chat event: {ws_error}")
     except Exception as e:
         import logging
 
@@ -571,17 +641,53 @@ async def get_chat(chat_id: int):
     if not chat_dict.get("name"):
         chat_dict["name"] = name
 
+    if chat_dict.get("channel_type") == "TELEGRAM":
+        if chat_dict.get("channel_icon") != TELEGRAM_SVG_ICON:
+            await database.execute(
+                channels.update()
+                .where(channels.c.id == chat_dict["channel_id"])
+                .values(svg_icon=TELEGRAM_SVG_ICON, updated_at=datetime.utcnow())
+            )
+        chat_dict["channel_icon"] = TELEGRAM_SVG_ICON
+
+    if chat_dict.get("contact") and chat_dict["contact"].get("avatar"):
+        chat_dict["contact"]["avatar"] = _normalize_public_file_url(
+            chat_dict["contact"]["avatar"]
+        )
+
     last_message_query = (
-        select([chat_messages.c.content])
+        select([chat_messages.c.id, chat_messages.c.content])
         .where(chat_messages.c.chat_id == chat_id)
         .order_by(desc(chat_messages.c.created_at))
         .limit(1)
     )
     last_message = await database.fetch_one(last_message_query)
 
-    if last_message and last_message["content"]:
-        preview = last_message["content"][:100]
-        chat_dict["last_message_preview"] = preview
+    preview = None
+    last_message_id = None
+    if last_message:
+        last_message_id = last_message["id"]
+        if last_message["content"]:
+            preview = last_message["content"][:100]
+
+    if last_message_id and _is_preview_placeholder(preview):
+        last_picture = await database.fetch_one(
+            select([pictures.c.url])
+            .where(
+                and_(
+                    pictures.c.entity == "messages",
+                    pictures.c.entity_id == last_message_id,
+                    pictures.c.is_deleted.is_not(True),
+                )
+            )
+            .order_by(pictures.c.created_at.asc())
+            .limit(1)
+        )
+        if last_picture and last_picture.get("url"):
+            preview = last_picture["url"]
+
+    if preview:
+        chat_dict["last_message_preview"] = _normalize_public_file_url(preview)
     else:
         chat_dict["last_message_preview"] = None
 
@@ -810,6 +916,30 @@ async def get_chats(
         .scalar_subquery()
     )
 
+    last_message_id_subquery = (
+        select([chat_messages.c.id])
+        .where(chat_messages.c.chat_id == chats.c.id)
+        .order_by(desc(chat_messages.c.created_at))
+        .limit(1)
+        .correlate(chats)
+        .scalar_subquery()
+    )
+
+    last_picture_url_subquery = (
+        select([pictures.c.url])
+        .where(
+            and_(
+                pictures.c.entity == "messages",
+                pictures.c.entity_id == last_message_id_subquery,
+                pictures.c.is_deleted.is_not(True),
+            )
+        )
+        .order_by(pictures.c.created_at.asc())
+        .limit(1)
+        .correlate(chats)
+        .scalar_subquery()
+    )
+
     unread_count_subquery = (
         select(
             [
@@ -852,6 +982,7 @@ async def get_chats(
             chat_contacts.c.avatar.label("contact_avatar"),
             chat_contacts.c.contragent_id.label("contact_contragent_id"),
             last_msg_correlated.label("last_message_preview"),
+            last_picture_url_subquery.label("last_message_file_url"),
             func.coalesce(unread_count_subquery.c.unread_count, 0).label(
                 "unread_count"
             ),
@@ -1052,7 +1183,33 @@ async def get_chats(
                     if isinstance(value, dict):
                         name = value.get("title")
         chat_dict["metadata"] = metadata
-        chat_dict["name"] = name
+        if not chat_dict.get("name"):
+            chat_dict["name"] = name
+
+        if chat_dict.get("channel_type") == "TELEGRAM":
+            if chat_dict.get("channel_icon") != TELEGRAM_SVG_ICON:
+                await database.execute(
+                    channels.update()
+                    .where(channels.c.id == chat_dict["channel_id"])
+                    .values(svg_icon=TELEGRAM_SVG_ICON, updated_at=datetime.utcnow())
+                )
+            chat_dict["channel_icon"] = TELEGRAM_SVG_ICON
+
+        if chat_dict.get("contact") and chat_dict["contact"].get("avatar"):
+            chat_dict["contact"]["avatar"] = _normalize_public_file_url(
+                chat_dict["contact"]["avatar"]
+            )
+
+        preview = chat_dict.get("last_message_preview")
+        if _is_preview_placeholder(preview) and chat_dict.get("last_message_file_url"):
+            preview = chat_dict.get("last_message_file_url")
+
+        if preview:
+            chat_dict["last_message_preview"] = _normalize_public_file_url(preview)
+        else:
+            chat_dict["last_message_preview"] = None
+
+        chat_dict.pop("last_message_file_url", None)
 
         is_avito_chat = chat_dict.get("channel_type") == "AVITO" or (
             chat_dict.get("external_chat_id")

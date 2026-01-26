@@ -95,6 +95,12 @@ async def connect_telegram_channel(
         )
     else:
         channel_id = existing_channel["id"]
+        if existing_channel.get("svg_icon") != TELEGRAM_SVG_ICON:
+            await database.execute(
+                channels.update()
+                .where(channels.c.id == channel_id)
+                .values(svg_icon=TELEGRAM_SVG_ICON)
+            )
 
     encrypted_bot_token = _encrypt_credential(payload.bot_token)
     webhook_secret = secrets.token_urlsafe(32)

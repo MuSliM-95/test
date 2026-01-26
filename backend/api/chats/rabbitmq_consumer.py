@@ -1,11 +1,13 @@
 from api.chats.handlers import (
     ChatMessageHandler,
+    ChatNewChatEventHandler,
     ChatTypingEventHandler,
     ChatUserConnectedEventHandler,
     ChatUserDisconnectedEventHandler,
 )
 from api.chats.producer import (
     ChatMessageModel,
+    ChatNewChatEventModel,
     ChatTypingEventModel,
     ChatUserConnectedEventModel,
     ChatUserDisconnectedEventModel,
@@ -52,6 +54,10 @@ class ChatRabbitMQConsumer:
                 ChatUserDisconnectedEventModel, ChatUserDisconnectedEventHandler()
             )
 
+            await self.rabbitmq_messaging.subscribe(
+                ChatNewChatEventModel, ChatNewChatEventHandler()
+            )
+
             await self.rabbitmq_messaging.install(
                 [
                     QueueSettingsModel(queue_name="chat.messages", prefetch_count=10),
@@ -63,6 +69,9 @@ class ChatRabbitMQConsumer:
                     ),
                     QueueSettingsModel(
                         queue_name="chat.events.user_disconnected", prefetch_count=10
+                    ),
+                    QueueSettingsModel(
+                        queue_name="chat.events.new_chat", prefetch_count=10
                     ),
                 ]
             )
