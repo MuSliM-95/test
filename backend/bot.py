@@ -992,6 +992,50 @@ async def create_balance(cashbox_id, message, tariff=None):
 async def reg_user_create(message: types.Message, state: FSMContext):
     await store_user_message(message)
     if message.contact:
+        # Проверяем, не зарегистрирован ли пользователь уже
+        existing_user = await database.fetch_one(
+            users.select().where(
+                users.c.chat_id == str(message.chat.id),
+                users.c.owner_id == str(message.from_user.id),
+            )
+        )
+
+        if existing_user:
+            # Пользователь уже зарегистрирован - очищаем состояние и выходим
+            await state.clear()
+            # Генерируем токен для существующего пользователя
+            users_cbox = await database.fetch_one(
+                cboxes.select().where(cboxes.c.admin == existing_user.id)
+            )
+            if users_cbox:
+                token = await generate_new_user_access_token_for_cashbox(
+                    user_id=existing_user.id, cashbox_id=users_cbox.id
+                )
+                answer_1 = texts.change_token_1
+                answer_2 = texts.change_token_2.format(token=token, url=app_url)
+            else:
+                token = (await create_cbox(existing_user)).token
+                answer_1 = texts.create_cbox_1
+                answer_2 = texts.create_cbox_2.format(token=token, url=app_url)
+
+            msg_id = (
+                await message.answer(
+                    text=answer_1, reply_markup=types.ReplyKeyboardRemove()
+                )
+            ).message_id
+            msg_id = (
+                await message.answer(
+                    text=answer_2, reply_markup=await get_open_app_link(token)
+                )
+            ).message_id
+            await store_bot_message(
+                tg_message_id=msg_id,
+                tg_user_or_chat=str(message.chat.id),
+                from_or_to=str(bot.id),
+                body=answer_2,
+            )
+            return
+
         if (message.contact.user_id != message.from_user.id) or (
             not message.reply_to_message
         ):
