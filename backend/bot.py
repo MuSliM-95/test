@@ -1000,6 +1000,14 @@ async def reg_user_create(message: types.Message, state: FSMContext):
             )
         )
 
+        logging.info(
+            f"Registration attempt: chat_id={message.chat.id}, "
+            f"from_user_id={message.from_user.id}, "
+            f"contact_user_id={message.contact.user_id if message.contact else None}, "
+            f"existing_user={existing_user.id if existing_user else None}, "
+            f"reply_to_message={message.reply_to_message is not None}"
+        )
+
         if existing_user:
             # Пользователь уже зарегистрирован - очищаем состояние и выходим
             await state.clear()
@@ -1036,14 +1044,22 @@ async def reg_user_create(message: types.Message, state: FSMContext):
             )
             return
 
-        if (message.contact.user_id != message.from_user.id) or (
-            not message.reply_to_message
-        ):
+        # Проверяем, что контакт принадлежит пользователю
+        # Для новых пользователей не требуем reply_to_message, так как кнопка может не быть reply
+        if message.contact.user_id != message.from_user.id:
+            logging.warning(
+                f"Contact user_id mismatch: contact.user_id={message.contact.user_id}, "
+                f"from_user.id={message.from_user.id}"
+            )
             msg_id = (await message.answer(texts.get_phone_by_btn)).message_id
             await store_bot_message(
                 msg_id, str(message.chat.id), str(bot.id), texts.get_phone_by_btn
             )
             return
+
+        logging.info(
+            f"Creating new user: chat_id={message.chat.id}, phone={message.contact.phone_number}"
+        )
 
         tariff_query = tariffs.select().where(tariffs.c.actual is True)
         tariff = await database.fetch_one(tariff_query)
