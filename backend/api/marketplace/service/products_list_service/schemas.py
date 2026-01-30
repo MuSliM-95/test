@@ -33,6 +33,9 @@ class MarketplaceProduct(BaseModel):
     manufacturer_name: Optional[str] = None
     price: float
     price_type: str
+    price_address: Optional[str] = None
+    price_latitude: Optional[float] = None
+    price_longitude: Optional[float] = None
     created_at: datetime
     updated_at: datetime
     images: Optional[List[str]] = None
@@ -135,6 +138,7 @@ class MarketplaceProductsRequest(BaseModel):
     seller_phone: Optional[str] = None
 
     city: Optional[str] = None  # Город для приоритетной сортировки товаров
+    address: Optional[str] = None  # Адрес для геокодирования и выбора ближайшей цены
 
     name: Optional[str] = None
     description_long: Optional[str] = None

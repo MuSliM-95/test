@@ -198,14 +198,25 @@ def get_view_events_utm(
 
 @router.get("/products/{product_id}", response_model=MarketplaceProductDetail)
 async def get_marketplace_product(
-    product_id: int, service: MarketplaceService = Depends(get_marketplace_service)
+    product_id: int,
+    lat: Optional[float] = Query(None, description="Широта клиента"),
+    lon: Optional[float] = Query(None, description="Долгота клиента"),
+    address: Optional[str] = Query(
+        None, description="Адрес клиента для геокодирования"
+    ),
+    city: Optional[str] = Query(
+        None, description="Город клиента (для обратной совместимости)"
+    ),
+    service: MarketplaceService = Depends(get_marketplace_service),
 ):
     """
     Получить один товар маркетплейса с SEO, атрибутами и остатками по складам
     """
 
     start = time.perf_counter()
-    product = await service.get_product(product_id)
+    product = await service.get_product(
+        product_id, lat=lat, lon=lon, address=address, city=city
+    )
     end_ms = int((time.perf_counter() - start) * 1000)
 
     return product.copy(update={"processing_time_ms": end_ms})

@@ -46,7 +46,7 @@ from functions.helpers import (
     get_user_by_token,
     update_entity_hash,
 )
-from sqlalchemy import and_, case, func, insert, or_, select
+from sqlalchemy import and_, case, exists, func, insert, or_, select
 from starlette import status
 from ws_manager import manager
 
@@ -365,6 +365,14 @@ async def get_nomenclature(
     category: Optional[int] = None,
     global_category_id: Optional[int] = None,
     global_category_name: Optional[str] = None,
+    description_long: Optional[str] = None,
+    description_short: Optional[str] = None,
+    has_photos: Optional[bool] = Query(
+        None, description="Фильтр по наличию фото (true - только с фото)"
+    ),
+    chatting_percent: Optional[float] = Query(
+        None, description="Фильтр по комиссии платформы"
+    ),
     limit: int = 100,
     offset: int = 0,
     with_prices: bool = False,
@@ -502,6 +510,36 @@ async def get_nomenclature(
             isouter=False,
         )
         conditions.append(global_categories.c.name.ilike(f"%{global_category_name}%"))
+
+    if description_long:
+        conditions.append(
+            nomenclature.c.description_long.ilike(f"%{description_long}%")
+        )
+
+    if description_short:
+        conditions.append(
+            nomenclature.c.description_short.ilike(f"%{description_short}%")
+        )
+
+    if has_photos is not None:
+        # Фильтрация по наличию фото
+        if has_photos:
+            # Только товары с фото - используем EXISTS для корректной фильтрации
+            photos_exists = exists(
+                select(1).where(
+                    and_(
+                        pictures.c.entity == "nomenclature",
+                        pictures.c.entity_id == nomenclature.c.id,
+                        pictures.c.is_deleted.is_not(True),
+                    )
+                )
+            )
+            conditions.append(photos_exists)
+        # Если has_photos=False, не добавляем фильтр (показываем все)
+
+    if chatting_percent is not None:
+        # Фильтрация по комиссии платформы (точное совпадение)
+        conditions.append(nomenclature.c.chatting_percent == chatting_percent)
 
     if min_price is not None:
         conditions.append(price_subquery.c.min_price >= min_price)

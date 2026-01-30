@@ -16,6 +16,7 @@ from api.marketplace.service.products_list_service.schemas import (
 from api.marketplace.service.public_categories.public_categories_service import (
     MarketplacePublicCategoriesService,
 )
+from common.geocoders.instance import geocoder
 from common.utils.url_helper import get_app_url_for_environment
 from database.db import (
     categories,
@@ -39,7 +40,17 @@ from database.db import (
     warehouses,
 )
 from fastapi import HTTPException
-from sqlalchemy import and_, asc, desc, func, literal_column, select
+from sqlalchemy import (
+    Float,
+    and_,
+    asc,
+    desc,
+    func,
+    literal_column,
+    or_,
+    select,
+    union_all,
+)
 
 
 class MarketplaceProductsListService(BaseMarketplaceService):
@@ -70,42 +81,306 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             base_url = f"https://{base_url}"
         return f"{base_url}/api/v1/pictures/{picture_id}/content"
 
-    async def get_product(self, product_id: int) -> MarketplaceProductDetail:
+    async def get_product(
+        self,
+        product_id: int,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+        address: Optional[str] = None,
+        city: Optional[str] = None,
+    ) -> MarketplaceProductDetail:
+        # Логируем параметры запроса для отладки
+        print(
+            f"[DEBUG] get_product: lat={lat}, lon={lon}, city={city}, address={address}"
+        )
+
+        # Если переданы адрес или город, но нет координат - геокодируем адрес
+        client_lat = lat
+        client_lon = lon
+        if (client_lat is None or client_lon is None) and (city or address):
+            search_address = address or city
+            try:
+                print(f"[DEBUG] Geocoding address: {search_address}")
+                # Пробуем геокодировать как есть
+                structured_geo = await geocoder.validate_address(
+                    search_address, limit=1
+                )
+                if (
+                    structured_geo
+                    and structured_geo.latitude
+                    and structured_geo.longitude
+                ):
+                    client_lat = structured_geo.latitude
+                    client_lon = structured_geo.longitude
+                    print(
+                        f"[DEBUG] Geocoded '{search_address}' to lat={client_lat}, lon={client_lon}"
+                    )
+                else:
+                    # Если не получилось, пробуем добавить "Россия" для городов
+                    print(
+                        f"[DEBUG] First geocoding failed, address={address}, city={city}"
+                    )
+                    search_address_with_country = f"{search_address}, Россия"
+                    print(
+                        f"[DEBUG] Retrying geocoding with country: {search_address_with_country}"
+                    )
+                    structured_geo = await geocoder.validate_address(
+                        search_address_with_country, limit=1
+                    )
+                    if (
+                        structured_geo
+                        and structured_geo.latitude
+                        and structured_geo.longitude
+                    ):
+                        client_lat = structured_geo.latitude
+                        client_lon = structured_geo.longitude
+                        print(
+                            f"[DEBUG] Geocoded '{search_address_with_country}' to lat={client_lat}, lon={client_lon}"
+                        )
+                    else:
+                        print(
+                            f"[DEBUG] Failed to geocode both '{search_address}' and '{search_address_with_country}': no coordinates returned"
+                        )
+            except Exception as e:
+                print(f"[DEBUG] Failed to geocode '{search_address}': {e}")
+                import traceback
+
+                traceback.print_exc()
+
         current_timestamp = int(datetime.now().timestamp())
 
-        ranked_prices_subquery = (
-            select(
-                prices.c.nomenclature.label("nomenclature_id"),
-                prices.c.id.label("price_id"),
-                prices.c.price,
-                prices.c.price_type,
-                prices.c.created_at,
-                prices.c.date_from,
-                prices.c.date_to,
-                prices.c.is_deleted,
+        # Если есть координаты клиента, добавляем расчет расстояния
+        order_by_list = []
+
+        if client_lat is not None and client_lon is not None:
+            # Используем формулу Haversine для расчета расстояния в SQL
+            client_lat_rad = func.radians(literal_column(str(client_lat)))
+            client_lon_rad = func.radians(literal_column(str(client_lon)))
+            price_lat_rad = func.radians(func.cast(prices.c.latitude, Float))
+            price_lon_rad = func.radians(func.cast(prices.c.longitude, Float))
+
+            # Формула Haversine
+            dlat = price_lat_rad - client_lat_rad
+            dlon = price_lon_rad - client_lon_rad
+            # Используем func.pow() вместо ** для совместимости с SQLAlchemy
+            a = func.pow(
+                func.sin(dlat / literal_column("2.0")), literal_column("2.0")
+            ) + func.cos(client_lat_rad) * func.cos(price_lat_rad) * func.pow(
+                func.sin(dlon / literal_column("2.0")), literal_column("2.0")
+            )
+            # Защита от случая, когда a > 1 (из-за ошибок округления)
+            a_safe = func.least(
+                literal_column("1.0"), func.greatest(literal_column("0.0"), a)
+            )
+            c = literal_column("2.0") * func.atan2(
+                func.sqrt(a_safe), func.sqrt(literal_column("1.0") - a_safe)
+            )
+            distance_km = literal_column("6371.0") * c
+
+            # Приоритет: сначала цены с координатами (ближайшие), потом без координат
+            distance_for_sort = func.coalesce(
+                distance_km,
+                literal_column("999999.0"),
+            )
+
+            order_by_list = [
+                distance_for_sort,
+                desc(
+                    func.coalesce(prices.c.date_from <= current_timestamp, True)
+                    & func.coalesce(current_timestamp < prices.c.date_to, True)
+                ),
+                desc(prices.c.created_at),
+                desc(prices.c.id),
+            ]
+        else:
+            # Если координат клиента нет, используем старую логику
+            order_by_list = [
+                desc(
+                    func.coalesce(prices.c.date_from <= current_timestamp, True)
+                    & func.coalesce(current_timestamp < prices.c.date_to, True)
+                ),
+                desc(prices.c.created_at),
+                desc(prices.c.id),
+            ]
+
+        # Если есть адрес/город для приоритизации, создаем два подзапроса:
+        # 1. Цены с совпадающим адресом (приоритет выше)
+        # 2. Остальные цены
+        # Затем объединяем их через UNION ALL и ранжируем
+        if address or city:
+            search_address_lower = (address or city or "").lower()
+
+            # Подзапрос для цен с совпадающим адресом
+            matching_address_prices = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    literal_column("0").label("address_priority"),  # Высокий приоритет
+                )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(
+                    prices.c.is_deleted.is_not(True),
+                    price_types.c.name == "chatting",
+                    prices.c.nomenclature
+                    == product_id,  # Фильтруем по конкретному товару
+                    prices.c.address.is_not(None),
+                    func.lower(prices.c.address).ilike(f"%{search_address_lower}%"),
+                )
+            )
+
+            # Подзапрос для остальных цен
+            other_prices = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    literal_column("1").label("address_priority"),  # Низкий приоритет
+                )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(
+                    prices.c.is_deleted.is_not(True),
+                    price_types.c.name == "chatting",
+                    prices.c.nomenclature
+                    == product_id,  # Фильтруем по конкретному товару
+                    or_(
+                        prices.c.address.is_(None),
+                        ~func.lower(prices.c.address).ilike(
+                            f"%{search_address_lower}%"
+                        ),
+                    ),
+                )
+            )
+
+            # Объединяем через UNION ALL
+            all_prices_union = union_all(
+                matching_address_prices, other_prices
+            ).subquery()
+
+            # Ранжируем объединенные цены
+            # Если есть координаты, добавляем расстояние в сортировку
+            union_order_by = [
+                all_prices_union.c.address_priority
+            ]  # Сначала совпадающие адреса
+            if client_lat is not None and client_lon is not None:
+                # Добавляем расчет расстояния для UNION запроса
+                union_client_lat_rad = func.radians(literal_column(str(client_lat)))
+                union_client_lon_rad = func.radians(literal_column(str(client_lon)))
+                union_price_lat_rad = func.radians(
+                    func.cast(all_prices_union.c.latitude, Float)
+                )
+                union_price_lon_rad = func.radians(
+                    func.cast(all_prices_union.c.longitude, Float)
+                )
+
+                union_dlat = union_price_lat_rad - union_client_lat_rad
+                union_dlon = union_price_lon_rad - union_client_lon_rad
+                union_a = func.pow(
+                    func.sin(union_dlat / literal_column("2.0")), literal_column("2.0")
+                ) + func.cos(union_client_lat_rad) * func.cos(
+                    union_price_lat_rad
+                ) * func.pow(
+                    func.sin(union_dlon / literal_column("2.0")), literal_column("2.0")
+                )
+                union_a_safe = func.least(
+                    literal_column("1.0"), func.greatest(literal_column("0.0"), union_a)
+                )
+                union_c = literal_column("2.0") * func.atan2(
+                    func.sqrt(union_a_safe),
+                    func.sqrt(literal_column("1.0") - union_a_safe),
+                )
+                union_distance_km = literal_column("6371.0") * union_c
+                union_distance_for_sort = func.coalesce(
+                    union_distance_km, literal_column("999999.0")
+                )
+                union_order_by.append(union_distance_for_sort)  # Потом по расстоянию
+
+            # Добавляем остальную сортировку
+            union_order_by.extend(
+                [
+                    desc(
+                        func.coalesce(
+                            all_prices_union.c.date_from <= current_timestamp, True
+                        )
+                        & func.coalesce(
+                            current_timestamp < all_prices_union.c.date_to, True
+                        )
+                    ),
+                    desc(all_prices_union.c.created_at),
+                    desc(all_prices_union.c.price_id),
+                ]
+            )
+
+            ranked_prices_subquery = select(
+                all_prices_union.c.nomenclature_id,
+                all_prices_union.c.price_id,
+                all_prices_union.c.price,
+                all_prices_union.c.price_type,
+                all_prices_union.c.created_at,
+                all_prices_union.c.date_from,
+                all_prices_union.c.date_to,
+                all_prices_union.c.is_deleted,
+                all_prices_union.c.address,
+                all_prices_union.c.latitude,
+                all_prices_union.c.longitude,
                 func.row_number()
                 .over(
-                    partition_by=prices.c.nomenclature,
-                    order_by=[
-                        desc(
-                            func.coalesce(prices.c.date_from <= current_timestamp, True)
-                            & func.coalesce(current_timestamp < prices.c.date_to, True)
-                        ),
-                        desc(prices.c.created_at),
-                        desc(prices.c.id),
-                    ],
+                    partition_by=all_prices_union.c.nomenclature_id,
+                    order_by=union_order_by,
                 )
                 .label("rn"),
+            ).subquery()
+        else:
+            # Если нет адреса для приоритизации, используем обычный запрос
+            ranked_prices_subquery = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    func.row_number()
+                    .over(
+                        partition_by=prices.c.nomenclature,
+                        order_by=order_by_list,
+                    )
+                    .label("rn"),
+                )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(
+                    prices.c.is_deleted.is_not(True),
+                    price_types.c.name == "chatting",
+                )
+                .subquery()
             )
-            .select_from(
-                prices.join(price_types, price_types.c.id == prices.c.price_type)
-            )
-            .where(
-                prices.c.is_deleted.is_not(True),
-                price_types.c.name == "chatting",
-            )
-            .subquery()
-        )
 
         active_prices_subquery = (
             select(ranked_prices_subquery)
@@ -145,6 +420,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 manufacturers.c.name.label("manufacturer_name"),
                 active_prices_subquery.c.price,
                 price_types.c.name.label("price_type"),
+                active_prices_subquery.c.address.label("price_address"),
+                active_prices_subquery.c.latitude.label("price_latitude"),
+                active_prices_subquery.c.longitude.label("price_longitude"),
                 func.coalesce(
                     func.nullif(cboxes.c.seller_name, ""),
                     cboxes.c.name,
@@ -220,6 +498,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 manufacturers.c.name,
                 active_prices_subquery.c.price,
                 price_types.c.name,
+                active_prices_subquery.c.address,
+                active_prices_subquery.c.latitude,
+                active_prices_subquery.c.longitude,
                 cboxes.c.seller_name,
                 cboxes.c.name,
                 cboxes.c.seller_photo,
@@ -454,63 +735,322 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         self,
         request: MarketplaceProductsRequest,
     ) -> MarketplaceProductList:
+        # Логируем параметры запроса для отладки
+        print(
+            f"[DEBUG] get_products: lat={request.lat}, lon={request.lon}, city={request.city}, address={request.address}"
+        )
+
+        # Если переданы адрес или город, но нет координат - геокодируем адрес
+        client_lat = request.lat
+        client_lon = request.lon
+        if (client_lat is None or client_lon is None) and (
+            request.city or request.address
+        ):
+            search_address = request.address or request.city
+            try:
+                print(f"[DEBUG] Geocoding address: {search_address}")
+                # Пробуем геокодировать как есть
+                structured_geo = await geocoder.validate_address(
+                    search_address, limit=1
+                )
+                if (
+                    structured_geo
+                    and structured_geo.latitude
+                    and structured_geo.longitude
+                ):
+                    client_lat = structured_geo.latitude
+                    client_lon = structured_geo.longitude
+                    print(
+                        f"[DEBUG] Geocoded '{search_address}' to lat={client_lat}, lon={client_lon}"
+                    )
+                else:
+                    # Если не получилось, пробуем добавить "Россия" для городов
+                    print(
+                        f"[DEBUG] First geocoding failed, request.address={request.address}, request.city={request.city}"
+                    )
+                    search_address_with_country = f"{search_address}, Россия"
+                    print(
+                        f"[DEBUG] Retrying geocoding with country: {search_address_with_country}"
+                    )
+                    structured_geo = await geocoder.validate_address(
+                        search_address_with_country, limit=1
+                    )
+                    if (
+                        structured_geo
+                        and structured_geo.latitude
+                        and structured_geo.longitude
+                    ):
+                        client_lat = structured_geo.latitude
+                        client_lon = structured_geo.longitude
+                        print(
+                            f"[DEBUG] Geocoded '{search_address_with_country}' to lat={client_lat}, lon={client_lon}"
+                        )
+                    else:
+                        print(
+                            f"[DEBUG] Failed to geocode both '{search_address}' and '{search_address_with_country}': no coordinates returned"
+                        )
+            except Exception as e:
+                print(f"[DEBUG] Failed to geocode '{search_address}': {e}")
+                import traceback
+
+                traceback.print_exc()
+
         # --- НАЧАЛО: Подзапрос для выбора актуальной цены ---
         # Получаем текущий timestamp (в PostgreSQL это NOW())
         current_timestamp = int(datetime.now().timestamp())
 
         # Подзапрос для получения актуальной цены
         # Используем ROW_NUMBER для ранжирования цен по приоритету
-        ranked_prices_subquery = (
-            select(
-                prices.c.nomenclature.label("nomenclature_id"),
-                prices.c.id.label("price_id"),
-                prices.c.price,
-                prices.c.price_type,
-                prices.c.created_at,
-                prices.c.date_from,
-                prices.c.date_to,
-                prices.c.is_deleted,
-                # Ранжируем: 1. по времени (текущее в интервале), 2. по дате создания (новые первые), 3. по id (стабильность)
+        # Если есть координаты клиента, выбираем цену с ближайшим адресом
+        order_by_list = []
+
+        # Если есть координаты клиента, добавляем расчет расстояния
+        if client_lat is not None and client_lon is not None:
+            print(
+                f"[DEBUG] Using Haversine formula with lat={client_lat}, lon={client_lon}"
+            )
+            # Используем формулу Haversine для расчета расстояния в SQL
+            # R = 6371.0 км (радиус Земли)
+            # Преобразуем координаты в радианы и вычисляем расстояние
+            client_lat_rad = func.radians(literal_column(str(client_lat)))
+            client_lon_rad = func.radians(literal_column(str(client_lon)))
+            price_lat_rad = func.radians(func.cast(prices.c.latitude, Float))
+            price_lon_rad = func.radians(func.cast(prices.c.longitude, Float))
+
+            # Формула Haversine
+            dlat = price_lat_rad - client_lat_rad
+            dlon = price_lon_rad - client_lon_rad
+            # Используем func.pow() вместо ** для совместимости с SQLAlchemy
+            # Используем literal_column для числовых констант
+            a = func.pow(
+                func.sin(dlat / literal_column("2.0")), literal_column("2.0")
+            ) + func.cos(client_lat_rad) * func.cos(price_lat_rad) * func.pow(
+                func.sin(dlon / literal_column("2.0")), literal_column("2.0")
+            )
+            # Защита от случая, когда a > 1 (из-за ошибок округления)
+            # Используем least(1, greatest(0, a)) для ограничения значения
+            a_safe = func.least(
+                literal_column("1.0"), func.greatest(literal_column("0.0"), a)
+            )
+            c = literal_column("2.0") * func.atan2(
+                func.sqrt(a_safe), func.sqrt(literal_column("1.0") - a_safe)
+            )
+            distance_km = literal_column("6371.0") * c
+
+            # Приоритет: сначала цены с координатами (ближайшие), потом без координат
+            # Используем COALESCE для сортировки: сначала цены с координатами (по расстоянию), потом без координат
+            # COALESCE вернет distance_km если координаты есть, иначе 999999.0
+            distance_for_sort = func.coalesce(
+                distance_km,
+                literal_column("999999.0"),
+            )
+
+            order_by_list = [
+                # Сначала цены с координатами (ближайшие к клиенту) - сортировка по возрастанию расстояния
+                distance_for_sort,
+                # Потом по времени (текущее в интервале) - сортируем по убыванию
+                desc(
+                    func.coalesce(prices.c.date_from <= current_timestamp, True)
+                    & func.coalesce(current_timestamp < prices.c.date_to, True)
+                ),
+                # Потом по дате создания (новые первые) - сортируем по убыванию
+                desc(prices.c.created_at),
+                # Потом по ID (стабильность) - сортируем по убыванию
+                desc(prices.c.id),
+            ]
+        else:
+            # Если координат клиента нет, используем старую логику
+            order_by_list = [
+                # Сначала по времени (текущее в интервале)
+                desc(
+                    func.coalesce(prices.c.date_from <= current_timestamp, True)
+                    & func.coalesce(current_timestamp < prices.c.date_to, True)
+                ),
+                # Потом по дате создания (новые первые)
+                desc(prices.c.created_at),
+                # Потом по ID (стабильность)
+                desc(prices.c.id),
+            ]
+
+        # Если есть адрес/город для приоритизации, создаем два подзапроса:
+        # 1. Цены с совпадающим адресом (приоритет выше)
+        # 2. Остальные цены
+        # Затем объединяем их через UNION ALL и ранжируем
+        # Применяем приоритет по адресу всегда, когда есть адрес/город (даже если есть координаты)
+        # Это важно, когда координаты одинаковые или неточные
+        if request.address or request.city:
+            search_address_lower = (request.address or request.city or "").lower()
+
+            # Подзапрос для цен с совпадающим адресом
+            matching_address_prices = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    literal_column("0").label("address_priority"),  # Высокий приоритет
+                )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(
+                    prices.c.is_deleted.is_not(True),
+                    price_types.c.name == "chatting",
+                    prices.c.address.is_not(None),
+                    func.lower(prices.c.address).ilike(f"%{search_address_lower}%"),
+                )
+            )
+
+            # Подзапрос для остальных цен
+            other_prices = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    literal_column("1").label("address_priority"),  # Низкий приоритет
+                )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(
+                    prices.c.is_deleted.is_not(True),
+                    price_types.c.name == "chatting",
+                    or_(
+                        prices.c.address.is_(None),
+                        ~func.lower(prices.c.address).ilike(
+                            f"%{search_address_lower}%"
+                        ),
+                    ),
+                )
+            )
+
+            # Объединяем через UNION ALL
+            all_prices_union = union_all(
+                matching_address_prices, other_prices
+            ).subquery()
+
+            # Ранжируем объединенные цены
+            # Если есть координаты, добавляем расстояние в сортировку
+            union_order_by = [
+                all_prices_union.c.address_priority
+            ]  # Сначала совпадающие адреса
+            if client_lat is not None and client_lon is not None:
+                # Добавляем расчет расстояния для UNION запроса
+                union_client_lat_rad = func.radians(literal_column(str(client_lat)))
+                union_client_lon_rad = func.radians(literal_column(str(client_lon)))
+                union_price_lat_rad = func.radians(
+                    func.cast(all_prices_union.c.latitude, Float)
+                )
+                union_price_lon_rad = func.radians(
+                    func.cast(all_prices_union.c.longitude, Float)
+                )
+
+                union_dlat = union_price_lat_rad - union_client_lat_rad
+                union_dlon = union_price_lon_rad - union_client_lon_rad
+                union_a = func.pow(
+                    func.sin(union_dlat / literal_column("2.0")), literal_column("2.0")
+                ) + func.cos(union_client_lat_rad) * func.cos(
+                    union_price_lat_rad
+                ) * func.pow(
+                    func.sin(union_dlon / literal_column("2.0")), literal_column("2.0")
+                )
+                union_a_safe = func.least(
+                    literal_column("1.0"), func.greatest(literal_column("0.0"), union_a)
+                )
+                union_c = literal_column("2.0") * func.atan2(
+                    func.sqrt(union_a_safe),
+                    func.sqrt(literal_column("1.0") - union_a_safe),
+                )
+                union_distance_km = literal_column("6371.0") * union_c
+                union_distance_for_sort = func.coalesce(
+                    union_distance_km, literal_column("999999.0")
+                )
+                union_order_by.append(union_distance_for_sort)  # Потом по расстоянию
+
+            # Добавляем остальную сортировку
+            union_order_by.extend(
+                [
+                    desc(
+                        func.coalesce(
+                            all_prices_union.c.date_from <= current_timestamp, True
+                        )
+                        & func.coalesce(
+                            current_timestamp < all_prices_union.c.date_to, True
+                        )
+                    ),
+                    desc(all_prices_union.c.created_at),
+                    desc(all_prices_union.c.price_id),
+                ]
+            )
+
+            ranked_prices_subquery = select(
+                all_prices_union.c.nomenclature_id,
+                all_prices_union.c.price_id,
+                all_prices_union.c.price,
+                all_prices_union.c.price_type,
+                all_prices_union.c.created_at,
+                all_prices_union.c.date_from,
+                all_prices_union.c.date_to,
+                all_prices_union.c.is_deleted,
+                all_prices_union.c.address,
+                all_prices_union.c.latitude,
+                all_prices_union.c.longitude,
                 func.row_number()
                 .over(
-                    partition_by=prices.c.nomenclature,
-                    order_by=[
-                        # Если дата не указана (None), считаем, что она подходит (предполагаем, что None означает "без ограничений")
-                        # Сначала идут записи с датами, которые соответствуют условию
-                        # func.coalesce(prices.c.date_from <= current_timestamp, True) & func.coalesce(current_timestamp < prices.c.date_to, True), # Не подходит напрямую для ORDER BY
-                        # Правильный способ - использовать CASE/WHEN для приоритета
-                        # Приоритет 1: цена с указанными датами и попадающая в интервал
-                        # Приоритет 2: цена с указанными датами, но НЕ попадающая в интервал (меньше приоритет)
-                        # Приоритет 3: цена с хотя бы одной датой None (предполагаем, что это "постоянно действительна", но может быть иначе)
-                        # Пример: сначала (1, ...), потом (0, 1, ...), потом (0, 0, ...)
-                        # (CASE WHEN (prices.c.date_from IS NOT NULL AND prices.c.date_to IS NOT NULL AND prices.c.date_from <= current_timestamp AND current_timestamp < prices.c.date_to) THEN 1 ELSE 0 END),
-                        # desc(CASE WHEN (prices.c.date_from IS NOT NULL AND prices.c.date_to IS NOT NULL AND prices.c.date_from <= current_timestamp AND current_timestamp < prices.c.date_to) THEN 1 ELSE 0 END),
-                        # desc((prices.c.date_from <= current_timestamp) & (current_timestamp < prices.c.date_to)),
-                        # Сортировка: сначала те, у кого даты указаны и они подходят, потом без дат (или частично), потом по created_at DESC
-                        # Чтобы сначала шли подходящие по времени:
-                        desc(
-                            func.coalesce(prices.c.date_from <= current_timestamp, True)
-                            & func.coalesce(current_timestamp < prices.c.date_to, True)
-                        ),
-                        # Потом по дате создания (новые первые)
-                        desc(prices.c.created_at),
-                        # Потом по ID (стабильность)
-                        desc(prices.c.id),
-                    ],
+                    partition_by=all_prices_union.c.nomenclature_id,
+                    order_by=union_order_by,
                 )
                 .label("rn"),
+            ).subquery()
+        else:
+            # Если нет адреса для приоритизации, используем обычный запрос
+            ranked_prices_subquery = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    # Ранжируем: 1. по расстоянию (если есть координаты), 2. по времени (текущее в интервале), 3. по дате создания (новые первые), 4. по id (стабильность)
+                    func.row_number()
+                    .over(
+                        partition_by=prices.c.nomenclature,
+                        order_by=order_by_list,
+                    )
+                    .label("rn"),
+                )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(
+                    # Учитываем только неудаленные цены
+                    prices.c.is_deleted.is_not(True),
+                    # Берём только цены типа "chatting"
+                    price_types.c.name == "chatting",
+                )
+                .subquery()
             )
-            .select_from(
-                prices.join(price_types, price_types.c.id == prices.c.price_type)
-            )
-            .where(
-                # Учитываем только неудаленные цены
-                prices.c.is_deleted.is_not(True),
-                # Берём только цены типа "chatting"
-                price_types.c.name == "chatting",
-            )
-            .subquery()
-        )
 
         # Фильтруем подзапрос, чтобы оставить только первую (самую приоритетную) цену для каждой номенклатуры
         # Это будет "актуальная" цена
@@ -661,6 +1201,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             manufacturers.c.name.label("manufacturer_name"),
             active_prices_subquery.c.price,
             price_types.c.name.label("price_type"),
+            active_prices_subquery.c.address.label("price_address"),
+            active_prices_subquery.c.latitude.label("price_latitude"),
+            active_prices_subquery.c.longitude.label("price_longitude"),
             func.coalesce(
                 func.nullif(cboxes.c.seller_name, ""),
                 cboxes.c.name,
@@ -858,6 +1401,9 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             manufacturers.c.name,
             active_prices_subquery.c.price,
             price_types.c.name,
+            active_prices_subquery.c.address,
+            active_prices_subquery.c.latitude,
+            active_prices_subquery.c.longitude,
             cboxes.c.seller_name,
             cboxes.c.name,
             cboxes.c.seller_photo,
@@ -897,8 +1443,14 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # (пагинацию применим после сортировки)
         products_db = await database.fetch_all(query)
 
-        # --- Сортировка по приоритету в Python (город+селлер, город, селлер, остальные) ---
-        if request.city or request.seller_id:
+        # --- Сортировка по приоритету в Python (город+селлер, город, селлер, совпадение адреса, остальные) ---
+        # Применяем приоритизацию только если есть параметры city, seller_id или address
+        # Это не должно менять набор товаров, только их порядок
+        if (
+            request.city
+            or request.seller_id
+            or (request.address and not request.lat and not request.lon)
+        ):
             # Получаем информацию о складах для определения города товара
             product_ids = [row["id"] for row in products_db]
             product_city_map = {}  # product_id -> has_city_warehouse (bool)
@@ -960,14 +1512,48 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 if request.seller_id and not seller_has_products:
                     is_seller = False
 
-                if has_city and is_seller:
-                    return 0  # Город + селлер
+                # Проверяем совпадение адреса цены с адресом/городом клиента
+                # Это важно, когда координаты одинаковые или неточные
+                # Применяем только если нет координат (иначе используем координаты)
+                price_address = product_row.get("price_address", "")
+                has_address_match = False
+                if (
+                    (request.address or request.city)
+                    and price_address
+                    and (not request.lat or not request.lon)
+                ):
+                    search_address_lower = (
+                        request.address or request.city or ""
+                    ).lower()
+                    price_address_lower = price_address.lower()
+                    has_address_match = search_address_lower in price_address_lower
+
+                # Приоритеты:
+                # 0 - Город + селлер + совпадение адреса
+                # 1 - Город + селлер
+                # 2 - Город + совпадение адреса
+                # 3 - Только город
+                # 4 - Селлер + совпадение адреса
+                # 5 - Только селлер
+                # 6 - Только совпадение адреса
+                # 7 - Остальные
+
+                if has_city and is_seller and has_address_match:
+                    return 0  # Город + селлер + совпадение адреса
+                elif has_city and is_seller:
+                    return 1  # Город + селлер
+                elif has_city and has_address_match:
+                    return 2  # Город + совпадение адреса
                 elif has_city:
-                    return 1  # Только город
+                    return 3  # Только город
+                elif is_seller and has_address_match:
+                    return 4  # Селлер + совпадение адреса
                 elif is_seller:
-                    return 2  # Только селлер
+                    return 5  # Только селлер
+                elif has_address_match:
+                    return 6  # Только совпадение адреса
                 else:
-                    return 3  # Остальные
+                    return 7  # Остальные
 
             # Сортируем по приоритету, затем по выбранному полю
             products_db = list(products_db)

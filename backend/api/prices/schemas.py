@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 
 class PriceCreate(BaseModel):
@@ -12,6 +12,17 @@ class PriceCreate(BaseModel):
     address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+
+    @validator("latitude", "longitude", pre=True)
+    def convert_to_float(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                return None
+        return v
 
     class Config:
         orm_mode = True
@@ -35,6 +46,17 @@ class PriceEdit(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+    @validator("latitude", "longitude", pre=True)
+    def convert_to_float(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                return None
+        return v
+
 
 class PriceEditOne(BaseModel):
     price: Optional[float]
@@ -45,12 +67,41 @@ class PriceEditOne(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+    @validator("latitude", "longitude", pre=True)
+    def convert_to_float(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                return None
+        return v
+
+    @validator("price_type", pre=True)
+    def convert_price_type_to_int(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            # Если это строка, которая является числом - преобразуем
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                # Если это не число (например, название типа цены) - игнорируем
+                # Роутер уже обработает это и удалит из price_values
+                return None
+        return v
+
 
 class PriceInList(BaseModel):
     id: int
     nomenclature_id: int
     nomenclature_name: str
     type: Optional[str]
+    # Адрес и координаты цены (чтобы фронт мог их отображать в таблице)
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     description_short: Optional[str]
     description_long: Optional[str]
     code: Optional[str]

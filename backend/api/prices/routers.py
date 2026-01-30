@@ -1,6 +1,8 @@
+import logging
 from typing import List, Optional
 
 import api.prices.schemas as schemas
+from common.geocoders.instance import geocoder
 from database.db import (
     categories,
     database,
@@ -21,7 +23,7 @@ from functions.helpers import (
     raise_bad_request,
 )
 from pydantic import parse_obj_as
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, select
 from ws_manager import manager
 
 router = APIRouter(tags=["prices"])
@@ -381,7 +383,11 @@ async def new_price(token: str, prices_data: schemas.PriceCreateMass):
     price_types_cache = set()
     nomenclature_cache = set()
     exceptions = []
+    logging.info(f"Creating prices, count: {len(prices_data.dict()['__root__'])}")
     for price_values in prices_data.dict()["__root__"]:
+        logging.info(
+            f"Processing price: nomenclature={price_values.get('nomenclature')}, address={price_values.get('address')}"
+        )
         price_values["owner"] = user.id
         price_values["is_deleted"] = False
         price_values["cashbox"] = user.cashbox_id
@@ -408,15 +414,67 @@ async def new_price(token: str, prices_data: schemas.PriceCreateMass):
                     exceptions.append(str(price_values) + " " + e.detail)
                     continue
 
-        # if price_values.get("price_type") is not None and price_values.get("nomenclature") is not None:
-        #     q = prices.select().where(prices.c.owner == user.id, prices.c.is_deleted == False, prices.c.nomenclature == price_values['nomenclature'], prices.c.price_type == price_values['price_type'])
-        #     ex_price = await database.fetch_one(q)
-        #     if ex_price:
-        #         raise HTTPException(403, "Цена с таким типом уже существует")
+        # Нормализуем адрес (убираем пробелы в начале и конце)
+        address = price_values.get("address")
+        if address:
+            address = address.strip()
+            # Если после strip адрес стал пустым, удаляем его
+            if address:
+                price_values["address"] = address
+            else:
+                price_values["address"] = None
+                address = None
+        else:
+            address = None
+
+        # Проверка на дубликаты: запрещаем создание цены с одинаковым адресом для одной номенклатуры
+        # Проверяем только если адрес не пустой
+        if address and price_values.get("nomenclature"):
+            logging.info(
+                f"Checking for duplicate: nomenclature_id={price_values['nomenclature']}, address='{address}', owner={user.id}"
+            )
+            duplicate_query = prices.select().where(
+                and_(
+                    prices.c.owner == user.id,
+                    prices.c.is_deleted.is_not(True),
+                    prices.c.nomenclature == price_values["nomenclature"],
+                    prices.c.address == address,
+                )
+            )
+            existing_price = await database.fetch_one(duplicate_query)
+            if existing_price:
+                error_msg = (
+                    f"Цена с адресом '{address}' уже существует для этого товара"
+                )
+                logging.warning(
+                    f"Duplicate price detected: {error_msg}, nomenclature_id={price_values['nomenclature']}, address='{address}', existing_price_id={existing_price.id}"
+                )
+                exceptions.append(error_msg)
+                continue
+            else:
+                logging.info(
+                    f"No duplicate found for nomenclature_id={price_values['nomenclature']}, address='{address}'"
+                )
 
         query = prices.insert().values(price_values)
         price_id = await database.execute(query)
         inserted_ids.add(price_id)
+
+    # Если все цены были отклонены из-за ошибок, возвращаем ошибку сразу
+    if not inserted_ids and exceptions:
+        # Если только одна ошибка, возвращаем её напрямую, иначе объединяем
+        error_message = (
+            exceptions[0]
+            if len(exceptions) == 1
+            else "Не были добавлены следующие записи: " + ", ".join(exceptions)
+        )
+        logging.error(
+            f"Price creation failed: inserted_ids={inserted_ids}, exceptions_count={len(exceptions)}, error_message='{error_message}'"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=error_message,
+        )
 
     query = prices.select().where(
         prices.c.cashbox == user.cashbox_id, prices.c.id.in_(inserted_ids)
@@ -532,18 +590,67 @@ async def edit_price(
 
     price_db = await get_entity_by_id(prices, price_db.id, user.cashbox_id)
     price_values = price.dict(exclude_unset=True)
+    # Получаем все поля для проверки price_type (может не попасть в exclude_unset=True)
+    price_dict_all = price.dict(exclude_unset=False)
 
     if price_values:
-        # if price_values.get("price_type") is not None and price_values.get("nomenclature") is not None:
-        #     q = prices.select().where(prices.c.owner == user.id, prices.c.is_deleted == False, prices.c.nomenclature == price_values['nomenclature'], prices.c.price_type == price_values['price_type'])
-        #     ex_price = await database.fetch_one(q)
-        #     if ex_price:
-        #         raise HTTPException(403, "Цена с таким типом уже существует")
+        # Обрабатываем price_type - проверяем из всех переданных полей
+        # Если price_type не передан явно, сохраняем существующее значение
+        if "price_type" not in price_dict_all:
+            # price_type не передан в запросе - сохраняем существующее значение
+            if price_db.price_type:
+                price_values["price_type"] = price_db.price_type
+        else:
+            # price_type передан в запросе - обрабатываем его
+            price_type_value = price_dict_all.get("price_type")
+            if price_type_value is not None:
+                # Если price_type пришел как строка, игнорируем его (фронтенд должен отправлять ID)
+                if isinstance(price_type_value, str):
+                    if "price_type" in price_values:
+                        price_values.pop("price_type")
+                    # Сохраняем существующее значение, если оно есть
+                    if price_db.price_type:
+                        price_values["price_type"] = price_db.price_type
+                else:
+                    # Проверяем существование типа цены
+                    await get_entity_by_id(
+                        price_types, price_type_value, user.cashbox_id
+                    )
+                    # Добавляем в price_values для обновления
+                    price_values["price_type"] = price_type_value
 
-        if price_values.get("price_type") is not None:
-            await get_entity_by_id(
-                price_types, price_values["price_type"], user.cashbox_id
+        # Нормализуем адрес (убираем пробелы в начале и конце)
+        if price_values.get("address"):
+            price_values["address"] = price_values["address"].strip()
+
+        # Обрабатываем адрес и координаты - если адрес есть, но координат нет - получаем их автоматически
+        if price_values.get("address") and (
+            not price_values.get("latitude") or not price_values.get("longitude")
+        ):
+            structured_geo = await geocoder.validate_address(price_values["address"])
+            if structured_geo and structured_geo.latitude and structured_geo.longitude:
+                price_values["latitude"] = structured_geo.latitude
+                price_values["longitude"] = structured_geo.longitude
+
+        # Проверка на дубликаты: запрещаем редактирование цены с одинаковым адресом для одной номенклатуры
+        # Проверяем только если адрес не пустой
+        address = price_values.get("address")
+        if address and price_db.nomenclature:
+            duplicate_query = prices.select().where(
+                and_(
+                    prices.c.owner == user.id,
+                    prices.c.is_deleted.is_not(True),
+                    prices.c.nomenclature == price_db.nomenclature,
+                    prices.c.address == address,
+                    prices.c.id != idx,  # Исключаем текущую цену
+                )
             )
+            existing_price = await database.fetch_one(duplicate_query)
+            if existing_price:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Цена с таким адресом уже существует для этого товара",
+                )
 
         query = (
             prices.update()
