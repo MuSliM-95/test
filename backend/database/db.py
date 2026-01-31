@@ -990,6 +990,9 @@ prices = sqlalchemy.Table(
     sqlalchemy.Column("address", String, nullable=True),
     sqlalchemy.Column("latitude", Float, nullable=True),
     sqlalchemy.Column("longitude", Float, nullable=True),
+    sqlalchemy.Column(
+        "warehouse_id", Integer, ForeignKey("warehouses.id"), nullable=True
+    ),
     sqlalchemy.Column("is_deleted", Boolean),
     sqlalchemy.Column("created_at", DateTime(timezone=True), server_default=func.now()),
     sqlalchemy.Column(
@@ -3289,7 +3292,7 @@ channels = sqlalchemy.Table(
     "channels",
     metadata,
     sqlalchemy.Column("id", Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("name", String(50), nullable=False, unique=True),
+    sqlalchemy.Column("name", String(50), nullable=False),
     sqlalchemy.Column("type", Enum(ChannelType), nullable=False),
     sqlalchemy.Column("description", String(255), nullable=True),
     sqlalchemy.Column("svg_icon", Text, nullable=True),
@@ -3301,6 +3304,12 @@ channels = sqlalchemy.Table(
     ),
     sqlalchemy.Column(
         "updated_at", DateTime, nullable=False, server_default=func.now()
+    ),
+    sqlalchemy.Index(
+        "uq_channels_name_when_active",
+        "name",
+        unique=True,
+        postgresql_where=text("is_active IS TRUE"),
     ),
 )
 

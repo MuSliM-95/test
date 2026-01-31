@@ -117,7 +117,6 @@ async def get_price_by_id(
     nom_db = await database.fetch_one(q)
 
     if nom_db:
-
         q = prices.select().where(
             prices.c.nomenclature == nom_db.id,
             prices.c.cashbox == user.cashbox_id,
@@ -271,6 +270,7 @@ async def get_prices(
                 prices.c.price,
                 prices.c.date_to,
                 prices.c.date_from,
+                prices.c.warehouse_id,
             )
             .join(nomenclature, nomenclature.c.id == prices.c.nomenclature)
             .join(units, units.c.id == nomenclature.c.unit, full=True)
@@ -737,7 +737,6 @@ async def edit_price(
     user = await get_user_by_token(token)
     response_body_list = []
     for price in prices_list:
-
         dates_filters = []
         if date_from and not date_to:
             dates_filters.append(prices.c.date_from <= date_from)

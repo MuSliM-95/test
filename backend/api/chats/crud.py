@@ -197,15 +197,23 @@ async def get_channel_by_cashbox(cashbox_id: int, channel_type: str = "AVITO"):
     return await database.fetch_one(query)
 
 
+# Типы каналов без OAuth (токен бота/ключ в api_key, без refresh_token)
+CHANNEL_TYPES_WITHOUT_OAUTH = frozenset({"TELEGRAM"})
+
+
 def calculate_channel_status(
     refresh_token: Optional[str],
     token_expires_at: Optional[datetime],
     is_active_cred: bool,
     is_active_channel: bool,
+    channel_type: Optional[str] = None,
 ) -> bool:
-    """Calculate real-time channel status based on tokens and active flags"""
+    """Calculate real-time channel status based on tokens and active flags."""
     if not is_active_cred or not is_active_channel:
         return False
+
+    if channel_type and channel_type in CHANNEL_TYPES_WITHOUT_OAUTH:
+        return True
 
     if refresh_token is not None:
         if isinstance(refresh_token, str) and refresh_token.strip():
@@ -272,6 +280,7 @@ async def get_all_channels_by_cashbox(
             token_expires_at=result_dict.get("token_expires_at"),
             is_active_cred=result_dict.get("credentials_is_active", False),
             is_active_channel=result_dict.get("is_active", False),
+            channel_type=result_dict.get("type"),
         )
         result_dict["is_active"] = real_status
         result_dict["real_status"] = real_status
@@ -642,13 +651,8 @@ async def get_chat(chat_id: int):
         chat_dict["name"] = name
 
     if chat_dict.get("channel_type") == "TELEGRAM":
-        if chat_dict.get("channel_icon") != TELEGRAM_SVG_ICON:
-            await database.execute(
-                channels.update()
-                .where(channels.c.id == chat_dict["channel_id"])
-                .values(svg_icon=TELEGRAM_SVG_ICON, updated_at=datetime.utcnow())
-            )
-        chat_dict["channel_icon"] = TELEGRAM_SVG_ICON
+        # Используем дефолтную иконку только если своя не задана (не перезаписываем БД)
+        chat_dict["channel_icon"] = chat_dict.get("channel_icon") or TELEGRAM_SVG_ICON
 
     if chat_dict.get("contact") and chat_dict["contact"].get("avatar"):
         chat_dict["contact"]["avatar"] = _normalize_public_file_url(
@@ -1187,13 +1191,10 @@ async def get_chats(
             chat_dict["name"] = name
 
         if chat_dict.get("channel_type") == "TELEGRAM":
-            if chat_dict.get("channel_icon") != TELEGRAM_SVG_ICON:
-                await database.execute(
-                    channels.update()
-                    .where(channels.c.id == chat_dict["channel_id"])
-                    .values(svg_icon=TELEGRAM_SVG_ICON, updated_at=datetime.utcnow())
-                )
-            chat_dict["channel_icon"] = TELEGRAM_SVG_ICON
+            # Используем дефолтную иконку только если своя не задана (не перезаписываем БД)
+            chat_dict["channel_icon"] = (
+                chat_dict.get("channel_icon") or TELEGRAM_SVG_ICON
+            )
 
         if chat_dict.get("contact") and chat_dict["contact"].get("avatar"):
             chat_dict["contact"]["avatar"] = _normalize_public_file_url(

@@ -9,6 +9,7 @@ class PriceCreate(BaseModel):
     price_type: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    warehouse_id: Optional[int] = None
     address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -42,6 +43,7 @@ class PriceEdit(BaseModel):
     price_type: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    warehouse_id: Optional[int] = None
     address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -63,6 +65,7 @@ class PriceEditOne(BaseModel):
     price_type: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    warehouse_id: Optional[int] = None
     address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -98,6 +101,7 @@ class PriceInList(BaseModel):
     nomenclature_id: int
     nomenclature_name: str
     type: Optional[str]
+    warehouse_id: Optional[int] = None
     # Адрес и координаты цены (чтобы фронт мог их отображать в таблице)
     address: Optional[str] = None
     latitude: Optional[float] = None
@@ -145,6 +149,7 @@ class PricePure(BaseModel):
     nomenclature: Optional[int]
     date_from: Optional[int]
     date_to: Optional[int]
+    warehouse_id: Optional[int] = None
     updated_at: int
     created_at: int
 
