@@ -1,5 +1,9 @@
+import logging
 import time
 from typing import Optional
+from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
 
 from api.marketplace.service.favorites_service.schemas import (
     CreateFavoritesUtm,
@@ -58,9 +62,54 @@ from api.marketplace.service.view_event_service.schemas import (
     ViewEventsUtm,
 )
 from api.marketplace.utils import get_marketplace_service
-from fastapi import APIRouter, Body, Depends, File, Form, Query, UploadFile, status
+from common.geocoders.instance import geocoder
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    Form,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 
 router = APIRouter(prefix="/mp", tags=["marketplace"])
+
+
+def get_client_ip(request: Request) -> Optional[str]:
+    """Получение IP адреса клиента из заголовков"""
+    # Проверяем X-Vercel-Forwarded-For (для Vercel)
+    vercel_forwarded = request.headers.get("X-Vercel-Forwarded-For")
+    if vercel_forwarded:
+        # X-Vercel-Forwarded-For может содержать несколько IP через запятую
+        # Берем первый (оригинальный IP клиента)
+        return vercel_forwarded.split(",")[0].strip()
+
+    # Проверяем X-Forwarded-For (для прокси/nginx/Vercel)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # X-Forwarded-For может содержать несколько IP через запятую
+        # Берем первый (оригинальный IP клиента)
+        return forwarded_for.split(",")[0].strip()
+
+    # Проверяем X-Real-IP (для nginx)
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+
+    # Проверяем CF-Connecting-IP (для Cloudflare, если используется)
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+
+    # Если заголовков нет, берем из request.client
+    if request.client:
+        return request.client.host
+
+    return None
 
 
 def get_create_order_utm(
@@ -199,6 +248,8 @@ def get_view_events_utm(
 @router.get("/products/{product_id}", response_model=MarketplaceProductDetail)
 async def get_marketplace_product(
     product_id: int,
+    http_request: Request,
+    response: Response,
     lat: Optional[float] = Query(None, description="Широта клиента"),
     lon: Optional[float] = Query(None, description="Долгота клиента"),
     address: Optional[str] = Query(
@@ -211,19 +262,64 @@ async def get_marketplace_product(
 ):
     """
     Получить один товар маркетплейса с SEO, атрибутами и остатками по складам
+
+    Если город не задан, автоматически определяется по IP адресу клиента.
     """
+    # Если город не задан, пытаемся определить по IP
+    resolved_city = city
+    resolved_lat = lat
+    resolved_lon = lon
+    detected_city = None
+    detected_lat = None
+    detected_lon = None
+
+    if not city and not address:
+        client_ip = get_client_ip(http_request)
+        if client_ip:
+            try:
+                location = await geocoder.get_location_by_ip(client_ip)
+                if location and location.city:
+                    resolved_city = location.city
+                    detected_city = location.city
+                    # Если координат нет, но есть из IP - используем их
+                    if not resolved_lat and location.latitude:
+                        resolved_lat = location.latitude
+                        detected_lat = location.latitude
+                    if not resolved_lon and location.longitude:
+                        resolved_lon = location.longitude
+                        detected_lon = location.longitude
+            except Exception:
+                # Если не удалось определить по IP - игнорируем ошибку
+                pass
 
     start = time.perf_counter()
     product = await service.get_product(
-        product_id, lat=lat, lon=lon, address=address, city=city
+        product_id,
+        lat=resolved_lat,
+        lon=resolved_lon,
+        address=address,
+        city=resolved_city,
     )
     end_ms = int((time.perf_counter() - start) * 1000)
 
-    return product.copy(update={"processing_time_ms": end_ms})
+    result = product.copy(update={"processing_time_ms": end_ms})
+
+    # Добавляем заголовки с информацией об автоматически определенном городе
+    # URL-encode для поддержки кириллицы в заголовках
+    if detected_city:
+        response.headers["X-Detected-City"] = quote(detected_city, safe="")
+    if detected_lat is not None:
+        response.headers["X-Detected-Lat"] = str(detected_lat)
+    if detected_lon is not None:
+        response.headers["X-Detected-Lon"] = str(detected_lon)
+
+    return result
 
 
 @router.get("/products", response_model=MarketplaceProductList)
 async def get_marketplace_products(
+    http_request: Request,
+    response: Response,
     request: MarketplaceProductsRequest = Depends(),
     service: MarketplaceService = Depends(get_marketplace_service),
 ):
@@ -232,12 +328,108 @@ async def get_marketplace_products(
 
     Фильтрует только товары с:
     - price_type = 'chatting'
+
+    Если город не задан, автоматически определяется по IP адресу клиента.
     """
+    # Если город не задан, пытаемся определить по IP
+    detected_city = None
+    detected_lat = None
+    detected_lon = None
+
+    # Проверяем, что city и address действительно отсутствуют (None или пустая строка)
+    has_city = request.city and request.city.strip()
+    has_address = request.address and request.address.strip()
+
+    # Используем print для гарантированного вывода в логи
+    print(
+        f"[AUTO-CITY] Checking auto-detection. city={request.city}, address={request.address}, has_city={has_city}, has_address={has_address}"
+    )
+    logger.info(
+        f"[AUTO-CITY] Checking auto-detection. city={request.city}, address={request.address}, has_city={has_city}, has_address={has_address}"
+    )
+
+    if not has_city and not has_address:
+        # Логируем все заголовки для отладки
+        headers_debug = {
+            "X-Vercel-Forwarded-For": http_request.headers.get(
+                "X-Vercel-Forwarded-For"
+            ),
+            "X-Forwarded-For": http_request.headers.get("X-Forwarded-For"),
+            "X-Real-IP": http_request.headers.get("X-Real-IP"),
+            "CF-Connecting-IP": http_request.headers.get("CF-Connecting-IP"),
+            "request.client.host": (
+                http_request.client.host if http_request.client else None
+            ),
+        }
+        print(f"[AUTO-CITY] Headers debug: {headers_debug}")
+        logger.info(f"[AUTO-CITY] Headers debug: {headers_debug}")
+
+        client_ip = get_client_ip(http_request)
+        print(f"[AUTO-CITY] Request without city/address. Client IP: {client_ip}")
+        logger.info(f"[AUTO-CITY] Request without city/address. Client IP: {client_ip}")
+        if client_ip:
+            try:
+                print(f"[AUTO-CITY] Trying to get location for IP: {client_ip}")
+                logger.info(f"[AUTO-CITY] Trying to get location for IP: {client_ip}")
+                location = await geocoder.get_location_by_ip(client_ip)
+                print(f"[AUTO-CITY] Location result: {location}")
+                logger.info(f"[AUTO-CITY] Location result: {location}")
+                if location and location.city:
+                    # Используем город из IP, если он определен
+                    request.city = location.city
+                    detected_city = location.city
+                    # Если координат нет, но есть из IP - используем их
+                    if not request.lat and location.latitude:
+                        request.lat = location.latitude
+                        detected_lat = location.latitude
+                    if not request.lon and location.longitude:
+                        request.lon = location.longitude
+                        detected_lon = location.longitude
+                    print(
+                        f"[AUTO-CITY] Detected city: {detected_city}, lat: {detected_lat}, lon: {detected_lon}"
+                    )
+                    logger.info(
+                        f"[AUTO-CITY] Detected city: {detected_city}, lat: {detected_lat}, lon: {detected_lon}"
+                    )
+                else:
+                    print(f"[AUTO-CITY] Location or city is None for IP: {client_ip}")
+                    logger.warning(
+                        f"[AUTO-CITY] Location or city is None for IP: {client_ip}"
+                    )
+            except Exception as e:
+                # Если не удалось определить по IP - логируем ошибку
+                logger.error(
+                    f"[AUTO-CITY] Error getting location by IP {client_ip}: {e}",
+                    exc_info=True,
+                )
+        else:
+            print("[AUTO-CITY] Client IP is None, cannot determine city")
+            logger.warning("[AUTO-CITY] Client IP is None, cannot determine city")
+
     start = time.perf_counter()
     products = await service.get_products(request)
     end_ms = int((time.perf_counter() - start) * 1000)
 
-    return products.copy(update={"processing_time_ms": end_ms})
+    # Добавляем информацию об автоматически определенном городе в тело ответа
+    # Это работает без изменения конфигурации nginx
+    result = products.copy(
+        update={
+            "processing_time_ms": end_ms,
+            "detected_city": detected_city,
+            "detected_lat": detected_lat,
+            "detected_lon": detected_lon,
+        }
+    )
+
+    # Также добавляем заголовки для совместимости (если nginx настроен)
+    if detected_city:
+        response.headers["X-Detected-City"] = quote(detected_city, safe="")
+    if detected_lat is not None:
+        response.headers["X-Detected-Lat"] = str(detected_lat)
+    if detected_lon is not None:
+        response.headers["X-Detected-Lon"] = str(detected_lon)
+
+    return result
 
 
 @router.get("/locations", response_model=LocationsListResponse)

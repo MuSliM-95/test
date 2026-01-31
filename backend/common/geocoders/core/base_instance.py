@@ -14,3 +14,8 @@ class BaseGeocoder(ABC):
         self, address: str, limit=1
     ) -> Union[GeocoderSearchResponse, None]:
         pass
+
+    async def get_location_by_ip(self, ip: str) -> Union[GeocoderSearchResponse, None]:
+        """Определение местоположения по IP адресу"""
+        # Реализация по умолчанию - переопределяется в наследниках
+        return None

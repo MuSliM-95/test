@@ -103,6 +103,9 @@ class MarketplaceProductList(BaseModel):
     page: int
     size: int
     processing_time_ms: Optional[int] = None
+    detected_city: Optional[str] = None  # Автоматически определенный город по IP
+    detected_lat: Optional[float] = None  # Широта определенного города
+    detected_lon: Optional[float] = None  # Долгота определенного города
 
 
 class MarketplaceSort(Enum):

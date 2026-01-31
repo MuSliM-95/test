@@ -3292,7 +3292,7 @@ channels = sqlalchemy.Table(
     sqlalchemy.Column("name", String(50), nullable=False, unique=True),
     sqlalchemy.Column("type", Enum(ChannelType), nullable=False),
     sqlalchemy.Column("description", String(255), nullable=True),
-    sqlalchemy.Column("svg_icon", String(255), nullable=True),
+    sqlalchemy.Column("svg_icon", Text, nullable=True),
     sqlalchemy.Column("tags", JSON, nullable=True),
     sqlalchemy.Column("api_config_name", String(100), nullable=True),
     sqlalchemy.Column("is_active", Boolean, nullable=False, server_default="true"),
@@ -3448,6 +3448,8 @@ channel_credentials = sqlalchemy.Table(
     sqlalchemy.Column("last_status_code", Integer, nullable=True),
     sqlalchemy.Column("last_status_check_at", DateTime, nullable=True),
     sqlalchemy.Column("connection_status", String(50), nullable=True),
+    sqlalchemy.Column("tariff_paid_status", Boolean, nullable=True),
+    sqlalchemy.Column("tariff_last_check_at", DateTime, nullable=True),
     sqlalchemy.Column(
         "created_at", DateTime, nullable=False, server_default=func.now()
     ),

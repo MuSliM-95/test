@@ -24,6 +24,7 @@ class Geoapify(BaseGeocoder):
             cls._instance.search_url = "https://api.geoapify.com/v1/geocode/search"
             cls._instance.autocomplete_cache = AsyncLRU()
             cls._instance.search_cache = AsyncLRU()
+            cls._instance.ip_cache = AsyncLRU()
         return cls._instance
 
     async def _get_session(self):
@@ -94,6 +95,39 @@ class Geoapify(BaseGeocoder):
                 longitude=properties.get("lon"),
             )
         else:
+            return None
+
+    async def get_location_by_ip(self, ip: str) -> Union[GeocoderSearchResponse, None]:
+        """Определение местоположения по IP адресу"""
+        return await self.ip_cache.get(key=ip, func=self._get_location_by_ip, ip=ip)
+
+    async def _get_location_by_ip(self, ip: str) -> Union[GeocoderSearchResponse, None]:
+        """Внутренний метод для определения местоположения по IP"""
+        try:
+            session = await self._get_session()
+            # Используем ip-api.com для определения по IP (бесплатный сервис)
+            # Geoapify не поддерживает определение по IP напрямую
+            url = f"http://ip-api.com/json/{ip}?lang=ru&fields=status,message,country,regionName,city,lat,lon,timezone"
+            async with session.get(url) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+
+                # ip-api.com возвращает другой формат
+                if data.get("status") == "success":
+                    return GeocoderSearchResponse(
+                        country=data.get("country"),
+                        state=data.get("regionName"),
+                        city=data.get("city"),
+                        street=None,
+                        housenumber=None,
+                        timezone=data.get("timezone"),
+                        postcode=None,
+                        latitude=data.get("lat"),
+                        longitude=data.get("lon"),
+                    )
+                else:
+                    return None
+        except aiohttp.ClientError as e:
             return None
 
     async def close(self):

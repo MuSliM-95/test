@@ -9,7 +9,7 @@ from api.chats.auth import get_current_user
 from api.chats.producer import chat_producer
 from common.utils.url_helper import get_app_url_for_environment
 from database.db import channel_credentials, chat_messages, database, pictures
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 router = APIRouter(prefix="/ws", tags=["chats-ws"])
 logger = logging.getLogger(__name__)
@@ -240,8 +240,8 @@ class CashboxConnectionManager:
 cashbox_manager = CashboxConnectionManager()
 
 
-@router.websocket("/chats/all/")
-async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
+@router.websocket("/chats/all/{token}/")
+async def websocket_all_chats(websocket: WebSocket, token: str):
     try:
         await websocket.accept()
     except Exception as e:
@@ -314,8 +314,8 @@ async def websocket_all_chats(websocket: WebSocket, token: str = Query(...)):
                 pass
 
 
-@router.websocket("/chats/{chat_id}/")
-async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(...)):
+@router.websocket("/chats/{chat_id}/{token}/")
+async def websocket_chat(chat_id: int, websocket: WebSocket, token: str):
     await websocket.accept()
 
     try:
@@ -577,6 +577,38 @@ async def websocket_chat(chat_id: int, websocket: WebSocket, token: str = Query(
                     )
                 except Exception:
                     pass
+
+                try:
+                    ts = datetime.utcnow().isoformat()
+                    ws_message = {
+                        "type": "message",
+                        "message_id": db_message["id"],
+                        "chat_id": chat_id,
+                        "sender_type": sender_type,
+                        "content": db_message.get("content")
+                        or message_data.get("content", ""),
+                        "message_type": message_type,
+                        "status": "DELIVERED",
+                        "timestamp": ts,
+                    }
+                    await chat_manager.broadcast_to_chat(chat_id, ws_message)
+                    await cashbox_manager.broadcast_to_cashbox(
+                        user.cashbox_id,
+                        {
+                            "type": "chat_message",
+                            "event": "new_message",
+                            "chat_id": chat_id,
+                            "message_id": db_message["id"],
+                            "sender_type": sender_type,
+                            "content": ws_message["content"],
+                            "message_type": message_type,
+                            "timestamp": ts,
+                        },
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to broadcast new message via WebSocket: %s", e
+                    )
 
             elif event_type == "typing":
                 is_typing = message_data.get("is_typing", False)

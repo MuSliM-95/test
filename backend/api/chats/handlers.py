@@ -42,7 +42,7 @@ class ChatMessageHandler(IEventHandler):
                 "sender_type": chat_message.sender_type,
                 "content": chat_message.content,
                 "message_type": chat_message.message_type,
-                "status": "delivered",
+                "status": "DELIVERED",
                 "timestamp": chat_message.timestamp,
             }
 

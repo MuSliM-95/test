@@ -194,6 +194,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
             ]
         else:
             # Если координат клиента нет, используем старую логику
+            # Приоритет: сначала цены без адреса (если адрес не задан), потом остальные
             order_by_list = [
                 desc(
                     func.coalesce(prices.c.date_from <= current_timestamp, True)
@@ -207,7 +208,17 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # 1. Цены с совпадающим адресом (приоритет выше)
         # 2. Остальные цены
         # Затем объединяем их через UNION ALL и ранжируем
-        if address or city:
+        # ИСКЛЮЧЕНИЕ: Если передается только city (без address) и есть координаты после геокодирования,
+        # то используем обычную логику с сортировкой по расстоянию, а не по текстовому совпадению адреса
+        # Также: если есть координаты клиента, но нет city/address - используем сортировку по расстоянию
+        use_address_priority = (address or city) and (
+            address or not client_lat or not client_lon
+        )
+        print(
+            f"[DEBUG] get_product price selection: use_address_priority={use_address_priority}, "
+            f"client_lat={client_lat}, client_lon={client_lon}, city={city}, address={address}"
+        )
+        if use_address_priority:
             search_address_lower = (address or city or "").lower()
 
             # Подзапрос для цен с совпадающим адресом
@@ -350,8 +361,23 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 )
                 .label("rn"),
             ).subquery()
-        else:
-            # Если нет адреса для приоритизации, используем обычный запрос
+        elif (
+            client_lat is not None
+            and client_lon is not None
+            and (not address or not address.strip())
+            and (not city or not city.strip())
+        ) or (city and client_lat is not None and client_lon is not None):
+            # Если есть координаты клиента (с city или без address/city), используем сортировку по расстоянию
+            # Это позволяет выбирать ближайшие цены по координатам
+            print(
+                f"[DEBUG] get_product: Using distance-based price selection with coordinates: lat={client_lat}, lon={client_lon}, city={city}, address={address}"
+            )
+            where_conditions = [
+                prices.c.is_deleted.is_not(True),
+                price_types.c.name == "chatting",
+                prices.c.nomenclature == product_id,
+            ]
+
             ranked_prices_subquery = (
                 select(
                     prices.c.nomenclature.label("nomenclature_id"),
@@ -375,10 +401,45 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 .select_from(
                     prices.join(price_types, price_types.c.id == prices.c.price_type)
                 )
-                .where(
-                    prices.c.is_deleted.is_not(True),
-                    price_types.c.name == "chatting",
+                .where(and_(*where_conditions))
+                .subquery()
+            )
+        else:
+            # Если нет адреса для приоритизации, используем обычный запрос
+            # Если нет координат и нет адреса - выбираем только цены БЕЗ адреса
+            where_conditions = [
+                prices.c.is_deleted.is_not(True),
+                price_types.c.name == "chatting",
+            ]
+
+            # Если нет координат и нет адреса - фильтруем только цены без адреса
+            if client_lat is None and client_lon is None and not address and not city:
+                where_conditions.append(prices.c.address.is_(None))
+
+            ranked_prices_subquery = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    func.row_number()
+                    .over(
+                        partition_by=prices.c.nomenclature,
+                        order_by=order_by_list,
+                    )
+                    .label("rn"),
                 )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(and_(*where_conditions))
                 .subquery()
             )
 
@@ -878,7 +939,18 @@ class MarketplaceProductsListService(BaseMarketplaceService):
         # Затем объединяем их через UNION ALL и ранжируем
         # Применяем приоритет по адресу всегда, когда есть адрес/город (даже если есть координаты)
         # Это важно, когда координаты одинаковые или неточные
-        if request.address or request.city:
+        # ИСКЛЮЧЕНИЕ: Если передается только city (без address) и есть координаты после геокодирования,
+        # то используем обычную логику с сортировкой по расстоянию, а не по текстовому совпадению адреса
+        # Также: если есть координаты клиента, но нет city/address - используем сортировку по расстоянию
+        use_address_priority = (request.address or request.city) and (
+            request.address or not client_lat or not client_lon
+        )
+        print(
+            f"[DEBUG] Price selection: use_address_priority={use_address_priority}, "
+            f"client_lat={client_lat}, client_lon={client_lon}, "
+            f"request.city={request.city}, request.address={request.address}"
+        )
+        if use_address_priority:
             search_address_lower = (request.address or request.city or "").lower()
 
             # Подзапрос для цен с совпадающим адресом
@@ -1017,8 +1089,67 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 )
                 .label("rn"),
             ).subquery()
+        elif (
+            client_lat is not None
+            and client_lon is not None
+            and (not request.address or not request.address.strip())
+            and (not request.city or not request.city.strip())
+        ) or (request.city and client_lat is not None and client_lon is not None):
+            # Если есть координаты клиента (с city или без), используем сортировку по расстоянию
+            # Это позволяет выбирать ближайшие цены по координатам
+            print(
+                f"[DEBUG] Using distance-based price selection with coordinates: lat={client_lat}, lon={client_lon}"
+            )
+            where_conditions = [
+                prices.c.is_deleted.is_not(True),
+                price_types.c.name == "chatting",
+            ]
+
+            ranked_prices_subquery = (
+                select(
+                    prices.c.nomenclature.label("nomenclature_id"),
+                    prices.c.id.label("price_id"),
+                    prices.c.price,
+                    prices.c.price_type,
+                    prices.c.created_at,
+                    prices.c.date_from,
+                    prices.c.date_to,
+                    prices.c.is_deleted,
+                    prices.c.address,
+                    prices.c.latitude,
+                    prices.c.longitude,
+                    func.row_number()
+                    .over(
+                        partition_by=prices.c.nomenclature,
+                        order_by=order_by_list,
+                    )
+                    .label("rn"),
+                )
+                .select_from(
+                    prices.join(price_types, price_types.c.id == prices.c.price_type)
+                )
+                .where(and_(*where_conditions))
+                .subquery()
+            )
         else:
             # Если нет адреса для приоритизации, используем обычный запрос
+            # Если нет координат и нет адреса - выбираем только цены БЕЗ адреса
+            where_conditions = [
+                # Учитываем только неудаленные цены
+                prices.c.is_deleted.is_not(True),
+                # Берём только цены типа "chatting"
+                price_types.c.name == "chatting",
+            ]
+
+            # Если нет координат и нет адреса - фильтруем только цены без адреса
+            if (
+                client_lat is None
+                and client_lon is None
+                and not request.address
+                and not request.city
+            ):
+                where_conditions.append(prices.c.address.is_(None))
+
             ranked_prices_subquery = (
                 select(
                     prices.c.nomenclature.label("nomenclature_id"),
@@ -1043,12 +1174,7 @@ class MarketplaceProductsListService(BaseMarketplaceService):
                 .select_from(
                     prices.join(price_types, price_types.c.id == prices.c.price_type)
                 )
-                .where(
-                    # Учитываем только неудаленные цены
-                    prices.c.is_deleted.is_not(True),
-                    # Берём только цены типа "chatting"
-                    price_types.c.name == "chatting",
-                )
+                .where(and_(*where_conditions))
                 .subquery()
             )
 
@@ -1781,17 +1907,56 @@ class MarketplaceProductsListService(BaseMarketplaceService):
 
             products.append(MarketplaceProduct(**product_dict))
 
+        # Дедупликация: оставляем только один товар с ближайшей ценой
+        # Если товар встречается несколько раз, выбираем тот, у которого цена ближе
+        # (приоритет: цена с координатами и меньшим расстоянием)
+        seen_products = {}
+        for product in products:
+            product_id = product.id
+            if product_id not in seen_products:
+                seen_products[product_id] = product
+            else:
+                # Если товар уже есть, выбираем тот, у которого цена ближе
+                existing = seen_products[product_id]
+                # Приоритет: товар с меньшим расстоянием до склада
+                existing_distance = (
+                    existing.distance if existing.distance is not None else float("inf")
+                )
+                current_distance = (
+                    product.distance if product.distance is not None else float("inf")
+                )
+
+                # Если текущий товар ближе, заменяем
+                if current_distance < existing_distance:
+                    seen_products[product_id] = product
+                # Если расстояния равны, приоритет у товара с меньшей ценой (более выгодная)
+                elif (
+                    current_distance == existing_distance
+                    and product.price < existing.price
+                ):
+                    seen_products[product_id] = product
+
+        # Преобразуем обратно в список
+        deduplicated_products = list(seen_products.values())
+
         # Отдельная сортировка по distance (после расчёта distance_to_client)
         if request.sort_by == MarketplaceSort.distance:
             reverse = request.sort_order == "desc"
-            products.sort(
+            deduplicated_products.sort(
                 key=lambda x: x.distance if x.distance is not None else float("inf"),
                 reverse=reverse,
             )
 
+        # Пересчитываем count после дедупликации
+        deduplicated_count = len(deduplicated_products)
+
+        # Применяем пагинацию после дедупликации
+        offset = (request.page - 1) * request.size
+        paginated_products = deduplicated_products[offset : offset + request.size]
+
         return MarketplaceProductList(
-            result=products,
-            count=total_count,
+            result=paginated_products,
+            count=deduplicated_count,
             page=request.page,
             size=request.size,
         )

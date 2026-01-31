@@ -284,6 +284,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Detected-City", "X-Detected-Lat", "X-Detected-Lon"],
 )
 
 app.include_router(tags_router)
