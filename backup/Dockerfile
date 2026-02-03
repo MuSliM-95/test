@@ -1,11 +1,12 @@
 FROM debian:bullseye-slim
-
 ARG TARGETARCH
 
+
 WORKDIR /root
-COPY src/* .
+COPY src/ .
 
 RUN apt-get update && apt-get install -y \
+    bash \
     curl \
     gnupg \
     lsb-release \
@@ -21,7 +22,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get update \
     && apt-get install -y postgresql-client-14 \
     && apt-get clean \
+    && sed -i 's/\r$//' *.sh \
     && rm -rf /var/lib/apt/lists/*
+
 
 RUN chmod +x ./*.sh /usr/local/bin/go-cron
 
