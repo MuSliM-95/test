@@ -22,7 +22,7 @@ services:
       - "443:443"
     volumes:
       - /certbot/www:/var/www/certbot/:ro
-      - /etc/letsencrypt/:/etc/nginx/ssl/:ro
+      - /etc/letsencrypt/:/etc/letsencrypt/live/:ro
       - /var/log:/var/log
       - /var/www/tablecrm-app:/var/www/app
       - /var/www/tablecrm-landing:/var/www/landing
